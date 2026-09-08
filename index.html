@@ -56,14 +56,16 @@ import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
 
 
 const zoneLayerState={};
+const zoneBackgroundState={};
 let activeLayerId=null;
 let decalTarget=null;
 let decalGroup=null;
 let layerSeq=1;
-function ensureZoneState(){if(!zoneLayerState[product.id])zoneLayerState[product.id]={};for(const z of product.zones)if(!zoneLayerState[product.id][z])zoneLayerState[product.id][z]=[];}
+function ensureZoneBackgroundState(){if(!zoneBackgroundState[product.id])zoneBackgroundState[product.id]={};for(const z of product.zones)if(!zoneBackgroundState[product.id][z])zoneBackgroundState[product.id][z]='#FFFFFF';return zoneBackgroundState[product.id];}
+function ensureZoneState(){if(!zoneLayerState[product.id])zoneLayerState[product.id]={};ensureZoneBackgroundState();for(const z of product.zones){if(!zoneLayerState[product.id][z])zoneLayerState[product.id][z]=[];const arr=zoneLayerState[product.id][z];for(let i=arr.length-1;i>=0;i--){const l=arr[i];if(l.type==='background'){zoneBackgroundState[product.id][z]=normalizeHex(l.color||'#FFFFFF')||'#FFFFFF';if(l.mesh&&decalGroup){decalGroup.remove(l.mesh);l.mesh.geometry?.dispose();l.mesh.material?.dispose();}l.texture?.dispose?.();arr.splice(i,1);}}}}
 function currentZoneLayers(){ensureZoneState();return zoneLayerState[product.id][activeZone]||[];}
-function allProductLayers(){ensureZoneState();return product.zones.flatMap(z=>zoneLayerState[product.id][z]||[]);}
-function syncLegacyLayers(){layers=allProductLayers().map(l=>({id:l.id,type:l.type,zone:l.zone,name:l.name,text:l.text,color:l.color,x:l.x,y:l.y,scale:l.scale,rotation:l.rotation,visible:l.visible}));}
+function allProductLayers(){ensureZoneState();return product.zones.flatMap(z=>zoneLayerState[product.id][z]||[]).filter(l=>l.type!=='background');}
+function syncLegacyLayers(){layers=allProductLayers().map(l=>({id:l.id,type:l.type,zone:l.zone,name:l.name,text:l.text,x:l.x,y:l.y,scale:l.scale,rotation:l.rotation,visible:l.visible}));}
 function clearDecals(){if(decalGroup){scene.remove(decalGroup);decalGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}})}decalGroup=new THREE.Group();decalGroup.name='MQD_ZONE_ARTWORK';scene.add(decalGroup);}
 function findDecalTarget(){let best=null,bestScore=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3());const score=sz.x*sz.y*sz.z;if(score>bestScore){bestScore=score;best=o}});return best;}
 function makeTextTexture(text){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);x.fillStyle='#111';x.font='bold 180px Inter, sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(text,512,256,950);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;}
@@ -76,11 +78,11 @@ else if(z==='Right Sleeve'){pos.set(box.max.x+size.x*.01,c.y+size.y*.19+ny*size.
 else if(z==='Collar'){pos.set(c.x+nx*size.x*.12,box.max.y+size.y*.005,c.z+ny*size.z*.12);ori.set(-Math.PI/2,0,r);dims.set(size.x*.28*sc,size.z*1.15*sc,size.y*.15)}
 else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.11+ny*size.y*.24,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.78*sc,size.z*1.6)}
 return{pos,ori,dims};}
-function rebuildLayerDecal(layer){if(!decalTarget||!decalGroup||!layer)return;if(layer.mesh){decalGroup.remove(layer.mesh);layer.mesh.geometry.dispose();layer.mesh.material.dispose();layer.mesh=null}if(layer.visible===false)return;const tex=layerTexture(layer);if(!tex)return;const q=zoneProjection(layer);try{const geo=new DecalGeometry(decalTarget,q.pos,q.ori,q.dims);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.8,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=layer.type==='background'?5:10;layer.mesh=mesh;decalGroup.add(mesh)}catch(e){console.warn('Artwork projection failed',e)}}
+function rebuildLayerDecal(layer){if(!decalTarget||!decalGroup||!layer)return;if(layer.mesh){decalGroup.remove(layer.mesh);layer.mesh.geometry.dispose();layer.mesh.material.dispose();layer.mesh=null}if(layer.visible===false)return;const tex=layerTexture(layer);if(!tex)return;const q=zoneProjection(layer);try{const geo=new DecalGeometry(decalTarget,q.pos,q.ori,q.dims);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.8,metalness:0});applyDecalZoneMask(mat,layer);const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=layer.type==='background'?5:10;layer.mesh=mesh;decalGroup.add(mesh)}catch(e){console.warn('Artwork projection failed',e)}}
 function rebuildAllDecals(){if(!garment)return;if(!decalGroup)clearDecals();allProductLayers().forEach(rebuildLayerDecal);}
 function selectLayer(id){activeLayerId=id;renderLayerEditor();}
 function activeLayer(){return currentZoneLayers().find(l=>l.id===activeLayerId)||null;}
-function renderLayerEditor(){ensureZoneState();const list=$('layerList'),empty=$('layerEmpty'),controlsEl=$('layerControls');if(!list)return;$('layerZoneLabel').textContent=activeZone;list.innerHTML='';const zs=currentZoneLayers();empty.classList.toggle('hidden',zs.length>0);zs.forEach(l=>{const row=document.createElement('div');row.className='layer-item'+(l.id===activeLayerId?' active':'');row.innerHTML=`<div style="min-width:0"><div class="layer-name">${escapeHtml(l.name||l.text||'Artwork')}</div><div class="layer-zone">${escapeHtml(l.zone)}${l.visible===false?' · hidden':''}</div></div><span>${l.type==='text'?'T':'▧'}</span>`;row.onclick=()=>selectLayer(l.id);list.appendChild(row)});const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l)return;$('selectedLayerName').textContent=l.name||l.text||'Selected layer';$('layerX').value=l.x;$('layerY').value=l.y;$('layerScale').value=l.scale;$('layerRotation').value=l.rotation;$('layerXVal').textContent=l.x;$('layerYVal').textContent=l.y;$('layerScaleVal').textContent=l.scale;$('layerRotationVal').textContent=l.rotation+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';}
+function renderLayerEditor(){ensureZoneState();const list=$('layerList'),empty=$('layerEmpty'),controlsEl=$('layerControls');if(!list)return;$('layerZoneLabel').textContent=activeZone;list.innerHTML='';const zs=currentZoneLayers().filter(l=>l.type!=='background');empty.classList.toggle('hidden',zs.length>0);zs.forEach(l=>{const row=document.createElement('div');row.className='layer-item'+(l.id===activeLayerId?' active':'');row.innerHTML=`<div style="min-width:0"><div class="layer-name">${escapeHtml(l.name||l.text||'Artwork')}</div><div class="layer-zone">${escapeHtml(l.zone)}${l.visible===false?' · hidden':''}</div></div><span>${l.type==='text'?'T':'▧'}</span>`;row.onclick=()=>selectLayer(l.id);list.appendChild(row)});const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l)return;$('selectedLayerName').textContent=l.name||l.text||'Selected layer';$('layerX').value=l.x;$('layerY').value=l.y;$('layerScale').value=l.scale;$('layerRotation').value=l.rotation;$('layerXVal').textContent=l.x;$('layerYVal').textContent=l.y;$('layerScaleVal').textContent=l.scale;$('layerRotationVal').textContent=l.rotation+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';}
 function updateActiveLayer(prop,value){const l=activeLayer();if(!l)return;l[prop]=value;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor();updateStats();}
 function addZoneLayer(layer){ensureZoneState();layer.id='layer-'+layerSeq++;layer.zone=activeZone;layer.x=0;layer.y=0;layer.scale=layer.type==='background'?140:(layer.type==='image'?100:70);layer.rotation=0;layer.visible=true;if(layer.type==='background')zoneLayerState[product.id][activeZone].unshift(layer);else zoneLayerState[product.id][activeZone].push(layer);activeLayerId=layer.id;syncLegacyLayers();rebuildLayerDecal(layer);renderLayerEditor();updateStats();}
 function bindLayerControls(){[['layerX','x'],['layerY','y'],['layerScale','scale'],['layerRotation','rotation']].forEach(([id,p])=>{$(id)?.addEventListener('input',e=>updateActiveLayer(p,Number(e.target.value)))});$('deleteLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;if(l.mesh){decalGroup.remove(l.mesh);l.mesh.geometry.dispose();l.mesh.material.dispose()}const arr=currentZoneLayers(),i=arr.findIndex(x=>x.id===l.id);if(i>=0)arr.splice(i,1);activeLayerId=arr.at(-1)?.id||null;syncLegacyLayers();renderLayerEditor();updateStats()});$('fillLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;l.x=0;l.y=0;l.rotation=0;l.scale=(l.zone==='Left Sleeve'||l.zone==='Right Sleeve'||l.zone==='Collar')?115:140;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor();updateStats()});$('toggleLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;l.visible=l.visible===false;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor()});}
@@ -191,20 +193,65 @@ function currentProduct(){return catalog.find(x=>x.id===product.id)||catalog[0]}
 function renderCatalog(){
  const list=$('productList');list.innerHTML='';catalog.forEach(p=>{const b=document.createElement('button');b.className='product-btn'+(p.id===product.id?' active':'');b.innerHTML='<div>'+escapeHtml(p.name)+'</div><div class="sub">'+escapeHtml(p.category)+' · $'+Number(p.price).toFixed(2)+'</div>';b.onclick=()=>selectProduct(p.id);list.appendChild(b)});
 }
+function zoneColorValue(zone){ensureZoneBackgroundState();return normalizeHex(zoneBackgroundState[product.id][zone]||'#FFFFFF')||'#FFFFFF';}
+function applyZoneBackgroundColors(){
+ if(!garment)return;
+ ensureZoneBackgroundState();
+ garment.traverse(o=>{
+  if(!o.isMesh||!o.geometry)return;
+  const g=o.geometry;const pos=g.getAttribute('position');if(!pos)return;
+  let normal=g.getAttribute('normal');if(!normal){g.computeVertexNormals();normal=g.getAttribute('normal')}
+  g.computeBoundingBox();const b=g.boundingBox;const sx=Math.max(.0001,b.max.x-b.min.x),sy=Math.max(.0001,b.max.y-b.min.y);const cx=(b.max.x+b.min.x)/2;
+  let col=g.getAttribute('color');if(!col||col.count!==pos.count){col=new THREE.BufferAttribute(new Float32Array(pos.count*3),3);g.setAttribute('color',col)}
+  const white=new THREE.Color('#FFFFFF'),frontC=new THREE.Color(zoneColorValue('Front')),backC=new THREE.Color(zoneColorValue('Back')),leftC=new THREE.Color(zoneColorValue('Left Sleeve')),rightC=new THREE.Color(zoneColorValue('Right Sleeve')),collarC=new THREE.Color(zoneColorValue('Collar'));
+  const torsoHalf=sx*.29, neckHalfX=sx*.19, neckStart=b.max.y-sy*.19;
+  for(let i=0;i<pos.count;i++){
+   const x=pos.getX(i),y=pos.getY(i),nz=normal?normal.getZ(i):0;let c=white;
+   const inTorso=Math.abs(x-cx)<=torsoHalf;
+   const inNeckPocket=(y>=neckStart&&Math.abs(x-cx)<=neckHalfX);
+   if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.14)c=collarC;
+   else if(product.zones.includes('Front')&&inTorso&&nz>=0.0&&!inNeckPocket)c=frontC;
+   else if(product.zones.includes('Back')&&inTorso&&nz<0.0&&!inNeckPocket)c=backC;
+   else if(product.zones.includes('Left Sleeve')&&x<cx-torsoHalf)c=leftC;
+   else if(product.zones.includes('Right Sleeve')&&x>cx+torsoHalf)c=rightC;
+   col.setXYZ(i,c.r,c.g,c.b);
+  }
+  col.needsUpdate=true;
+  const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.vertexColors=true;if(m.color)m.color.set('#FFFFFF');m.needsUpdate=true});
+ });
+}
+function applyDecalZoneMask(mat,layer){
+ if(!garment||!layer||layer.zone!=='Front')return;
+ const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
+ const neckCenterY=box.max.y-size.y*.075,neckHalfY=size.y*.125,neckHalfX=size.x*.20,torsoHalfX=size.x*.30;
+ mat.onBeforeCompile=shader=>{
+  shader.uniforms.mqdCenterX={value:center.x};shader.uniforms.mqdTorsoHalfX={value:torsoHalfX};shader.uniforms.mqdNeckCenterY={value:neckCenterY};shader.uniforms.mqdNeckHalfX={value:neckHalfX};shader.uniforms.mqdNeckHalfY={value:neckHalfY};
+  shader.vertexShader='varying vec3 vMqdWorldPos;\n'+shader.vertexShader;
+  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvMqdWorldPos=(modelMatrix*vec4(position,1.0)).xyz;');
+  shader.fragmentShader='varying vec3 vMqdWorldPos;\nuniform float mqdCenterX;\nuniform float mqdTorsoHalfX;\nuniform float mqdNeckCenterY;\nuniform float mqdNeckHalfX;\nuniform float mqdNeckHalfY;\n'+shader.fragmentShader;
+  shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>',`#include <alphatest_fragment>
+if(abs(vMqdWorldPos.x-mqdCenterX)>mqdTorsoHalfX) discard;
+float mqdNX=(vMqdWorldPos.x-mqdCenterX)/mqdNeckHalfX;
+float mqdNY=(vMqdWorldPos.y-mqdNeckCenterY)/mqdNeckHalfY;
+if((mqdNX*mqdNX+mqdNY*mqdNY)<1.0) discard;`);
+ };
+ mat.customProgramCacheKey=()=>`mqd-front-mask-v2`;
+ mat.needsUpdate=true;
+}
 function renderZones(){
  $('zones').innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone'+(z===activeZone?' active':'');b.textContent=z;b.onclick=()=>{activeZone=z;activeLayerId=currentZoneLayers().filter(l=>l.type!=='background').at(-1)?.id||currentZoneLayers().at(-1)?.id||null;renderZones();renderSwatches();renderLayerEditor();updateStats()};$('zones').appendChild(b)});
 }
-function setZoneBackground(c){ensureZoneState();let bg=currentZoneLayers().find(l=>l.type==='background');if(!bg){bg={type:'background',name:'Background',color:c};addZoneLayer(bg)}else{bg.color=c;if(bg.texture){bg.texture.dispose();bg.texture=null}rebuildLayerDecal(bg);syncLegacyLayers();renderLayerEditor();updateStats()}}
+function setZoneBackground(c){const hex=normalizeHex(c);if(!hex)return;ensureZoneBackgroundState();zoneBackgroundState[product.id][activeZone]=hex;applyZoneBackgroundColors();syncZoneColorInputs();updateStats();}
 function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null}
-function syncZoneColorInputs(){const bg=currentZoneLayers().find(l=>l.type==='background');const c=normalizeHex(bg?.color||'#FFFFFF')||'#FFFFFF';const picker=$('zoneColorPicker'),hex=$('zoneHex');if(picker)picker.value=c.toLowerCase();if(hex)hex.value=c;}
-function renderSwatches(){ $('swatches').innerHTML='';const bg=currentZoneLayers().find(l=>l.type==='background');colors.forEach((c,i)=>{const b=document.createElement('button');b.className='swatch'+((bg?.color||colors[0]).toLowerCase()===c.toLowerCase()?' active':'');b.style.background=c;b.title=c;b.onclick=()=>{setZoneBackground(c);Array.from(document.querySelectorAll('.swatch')).forEach(x=>x.classList.remove('active'));b.classList.add('active');syncZoneColorInputs()};$('swatches').appendChild(b)});syncZoneColorInputs()}
-function updateStats(){ renderTemplatePanel(); $('activeLabel').textContent=activeZone; $('layerCount').textContent=layers.length; $('productName').textContent=product.name; $('price').textContent='$'+Number(product.price).toFixed(2);$('category').textContent=product.category; }
+function syncZoneColorInputs(){ensureZoneBackgroundState();const c=zoneColorValue(activeZone);const picker=$('zoneColorPicker'),hex=$('zoneHex');if(picker)picker.value=c.toLowerCase();if(hex)hex.value=c;}
+function renderSwatches(){ $('swatches').innerHTML='';const current=zoneColorValue(activeZone);colors.forEach(c=>{const b=document.createElement('button');b.className='swatch'+(current.toLowerCase()===c.toLowerCase()?' active':'');b.style.background=c;b.title=c;b.onclick=()=>{setZoneBackground(c);renderSwatches()};$('swatches').appendChild(b)});syncZoneColorInputs()}
+function updateStats(){ renderTemplatePanel(); $('activeLabel').textContent=activeZone; $('layerCount').textContent=allProductLayers().length; $('productName').textContent=product.name; $('price').textContent='$'+Number(product.price).toFixed(2);$('category').textContent=product.category; }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fitObject(obj){const box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());const max=Math.max(size.x,size.y,size.z);obj.position.sub(center);camera.position.set(0,max*0.5,max*2.25);camera.near=max/100;camera.far=max*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update()}
 async function loadGarment(){
  if(!renderer)init3D();
  if(garment){scene.remove(garment);garment.traverse(o=>{if(o.geometry)o.geometry.dispose(); if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}});garment=null}
- new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitObject(garment);prepareDesignTexture();decalTarget=findDecalTarget();clearDecals();rebuildAllDecals();renderLayerEditor();},undefined,e=>console.error(e));
+ new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitObject(garment);prepareDesignTexture();applyZoneBackgroundColors();decalTarget=findDecalTarget();clearDecals();rebuildAllDecals();renderLayerEditor();},undefined,e=>console.error(e));
 }
 function prepareDesignTexture(){
  designCanvas=document.createElement('canvas');
@@ -256,15 +303,14 @@ function init3D(){
 function nextArtworkLayerName(){return 'Layer '+(currentZoneLayers().filter(l=>l.type!=='background').length+1)}
 function addImage(src){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:nextArtworkLayerName(),texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}
 $('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f))});
-let zoneColorPickerRaf=0;
-$('zoneColorPicker')?.addEventListener('input',e=>{const c=e.target.value.toUpperCase();$('zoneHex').value=c;cancelAnimationFrame(zoneColorPickerRaf);zoneColorPickerRaf=requestAnimationFrame(()=>setZoneBackground(c))});
+$('zoneColorPicker')?.addEventListener('input',e=>{$('zoneHex').value=e.target.value.toUpperCase()});
 $('zoneColorPicker')?.addEventListener('change',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});
 $('zoneHex')?.addEventListener('change',e=>{const c=normalizeHex(e.target.value);if(!c){syncZoneColorInputs();return}setZoneBackground(c);$('zoneColorPicker').value=c.toLowerCase();renderSwatches()});
 
 $('addText').onclick=()=>{const text=prompt('Text to add');if(!text)return;addZoneLayer({type:'text',name:text,text});};
 $('reset').onclick=()=>{ensureZoneState();const arr=currentZoneLayers();arr.forEach(l=>{if(l.mesh){decalGroup?.remove(l.mesh);l.mesh.geometry.dispose();l.mesh.material.dispose()}});zoneLayerState[product.id][activeZone]=[];activeLayerId=null;syncLegacyLayers();const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.removeAttribute('src');preview.style.display='none'}if(empty)empty.style.display='flex';renderLayerEditor();updateStats()}
 function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];ensureZoneState();activeLayerId=currentZoneLayers().at(-1)?.id||null;syncLegacyLayers();renderCatalog();renderZones();renderLayerEditor();updateStats();loadGarment()}
-async function saveDesign(){const data={product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,layers,createdAt:new Date().toISOString()};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click()}
+async function saveDesign(){const data={product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,layers,zoneBackgrounds:{...(zoneBackgroundState[product.id]||{})},createdAt:new Date().toISOString()};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click()}
 function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(',');const bin=atob(b);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]})}
 async function downloadPack(){
  if(!designCanvas)return;
@@ -299,6 +345,7 @@ async function downloadPack(){
    productionTemplateStatus:'Configured from supplied production templates where available; remaining zones stay provisional until their source dimensions/UV placement are verified.',
    notes:'Template previews preserve the supplied reference images. Dimension-matched artwork previews are not factory-ready flats until UV-to-pattern placement is verified.',
    zones:product.zones,
+   zoneBackgrounds:{...(zoneBackgroundState[product.id]||{})},
    generatedAt:new Date().toISOString()
  },null,2));
  if(garment){const resp=await fetch(product.model);if(resp.ok)root.file(product.id+'.glb',await resp.blob())}
