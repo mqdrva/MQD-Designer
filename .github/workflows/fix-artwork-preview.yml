@@ -1,0 +1,51 @@
+name: Fix artwork preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-artwork-preview.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch artwork preview
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          old_html='''<div class="section"><div class="label">Current artwork</div><div class="preview"><img id="previewImage" src="/assets/tshirt.glb" alt="3D garment"></div><div class="small" style="margin-top:9px">The preview shown in the editor is driven by this garment's GLB and its saved design canvas. Production-template references are attached per zone where supplied.</div></div>'''
+          new_html='''<div class="section"><div class="label">Current artwork</div><div class="preview" id="artworkPreview"><div id="previewEmpty" style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;color:#888;font-size:12px">No artwork uploaded yet</div><img id="previewImage" alt="Uploaded artwork preview" style="display:none"></div><div class="small" style="margin-top:9px">Uploaded customer artwork will appear here and be applied to the selected garment area.</div></div>'''
+          if old_html not in s:
+              raise SystemExit('Current artwork HTML block not found')
+          s=s.replace(old_html,new_html,1)
+
+          old_add="""function addImage(src){const img=new Image();img.onload=()=>{designCtx.clearRect(0,0,2048,2048);if(baseImage)designCtx.drawImage(baseImage,0,0,2048,2048);designCtx.save();const max=1500,scale=Math.min(max/img.width,max/img.height,1);const w=img.width*scale,h=img.height*scale;designCtx.drawImage(img,(2048-w)/2,(2048-h)/2,w,h);designCtx.restore();designTexture.needsUpdate=true;applyDesignTexture();layers.push({type:'image',zone:activeZone,name:'upload'});updateStats()};img.src=src}"""
+          new_add="""function addImage(src){const img=new Image();img.onload=()=>{designCtx.clearRect(0,0,2048,2048);if(baseImage)designCtx.drawImage(baseImage,0,0,2048,2048);designCtx.save();const max=1500,scale=Math.min(max/img.width,max/img.height,1);const w=img.width*scale,h=img.height*scale;designCtx.drawImage(img,(2048-w)/2,(2048-h)/2,w,h);designCtx.restore();designTexture.needsUpdate=true;applyDesignTexture();const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';layers.push({type:'image',zone:activeZone,name:'upload'});updateStats()};img.src=src}"""
+          if old_add not in s:
+              raise SystemExit('addImage block not found')
+          s=s.replace(old_add,new_add,1)
+
+          old_reset="""$('reset').onclick=()=>{if(!designCtx)return;designCtx.clearRect(0,0,2048,2048);designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);if(garment)garment.traverse(o=>{if(!o.isMesh)return;const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if('mqdOriginalMap' in m.userData)m.map=m.userData.mqdOriginalMap;m.needsUpdate=true})});designTexture.needsUpdate=true;layers=[];updateStats()};"""
+          new_reset="""$('reset').onclick=()=>{if(!designCtx)return;designCtx.clearRect(0,0,2048,2048);designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);if(garment)garment.traverse(o=>{if(!o.isMesh)return;const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if('mqdOriginalMap' in m.userData)m.map=m.userData.mqdOriginalMap;m.needsUpdate=true})});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.removeAttribute('src');preview.style.display='none'}if(empty)empty.style.display='flex';designTexture.needsUpdate=true;layers=[];updateStats()};"""
+          if old_reset not in s:
+              raise SystemExit('reset block not found')
+          s=s.replace(old_reset,new_reset,1)
+
+          p.write_text(s,encoding='utf-8')
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix current artwork preview"
+          git push origin main
