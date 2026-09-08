@@ -76,7 +76,7 @@ if(z==='Back'){pos.set(c.x+nx*size.x*.25,c.y+ny*size.y*.30,box.min.z-size.z*.08)
 else if(z==='Left Sleeve'){pos.set(box.min.x-size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z+nx*size.z*.18);ori.set(0,-Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
 else if(z==='Right Sleeve'){pos.set(box.max.x+size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z-nx*size.z*.18);ori.set(0,Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
 else if(z==='Collar'){pos.set(c.x+nx*size.x*.12,box.max.y+size.y*.005,c.z+ny*size.z*.12);ori.set(-Math.PI/2,0,r);dims.set(size.x*.28*sc,size.z*1.15*sc,size.y*.15)}
-else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.11+ny*size.y*.24,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.78*sc,size.z*1.6)}
+else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.015+ny*size.y*.28,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.94*sc,size.z*1.6)}
 return{pos,ori,dims};}
 function rebuildLayerDecal(layer){if(!decalTarget||!decalGroup||!layer)return;if(layer.mesh){decalGroup.remove(layer.mesh);layer.mesh.geometry.dispose();layer.mesh.material.dispose();layer.mesh=null}if(layer.visible===false)return;const tex=layerTexture(layer);if(!tex)return;const q=zoneProjection(layer);try{const geo=new DecalGeometry(decalTarget,q.pos,q.ori,q.dims);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.8,metalness:0});applyDecalZoneMask(mat,layer);const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=layer.type==='background'?5:10;layer.mesh=mesh;decalGroup.add(mesh)}catch(e){console.warn('Artwork projection failed',e)}}
 function rebuildAllDecals(){if(!garment)return;if(!decalGroup)clearDecals();allProductLayers().forEach(rebuildLayerDecal);}
@@ -204,12 +204,12 @@ function applyZoneBackgroundColors(){
   g.computeBoundingBox();const b=g.boundingBox;const sx=Math.max(.0001,b.max.x-b.min.x),sy=Math.max(.0001,b.max.y-b.min.y);const cx=(b.max.x+b.min.x)/2;
   let col=g.getAttribute('color');if(!col||col.count!==pos.count){col=new THREE.BufferAttribute(new Float32Array(pos.count*3),3);g.setAttribute('color',col)}
   const white=new THREE.Color('#FFFFFF'),frontC=new THREE.Color(zoneColorValue('Front')),backC=new THREE.Color(zoneColorValue('Back')),leftC=new THREE.Color(zoneColorValue('Left Sleeve')),rightC=new THREE.Color(zoneColorValue('Right Sleeve')),collarC=new THREE.Color(zoneColorValue('Collar'));
-  const torsoHalf=sx*.29, neckHalfX=sx*.19, neckStart=b.max.y-sy*.19;
+  const torsoHalf=sx*.29, neckHalfX=sx*.13, neckStart=b.max.y-sy*.10;
   for(let i=0;i<pos.count;i++){
    const x=pos.getX(i),y=pos.getY(i),nz=normal?normal.getZ(i):0;let c=white;
    const inTorso=Math.abs(x-cx)<=torsoHalf;
    const inNeckPocket=(y>=neckStart&&Math.abs(x-cx)<=neckHalfX);
-   if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.14)c=collarC;
+   if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.075)c=collarC;
    else if(product.zones.includes('Front')&&inTorso&&nz>=0.0&&!inNeckPocket)c=frontC;
    else if(product.zones.includes('Back')&&inTorso&&nz<0.0&&!inNeckPocket)c=backC;
    else if(product.zones.includes('Left Sleeve')&&x<cx-torsoHalf)c=leftC;
@@ -223,7 +223,7 @@ function applyZoneBackgroundColors(){
 function applyDecalZoneMask(mat,layer){
  if(!garment||!layer||layer.zone!=='Front')return;
  const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
- const neckCenterY=box.max.y-size.y*.075,neckHalfY=size.y*.125,neckHalfX=size.x*.20,torsoHalfX=size.x*.30;
+ const neckCenterY=box.max.y-size.y*.045,neckHalfY=size.y*.065,neckHalfX=size.x*.135,torsoHalfX=size.x*.30;
  mat.onBeforeCompile=shader=>{
   shader.uniforms.mqdCenterX={value:center.x};shader.uniforms.mqdTorsoHalfX={value:torsoHalfX};shader.uniforms.mqdNeckCenterY={value:neckCenterY};shader.uniforms.mqdNeckHalfX={value:neckHalfX};shader.uniforms.mqdNeckHalfY={value:neckHalfY};
   shader.vertexShader='varying vec3 vMqdWorldPos;\n'+shader.vertexShader;
@@ -235,7 +235,7 @@ float mqdNX=(vMqdWorldPos.x-mqdCenterX)/mqdNeckHalfX;
 float mqdNY=(vMqdWorldPos.y-mqdNeckCenterY)/mqdNeckHalfY;
 if((mqdNX*mqdNX+mqdNY*mqdNY)<1.0) discard;`);
  };
- mat.customProgramCacheKey=()=>`mqd-front-mask-v2`;
+ mat.customProgramCacheKey=()=>`mqd-front-mask-v3`;
  mat.needsUpdate=true;
 }
 function renderZones(){
