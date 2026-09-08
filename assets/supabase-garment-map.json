@@ -1,0 +1,67 @@
+{
+  "storageProvider": "supabase",
+  "bucket": "garments",
+  "publicBaseUrl": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/",
+  "products": [
+    {
+      "id": "tshirt",
+      "filename": "tshirt.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/tshirt.glb"
+    },
+    {
+      "id": "long-sleeve-tshirt",
+      "filename": "long-sleeve-tshirt.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-tshirt.glb"
+    },
+    {
+      "id": "short-sleeve-polo",
+      "filename": "short-sleeve-polo.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/short-sleeve-polo.glb"
+    },
+    {
+      "id": "long-sleeve-polo",
+      "filename": "long-sleeve-polo.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-polo.glb"
+    },
+    {
+      "id": "fleece-hoodie",
+      "filename": "fleece-hoodie.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/fleece-hoodie.glb"
+    },
+    {
+      "id": "lightweight-jacket",
+      "filename": "lightweight-jacket.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/lightweight-jacket.glb"
+    },
+    {
+      "id": "mask",
+      "filename": "mask.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/mask.glb"
+    },
+    {
+      "id": "hood-mask-shirt",
+      "filename": "hood-mask-shirt.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hood-mask-shirt.glb"
+    },
+    {
+      "id": "shorts",
+      "filename": "shorts.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/shorts.glb"
+    },
+    {
+      "id": "sweat-pants",
+      "filename": "sweat-pants.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/sweat-pants.glb"
+    },
+    {
+      "id": "hooded-long-sleeve",
+      "filename": "hooded-long-sleeve.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hooded-long-sleeve.glb"
+    },
+    {
+      "id": "hat",
+      "filename": "hat.glb",
+      "url": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb"
+    }
+  ]
+}

@@ -1,0 +1,270 @@
+{
+  "brand": "Morales Quality Designs",
+  "templateStatus": "mapped-references",
+  "products": [
+    {
+      "id": "tshirt",
+      "name": "All-Over Print T-Shirt",
+      "zones": {
+        "Front": [
+          3763,
+          4992
+        ],
+        "Back": [
+          3750,
+          5011
+        ],
+        "Left Sleeve": [
+          2841,
+          1702
+        ],
+        "Right Sleeve": [
+          2841,
+          1702
+        ],
+        "Collar": [
+          3276,
+          435
+        ]
+      }
+    },
+    {
+      "id": "long-sleeve-tshirt",
+      "name": "Long Sleeve T-Shirt",
+      "zones": {
+        "Front": [
+          3763,
+          4992
+        ],
+        "Back": [
+          3750,
+          5011
+        ],
+        "Left Sleeve": [
+          2690,
+          4120
+        ],
+        "Right Sleeve": [
+          2690,
+          4120
+        ],
+        "Collar": [
+          3276,
+          435
+        ]
+      }
+    },
+    {
+      "id": "short-sleeve-polo",
+      "name": "Short Sleeve Polo",
+      "zones": {
+        "Front": [
+          3730,
+          4980
+        ],
+        "Back": [
+          3730,
+          5080
+        ],
+        "Left Sleeve": [
+          2930,
+          1740
+        ],
+        "Right Sleeve": [
+          2930,
+          1740
+        ],
+        "Collar": [
+          3180,
+          1130
+        ]
+      }
+    },
+    {
+      "id": "long-sleeve-polo",
+      "name": "Long Sleeve Polo",
+      "zones": {
+        "Front": [
+          3730,
+          4980
+        ],
+        "Back": [
+          3730,
+          5080
+        ],
+        "Left Sleeve": [
+          2690,
+          4120
+        ],
+        "Right Sleeve": [
+          2690,
+          4120
+        ],
+        "Collar": [
+          3180,
+          1130
+        ]
+      }
+    },
+    {
+      "id": "fleece-hoodie",
+      "name": "Fleece Hoodie",
+      "zones": {
+        "Front": [
+          3865,
+          3884
+        ],
+        "Back": [
+          3865,
+          4006
+        ],
+        "Left Sleeve": [
+          3276,
+          6124
+        ],
+        "Right Sleeve": [
+          3276,
+          6124
+        ],
+        "Hood": [
+          4684,
+          2073
+        ]
+      }
+    },
+    {
+      "id": "lightweight-jacket",
+      "name": "Lightweight Jacket",
+      "zones": {
+        "Front": [
+          4220,
+          4740
+        ],
+        "Back": [
+          3865,
+          4006
+        ],
+        "Left Sleeve": [
+          3276,
+          6124
+        ],
+        "Right Sleeve": [
+          3276,
+          6124
+        ],
+        "Hood": [
+          4684,
+          2073
+        ]
+      }
+    },
+    {
+      "id": "mask",
+      "name": "Mask",
+      "zones": {
+        "Entire Mask": [
+          3100,
+          3110
+        ]
+      }
+    },
+    {
+      "id": "hood-mask-shirt",
+      "name": "Long Sleeve Shirt With Hood And Built-In Mask",
+      "zones": {
+        "Front": [
+          3763,
+          4992
+        ],
+        "Back": [
+          3750,
+          5011
+        ],
+        "Left Sleeve": [
+          2690,
+          4120
+        ],
+        "Right Sleeve": [
+          2690,
+          4120
+        ],
+        "Hood": [
+          4684,
+          2073
+        ],
+        "Built-In Mask": [
+          3100,
+          3110
+        ]
+      }
+    },
+    {
+      "id": "shorts",
+      "name": "Shorts",
+      "zones": {
+        "Front": [
+          2145,
+          3480
+        ],
+        "Back": [
+          2455,
+          3650
+        ]
+      }
+    },
+    {
+      "id": "sweat-pants",
+      "name": "Sweat Pants",
+      "zones": {
+        "Front": [
+          3670,
+          5960
+        ],
+        "Back": [
+          3670,
+          5960
+        ]
+      }
+    },
+    {
+      "id": "hooded-long-sleeve",
+      "name": "Long Sleeve Shirt With Hood",
+      "zones": {
+        "Front": [
+          3763,
+          4992
+        ],
+        "Back": [
+          3750,
+          5011
+        ],
+        "Left Sleeve": [
+          2690,
+          4120
+        ],
+        "Right Sleeve": [
+          2690,
+          4120
+        ],
+        "Hood": [
+          4684,
+          2073
+        ]
+      }
+    },
+    {
+      "id": "hat",
+      "name": "Hat",
+      "zones": {
+        "Front Panel": [
+          1151,
+          1050
+        ],
+        "Top of Bill": [
+          1169,
+          941
+        ]
+      }
+    }
+  ]
+}

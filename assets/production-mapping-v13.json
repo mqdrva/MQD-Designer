@@ -1,0 +1,415 @@
+{
+  "version": "13.0",
+  "purpose": "Multi-garment AOP production mapping workspace",
+  "important": "All supplied template dimensions and reuse rules are recorded. UV occupancy diagnostics are generated for every GLB. Exact factory-ready UV-to-pattern transforms still require per-zone correspondence verification.",
+  "products": {
+    "tshirt": {
+      "glb": "/assets/tshirt.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3763,
+          "heightPx": 4992,
+          "template": "/assets/templates/tshirt/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3750,
+          "heightPx": 5011,
+          "template": "/assets/templates/tshirt/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2841,
+          "heightPx": 1702,
+          "template": "/assets/templates/tshirt/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2841,
+          "heightPx": 1702,
+          "template": "/assets/templates/tshirt/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Collar": {
+          "widthPx": 3276,
+          "heightPx": 435,
+          "template": "/assets/templates/tshirt/collar.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/tshirt-uv.json"
+    },
+    "long-sleeve-tshirt": {
+      "glb": "/assets/long-sleeve-tshirt.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3763,
+          "heightPx": 4992,
+          "template": "/assets/templates/tshirt/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3750,
+          "heightPx": 5011,
+          "template": "/assets/templates/tshirt/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Collar": {
+          "widthPx": 3276,
+          "heightPx": 435,
+          "template": "/assets/templates/tshirt/collar.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/long-sleeve-tshirt-uv.json"
+    },
+    "short-sleeve-polo": {
+      "glb": "/assets/short-sleeve-polo.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3730,
+          "heightPx": 4980,
+          "template": "/assets/templates/polo/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3730,
+          "heightPx": 5080,
+          "template": "/assets/templates/polo/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2930,
+          "heightPx": 1740,
+          "template": "/assets/templates/polo/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2930,
+          "heightPx": 1740,
+          "template": "/assets/templates/polo/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Collar": {
+          "widthPx": 3180,
+          "heightPx": 1130,
+          "template": "/assets/templates/polo/collar.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/short-sleeve-polo-uv.json"
+    },
+    "long-sleeve-polo": {
+      "glb": "/assets/long-sleeve-polo.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3730,
+          "heightPx": 4980,
+          "template": "/assets/templates/polo/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3730,
+          "heightPx": 5080,
+          "template": "/assets/templates/polo/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Collar": {
+          "widthPx": 3180,
+          "heightPx": 1130,
+          "template": "/assets/templates/polo/collar.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/long-sleeve-polo-uv.json"
+    },
+    "fleece-hoodie": {
+      "glb": "/assets/fleece-hoodie.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3865,
+          "heightPx": 3884,
+          "template": "/assets/templates/hoodie/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3865,
+          "heightPx": 4006,
+          "template": "/assets/templates/hoodie/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 3276,
+          "heightPx": 6124,
+          "template": "/assets/templates/hoodie/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 3276,
+          "heightPx": 6124,
+          "template": "/assets/templates/hoodie/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Hood": {
+          "widthPx": 4684,
+          "heightPx": 2073,
+          "template": "/assets/templates/hoodie/hood.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/fleece-hoodie-uv.json"
+    },
+    "lightweight-jacket": {
+      "glb": "/assets/lightweight-jacket.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 4220,
+          "heightPx": 4740,
+          "template": "/assets/templates/rain-jacket/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3865,
+          "heightPx": 4006,
+          "template": "/assets/templates/hoodie/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 3276,
+          "heightPx": 6124,
+          "template": "/assets/templates/hoodie/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 3276,
+          "heightPx": 6124,
+          "template": "/assets/templates/hoodie/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Hood": {
+          "widthPx": 4684,
+          "heightPx": 2073,
+          "template": "/assets/templates/hoodie/hood.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/lightweight-jacket-uv.json"
+    },
+    "mask": {
+      "glb": "/assets/mask.glb",
+      "zones": {
+        "Entire Mask": {
+          "widthPx": 3100,
+          "heightPx": 3110,
+          "template": null,
+          "shape": "rectangle",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/mask-uv.json"
+    },
+    "hood-mask-shirt": {
+      "glb": "/assets/hood-mask-shirt.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3763,
+          "heightPx": 4992,
+          "template": "/assets/templates/tshirt/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3750,
+          "heightPx": 5011,
+          "template": "/assets/templates/tshirt/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Hood": {
+          "widthPx": 4684,
+          "heightPx": 2073,
+          "template": "/assets/templates/hoodie/hood.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Built-In Mask": {
+          "widthPx": 3100,
+          "heightPx": 3110,
+          "template": null,
+          "shape": "rectangle",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/hood-mask-shirt-uv.json"
+    },
+    "shorts": {
+      "glb": "/assets/shorts.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 2145,
+          "heightPx": 3480,
+          "template": "/assets/templates/shorts/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 2455,
+          "heightPx": 3650,
+          "template": "/assets/templates/shorts/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/shorts-uv.json"
+    },
+    "sweat-pants": {
+      "glb": "/assets/sweat-pants.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3670,
+          "heightPx": 5960,
+          "template": "/assets/templates/sweat-pants/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3670,
+          "heightPx": 5960,
+          "template": "/assets/templates/sweat-pants/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/sweat-pants-uv.json"
+    },
+    "hooded-long-sleeve": {
+      "glb": "/assets/hooded-long-sleeve.glb",
+      "zones": {
+        "Front": {
+          "widthPx": 3763,
+          "heightPx": 4992,
+          "template": "/assets/templates/tshirt/front.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Back": {
+          "widthPx": 3750,
+          "heightPx": 5011,
+          "template": "/assets/templates/tshirt/back.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Left Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Right Sleeve": {
+          "widthPx": 2690,
+          "heightPx": 4120,
+          "template": "/assets/templates/long-sleeve/sleeve.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Hood": {
+          "widthPx": 4684,
+          "heightPx": 2073,
+          "template": "/assets/templates/hoodie/hood.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/hooded-long-sleeve-uv.json"
+    },
+    "hat": {
+      "glb": "/assets/hat.glb",
+      "zones": {
+        "Front Panel": {
+          "widthPx": 1151,
+          "heightPx": 1050,
+          "template": "/assets/templates/hat/front-panel.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        },
+        "Top of Bill": {
+          "widthPx": 1169,
+          "heightPx": 941,
+          "template": "/assets/templates/hat/top-of-bill.png",
+          "shape": "pattern",
+          "status": "template-attached; UV correspondence verification pending"
+        }
+      },
+      "calibration": "/assets/calibration/hat-uv.json"
+    }
+  }
+}

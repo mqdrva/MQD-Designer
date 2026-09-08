@@ -1,0 +1,15 @@
+{
+  "productId": "hat",
+  "glb": "/assets/hat.glb",
+  "uvVertexCount": 295786,
+  "triangleCount": 500000,
+  "uvBounds": {
+    "minU": 0.0010000169277191162,
+    "maxU": 0.999000072479248,
+    "minV": 0.0009999871253967285,
+    "maxV": 0.9990000128746033
+  },
+  "uvAreaSum": 0.659249257081718,
+  "calibrationStatus": "UV occupancy generated; zone-to-pattern correspondence requires verification against physical production pattern geometry.",
+  "diagnosticImage": "/assets/calibration/hat-uv-occupancy.png"
+}

@@ -1,0 +1,15 @@
+{
+  "productId": "lightweight-jacket",
+  "glb": "/assets/lightweight-jacket.glb",
+  "uvVertexCount": 337185,
+  "triangleCount": 500000,
+  "uvBounds": {
+    "minU": 0.0009999275207519531,
+    "maxU": 0.9990000128746033,
+    "minV": 0.0009999275207519531,
+    "maxV": 0.9990000128746033
+  },
+  "uvAreaSum": 0.7102776033618412,
+  "calibrationStatus": "Corrected GLB installed; UV occupancy generated. Exact zone-to-template correspondence still requires verification against physical panel geometry.",
+  "diagnosticImage": "/assets/calibration/lightweight-jacket-uv-occupancy.png"
+}
