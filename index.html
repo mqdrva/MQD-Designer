@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Morales Quality Designs — Custom AOP Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#111;--muted:#6d6e73;--line:#e7e7ea;--paper:#f7f7f8;--accent:#c91f26;--soft:#fff;--good:#1a7f37}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}button,input,select,textarea{font:inherit}.hidden{display:none!important}
+.topbar{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:20}.topbar img{height:48px;width:auto}.top-actions{display:flex;gap:10px;align-items:center}.pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}.pill.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.app{min-height:calc(100vh - 72px);display:grid;grid-template-columns:280px 1fr 330px}.panel{background:#fff;border-right:1px solid var(--line);padding:18px;overflow:auto}.panel.right{border-right:0;border-left:1px solid var(--line)}
+.kicker{text-transform:uppercase;letter-spacing:.09em;font-size:11px;color:var(--muted);font-weight:800}.title{font-size:24px;font-weight:800;margin:8px 0}.small{font-size:12px;line-height:1.45;color:var(--muted)}.section{padding:18px 0;border-top:1px solid var(--line)}.section:first-child{border-top:0;padding-top:0}.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#707177;font-weight:800;margin-bottom:9px}.product-list{display:grid;gap:8px}.product-btn{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 12px;cursor:pointer}.product-btn.active{border-color:var(--ink);background:#111;color:#fff}.product-btn .sub{font-size:11px;opacity:.65;margin-top:4px}.zones{display:grid;grid-template-columns:1fr 1fr;gap:8px}.zone{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px;cursor:pointer;font-size:12px;text-align:left}.zone.active{background:#111;color:#fff;border-color:#111}
+.row{display:flex;gap:8px}.row>*{flex:1}.btn{width:100%;border:1px solid #d9d9dd;background:#fff;border-radius:10px;padding:11px 12px;cursor:pointer;font-weight:700}.btn.primary{background:#111;color:#fff;border-color:#111}.btn.danger{color:#a8181e}.input,select,textarea{width:100%;border:1px solid #d9d9dd;border-radius:10px;padding:10px;background:#fff}.control{margin-top:9px}.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.swatch{height:34px;border-radius:9px;border:2px solid #ddd;cursor:pointer}.swatch.active{outline:2px solid #111;outline-offset:2px}
+.scene{position:relative;min-width:0;background:radial-gradient(circle at 50% 38%,#fff 0%,#ececef 72%)}canvas{display:block;width:100%;height:100%}.scene-badge{position:absolute;left:18px;top:18px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:999px;padding:9px 12px;font-size:11px;font-weight:800;z-index:2}.scene-help{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:999px;padding:9px 12px;font-size:11px;color:#666;z-index:2;white-space:nowrap}
+.card{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff}.price{font-size:24px;font-weight:800}.meta{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.preview{height:170px;border:1px solid var(--line);border-radius:12px;background:#f4f4f5;overflow:hidden;margin-top:10px}.preview img{width:100%;height:100%;object-fit:cover}.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:12px}.stat:last-child{border-bottom:0}
+.overlay{position:fixed;inset:0;background:rgba(15,16,18,.48);display:flex;align-items:flex-start;justify-content:center;padding:28px;z-index:40}.modal{width:min(1200px,100%);max-height:calc(100vh - 56px);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.25);display:flex;flex-direction:column}.modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.modal-body{padding:20px;overflow:auto}.admin-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:18px}.product-table{display:grid;gap:8px}.product-row{display:grid;grid-template-columns:1.2fr .7fr .9fr auto;gap:10px;align-items:center;border:1px solid var(--line);padding:10px;border-radius:12px}.zone-chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:11px;border:1px solid var(--line);padding:5px 8px;border-radius:999px;background:#fafafa}.admin-note{font-size:12px;color:var(--muted);line-height:1.5;background:#f8f8f9;border-radius:12px;padding:12px}.template-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fafafa}.template-card img{width:100%;height:110px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid #eee}.template-meta{font-size:11px;color:#666;margin-top:7px;line-height:1.35}
+@media(max-width:1020px){.app{grid-template-columns:240px 1fr}.panel.right{display:none}}@media(max-width:760px){.topbar{padding:0 12px}.topbar img{height:40px}.app{grid-template-columns:1fr}.panel{display:none}.scene{height:calc(100vh - 72px)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <img src="/assets/brand-logo.png" alt="Morales Quality Designs">
+  <div class="top-actions"><button class="pill" id="openAdmin">Product Admin</button><button class="pill primary" id="downloadPackTop">Download Production ZIP</button></div>
+</header>
+<div class="app">
+  <aside class="panel">
+    <div class="section">
+      <div class="kicker">Morales Quality Designs</div><div class="title">AOP Studio</div>
+      <div class="small">One designer for every garment. Edit product names and print zones from Product Admin.</div>
+    </div>
+    <div class="section"><div class="label">Product</div><div id="productList" class="product-list"></div></div>
+    <div class="section"><div class="label">Printable areas</div><div id="zones" class="zones"></div></div>
+    <div class="section"><div class="label">Artwork</div><input id="artUpload" type="file" accept="image/png,image/jpeg,image/webp" class="input"><div class="row control"><button class="btn" id="addText">Add Text</button><button class="btn" id="reset">Reset</button></div></div>
+    <div class="section"><div class="label">Garment color</div><div id="swatches" class="swatches"></div></div>
+  </aside>
+  <main class="scene"><div class="scene-badge" id="sceneBadge">3D AOP GARMENT EDITOR</div><div class="scene-help">Drag to rotate · Scroll to zoom · Select a printable area</div><canvas id="webgl"></canvas></main>
+  <aside class="panel right">
+    <div class="card"><div class="meta"><div><div class="kicker" id="category">Custom Apparel</div><div style="font-size:18px;font-weight:800;margin-top:5px" id="productName">T-Shirt</div></div><div class="price" id="price">$39</div></div></div>
+    <div class="section"><div class="label">Production template</div><div id="templatePanel" class="card"></div></div><div class="section"><div class="label">Current artwork</div><div class="preview"><img id="previewImage" src="/assets/tshirt.glb" alt="3D garment"></div><div class="small" style="margin-top:9px">The preview shown in the editor is driven by this garment's GLB and its saved design canvas. Production-template references are attached per zone where supplied.</div></div>
+    <div class="section"><div class="label">Design status</div><div class="stat"><span>Active area</span><strong id="activeLabel">Front</strong></div><div class="stat"><span>Artwork layers</span><strong id="layerCount">0</strong></div><div class="stat"><span>Production size</span><strong>2048 × 2048</strong></div></div>
+    <div class="section"><button class="btn primary" id="downloadPack">Download Production ZIP</button><button class="btn" id="saveDesign" style="margin-top:8px">Save Design JSON</button><div class="small" style="margin-top:10px">Production template references are attached by zone where supplied; final factory flats still require verified UV-to-pattern placement.</div></div>
+  </aside>
+</div>
+<div id="adminOverlay" class="overlay hidden"><div class="modal"><div class="modal-head"><div><div class="kicker">Store Management</div><div style="font-size:22px;font-weight:800;margin-top:4px">Product Catalog</div></div><button class="pill" id="closeAdmin">Close</button></div><div class="modal-body"><div class="admin-grid"><div><div class="card"><div class="label">Edit selected product</div><input id="adminName" class="input" placeholder="Product name"><div class="control"><input id="adminCategory" class="input" placeholder="Category"></div><div class="control"><input id="adminPrice" class="input" type="number" step="0.01" placeholder="Price"></div><div class="label" style="margin-top:14px">Printable zones</div><div id="adminZones" class="zone-chips"></div><div class="row control"><button class="btn" id="addZone">Add Zone</button><button class="btn" id="saveProduct">Save Product</button></div></div><div class="admin-note" style="margin-top:12px">You can change a product name, category, price, or printable-zone list without changing the GLB. Future garments can be added here by supplying a new GLB path in the catalog data.</div></div><div><div class="label">Catalog</div><div id="adminProductList" class="product-table"></div></div></div></div></div></div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}
+function safeFileName(s){return String(s||'file').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/-+/g,'-')}
+function getDesignColors(){
+  const bg = (typeof backgroundColor!=='undefined' && backgroundColor) ? backgroundColor : '#ffffff';
+  const garment = (typeof garmentColor!=='undefined' && garmentColor) ? garmentColor : '#ffffff';
+  const layers = (typeof designLayers!=='undefined' && Array.isArray(designLayers)) ? designLayers : [];
+  return {
+    background:{hex:bg},
+    garment:{hex:garment},
+    artworkLayers:layers.map((l,i)=>({
+      index:i,
+      type:l?.type||'unknown',
+      text:l?.text||null,
+      color:l?.color||null
+    }))
+  };
+}
+function dataUrlToBlob(dataUrl){
+  const [head, body] = dataUrl.split(',');
+  const mime = (head.match(/data:([^;]+)/)||[])[1] || 'application/octet-stream';
+  const bytes = Uint8Array.from(atob(body), c=>c.charCodeAt(0));
+  return new Blob([bytes],{type:mime});
+}
+async function fetchBlob(url){
+  const r=await fetch(url);
+  if(!r.ok) throw new Error('Could not fetch '+url);
+  return await r.blob();
+}
+async function buildCustomerPackage(){
+  const zip=new JSZip();
+  const root=zip.folder('morales-quality-designs-order');
+  const previews=root.folder('PREVIEWS');
+  const artwork=root.folder('ARTWORK');
+  const source=root.folder('SOURCE');
+  const design=root.folder('DESIGN');
+  const order=root.folder('ORDER');
+
+  // Full current design preview.
+  if(typeof designCanvas!=='undefined' && designCanvas){
+    previews.file('master-preview.png',dataUrlToBlob(designCanvas.toDataURL('image/png')));
+  }
+
+  // Exact color/source metadata.
+  design.file('colors.json',JSON.stringify(getDesignColors(),null,2));
+
+  // Current product configuration and printable zones.
+  design.file('product-config.json',JSON.stringify(product,null,2));
+
+  // Per-zone reference + dimension metadata and artwork preview.
+  const zoneInfo={};
+  for(const z of (product.zones||[])){
+    const t=templateFor(product,z);
+    zoneInfo[z]=t||null;
+    const safe=safeFileName(z);
+    if(t?.path){
+      try{ source.file(`templates/${safe}${t.path.toLowerCase().endsWith('.jpg')?'.jpg':'.png'}`,await fetchBlob(t.path)); }catch(e){console.warn(e)}
+    }
+    if(t?.width && t?.height && typeof designCanvas!=='undefined' && designCanvas){
+      const c=document.createElement('canvas');
+      c.width=t.width;c.height=t.height;
+      const ctx=c.getContext('2d');
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+      const scale=Math.min((c.width*0.65)/designCanvas.width,(c.height*0.65)/designCanvas.height);
+      const w=designCanvas.width*scale,h=designCanvas.height*scale;
+      ctx.drawImage(designCanvas,(c.width-w)/2,(c.height-h)/2,w,h);
+      artwork.file(`${safe}-preview.png`,dataUrlToBlob(c.toDataURL('image/png')));
+      previews.file(`${safe}-production-view.png`,dataUrlToBlob(c.toDataURL('image/png')));
+    }else if(typeof designCanvas!=='undefined' && designCanvas){
+      artwork.file(`${safe}-preview.png`,dataUrlToBlob(designCanvas.toDataURL('image/png')));
+    }
+  }
+  design.file('zone-config.json',JSON.stringify(zoneInfo,null,2));
+
+  // Original uploaded artwork references. If the app exposes them as object URLs/data URLs,
+  // preserve any discoverable layer source records in JSON.
+  design.file('design-source.json',JSON.stringify({
+    savedAt:new Date().toISOString(),
+    productId:product?.id||null,
+    productName:product?.name||null,
+    note:'Package contains rendered previews and source configuration. Original customer upload binaries are included when the browser app retains an accessible source URL.'
+  },null,2));
+
+  // 3D garment source.
+  if(product?.model){
+    try{source.file('garment.glb',await fetchBlob(product.model));}catch(e){console.warn('GLB fetch failed',e)}
+  }
+
+  order.file('order-readme.txt',
+`Morales Quality Designs — Customer Design Package
+
+Product: ${product?.name||''}
+Generated: ${new Date().toLocaleString()}
+
+This package is designed for owner-controlled printing. Use the 3D previews for visual reference and the artwork/source assets for final print preparation.
+`);
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${safeFileName(product?.name||'design')}-customer-package.zip`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const seed=[
+{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',price:39,model:'/assets/tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+ 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
+ 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
+ 'Left Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
+ 'Right Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
+ 'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
+}},
+{id:'long-sleeve-tshirt',name:'Long Sleeve T-Shirt',category:'Long Sleeve',price:49,model:'/assets/long-sleeve-tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+ 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
+ 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
+ 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
+}},
+{id:'short-sleeve-polo',name:'Short Sleeve Polo',category:'Polos',price:54,model:'/assets/short-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+ 'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
+ 'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
+ 'Left Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
+ 'Right Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
+ 'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
+}},
+{id:'long-sleeve-polo',name:'Long Sleeve Polo',category:'Polos',price:59,model:'/assets/long-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+ 'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
+ 'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
+ 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
+}},
+{id:'fleece-hoodie',name:'Fleece Hoodie',category:'Hoodies',price:69,model:'/assets/fleece-hoodie.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+ 'Front':{path:'/assets/templates/hoodie/front.png',width:3865,height:3884},
+ 'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
+ 'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
+ 'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
+ 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
+}},
+{id:'lightweight-jacket',name:'Lightweight Jacket',category:'Jackets',price:79,model:'/assets/lightweight-jacket.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+ 'Front':{path:'/assets/templates/rain-jacket/front.png',width:4220,height:4740},
+ 'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
+ 'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
+ 'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
+ 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
+}},
+{id:'mask',name:'Mask',category:'Accessories',price:19,model:'/assets/mask.glb',zones:['Entire Mask'],templates:{
+ 'Entire Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full mask design area.'}
+}},
+{id:'hood-mask-shirt',name:'Long Sleeve Shirt With Hood And Built-In Mask',category:'Long Sleeve',price:64,model:'/assets/hood-mask-shirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood','Built-In Mask'],templates:{
+ 'Front':{path:'/assets/tshirt/front.png',width:3763,height:4992},
+ 'Back':{path:'/assets/tshirt/back.png',width:3750,height:5011},
+ 'Left Sleeve':{path:'/assets/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Right Sleeve':{path:'/assets/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Hood':{path:'/assets/hoodie/hood.png',width:4684,height:2073},
+ 'Built-In Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full built-in mask design area; uses the confirmed mask production size.'}
+}},
+{id:'shorts',name:'Shorts',category:'Bottoms',price:44,model:'/assets/shorts.glb',zones:['Front','Back'],templates:{
+ 'Front':{path:'/assets/templates/shorts/front.png',width:2145,height:3480},
+ 'Back':{path:'/assets/templates/shorts/back.png',width:2455,height:3650}
+}},
+{id:'sweat-pants',name:'Sweat Pants',category:'Bottoms',price:54,model:'/assets/sweat-pants.glb',zones:['Front','Back'],templates:{
+ 'Front':{path:'/assets/templates/sweat-pants/front.png',width:3670,height:5960},
+ 'Back':{path:'/assets/templates/sweat-pants/back.png',width:3670,height:5960}
+}},
+{id:'hooded-long-sleeve',name:'Long Sleeve Shirt With Hood',category:'Long Sleeve',price:59,model:'/assets/hooded-long-sleeve.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+ 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
+ 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
+ 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
+ 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
+}},
+{id:'hat',name:'Hat',category:'Headwear',price:34,model:'/assets/hat.glb',zones:['Front Panel','Top of Bill'],templates:{
+ 'Front Panel':{path:'/assets/templates/hat/front-panel.png',width:1151,height:1050},
+ 'Top of Bill':{path:'/assets/templates/hat/top-of-bill.png',width:1169,height:941}
+}}
+];
+const colors=['#ffffff','#111111','#7a0f14','#1e3a5f','#56704d'];
+function templateFor(p,z){return p.templates?.[z]||null}
+function renderTemplatePanel(){
+ const el=$('templatePanel'); if(!el)return;
+ const t=templateFor(product,activeZone);
+ if(!t){
+   el.innerHTML='<div class="small">No factory-authoritative template attached to this zone yet. The zone is available in the designer, but production export remains provisional.</div>';
+   return;
+ }
+ if(t.shape==='rectangle' && (!t.width || !t.height)){
+   el.innerHTML=`<div class="template-card"><div style="font-size:28px;line-height:1;margin-bottom:8px">▭</div><div class="template-meta"><strong>${escapeHtml(activeZone)}</strong><br>Shape: single rectangle covering the design area<br>Exact factory pixel size: to be supplied by production source<br><em>${escapeHtml(t.notes||'')}</em></div></div>`;
+   return;
+ }
+ el.innerHTML=`<div class="template-card"><img src="${t.path}" alt="${escapeHtml(activeZone)} production template"><div class="template-meta"><strong>${escapeHtml(activeZone)}</strong><br>Maximum artwork: ${t.width.toLocaleString()} × ${t.height.toLocaleString()} px<br><a href="${t.path}" target="_blank" rel="noopener">Open template</a></div></div>`;
+}
+let catalog=JSON.parse(localStorage.getItem('mqd-catalog')||'null')||seed;
+let product=catalog[0],activeZone=product.zones[0],layers=[];
+let scene,camera,renderer,controls,garment=null,designCanvas,designCtx,designTexture,baseImage=null;
+const $=id=>document.getElementById(id);
+function persist(){localStorage.setItem('mqd-catalog',JSON.stringify(catalog))}
+function currentProduct(){return catalog.find(x=>x.id===product.id)||catalog[0]}
+function renderCatalog(){
+ const list=$('productList');list.innerHTML='';catalog.forEach(p=>{const b=document.createElement('button');b.className='product-btn'+(p.id===product.id?' active':'');b.innerHTML='<div>'+escapeHtml(p.name)+'</div><div class="sub">'+escapeHtml(p.category)+' · $'+Number(p.price).toFixed(2)+'</div>';b.onclick=()=>selectProduct(p.id);list.appendChild(b)});
+}
+function renderZones(){
+ $('zones').innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone'+(z===activeZone?' active':'');b.textContent=z;b.onclick=()=>{activeZone=z;renderZones();updateStats()};$('zones').appendChild(b)});
+}
+function renderSwatches(){ $('swatches').innerHTML='';colors.forEach((c,i)=>{const b=document.createElement('button');b.className='swatch'+(i===0?' active':'');b.style.background=c;b.title=c;b.onclick=()=>{garment?.traverse(o=>{if(o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if(m.color)m.color.set(c)})}});Array.from(document.querySelectorAll('.swatch')).forEach(x=>x.classList.remove('active'));b.classList.add('active')};$('swatches').appendChild(b)})}
+function updateStats(){ renderTemplatePanel(); $('activeLabel').textContent=activeZone; $('layerCount').textContent=layers.length; $('productName').textContent=product.name; $('price').textContent='$'+Number(product.price).toFixed(2);$('category').textContent=product.category; }
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fitObject(obj){const box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());const max=Math.max(size.x,size.y,size.z);obj.position.sub(center);camera.position.set(0,max*0.5,max*2.25);camera.near=max/100;camera.far=max*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update()}
+async function loadGarment(){
+ if(!renderer)init3D();
+ if(garment){scene.remove(garment);garment.traverse(o=>{if(o.geometry)o.geometry.dispose(); if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}});garment=null}
+ new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitObject(garment);prepareDesignTexture();},undefined,e=>console.error(e));
+}
+function prepareDesignTexture(){
+ designCanvas=document.createElement('canvas');designCanvas.width=2048;designCanvas.height=2048;designCtx=designCanvas.getContext('2d');designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);
+ baseImage=null;
+ let sourceMap=null;garment.traverse(o=>{if(!sourceMap&&o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){if(m.map?.image){sourceMap=m.map;break}}}});
+ if(sourceMap?.image){baseImage=sourceMap.image;try{designCtx.drawImage(baseImage,0,0,2048,2048)}catch{}}
+ designTexture=new THREE.CanvasTexture(designCanvas);designTexture.colorSpace=THREE.SRGBColorSpace;designTexture.needsUpdate=true;
+ garment.traverse(o=>{if(o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.map=designTexture;m.needsUpdate=true})}});
+ }
+function init3D(){
+ const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);renderer.outputColorSpace=THREE.SRGBColorSpace;
+ scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(35,canvas.clientWidth/canvas.clientHeight,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.minDistance=.25;controls.maxDistance=8;
+ scene.add(new THREE.HemisphereLight(0xffffff,0x555555,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);const fill=new THREE.DirectionalLight(0xffffff,1.2);fill.position.set(-3,1,-2);scene.add(fill);
+ const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();
+ const loop=()=>{controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)};loop();
+}
+function addImage(src){const img=new Image();img.onload=()=>{designCtx.clearRect(0,0,2048,2048);if(baseImage)designCtx.drawImage(baseImage,0,0,2048,2048);designCtx.save();const max=1500,scale=Math.min(max/img.width,max/img.height,1);const w=img.width*scale,h=img.height*scale;designCtx.drawImage(img,(2048-w)/2,(2048-h)/2,w,h);designCtx.restore();designTexture.needsUpdate=true;layers.push({type:'image',zone:activeZone,name:'upload'});updateStats()};img.src=src}
+$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f))});
+$('addText').onclick=()=>{const text=prompt('Text to add');if(!text||!designCtx)return;designCtx.save();designCtx.fillStyle='#111';designCtx.font='bold 150px Inter, sans-serif';designCtx.textAlign='center';designCtx.textBaseline='middle';designCtx.fillText(text,1024,1024);designCtx.restore();designTexture.needsUpdate=true;layers.push({type:'text',zone:activeZone,text});updateStats()};
+$('reset').onclick=()=>{if(!designCtx)return;designCtx.clearRect(0,0,2048,2048);if(baseImage)designCtx.drawImage(baseImage,0,0,2048,2048);designTexture.needsUpdate=true;layers=[];updateStats()};
+function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];layers=[];renderCatalog();renderZones();updateStats();loadGarment()}
+async function saveDesign(){const data={product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,layers,createdAt:new Date().toISOString()};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click()}
+function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(',');const bin=atob(b);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]})}
+async function downloadPack(){
+ if(!designCanvas)return;
+ const zip=new JSZip();
+ const root=zip.folder((product.id||'design')+'-production');
+ root.file('master-preview-2048.png',dataUrlBlob(designCanvas.toDataURL('image/png')));
+ const productionFolder=root.folder('zones');
+ for(const z of product.zones){
+   const t=templateFor(product,z);
+   const safe=z.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+   if(t?.path){
+     try{
+       const resp=await fetch(t.path);
+       if(resp.ok)root.file(`${safe}-template-reference${t.path.toLowerCase().endsWith('.jpg')?'.jpg':'.png'}`,await resp.blob());
+     }catch(e){console.warn('Template fetch failed',z,e)}
+   }
+   if(t && t.width && t.height){
+     const c=document.createElement('canvas'); c.width=t.width; c.height=t.height;
+     const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+     const scale=Math.min((c.width*0.65)/designCanvas.width,(c.height*0.65)/designCanvas.height);
+     const w=designCanvas.width*scale,h=designCanvas.height*scale;
+     x.drawImage(designCanvas,(c.width-w)/2,(c.height-h)/2,w,h);
+     productionFolder.file(`${safe}-artwork-preview.png`,dataUrlBlob(c.toDataURL('image/png')));
+   }else if(t?.shape==='rectangle'){
+     productionFolder.file(`${safe}-artwork-rectangle-provisional.png`,dataUrlBlob(designCanvas.toDataURL('image/png')));
+   }else{
+     productionFolder.file(`${safe}-provisional.png`,dataUrlBlob(designCanvas.toDataURL('image/png')));
+   }
+ }
+ root.file('production-spec.json',JSON.stringify({
+   product,
+   productionTemplateStatus:'Configured from supplied production templates where available; remaining zones stay provisional until their source dimensions/UV placement are verified.',
+   notes:'Template previews preserve the supplied reference images. Dimension-matched artwork previews are not factory-ready flats until UV-to-pattern placement is verified.',
+   zones:product.zones,
+   generatedAt:new Date().toISOString()
+ },null,2));
+ if(garment){const resp=await fetch(product.model);if(resp.ok)root.file(product.id+'.glb',await resp.blob())}
+ const blob=await zip.generateAsync({type:'blob'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();
+}
+$('downloadPack').onclick=downloadPack;
+$('customerPackage').onclick=buildCustomerPackage;$('downloadPackTop').onclick=downloadPack;$('saveDesign').onclick=saveDesign;
+function renderAdmin(){const list=$('adminProductList');list.innerHTML='';catalog.forEach(p=>{const row=document.createElement('div');row.className='product-row';row.innerHTML='<div><strong>'+escapeHtml(p.name)+'</strong><div class="small">'+escapeHtml(p.category)+'</div></div><div>$'+Number(p.price).toFixed(2)+'</div><div class="small">'+p.zones.length+' zones</div><button class="btn">Edit</button>';row.querySelector('button').onclick=()=>loadAdmin(p.id);list.appendChild(row)})}
+function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminName').value=p.name;$('adminCategory').value=p.category;$('adminPrice').value=p.price;$('adminZones').innerHTML='';p.zones.forEach(z=>{const chip=document.createElement('span');chip.className='chip';chip.innerHTML=escapeHtml(z)+' <button style="border:0;background:transparent;cursor:pointer" aria-label="remove">×</button>';chip.querySelector('button').onclick=()=>{p.zones=p.zones.filter(x=>x!==z);if(p.id===product.id){product=p;activeZone=p.zones[0]||'';renderZones();updateStats()};renderAdmin();loadAdmin(p.id)};$('adminZones').appendChild(chip)});$('saveProduct').dataset.id=id}
+$('saveProduct').onclick=()=>{const p=catalog.find(x=>x.id===$('saveProduct').dataset.id);if(!p)return;p.name=$('adminName').value.trim()||p.name;p.category=$('adminCategory').value.trim()||p.category;p.price=Number($('adminPrice').value)||p.price;persist();if(product.id===p.id){product=p;renderCatalog();renderZones();updateStats()};renderAdmin();alert('Product saved.')};
+$('addZone').onclick=()=>{const name=prompt('Zone name');const id=$('saveProduct').dataset.id;const p=catalog.find(x=>x.id===id);if(!p||!name)return;p.zones.push(name.trim());persist();renderAdmin();loadAdmin(id);if(product.id===id){product=p;renderZones();updateStats()}};
+$('openAdmin').onclick=()=>{$('adminOverlay').classList.remove('hidden');renderAdmin();loadAdmin(product.id)};$('closeAdmin').onclick=()=>{$('adminOverlay').classList.add('hidden')};$('adminOverlay').addEventListener('click',e=>{if(e.target===$('adminOverlay'))$('adminOverlay').classList.add('hidden')});
+renderCatalog();renderZones();renderSwatches();updateStats();selectProduct(product.id);
+</script>
+
+<section class="card" style="margin-top:14px">
+  <div class="label">UV calibration workspace</div><div class="small" style="margin-top:6px">Owner-controlled printing mode: customer packages preserve previews, template references, colors, design configuration, and the garment GLB for your final print preparation.</div><div class="small" style="margin-top:6px"><strong>Corrected Lightweight Jacket GLB installed.</strong> UV occupancy was regenerated from the replacement asset.</div>
+  <div class="small">
+    Every garment now has a UV occupancy diagnostic and a production-mapping manifest.
+    Use these diagnostics to verify each printable zone against the physical factory pattern before enabling final production exports.
+  </div>
+</section>
+</body>
+</html>
