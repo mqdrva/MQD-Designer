@@ -1,0 +1,61 @@
+name: Fix front coverage to collar seam
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-front-to-collar-seam.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-front-collar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Refine front and collar boundary
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          replacements=[
+            (
+              "const torsoHalf=sx*.29, neckHalfX=sx*.19, neckStart=b.max.y-sy*.19;",
+              "const torsoHalf=sx*.29, neckHalfX=sx*.13, neckStart=b.max.y-sy*.10;"
+            ),
+            (
+              "if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.14)c=collarC;",
+              "if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.075)c=collarC;"
+            ),
+            (
+              "const neckCenterY=box.max.y-size.y*.075,neckHalfY=size.y*.125,neckHalfX=size.x*.20,torsoHalfX=size.x*.30;",
+              "const neckCenterY=box.max.y-size.y*.045,neckHalfY=size.y*.065,neckHalfX=size.x*.135,torsoHalfX=size.x*.30;"
+            ),
+            (
+              "mat.customProgramCacheKey=()=>`mqd-front-mask-v2`;",
+              "mat.customProgramCacheKey=()=>`mqd-front-mask-v3`;"
+            ),
+            (
+              "else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.11+ny*size.y*.24,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.78*sc,size.z*1.6)}",
+              "else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.015+ny*size.y*.28,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.94*sc,size.z*1.6)}"
+            ),
+          ]
+
+          for old,new in replacements:
+            if old not in s:
+              raise SystemExit('Expected block not found: '+old)
+            s=s.replace(old,new,1)
+
+          p.write_text(s,encoding='utf-8')
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Extend front artwork to collar seam"
+          git push origin main
