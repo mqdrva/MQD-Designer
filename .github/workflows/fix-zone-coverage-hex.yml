@@ -1,0 +1,27 @@
+name: Fix zone coverage and HEX color
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-zone-coverage-hex.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply zone coverage and HEX color patch
+        run: python .github/scripts/fix_zone_coverage_hex.py
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Improve zone coverage and add HEX color picker"
+          git push origin main
