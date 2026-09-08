@@ -74,7 +74,7 @@ if(z==='Back'){pos.set(c.x+nx*size.x*.25,c.y+ny*size.y*.30,box.min.z-size.z*.08)
 else if(z==='Left Sleeve'){pos.set(box.min.x-size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z+nx*size.z*.18);ori.set(0,-Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
 else if(z==='Right Sleeve'){pos.set(box.max.x+size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z-nx*size.z*.18);ori.set(0,Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
 else if(z==='Collar'){pos.set(c.x+nx*size.x*.12,box.max.y+size.y*.005,c.z+ny*size.z*.12);ori.set(-Math.PI/2,0,r);dims.set(size.x*.28*sc,size.z*1.15*sc,size.y*.15)}
-else{pos.set(c.x+nx*size.x*.25,c.y+ny*size.y*.30,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.92*sc,size.z*1.6)}
+else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.11+ny*size.y*.24,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.78*sc,size.z*1.6)}
 return{pos,ori,dims};}
 function rebuildLayerDecal(layer){if(!decalTarget||!decalGroup||!layer)return;if(layer.mesh){decalGroup.remove(layer.mesh);layer.mesh.geometry.dispose();layer.mesh.material.dispose();layer.mesh=null}if(layer.visible===false)return;const tex=layerTexture(layer);if(!tex)return;const q=zoneProjection(layer);try{const geo=new DecalGeometry(decalTarget,q.pos,q.ori,q.dims);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.8,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=layer.type==='background'?5:10;layer.mesh=mesh;decalGroup.add(mesh)}catch(e){console.warn('Artwork projection failed',e)}}
 function rebuildAllDecals(){if(!garment)return;if(!decalGroup)clearDecals();allProductLayers().forEach(rebuildLayerDecal);}
@@ -253,9 +253,12 @@ function init3D(){
  const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();
  const loop=()=>{controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)};loop();
 }
-function addImage(src,fileName='Artwork'){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:fileName,texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}
-$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f),f.name)});
-$('zoneColorPicker')?.addEventListener('input',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});
+function nextArtworkLayerName(){return 'Layer '+(currentZoneLayers().filter(l=>l.type!=='background').length+1)}
+function addImage(src){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:nextArtworkLayerName(),texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}
+$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f))});
+let zoneColorPickerRaf=0;
+$('zoneColorPicker')?.addEventListener('input',e=>{const c=e.target.value.toUpperCase();$('zoneHex').value=c;cancelAnimationFrame(zoneColorPickerRaf);zoneColorPickerRaf=requestAnimationFrame(()=>setZoneBackground(c))});
+$('zoneColorPicker')?.addEventListener('change',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});
 $('zoneHex')?.addEventListener('change',e=>{const c=normalizeHex(e.target.value);if(!c){syncZoneColorInputs();return}setZoneBackground(c);$('zoneColorPicker').value=c.toLowerCase();renderSwatches()});
 
 $('addText').onclick=()=>{const text=prompt('Text to add');if(!text)return;addZoneLayer({type:'text',name:text,text});};
