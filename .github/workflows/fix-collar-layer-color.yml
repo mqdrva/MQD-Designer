@@ -1,0 +1,51 @@
+name: Fix collar isolation, layer labels, and color picker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-collar-layer-color.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply targeted editor fixes
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          old_front="""else{pos.set(c.x+nx*size.x*.25,c.y+ny*size.y*.30,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.92*sc,size.z*1.6)}"""
+          new_front="""else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.11+ny*size.y*.24,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.78*sc,size.z*1.6)}"""
+          if old_front not in s:
+              raise SystemExit('Front projection block not found')
+          s=s.replace(old_front,new_front,1)
+
+          old_add="""function addImage(src,fileName='Artwork'){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:fileName,texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}\n$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f),f.name)});"""
+          new_add="""function nextArtworkLayerName(){return 'Layer '+(currentZoneLayers().filter(l=>l.type!=='background').length+1)}\nfunction addImage(src){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:nextArtworkLayerName(),texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}\n$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f))});"""
+          if old_add not in s:
+              raise SystemExit('Image upload block not found')
+          s=s.replace(old_add,new_add,1)
+
+          old_color="""$('zoneColorPicker')?.addEventListener('input',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});\n$('zoneHex')?.addEventListener('change',e=>{const c=normalizeHex(e.target.value);if(!c){syncZoneColorInputs();return}setZoneBackground(c);$('zoneColorPicker').value=c.toLowerCase();renderSwatches()});"""
+          new_color="""let zoneColorPickerRaf=0;\n$('zoneColorPicker')?.addEventListener('input',e=>{const c=e.target.value.toUpperCase();$('zoneHex').value=c;cancelAnimationFrame(zoneColorPickerRaf);zoneColorPickerRaf=requestAnimationFrame(()=>setZoneBackground(c))});\n$('zoneColorPicker')?.addEventListener('change',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});\n$('zoneHex')?.addEventListener('change',e=>{const c=normalizeHex(e.target.value);if(!c){syncZoneColorInputs();return}setZoneBackground(c);$('zoneColorPicker').value=c.toLowerCase();renderSwatches()});"""
+          if old_color not in s:
+              raise SystemExit('Color picker block not found')
+          s=s.replace(old_color,new_color,1)
+
+          p.write_text(s,encoding='utf-8')
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix collar bleed, layer labels, and color picker"
+          git push origin main
