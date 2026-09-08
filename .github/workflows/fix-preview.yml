@@ -1,0 +1,105 @@
+name: Fix 3D garment preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-preview.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch texture handling
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          old_prepare = """function prepareDesignTexture(){
+           designCanvas=document.createElement('canvas');designCanvas.width=2048;designCanvas.height=2048;designCtx=designCanvas.getContext('2d');designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);
+           baseImage=null;
+           let sourceMap=null;garment.traverse(o=>{if(!sourceMap&&o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){if(m.map?.image){sourceMap=m.map;break}}}});
+           if(sourceMap?.image){baseImage=sourceMap.image;try{designCtx.drawImage(baseImage,0,0,2048,2048)}catch{}}
+           designTexture=new THREE.CanvasTexture(designCanvas);designTexture.colorSpace=THREE.SRGBColorSpace;designTexture.needsUpdate=true;
+           garment.traverse(o=>{if(o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.map=designTexture;m.needsUpdate=true})}});
+           }"""
+
+          new_prepare = """function prepareDesignTexture(){
+           designCanvas=document.createElement('canvas');
+           designCanvas.width=2048;designCanvas.height=2048;
+           designCtx=designCanvas.getContext('2d');
+           designCtx.imageSmoothingEnabled=true;
+           designCtx.imageSmoothingQuality='high';
+           designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);
+           baseImage=null;
+           designTexture=new THREE.CanvasTexture(designCanvas);
+           designTexture.colorSpace=THREE.SRGBColorSpace;
+           designTexture.anisotropy=renderer.capabilities.getMaxAnisotropy();
+           designTexture.minFilter=THREE.LinearMipmapLinearFilter;
+           designTexture.magFilter=THREE.LinearFilter;
+           designTexture.generateMipmaps=true;
+           designTexture.needsUpdate=true;
+           garment.traverse(o=>{
+             if(!o.isMesh)return;
+             const mats=Array.isArray(o.material)?o.material:[o.material];
+             mats.forEach(m=>{if(!('mqdOriginalMap' in m.userData))m.userData.mqdOriginalMap=m.map||null});
+           });
+          }
+          function applyDesignTexture(){
+           if(!garment||!designTexture)return;
+           garment.traverse(o=>{
+             if(!o.isMesh)return;
+             const mats=Array.isArray(o.material)?o.material:[o.material];
+             mats.forEach(m=>{
+               if(!('mqdOriginalMap' in m.userData))m.userData.mqdOriginalMap=m.map||null;
+               m.map=designTexture;
+               if(m.color)m.color.set(0xffffff);
+               m.needsUpdate=true;
+             });
+           });
+          }"""
+
+          old_renderer = "const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);renderer.outputColorSpace=THREE.SRGBColorSpace;"
+          new_renderer = """const canvas=$('webgl');
+           renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+           renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+           renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
+           renderer.outputColorSpace=THREE.SRGBColorSpace;
+           renderer.toneMapping=THREE.ACESFilmicToneMapping;
+           renderer.toneMappingExposure=1.05;"""
+
+          old_image = "designCtx.restore();designTexture.needsUpdate=true;layers.push({type:'image',zone:activeZone,name:'upload'});"
+          new_image = "designCtx.restore();designTexture.needsUpdate=true;applyDesignTexture();layers.push({type:'image',zone:activeZone,name:'upload'});"
+          old_text = "designCtx.restore();designTexture.needsUpdate=true;layers.push({type:'text',zone:activeZone,text});"
+          new_text = "designCtx.restore();designTexture.needsUpdate=true;applyDesignTexture();layers.push({type:'text',zone:activeZone,text});"
+          old_reset = "$('reset').onclick=()=>{if(!designCtx)return;designCtx.clearRect(0,0,2048,2048);if(baseImage)designCtx.drawImage(baseImage,0,0,2048,2048);designTexture.needsUpdate=true;layers=[];updateStats()};"
+          new_reset = "$('reset').onclick=()=>{if(!designCtx)return;designCtx.clearRect(0,0,2048,2048);designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);if(garment)garment.traverse(o=>{if(!o.isMesh)return;const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if('mqdOriginalMap' in m.userData)m.map=m.userData.mqdOriginalMap;m.needsUpdate=true})});designTexture.needsUpdate=true;layers=[];updateStats()};"
+
+          replacements = [
+            (old_prepare,new_prepare,'prepareDesignTexture'),
+            (old_renderer,new_renderer,'renderer'),
+            (old_image,new_image,'image artwork'),
+            (old_text,new_text,'text artwork'),
+            (old_reset,new_reset,'reset')
+          ]
+          for old,new,label in replacements:
+            if old not in s:
+              raise SystemExit(f'Missing expected block: {label}')
+            s = s.replace(old,new,1)
+
+          p.write_text(s,encoding='utf-8')
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix 3D garment texture distortion"
+          git push origin main
