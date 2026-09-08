@@ -1,0 +1,27 @@
+name: Fix zone fill and selected-area color
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-zone-fill-color.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply zone fill/color patch
+        run: python .github/scripts/fix_zone_fill_color.py
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix per-zone fill and background color"
+          git push origin main
