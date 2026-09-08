@@ -73,14 +73,8 @@ The diagnostics are intended to support exact UV-to-factory-pattern calibration;
 ## V14 — corrected Lightweight Jacket asset
 The Lightweight Jacket product now points to the newly supplied `lightweight-jacket.glb`. Its UV occupancy diagnostic and UV report were regenerated from that corrected GLB. This verifies UV readiness but does not certify exact factory-template correspondence until panel-level calibration is confirmed.
 
-## V15 — owner-controlled printing package
-The customer-facing workflow now includes an Export Customer Package action.
-The package contains:
-- 3D garment GLB
-- Master design preview
-- Zone-sized artwork previews where zone dimensions are known
-- Production template references
-- Product and zone configuration JSON
-- Color metadata including hex values when available
-- A package README
-These files are intended to support owner-controlled final print preparation. They are not represented as automated factory-certified separations.
+## V16 — Supabase garment storage connection
+All 12 product GLB model URLs are configured to load from the public Supabase `garments` bucket.
+Vercel remains responsible for the web application; Supabase Storage serves the larger 3D assets.
+The Supabase project URL and publishable key are stored as Vercel environment variables for later application/backend use.
+No service-role/secret key is embedded in the browser code.

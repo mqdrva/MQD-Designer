@@ -44,110 +44,7 @@
   </aside>
 </div>
 <div id="adminOverlay" class="overlay hidden"><div class="modal"><div class="modal-head"><div><div class="kicker">Store Management</div><div style="font-size:22px;font-weight:800;margin-top:4px">Product Catalog</div></div><button class="pill" id="closeAdmin">Close</button></div><div class="modal-body"><div class="admin-grid"><div><div class="card"><div class="label">Edit selected product</div><input id="adminName" class="input" placeholder="Product name"><div class="control"><input id="adminCategory" class="input" placeholder="Category"></div><div class="control"><input id="adminPrice" class="input" type="number" step="0.01" placeholder="Price"></div><div class="label" style="margin-top:14px">Printable zones</div><div id="adminZones" class="zone-chips"></div><div class="row control"><button class="btn" id="addZone">Add Zone</button><button class="btn" id="saveProduct">Save Product</button></div></div><div class="admin-note" style="margin-top:12px">You can change a product name, category, price, or printable-zone list without changing the GLB. Future garments can be added here by supplying a new GLB path in the catalog data.</div></div><div><div class="label">Catalog</div><div id="adminProductList" class="product-table"></div></div></div></div></div></div>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}
-function safeFileName(s){return String(s||'file').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/-+/g,'-')}
-function getDesignColors(){
-  const bg = (typeof backgroundColor!=='undefined' && backgroundColor) ? backgroundColor : '#ffffff';
-  const garment = (typeof garmentColor!=='undefined' && garmentColor) ? garmentColor : '#ffffff';
-  const layers = (typeof designLayers!=='undefined' && Array.isArray(designLayers)) ? designLayers : [];
-  return {
-    background:{hex:bg},
-    garment:{hex:garment},
-    artworkLayers:layers.map((l,i)=>({
-      index:i,
-      type:l?.type||'unknown',
-      text:l?.text||null,
-      color:l?.color||null
-    }))
-  };
-}
-function dataUrlToBlob(dataUrl){
-  const [head, body] = dataUrl.split(',');
-  const mime = (head.match(/data:([^;]+)/)||[])[1] || 'application/octet-stream';
-  const bytes = Uint8Array.from(atob(body), c=>c.charCodeAt(0));
-  return new Blob([bytes],{type:mime});
-}
-async function fetchBlob(url){
-  const r=await fetch(url);
-  if(!r.ok) throw new Error('Could not fetch '+url);
-  return await r.blob();
-}
-async function buildCustomerPackage(){
-  const zip=new JSZip();
-  const root=zip.folder('morales-quality-designs-order');
-  const previews=root.folder('PREVIEWS');
-  const artwork=root.folder('ARTWORK');
-  const source=root.folder('SOURCE');
-  const design=root.folder('DESIGN');
-  const order=root.folder('ORDER');
-
-  // Full current design preview.
-  if(typeof designCanvas!=='undefined' && designCanvas){
-    previews.file('master-preview.png',dataUrlToBlob(designCanvas.toDataURL('image/png')));
-  }
-
-  // Exact color/source metadata.
-  design.file('colors.json',JSON.stringify(getDesignColors(),null,2));
-
-  // Current product configuration and printable zones.
-  design.file('product-config.json',JSON.stringify(product,null,2));
-
-  // Per-zone reference + dimension metadata and artwork preview.
-  const zoneInfo={};
-  for(const z of (product.zones||[])){
-    const t=templateFor(product,z);
-    zoneInfo[z]=t||null;
-    const safe=safeFileName(z);
-    if(t?.path){
-      try{ source.file(`templates/${safe}${t.path.toLowerCase().endsWith('.jpg')?'.jpg':'.png'}`,await fetchBlob(t.path)); }catch(e){console.warn(e)}
-    }
-    if(t?.width && t?.height && typeof designCanvas!=='undefined' && designCanvas){
-      const c=document.createElement('canvas');
-      c.width=t.width;c.height=t.height;
-      const ctx=c.getContext('2d');
-      ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
-      const scale=Math.min((c.width*0.65)/designCanvas.width,(c.height*0.65)/designCanvas.height);
-      const w=designCanvas.width*scale,h=designCanvas.height*scale;
-      ctx.drawImage(designCanvas,(c.width-w)/2,(c.height-h)/2,w,h);
-      artwork.file(`${safe}-preview.png`,dataUrlToBlob(c.toDataURL('image/png')));
-      previews.file(`${safe}-production-view.png`,dataUrlToBlob(c.toDataURL('image/png')));
-    }else if(typeof designCanvas!=='undefined' && designCanvas){
-      artwork.file(`${safe}-preview.png`,dataUrlToBlob(designCanvas.toDataURL('image/png')));
-    }
-  }
-  design.file('zone-config.json',JSON.stringify(zoneInfo,null,2));
-
-  // Original uploaded artwork references. If the app exposes them as object URLs/data URLs,
-  // preserve any discoverable layer source records in JSON.
-  design.file('design-source.json',JSON.stringify({
-    savedAt:new Date().toISOString(),
-    productId:product?.id||null,
-    productName:product?.name||null,
-    note:'Package contains rendered previews and source configuration. Original customer upload binaries are included when the browser app retains an accessible source URL.'
-  },null,2));
-
-  // 3D garment source.
-  if(product?.model){
-    try{source.file('garment.glb',await fetchBlob(product.model));}catch(e){console.warn('GLB fetch failed',e)}
-  }
-
-  order.file('order-readme.txt',
-`Morales Quality Designs — Customer Design Package
-
-Product: ${product?.name||''}
-Generated: ${new Date().toLocaleString()}
-
-This package is designed for owner-controlled printing. Use the 3D previews for visual reference and the artwork/source assets for final print preparation.
-`);
-  const blob=await zip.generateAsync({type:'blob'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`${safeFileName(product?.name||'design')}-customer-package.zip`;
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-}
-
-</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
 import * as THREE from 'three';
@@ -155,52 +52,52 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 const seed=[
-{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',price:39,model:'/assets/tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',price:39,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
  'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
  'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
  'Left Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
  'Right Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
  'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
 }},
-{id:'long-sleeve-tshirt',name:'Long Sleeve T-Shirt',category:'Long Sleeve',price:49,model:'/assets/long-sleeve-tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+{id:'long-sleeve-tshirt',name:'Long Sleeve T-Shirt',category:'Long Sleeve',price:49,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
  'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
  'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
  'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
 }},
-{id:'short-sleeve-polo',name:'Short Sleeve Polo',category:'Polos',price:54,model:'/assets/short-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+{id:'short-sleeve-polo',name:'Short Sleeve Polo',category:'Polos',price:54,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/short-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
  'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
  'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
  'Left Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
  'Right Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
  'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
 }},
-{id:'long-sleeve-polo',name:'Long Sleeve Polo',category:'Polos',price:59,model:'/assets/long-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
+{id:'long-sleeve-polo',name:'Long Sleeve Polo',category:'Polos',price:59,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
  'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
  'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
  'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
 }},
-{id:'fleece-hoodie',name:'Fleece Hoodie',category:'Hoodies',price:69,model:'/assets/fleece-hoodie.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+{id:'fleece-hoodie',name:'Fleece Hoodie',category:'Hoodies',price:69,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/fleece-hoodie.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
  'Front':{path:'/assets/templates/hoodie/front.png',width:3865,height:3884},
  'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
  'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
  'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
  'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
 }},
-{id:'lightweight-jacket',name:'Lightweight Jacket',category:'Jackets',price:79,model:'/assets/lightweight-jacket.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+{id:'lightweight-jacket',name:'Lightweight Jacket',category:'Jackets',price:79,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/lightweight-jacket.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
  'Front':{path:'/assets/templates/rain-jacket/front.png',width:4220,height:4740},
  'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
  'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
  'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
  'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
 }},
-{id:'mask',name:'Mask',category:'Accessories',price:19,model:'/assets/mask.glb',zones:['Entire Mask'],templates:{
+{id:'mask',name:'Mask',category:'Accessories',price:19,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/mask.glb',zones:['Entire Mask'],templates:{
  'Entire Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full mask design area.'}
 }},
-{id:'hood-mask-shirt',name:'Long Sleeve Shirt With Hood And Built-In Mask',category:'Long Sleeve',price:64,model:'/assets/hood-mask-shirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood','Built-In Mask'],templates:{
+{id:'hood-mask-shirt',name:'Long Sleeve Shirt With Hood And Built-In Mask',category:'Long Sleeve',price:64,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hood-mask-shirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood','Built-In Mask'],templates:{
  'Front':{path:'/assets/tshirt/front.png',width:3763,height:4992},
  'Back':{path:'/assets/tshirt/back.png',width:3750,height:5011},
  'Left Sleeve':{path:'/assets/long-sleeve/sleeve.png',width:2690,height:4120},
@@ -208,28 +105,36 @@ const seed=[
  'Hood':{path:'/assets/hoodie/hood.png',width:4684,height:2073},
  'Built-In Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full built-in mask design area; uses the confirmed mask production size.'}
 }},
-{id:'shorts',name:'Shorts',category:'Bottoms',price:44,model:'/assets/shorts.glb',zones:['Front','Back'],templates:{
+{id:'shorts',name:'Shorts',category:'Bottoms',price:44,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/shorts.glb',zones:['Front','Back'],templates:{
  'Front':{path:'/assets/templates/shorts/front.png',width:2145,height:3480},
  'Back':{path:'/assets/templates/shorts/back.png',width:2455,height:3650}
 }},
-{id:'sweat-pants',name:'Sweat Pants',category:'Bottoms',price:54,model:'/assets/sweat-pants.glb',zones:['Front','Back'],templates:{
+{id:'sweat-pants',name:'Sweat Pants',category:'Bottoms',price:54,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/sweat-pants.glb',zones:['Front','Back'],templates:{
  'Front':{path:'/assets/templates/sweat-pants/front.png',width:3670,height:5960},
  'Back':{path:'/assets/templates/sweat-pants/back.png',width:3670,height:5960}
 }},
-{id:'hooded-long-sleeve',name:'Long Sleeve Shirt With Hood',category:'Long Sleeve',price:59,model:'/assets/hooded-long-sleeve.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
+{id:'hooded-long-sleeve',name:'Long Sleeve Shirt With Hood',category:'Long Sleeve',price:59,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hooded-long-sleeve.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
  'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
  'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
  'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
  'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
 }},
-{id:'hat',name:'Hat',category:'Headwear',price:34,model:'/assets/hat.glb',zones:['Front Panel','Top of Bill'],templates:{
+{id:'hat',name:'Hat',category:'Headwear',price:34,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb',zones:['Front Panel','Top of Bill'],templates:{
  'Front Panel':{path:'/assets/templates/hat/front-panel.png',width:1151,height:1050},
  'Top of Bill':{path:'/assets/templates/hat/top-of-bill.png',width:1169,height:941}
 }}
 ];
 const colors=['#ffffff','#111111','#7a0f14','#1e3a5f','#56704d'];
 function templateFor(p,z){return p.templates?.[z]||null}
+
+function ensureSupabaseGarmentModel(){
+  if(product?.model){
+    const file = product.model.split('/').pop();
+    if(file && file.endsWith('.glb')) product.model = getSupabaseGarmentUrl(file);
+  }
+}
+
 function renderTemplatePanel(){
  const el=$('templatePanel'); if(!el)return;
  const t=templateFor(product,activeZone);
@@ -325,8 +230,7 @@ async function downloadPack(){
  const blob=await zip.generateAsync({type:'blob'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();
 }
-$('downloadPack').onclick=downloadPack;
-$('customerPackage').onclick=buildCustomerPackage;$('downloadPackTop').onclick=downloadPack;$('saveDesign').onclick=saveDesign;
+$('downloadPack').onclick=downloadPack;$('downloadPackTop').onclick=downloadPack;$('saveDesign').onclick=saveDesign;
 function renderAdmin(){const list=$('adminProductList');list.innerHTML='';catalog.forEach(p=>{const row=document.createElement('div');row.className='product-row';row.innerHTML='<div><strong>'+escapeHtml(p.name)+'</strong><div class="small">'+escapeHtml(p.category)+'</div></div><div>$'+Number(p.price).toFixed(2)+'</div><div class="small">'+p.zones.length+' zones</div><button class="btn">Edit</button>';row.querySelector('button').onclick=()=>loadAdmin(p.id);list.appendChild(row)})}
 function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminName').value=p.name;$('adminCategory').value=p.category;$('adminPrice').value=p.price;$('adminZones').innerHTML='';p.zones.forEach(z=>{const chip=document.createElement('span');chip.className='chip';chip.innerHTML=escapeHtml(z)+' <button style="border:0;background:transparent;cursor:pointer" aria-label="remove">×</button>';chip.querySelector('button').onclick=()=>{p.zones=p.zones.filter(x=>x!==z);if(p.id===product.id){product=p;activeZone=p.zones[0]||'';renderZones();updateStats()};renderAdmin();loadAdmin(p.id)};$('adminZones').appendChild(chip)});$('saveProduct').dataset.id=id}
 $('saveProduct').onclick=()=>{const p=catalog.find(x=>x.id===$('saveProduct').dataset.id);if(!p)return;p.name=$('adminName').value.trim()||p.name;p.category=$('adminCategory').value.trim()||p.category;p.price=Number($('adminPrice').value)||p.price;persist();if(product.id===p.id){product=p;renderCatalog();renderZones();updateStats()};renderAdmin();alert('Product saved.')};
@@ -336,7 +240,7 @@ renderCatalog();renderZones();renderSwatches();updateStats();selectProduct(produ
 </script>
 
 <section class="card" style="margin-top:14px">
-  <div class="label">UV calibration workspace</div><div class="small" style="margin-top:6px">Owner-controlled printing mode: customer packages preserve previews, template references, colors, design configuration, and the garment GLB for your final print preparation.</div><div class="small" style="margin-top:6px"><strong>Corrected Lightweight Jacket GLB installed.</strong> UV occupancy was regenerated from the replacement asset.</div>
+  <div class="label">UV calibration workspace</div><div class="small" style="margin-top:6px">Garments are hosted in Supabase Storage; the live designer loads the public GLB assets directly from the <code>garments</code> bucket.</div><div class="small" style="margin-top:6px"><strong>Corrected Lightweight Jacket GLB installed.</strong> UV occupancy was regenerated from the replacement asset.</div>
   <div class="small">
     Every garment now has a UV occupancy diagnostic and a production-mapping manifest.
     Use these diagnostics to verify each printable zone against the physical factory pattern before enabling final production exports.
