@@ -1,0 +1,36 @@
+name: Fix v20 installer padding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v20-padding.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Restore missing base64 padding
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('.github/workflows/install-template-editor-v20.yml')
+          s=p.read_text()
+          old="KqUsqYGkAAA='''"
+          new="KqUsqYGkAAA=='''"
+          if old not in s:
+              raise SystemExit('Expected padding target not found')
+          p.write_text(s.replace(old,new,1))
+      - name: Commit padding fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/install-template-editor-v20.yml
+          git commit -m "Fix v20 installer base64 padding"
+          git push origin main
