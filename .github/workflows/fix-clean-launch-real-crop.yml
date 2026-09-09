@@ -32,8 +32,7 @@ jobs:
   const left=Math.max(0,Math.min(.45,Number(crop.left)||0)),top=Math.max(0,Math.min(.45,Number(crop.top)||0)),right=Math.max(0,Math.min(.45,Number(crop.right)||0)),bottom=Math.max(0,Math.min(.45,Number(crop.bottom)||0));
   const fullW=Math.max(1,l.image.width),fullH=Math.max(1,l.image.height);
   const sx=fullW*left,sy=fullH*top,sw=Math.max(1,fullW*(1-left-right)),sh=Math.max(1,fullH*(1-top-bottom));
-  // IMPORTANT: crop removes pixels without re-fitting the remaining image.
-  // Base scale is always calculated from the ORIGINAL image dimensions.
+  // Crop removes pixels without re-fitting or zooming the remaining image.
   const base=Math.max(b.w/fullW,b.h/fullH),scale=base*(l.scale||1),iw=fullW*scale,ih=fullH*scale;
   const dx=-iw/2+iw*left,dy=-ih/2+ih*top,dw=iw*(1-left-right),dh=ih*(1-top-bottom);
   c.scale(l.flipX?-1:1,l.flipY?-1:1);
@@ -59,10 +58,8 @@ jobs:
 
           old="""new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}"""
           new="""new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){
-    // The source GLB contains baked sample artwork on secondary meshes. A fresh
-    // customer design must always launch as a clean blank garment, so strip
-    // those inherited color maps before creating the five editable zones.
-    garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{for(const key of['map','emissiveMap','alphaMap']){if(m[key]){m[key]=null;}}if(m.color)m.color.set('#ffffff');m.needsUpdate=true;});});
+    // Fresh customer sessions must not show sample artwork baked into the GLB.
+    garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{for(const key of['map','emissiveMap','alphaMap'])if(m[key])m[key]=null;if(m.color)m.color.set('#ffffff');m.needsUpdate=true;});});
     const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);
   }rebuildGarmentPreview();},undefined,e=>console.error(e));}"""
           if old not in s: raise SystemExit('loadGarment block not found')
