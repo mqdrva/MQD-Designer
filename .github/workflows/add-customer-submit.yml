@@ -1,0 +1,63 @@
+name: Add customer design submission
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/add-customer-submit.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch customer submit flow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old='<div class="top-actions"><button id="downloadMockup" class="btn primary">Download Mockup PNG</button><button id="openAdmin" class="btn owner-only">Product Admin</button>'
+          new='<div class="top-actions"><button id="submitDesign" class="btn orange">Submit Design</button><button id="downloadMockup" class="btn primary">Download Mockup PNG</button><button id="openAdmin" class="btn owner-only">Product Admin</button>'
+          if old not in s: raise SystemExit('index target not found')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          anchor="$('downloadMockup').onclick=downloadMockupPNG;"
+          insert=r'''
+const MQD_SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
+async function submitCustomerDesign(){
+ const button=$('submitDesign');if(!button)return;
+ const original=button.textContent;button.disabled=true;button.textContent='Submitting…';
+ try{
+  const payload=designJSON(),form=new FormData();
+  form.append('payload',JSON.stringify(payload,(k,v)=>k==='src'||k==='image'?undefined:v));
+  for(const [zone,state] of Object.entries(payload.design.zones||{})){
+   const live=stateFor().zones?.[zone];
+   for(const layer of live?.layers||[]){
+    if(layer.type!=='image'||!layer.src)continue;
+    const blob=layer.src.startsWith('data:')?dataUrlBlob(layer.src):await fetch(layer.src).then(r=>{if(!r.ok)throw new Error('Could not prepare artwork');return r.blob();});
+    form.append('asset',blob,layer.filename||'artwork.png');
+    form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
+   }
+  }
+  const response=await fetch(MQD_SUBMIT_URL,{method:'POST',body:form});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw new Error(result.error||'Design submission failed');
+  alert('Design submitted successfully. Reference: '+result.orderNumber+'\n\nSave this reference for your order.');
+ }catch(err){console.error(err);alert('Design could not be submitted: '+err.message);}
+ finally{button.disabled=false;button.textContent=original;}
+}
+$('submitDesign').onclick=submitCustomerDesign;
+'''
+          if anchor not in s: raise SystemExit('editor target not found')
+          p.write_text(s.replace(anchor,anchor+'\n'+insert,1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "MQD Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html v20/editor.js
+          git commit -m "Connect customer design submission to private backend" || exit 0
+          git push
