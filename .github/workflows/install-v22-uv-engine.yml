@@ -1,0 +1,185 @@
+name: Install v22 UV material engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-v22-uv-engine.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Replace decal-driven T-shirt preview with zone UV materials
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p=Path('v20/editor.js')
+          s=p.read_text(encoding='utf-8')
+
+          def replace_function(src,name,new_code):
+              marker=f'function {name}('
+              start=src.find(marker)
+              if start<0:
+                  raise SystemExit(f'Missing function: {name}')
+              brace=src.find('{',start)
+              depth=0
+              end=None
+              for i in range(brace,len(src)):
+                  if src[i]=='{': depth+=1
+                  elif src[i]=='}':
+                      depth-=1
+                      if depth==0:
+                          end=i+1
+                          break
+              if end is None:
+                  raise SystemExit(f'Could not parse function: {name}')
+              return src[:start]+new_code.strip()+src[end:]
+
+          # Add state used by the new exact-template mask renderer and T-shirt UV zone meshes.
+          old_decl="let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;"
+          new_decl="let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;\nlet tshirtZoneGroup=null;\nconst tshirtZoneMeshes=new Map();\nlet colorRaf=0;"
+          if old_decl in s:
+              s=s.replace(old_decl,new_decl,1)
+
+          s=replace_function(s,'ensureTemplateImage',r'''
+function ensureTemplateImage(zone=activeZone){
+  const t=product.templates?.[zone];
+  if(!t?.path)return null;
+  if(templateCache.has(t.path))return templateCache.get(t.path);
+  const rec={img:null,maskCanvas:null,bounds:null,status:'loading'};
+  templateCache.set(t.path,rec);
+  const img=new Image();
+  img.onload=()=>{
+    rec.img=img;
+    try{const built=buildTemplateMask(img);rec.maskCanvas=built.maskCanvas;rec.bounds=built.bounds;rec.status='ready';}
+    catch(err){console.warn('Template mask build failed',t.path,err);rec.status='guide-only';}
+    if(zone===activeZone)drawEditor();
+  };
+  img.onerror=()=>{rec.status='error';};
+  img.src=t.path;
+  return rec;
+}''')
+
+          preload_marker="function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}"
+          if 'function buildTemplateMask(' not in s:
+              helpers=r'''
+function buildTemplateMask(img){
+  const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  const src=document.createElement('canvas');src.width=w;src.height=h;
+  const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
+  const data=sx.getImageData(0,0,w,h).data;
+  const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
+  for(let i=0,p=0;i<data.length;i+=4,p++){
+    const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3],lum=(r+g+b)/3;
+    const redInk=r>165&&g<155&&b<155;
+    blocked[p]=(a>15&&(lum<232||redInk))?1:0;
+  }
+  let head=0,tail=0;
+  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
+  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+  while(head<tail){const idx=queue[head++],x=idx%w,y=(idx/w)|0;if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);}
+  const mask=document.createElement('canvas');mask.width=w;mask.height=h;const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+  let minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const idx=y*w+x,o=idx*4;if(!outside[idx]){out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}}
+  if(maxX<minX||maxY<minY){minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);}else mx.putImageData(out,0,0);
+  return{maskCanvas:mask,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+}
+function scaleBounds(b,sw,sh,dw,dh){return{x:b.x/sw*dw,y:b.y/sh*dh,w:b.w/sw*dw,h:b.h/sh*dh};}
+function drawLayerStack(c,zone,b){
+  const z=zoneState(zone);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
+  (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
+    if(l.type==='image'&&l.image){const base=Math.max(b.w/l.image.width,b.h/l.image.height),scale=base*(l.scale||1),iw=l.image.width*scale,ih=l.image.height*scale;c.drawImage(l.image,-iw/2,-ih/2,iw,ih);}
+    else if(l.type==='text'){const fs=Math.max(24,b.w*.10*(l.scale||1));c.fillStyle=l.color||'#111';c.font=`800 ${fs}px Inter, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(l.text||'Text',0,0,b.w*.84);}c.restore();});
+}
+function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
+  const out=document.createElement('canvas');out.width=w;out.height=h;const ox=out.getContext('2d'),rec=ensureTemplateImage(zone),t=product.templates?.[zone];
+  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,b=scaleBounds(rec.bounds,sw,sh,w,h);drawLayerStack(ox,zone,b);ox.globalCompositeOperation='destination-in';ox.drawImage(rec.maskCanvas,0,0,w,h);ox.globalCompositeOperation='source-over';if(includeGuide){ox.save();ox.globalAlpha=.72;ox.globalCompositeOperation='multiply';ox.drawImage(rec.img,0,0,w,h);ox.restore();}return out;}
+  if(t?.shape==='rectangle'||!t?.path){drawLayerStack(ox,zone,{x:0,y:0,w,h});return out;}
+  ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
+}
+function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
+function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
+'''
+              if preload_marker not in s:
+                  raise SystemExit('Missing preloadTemplates marker')
+              s=s.replace(preload_marker,preload_marker+'\n'+helpers,1)
+
+          s=replace_function(s,'drawZoneComposite',r'''
+function drawZoneComposite(targetCtx,w,h,includeGuides=false){
+  const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);targetCtx.save();targetCtx.clearRect(0,0,w,h);targetCtx.translate(w/2,h/2);targetCtx.scale(editorZoom,editorZoom);targetCtx.translate(-w/2,-h/2);
+  if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
+  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){const source=renderMaskedZoneCanvas(activeZone,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,false);targetCtx.drawImage(source,r.x,r.y,r.w,r.h);targetCtx.save();targetCtx.globalAlpha=.72;targetCtx.globalCompositeOperation='multiply';targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);targetCtx.restore();}
+  else{targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.clip();drawLayerStack(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});targetCtx.restore();}
+  targetCtx.restore();
+}''')
+
+          s=replace_function(s,'makeZoneTextureCanvas',r'''
+function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}''')
+
+          s=replace_function(s,'drawProductionZone',r'''
+function drawProductionZone(c,zone,w,h){c.clearRect(0,0,w,h);const masked=renderMaskedZoneCanvas(zone,w,h,false);c.drawImage(masked,0,0,w,h);}''')
+
+          if 'function splitTshirtGeometry(' not in s:
+              mesh_helpers=r'''
+function findPrimaryMesh(root=garment){let best=null,score=-1;root?.traverse(o=>{if(!o.isMesh||!o.geometry?.getAttribute('position'))return;const count=o.geometry.index?o.geometry.index.count:o.geometry.getAttribute('position').count;if(count>score){score=count;best=o;}});return best;}
+function classifyTshirtTriangle(cx,cy,cz,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y),sz=Math.max(1e-6,b.max.z-b.min.z),xn=Math.abs(cx-(b.min.x+b.max.x)/2)/(sx/2),yn=(cy-b.min.y)/sy,zn=(cz-(b.min.z+b.max.z)/2)/sz;if(yn>.86&&xn<.36)return'Collar';if(xn>.58&&yn>.55)return cx<0?'Left Sleeve':'Right Sleeve';return zn>=0?'Front':'Back';}
+function uvForZone(zone,x,y,z,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y);let u=.5,v=.5;if(zone==='Front'||zone==='Back'){u=(x-b.min.x)/sx;v=(y-b.min.y)/sy;if(zone==='Back')u=1-u;}else if(zone==='Left Sleeve'||zone==='Right Sleeve'){const left=zone==='Left Sleeve',shoulder={x:left?-.36:.36,y:.66},cuff={x:left?-.64:.64,y:.28},dx=cuff.x-shoulder.x,dy=cuff.y-shoulder.y,len2=dx*dx+dy*dy,px=x-shoulder.x,py=y-shoulder.y,along=Math.max(0,Math.min(1,(px*dx+py*dy)/len2)),len=Math.sqrt(len2),perp=(-dy/len)*px+(dx/len)*py,angle=Math.atan2(z,perp);u=(angle+Math.PI)/(Math.PI*2);v=1-along;}else if(zone==='Collar'){u=(Math.atan2(z,x)+Math.PI)/(Math.PI*2);v=(y-b.min.y)/sy;}return[Math.max(0,Math.min(1,u)),Math.max(0,Math.min(1,v))];}
+function splitTshirtGeometry(sourceMesh){
+  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position'))return false;if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index,triCount=index?index.count/3:pos.count/3;geometry.computeBoundingBox();const bb=geometry.boundingBox.clone(),names=['Front','Back','Left Sleeve','Right Sleeve','Collar'],zoneIndex=new Map(names.map((n,i)=>[n,i])),faces=names.map(()=>[]),bounds=names.map(()=>({min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}})),vid=(t,k)=>index?index.getX(t*3+k):t*3+k;
+  for(let t=0;t<triCount;t++){const a=vid(t,0),b=vid(t,1),c=vid(t,2),cx=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3,cy=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3,cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3,name=classifyTshirtTriangle(cx,cy,cz,bb),zi=zoneIndex.get(name);faces[zi].push(t);const zb=bounds[zi];for(const vi of[a,b,c]){const x=pos.getX(vi),y=pos.getY(vi),z=pos.getZ(vi);zb.min.x=Math.min(zb.min.x,x);zb.min.y=Math.min(zb.min.y,y);zb.min.z=Math.min(zb.min.z,z);zb.max.x=Math.max(zb.max.x,x);zb.max.y=Math.max(zb.max.y,y);zb.max.z=Math.max(zb.max.z,z);}}
+  const parent=sourceMesh.parent;if(!parent)return false;tshirtZoneGroup=new THREE.Group();tshirtZoneGroup.name='MQD_Tshirt_Zones';tshirtZoneGroup.position.copy(sourceMesh.position);tshirtZoneGroup.quaternion.copy(sourceMesh.quaternion);tshirtZoneGroup.scale.copy(sourceMesh.scale);parent.add(tshirtZoneGroup);const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
+  names.forEach((name,zi)=>{const remap=new Int32Array(pos.count);remap.fill(-1);const P=[],N=[],UV=[],I=[];let next=0,zb=bounds[zi];for(const t of faces[zi])for(let k=0;k<3;k++){const old=vid(t,k);let ni=remap[old];if(ni<0){ni=next++;remap[old]=ni;const x=pos.getX(old),y=pos.getY(old),z=pos.getZ(old);P.push(x,y,z);N.push(normal.getX(old),normal.getY(old),normal.getZ(old));const uv=uvForZone(name,x,y,z,zb);UV.push(uv[0],uv[1]);}I.push(ni);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));g.setIndex(I);g.computeBoundingBox();g.computeBoundingSphere();const m=base?.clone?base.clone():new THREE.MeshStandardMaterial({roughness:.88,metalness:0});if(m.color)m.color.set('#fff');for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;if('roughness'in m)m.roughness=.88;if('metalness'in m)m.metalness=0;m.needsUpdate=true;const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+name.replace(/\s+/g,'_');mesh.castShadow=sourceMesh.castShadow;mesh.receiveShadow=sourceMesh.receiveShadow;tshirtZoneGroup.add(mesh);tshirtZoneMeshes.set(name,mesh);});sourceMesh.visible=false;console.info('MQD UV material zones ready',Object.fromEntries([...tshirtZoneMeshes].map(([k,v])=>[k,v.geometry.index.count/3])));return tshirtZoneMeshes.size===5;
+}
+function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
+function updateTshirtZoneTextures(){if(product.id!=='tshirt'||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}
+'''
+              init_marker='function init3D()'
+              if init_marker not in s: raise SystemExit('Missing init3D')
+              s=s.replace(init_marker,mesh_helpers+'\n'+init_marker,1)
+
+          # Add the UV/material preview wrapper after the existing decal fallback.
+          if 'function rebuildGarmentPreview(' not in s:
+              marker='function rebuildDecals()'
+              start=s.find(marker);brace=s.find('{',start);depth=0;end=None
+              for i in range(brace,len(s)):
+                  if s[i]=='{': depth+=1
+                  elif s[i]=='}':
+                      depth-=1
+                      if depth==0: end=i+1;break
+              wrapper="\nfunction rebuildGarmentPreview(){if(product.id==='tshirt'&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}\n"
+              s=s[:end]+wrapper+s[end:]
+
+          s=replace_function(s,'loadGarment',r'''
+function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}''')
+
+          s=s.replace('function renderAll(){renderProducts();renderZones();renderLayerPanel();renderStatus();drawEditor();rebuildDecals();}','function renderAll(){renderProducts();renderZones();renderLayerPanel();renderStatus();drawEditor();rebuildGarmentPreview();}')
+          s=s.replace('function updateLayer(prop,val){const l=activeLayer();if(!l)return;l[prop]=val;renderLayerPanel();drawEditor();rebuildDecals();}','function updateLayer(prop,val){const l=activeLayer();if(!l)return;l[prop]=val;renderLayerPanel();drawEditor();rebuildGarmentPreview();}')
+          s=s.replace('function setBackground(hex,record=true){const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildDecals();}','function setBackground(hex,record=true){const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildGarmentPreview();}')
+          s=s.replace('drawEditor();renderLayerPanel();rebuildDecals();','drawEditor();renderLayerPanel();rebuildGarmentPreview();')
+
+          old_color="$('zoneColor').oninput=e=>{$('zoneHex').value=e.target.value.toUpperCase();};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase());"
+          new_color="$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);"
+          if old_color in s:s=s.replace(old_color,new_color,1)
+
+          old_move="const p=pointerToCanvas(e),dx=(p.x-dragState.start.x)/editorCanvas.width*200,dy=(p.y-dragState.start.y)/editorCanvas.height*200;l.x=Math.max(-100,Math.min(100,dragState.x+dx));l.y=Math.max(-100,Math.min(100,dragState.y+dy));drawEditor();renderLayerPanel();rebuildGarmentPreview();"
+          new_move="const p=pointerToCanvas(e),r=editorRect(),dx=(p.x-dragState.start.x)/Math.max(1,r.w)*200,dy=(p.y-dragState.start.y)/Math.max(1,r.h)*200;l.x=Math.max(-100,Math.min(100,dragState.x+dx));l.y=Math.max(-100,Math.min(100,dragState.y+dy));drawEditor();renderLayerPanel();rebuildGarmentPreview();"
+          if old_move in s:s=s.replace(old_move,new_move,1)
+
+          p.write_text(s,encoding='utf-8')
+      - name: Verify editor syntax
+        run: node --check v20/editor.js
+      - name: Commit UV engine
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Use exact template masks and UV material zones for T-shirt"
+          git push origin main
