@@ -1,0 +1,45 @@
+name: Run v23 panel shader patch
+on:
+  push:
+    paths:
+      - '.github/workflows/run-v23-panel-shader.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply v23 patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, base64
+          installer=Path('.github/workflows/install-v23-panel-shader.yml').read_text()
+          blobs=re.findall(r'base64\.b64decode\("([A-Za-z0-9+/=]+)"',installer)
+          if len(blobs)<2: raise SystemExit(f'encoded patch payloads not found: {len(blobs)}')
+          replacement=base64.b64decode(blobs[0]).decode('utf-8')
+          new_update=base64.b64decode(blobs[1]).decode('utf-8')
+          path=Path('v20/editor.js')
+          text=path.read_text()
+          text=text.replace("const MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';","const MQD_TSHIRT_ZONE_CALIBRATION='v23.0-single-mesh-panel-shader';")
+          if "let tshirtShaderState=null;" not in text:
+              text=text.replace("const tshirtZoneMeshes=new Map();\n","const tshirtZoneMeshes=new Map();\nlet tshirtShaderState=null;\n")
+          pattern=re.compile(r"function uvForZone\(zone,x,y,z,b\)\{.*?\n\}\nfunction disposeZoneTexture\(mesh\)\{const map=mesh\?\.material\?\.map;if\(map\)\{mesh\.material\.map=null;map\.dispose\(\);\}\}",re.S)
+          text,n=pattern.subn(replacement,text,count=1)
+          if n!=1: raise SystemExit(f'old T-shirt engine block not found: {n}')
+          pattern2=re.compile(r"function updateTshirtZoneTextures\(\)\{.*?\n\}",re.S)
+          text,n2=pattern2.subn(new_update,text,count=1)
+          if n2!=1: raise SystemExit(f'texture updater not found: {n2}')
+          text=text.replace("function loadGarment(){if(!renderer)init3D();if(garment){","function loadGarment(){if(!renderer)init3D();disposeTshirtShaderState();if(garment){")
+          path.write_text(text)
+      - name: Verify editor syntax
+        run: node --check v20/editor.js
+      - name: Commit v23 engine
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Use continuous panel shader for T-shirt zones" || exit 0
+          git push
