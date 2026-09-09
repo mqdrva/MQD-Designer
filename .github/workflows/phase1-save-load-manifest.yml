@@ -17,87 +17,77 @@ jobs:
         with:
           ref: main
 
-      - name: Add load-design workflow and production manifest
-        shell: python
+      - name: Patch Phase 1 functionality
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           index = Path('index.html')
           s = index.read_text(encoding='utf-8')
           old = '<div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>'
           new = '<div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="loadDesign" class="btn">Load Design</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>'
-          if old not in s:
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif 'id="loadDesign"' not in s:
               raise SystemExit('Top action marker not found')
-          s = s.replace(old, new, 1)
 
-          old = '<input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">'
-          new = old + '\n    <input id="designUpload" class="upload-input" type="file" accept="application/json,.json">'
-          if old not in s:
-              raise SystemExit('artUpload marker not found')
-          s = s.replace(old, new, 1)
+          old_upload = '<input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">'
+          new_upload = old_upload + '\n    <input id="designUpload" class="upload-input" type="file" accept="application/json,.json">'
+          if 'id="designUpload"' not in s:
+              if old_upload not in s:
+                  raise SystemExit('artUpload marker not found')
+              s = s.replace(old_upload, new_upload, 1)
           index.write_text(s, encoding='utf-8')
 
           p = Path('v20/editor.js')
           s = p.read_text(encoding='utf-8')
 
-          old = "function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}\n$('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};"
-          new = r'''function designJSON(){
- const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));
- const templates=Object.fromEntries(product.zones.map(z=>[z,product.templates?.[z]||null]));
- return{
-  schema:'mqd-design-v1',
-  engine:{calibration:product.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview'},
-  product:{id:product.id,name:product.name,category:product.category,price:product.price,model:product.model},
-  activeZone,
-  templates,
-  design:clean[product.id]||{},
-  savedAt:new Date().toISOString()
- };
-}
-function recomputeLayerSeq(){
- let max=0;
- Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>(z.layers||[]).forEach(l=>{const m=String(l.id||'').match(/^layer-(\d+)$/);if(m)max=Math.max(max,Number(m[1]));})));
- layerSeq=max+1;
-}
-function downloadJsonFile(name,data){
- const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
- const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
-}
-$('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
-$('loadDesign').onclick=()=>$('designUpload').click();
-$('designUpload').onchange=async e=>{
- const f=e.target.files?.[0];if(!f)return;
- try{
-  const payload=JSON.parse(await f.text());
-  const pid=payload?.product?.id;
-  const p=catalog.find(x=>x.id===pid);
-  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
-  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design file.');
-  snapshot();
-  designs[pid]=payload.design;
-  product=p;
-  activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];
-  activeLayerId=zoneState().layers.at(-1)?.id||null;
-  recomputeLayerSeq();
-  repairImageObjects();
-  editorZoom=1;
-  renderAll();
-  loadGarment();
-  alert('Design loaded.');
- }catch(err){console.error(err);alert('Design could not be loaded: '+err.message);}
- finally{e.target.value='';}
-};'''
-          if old not in s:
-              raise SystemExit('designJSON/save marker not found')
-          s = s.replace(old, new, 1)
+          old_design = "function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}"
+          new_design = """function designJSON(){
+           const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));
+           const templates=Object.fromEntries(product.zones.map(z=>[z,product.templates?.[z]||null]));
+           return{schema:'mqd-design-v1',engine:{calibration:product.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview'},product:{id:product.id,name:product.name,category:product.category,price:product.price,model:product.model},activeZone,templates,design:clean[product.id]||{},savedAt:new Date().toISOString()};
+          }"""
+          if old_design in s:
+              s = s.replace(old_design, new_design, 1)
 
-          old = "  root.file('background-colors.json',JSON.stringify(colors,null,2));"
-          new = "  const manifest={schema:'mqd-production-v1',generatedAt:new Date().toISOString(),engineCalibration:selected.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview',product:{id:selected.id,name:selected.name,category:selected.category,price:selected.price,model:selected.model},zones:selected.zones.map(z=>({name:z,template:selected.templates?.[z]||null,backgroundHex:colors[z]||'#FFFFFF'}))};\n  root.file('manifest.json',JSON.stringify(manifest,null,2));\n" + old
-          if old not in s:
-              raise SystemExit('background-colors marker not found')
-          s = s.replace(old, new, 1)
+          old_save = "$('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};"
+          save_load = """function recomputeLayerSeq(){
+           let max=0;
+           Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>(z.layers||[]).forEach(l=>{const m=String(l.id||'').match(/^layer-(\\d+)$/);if(m)max=Math.max(max,Number(m[1]));})));
+           layerSeq=max+1;
+          }
+          function downloadJsonFile(name,data){
+           const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+           const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+          }
+          $('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
+          $('loadDesign').onclick=()=>$('designUpload').click();
+          $('designUpload').onchange=async e=>{
+           const f=e.target.files?.[0];if(!f)return;
+           try{
+            const payload=JSON.parse(await f.text()),pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
+            if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
+            if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design file.');
+            snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
+            recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();alert('Design loaded.');
+           }catch(err){console.error(err);alert('Design could not be loaded: '+err.message);}finally{e.target.value='';}
+          };"""
+          if old_save in s:
+              s = s.replace(old_save, save_load, 1)
+          elif "$('loadDesign').onclick" not in s:
+              raise SystemExit('Save handler marker not found')
+
+          marker = "  root.file('background-colors.json',JSON.stringify(colors,null,2));"
+          manifest = "  const manifest={schema:'mqd-production-v1',generatedAt:new Date().toISOString(),engineCalibration:selected.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview',product:{id:selected.id,name:selected.name,category:selected.category,price:selected.price,model:selected.model},zones:selected.zones.map(z=>({name:z,template:selected.templates?.[z]||null,backgroundHex:colors[z]||'#FFFFFF'}))};\n  root.file('manifest.json',JSON.stringify(manifest,null,2));\n"
+          if "root.file('manifest.json'" not in s:
+              if marker not in s:
+                  raise SystemExit('background-colors marker not found')
+              s = s.replace(marker, manifest + marker, 1)
 
           p.write_text(s, encoding='utf-8')
+          PY
 
       - name: Syntax check
         run: |
@@ -105,7 +95,7 @@ $('designUpload').onchange=async e=>{
           node --check v20/panels.js
           test -f v20/tshirt-collar-mask.js
 
-      - name: Commit installed Phase 1 functionality
+      - name: Commit Phase 1 functionality
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
