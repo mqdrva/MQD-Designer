@@ -11,7 +11,7 @@
 <body>
 <header>
   <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><select id="productSelect" class="product-select"></select></div>
-  <div class="top-actions"><button id="downloadMockup" class="btn primary">Download Mockup PNG</button><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Save Design</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
+  <div class="top-actions"><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
 </header>
 <div class="app">
   <section class="preview-pane">
@@ -49,5 +49,6 @@
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module" src="/v20/editor.js"></script>
+<script type="module" src="/v20/customer.js"></script>
 </body>
 </html>
