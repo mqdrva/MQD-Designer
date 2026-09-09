@@ -62,7 +62,10 @@ export function panelUv(zone,x,y,z,b){
   const sign=zone==='Left Sleeve'?1:-1,px=sign*x-.34,py=y-.68,dx=.25,dy=-.43,len=Math.hypot(dx,dy);
   const along=clamp((px*dx+py*dy)/(len*len));
   const around=(Math.atan2(z+.055,(-dy*px+dx*py)/len)+Math.PI)/(2*Math.PI);
-  return[around,1-along];
+  // The supplied T-shirt's left sleeve runs opposite the flat artwork frame.
+  // Mirror only its U coordinate so text/images stay readable while the 2D editor remains normal.
+  const u=zone==='Left Sleeve'?1-around:around;
+  return[clamp(u),1-along];
  }
  // Collar: map around the neck circumference; V follows the isolated rib height.
  const u=(Math.atan2(z+.07,x)+Math.PI)/(2*Math.PI),bh=Math.max(1e-6,b.max.y-b.min.y);
