@@ -1,0 +1,40 @@
+name: Fix v20 installer padding v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v20-padding-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Repair js base64 padding by length
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p=Path('.github/workflows/install-template-editor-v20.yml')
+          s=p.read_text()
+          m=re.search(r"js_b64 = '''([A-Za-z0-9+/=]+)'''",s)
+          if not m:
+              raise SystemExit('js_b64 payload not found')
+          data=m.group(1)
+          fixed=data.rstrip('=')
+          fixed += '=' * (-len(fixed) % 4)
+          s=s[:m.start(1)] + fixed + s[m.end(1):]
+          p.write_text(s)
+      - name: Commit padding repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/install-template-editor-v20.yml
+          git commit -m "Repair v20 installer payload padding"
+          git push origin main
