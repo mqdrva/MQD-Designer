@@ -41,9 +41,24 @@ function activeLayer(){return zoneState().layers.find(l=>l.id===activeLayerId)||
 function templateFor(zone=activeZone){return product.templates?.[zone]||null;}
 function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null;}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function snapshot(){history.push(JSON.stringify(designs));if(history.length>30)history.shift();future.length=0;}
-function undo(){if(!history.length)return;future.push(JSON.stringify(designs));const prev=JSON.parse(history.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,prev);repairImageObjects();renderAll();}
-function redo(){if(!future.length)return;history.push(JSON.stringify(designs));const next=JSON.parse(future.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,next);repairImageObjects();renderAll();}
+function cloneDesignState(source=designs){
+  const out={};
+  for(const [pid,ps] of Object.entries(source||{})){
+    out[pid]={...ps,zones:{}};
+    for(const [zone,z] of Object.entries(ps.zones||{})){
+      out[pid].zones[zone]={...z,layers:(z.layers||[]).map(l=>({...l,crop:l.crop?{...l.crop}:l.crop,image:l.image||null}))};
+    }
+  }
+  return out;
+}
+function restoreDesignState(state){
+  Object.keys(designs).forEach(k=>delete designs[k]);
+  Object.assign(designs,cloneDesignState(state));
+  if(activeLayerId&&!activeLayer())activeLayerId=zoneState().layers.at(-1)?.id||null;
+}
+function snapshot(){history.push(cloneDesignState());if(history.length>30)history.shift();future.length=0;}
+function undo(){if(!history.length)return;future.push(cloneDesignState());restoreDesignState(history.pop());renderAll();}
+function redo(){if(!future.length)return;history.push(cloneDesignState());restoreDesignState(future.pop());renderAll();}
 function repairImageObjects(){Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>z.layers?.forEach(l=>{if(l.type==='image'&&l.src&&!l.image){const img=new Image();img.onload=renderAll;img.src=l.src;l.image=img;}})));}
 
 function ensureTemplateImage(zone=activeZone){
