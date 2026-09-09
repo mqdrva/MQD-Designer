@@ -143,10 +143,12 @@ function drawImageLayer(c,l,b){
   if(!l.image)return;
   const crop=l.crop||{left:0,top:0,right:0,bottom:0};
   const left=Math.max(0,Math.min(.45,Number(crop.left)||0)),top=Math.max(0,Math.min(.45,Number(crop.top)||0)),right=Math.max(0,Math.min(.45,Number(crop.right)||0)),bottom=Math.max(0,Math.min(.45,Number(crop.bottom)||0));
-  const sx=l.image.width*left,sy=l.image.height*top,sw=Math.max(1,l.image.width*(1-left-right)),sh=Math.max(1,l.image.height*(1-top-bottom));
-  const base=Math.max(b.w/sw,b.h/sh),scale=base*(l.scale||1),iw=sw*scale,ih=sh*scale;
+  const fullW=Math.max(1,l.image.width),fullH=Math.max(1,l.image.height);
+  const sx=fullW*left,sy=fullH*top,sw=Math.max(1,fullW*(1-left-right)),sh=Math.max(1,fullH*(1-top-bottom));
+  const base=Math.max(b.w/fullW,b.h/fullH),scale=base*(l.scale||1),iw=fullW*scale,ih=fullH*scale;
+  const dx=-iw/2+iw*left,dy=-ih/2+ih*top,dw=iw*(1-left-right),dh=ih*(1-top-bottom);
   c.scale(l.flipX?-1:1,l.flipY?-1:1);
-  c.drawImage(l.image,sx,sy,sw,sh,-iw/2,-ih/2,iw,ih);
+  c.drawImage(l.image,sx,sy,sw,sh,dx,dy,dw,dh);
 }
 function drawTextLayer(c,l,b){
   const fs=Math.max(18,b.w*.10*(l.scale||1));
@@ -284,7 +286,12 @@ function activeLayerScreenRect(){
   const l=activeLayer();if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
   if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
   const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
-  if(l.type==='image'&&l.image){const crop=l.crop||{left:0,top:0,right:0,bottom:0},left=Number(crop.left)||0,top=Number(crop.top)||0,right=Number(crop.right)||0,bottom=Number(crop.bottom)||0,sw=Math.max(1,l.image.width*(1-left-right)),sh=Math.max(1,l.image.height*(1-top-bottom)),base=Math.max(b.w/sw,b.h/sh),scale=base*(l.scale||1);return{x:cx-sw*scale/2,y:cy-sh*scale/2,w:sw*scale,h:sh*scale,cx,cy,b};}
+  if(l.type==='image'&&l.image){
+    const crop=l.crop||{left:0,top:0,right:0,bottom:0},left=Math.max(0,Math.min(.45,Number(crop.left)||0)),top=Math.max(0,Math.min(.45,Number(crop.top)||0)),right=Math.max(0,Math.min(.45,Number(crop.right)||0)),bottom=Math.max(0,Math.min(.45,Number(crop.bottom)||0));
+    const fullW=Math.max(1,l.image.width),fullH=Math.max(1,l.image.height),base=Math.max(b.w/fullW,b.h/fullH),scale=base*(l.scale||1),iw=fullW*scale,ih=fullH*scale;
+    const x=cx-iw/2+iw*left,y=cy-ih/2+ih*top,w=iw*(1-left-right),h=ih*(1-top-bottom);
+    return{x,y,w,h,cx,cy,b,fullW:iw,fullH:ih,crop};
+  }
   const fs=Math.max(18,b.w*.10*(l.scale||1));return{x:cx-b.w*.22,y:cy-fs*.75,w:b.w*.44,h:fs*1.5,cx,cy,b};
 }
 function drawSelectionOverlay(){const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.strokeStyle=cropMode&&l.type==='image'?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.strokeRect(q.x,q.y,q.w,q.h);ctx.setLineDash([]);const handles=cropMode&&l.type==='image'?[[q.x,q.y],[q.x+q.w,q.y],[q.x,q.y+q.h],[q.x+q.w,q.y+q.h]]:[[q.x+q.w,q.y+q.h]];for(const [x,y] of handles){ctx.fillStyle='#fff';ctx.strokeStyle=cropMode?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.beginPath();ctx.rect(x-6,y-6,12,12);ctx.fill();ctx.stroke();}ctx.restore();}
@@ -376,7 +383,10 @@ function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.is
 function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
 function rebuildGarmentPreview(){if(product.id==='tshirt'&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}
 
-function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
+function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){
+    garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{for(const key of['map','emissiveMap','alphaMap'])if(m[key])m[key]=null;if(m.color)m.color.set('#ffffff');m.needsUpdate=true;});});
+    const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);
+  }rebuildGarmentPreview();},undefined,e=>console.error(e));}
 
 function selectProduct(id){cropMode=false;product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
 function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
@@ -424,7 +434,7 @@ $('fillLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.x=0;
 
 function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
 editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=18;snapshot();let mode='move',corner=null;if(cropMode&&l.type==='image'){const hs=[[q.x,q.y,'tl'],[q.x+q.w,q.y,'tr'],[q.x,q.y+q.h,'bl'],[q.x+q.w,q.y+q.h,'br']];const hit=hs.find(h=>near(h[0],h[1]));if(hit){mode='crop';corner=hit[2];}}else if(near(q.x+q.w,q.y+q.h)){mode='resize';}dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});
-editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;if(dragState.mode==='move'){l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));}else if(dragState.mode==='resize'){const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);l.scale=Math.max(.2,Math.min(2.2,dragState.scale*d1/d0));}else if(dragState.mode==='crop'&&l.type==='image'){const c={...dragState.crop},fx=dx/Math.max(40,q.w),fy=dy/Math.max(40,q.h),corner=dragState.corner;if(corner.includes('l'))c.left=Math.max(0,Math.min(.45,(dragState.crop.left||0)+fx));if(corner.includes('r'))c.right=Math.max(0,Math.min(.45,(dragState.crop.right||0)-fx));if(corner.includes('t'))c.top=Math.max(0,Math.min(.45,(dragState.crop.top||0)+fy));if(corner.includes('b'))c.bottom=Math.max(0,Math.min(.45,(dragState.crop.bottom||0)-fy));if(c.left+c.right<.9&&c.top+c.bottom<.9)l.crop=c;}drawEditor();renderLayerPanel();rebuildGarmentPreview();});
+editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;if(dragState.mode==='move'){l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));}else if(dragState.mode==='resize'){const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);l.scale=Math.max(.2,Math.min(2.2,dragState.scale*d1/d0));}else if(dragState.mode==='crop'&&l.type==='image'){const c={...dragState.crop},fx=dx/Math.max(40,q.fullW||q.w),fy=dy/Math.max(40,q.fullH||q.h),corner=dragState.corner;if(corner.includes('l'))c.left=Math.max(0,Math.min(.45,(dragState.crop.left||0)+fx));if(corner.includes('r'))c.right=Math.max(0,Math.min(.45,(dragState.crop.right||0)-fx));if(corner.includes('t'))c.top=Math.max(0,Math.min(.45,(dragState.crop.top||0)+fy));if(corner.includes('b'))c.bottom=Math.max(0,Math.min(.45,(dragState.crop.bottom||0)-fy));if(c.left+c.right<.9&&c.top+c.bottom<.9)l.crop=c;}drawEditor();renderLayerPanel();rebuildGarmentPreview();});
 editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
 
 function designJSON(){
