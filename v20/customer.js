@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id);
 const SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
+const STRIPE_TSHIRT_TEST_LINK='https://buy.stripe.com/test_7sY00d7B1ecEdmm2OYaVa00';
 
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
 
@@ -148,11 +149,28 @@ async function addToCart(){
   }finally{btn.disabled=false;}
 }
 
+function stripeCheckoutUrl(item){
+  const join=STRIPE_TSHIRT_TEST_LINK.includes('?')?'&':'?';
+  return STRIPE_TSHIRT_TEST_LINK+join+'client_reference_id='+encodeURIComponent(item.orderNumber||item.designId||'MQD');
+}
+
 function showCart(){
   const items=cartItems();
   if(!items.length){alert('Your cart is empty.');return;}
   const total=items.reduce((n,x)=>n+(Number(x.price)||0),0);
-  alert(items.map((x,i)=>`${i+1}. ${x.productName} — $${Number(x.price).toFixed(2)}\nRef: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}\n\nStripe checkout is the next connection.`);
+  const summary=items.map((x,i)=>`${i+1}. ${x.productName} — $${Number(x.price).toFixed(2)}\nRef: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}`;
+
+  if(items.some(x=>x.pendingSync)){
+    alert(summary+'\n\nCheckout is temporarily blocked because at least one design has not synced to production storage yet.');
+    return;
+  }
+  if(items.length!==1||items[0].productId!=='tshirt'||Number(items[0].price)!==39){
+    alert(summary+'\n\nPhase 1 Stripe checkout currently supports one $39 All-Over Print T-Shirt at a time.');
+    return;
+  }
+
+  const proceed=confirm(summary+'\n\nContinue to secure Stripe TEST checkout?\n\nNo real money will be charged in sandbox mode.');
+  if(proceed) window.location.assign(stripeCheckoutUrl(items[0]));
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
