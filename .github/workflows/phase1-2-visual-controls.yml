@@ -2,6 +2,7 @@ name: Add Phase 1 and 2 visual editing controls
 on:
   push:
     paths:
+      - 'scripts/phase1_2_patch.py'
       - '.github/workflows/phase1-2-visual-controls.yml'
 permissions:
   contents: write
@@ -10,93 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch visual crop, positioning and 2D/3D alignment
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          # ---------- index.html ----------
-          p=Path('index.html')
-          s=p.read_text()
-          old='<div class="range-line"><span>Rotate</span><input id="layerRotation" type="range" min="-180" max="180" value="0"><strong id="layerRotationVal">0°</strong></div><div id="textControls"'
-          new='''<div class="range-line"><span>Rotate</span><input id="layerRotation" type="range" min="-180" max="180" value="0"><strong id="layerRotationVal">0°</strong></div><div id="imageQuickControls" class="image-quick hidden"><div class="quick-label">Move on canvas or nudge</div><div class="nudge-pad"><button id="nudgeUp" type="button">↑</button><button id="nudgeLeft" type="button">←</button><button id="nudgeCenter" type="button">●</button><button id="nudgeRight" type="button">→</button><button id="nudgeDown" type="button">↓</button></div><div id="cropHint" class="crop-hint hidden">Crop mode: drag the orange corner handles, then click Crop again to finish.</div></div><div id="textControls"'''
-          if old not in s: raise SystemExit('index insertion point not found')
-          s=s.replace(old,new,1)
-          p.write_text(s)
-
-          # ---------- editor.css ----------
-          p=Path('v20/editor.css')
-          s=p.read_text()
-          css='''\n.image-quick{margin-top:10px;padding-top:9px;border-top:1px solid #e8e8e8}.quick-label{font-size:9px;color:#888;text-align:center;margin-bottom:6px}.nudge-pad{display:grid;grid-template-columns:34px 34px 34px;grid-template-areas:". up ." "left center right" ". down .";justify-content:center;gap:4px}.nudge-pad button{width:34px;height:30px;border:1px solid #d8d8d8;border-radius:7px;background:#fff;cursor:pointer;font-weight:800}.nudge-pad button:hover{background:#f2f2f2}.nudge-pad #nudgeUp{grid-area:up}.nudge-pad #nudgeLeft{grid-area:left}.nudge-pad #nudgeCenter{grid-area:center;color:#ff6b00}.nudge-pad #nudgeRight{grid-area:right}.nudge-pad #nudgeDown{grid-area:down}.crop-hint{margin-top:8px;border:1px solid #ffd1ad;background:#fff7f0;color:#9a4a0a;border-radius:7px;padding:7px;font-size:9px;line-height:1.35}.tool.active-tool{background:#fff0e5;color:#ff6b00;font-weight:800}\n'''
-          if '.image-quick{' not in s:s+=css
-          p.write_text(s)
-
-          # ---------- editor.js ----------
-          p=Path('v20/editor.js')
-          s=p.read_text()
-          s=s.replace('let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;','let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null,cropMode=false;',1)
-
-          old="function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}"
-          new="""function makeCleanZoneDesignCanvas(zone,maxSide=1600){
-  const rec=ensureTemplateImage(zone);
-  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
-    const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height;
-    const ratio=rec.bounds.w/Math.max(1,rec.bounds.h);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}
-    const scale=Math.max(w/rec.bounds.w,h/rec.bounds.h),fullW=Math.max(1,Math.round(sw*scale)),fullH=Math.max(1,Math.round(sh*scale));
-    const full=renderMaskedZoneCanvas(zone,fullW,fullH,false),b=scaleBounds(rec.bounds,sw,sh,fullW,fullH);
-    const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-    x.drawImage(full,b.x,b.y,b.w,b.h,0,0,w,h);return c;
-  }
-  const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;
-}"""
-          if old not in s: raise SystemExit('makeCleanZoneDesignCanvas not found')
-          s=s.replace(old,new,1)
-
-          old="function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);}"
-          new="""function activeLayerScreenRect(){
-  const l=activeLayer();if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
-  if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
-  const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
-  if(l.type==='image'&&l.image){const crop=l.crop||{left:0,top:0,right:0,bottom:0},left=Number(crop.left)||0,top=Number(crop.top)||0,right=Number(crop.right)||0,bottom=Number(crop.bottom)||0,sw=Math.max(1,l.image.width*(1-left-right)),sh=Math.max(1,l.image.height*(1-top-bottom)),base=Math.max(b.w/sw,b.h/sh),scale=base*(l.scale||1);return{x:cx-sw*scale/2,y:cy-sh*scale/2,w:sw*scale,h:sh*scale,cx,cy,b};}
-  const fs=Math.max(18,b.w*.10*(l.scale||1));return{x:cx-b.w*.22,y:cy-fs*.75,w:b.w*.44,h:fs*1.5,cx,cy,b};
-}
-function drawSelectionOverlay(){const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.strokeStyle=cropMode&&l.type==='image'?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.strokeRect(q.x,q.y,q.w,q.h);ctx.setLineDash([]);const handles=cropMode&&l.type==='image'?[[q.x,q.y],[q.x+q.w,q.y],[q.x,q.y+q.h],[q.x+q.w,q.y+q.h]]:[[q.x+q.w,q.y+q.h]];for(const [x,y] of handles){ctx.fillStyle='#fff';ctx.strokeStyle=cropMode?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.beginPath();ctx.rect(x-6,y-6,12,12);ctx.fill();ctx.stroke();}ctx.restore();}
-function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();}"""
-          if old not in s: raise SystemExit('drawEditor not found')
-          s=s.replace(old,new,1)
-
-          old="const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);"
-          new="const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);$('imageQuickControls')?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');"
-          if old not in s: raise SystemExit('renderLayerPanel insertion not found')
-          s=s.replace(old,new,1)
-
-          old="function cropActive(){const l=requireImageLayer();if(!l)return;const current=l.crop||{top:0,right:0,bottom:0,left:0};const fmt=v=>Math.round((Number(v)||0)*100);const entered=prompt('Crop percentages: top, right, bottom, left',fmt(current.top)+', '+fmt(current.right)+', '+fmt(current.bottom)+', '+fmt(current.left));if(entered===null)return;const a=entered.split(',').map(v=>Number(v.trim()));if(a.length!==4||a.some(v=>!Number.isFinite(v)||v<0||v>45)){alert('Use four percentages from 0 to 45, for example: 10, 5, 10, 5');return;}snapshot();l.crop={top:a[0]/100,right:a[1]/100,bottom:a[2]/100,left:a[3]/100};renderAll();}"
-          new="""function cropActive(){const l=requireImageLayer();if(!l)return;cropMode=!cropMode;renderLayerPanel();drawEditor();}
-function nudgeActive(dx,dy){const l=activeLayer();if(!l)return;snapshot();l.x=Math.max(-100,Math.min(100,(Number(l.x)||0)+dx));l.y=Math.max(-100,Math.min(100,(Number(l.y)||0)+dy));renderAll();}
-"""
-          if old not in s: raise SystemExit('old cropActive not found')
-          s=s.replace(old,new,1)
-
-          marker="$('resetTool')?.addEventListener('click',resetActive);"
-          insert="""$('resetTool')?.addEventListener('click',resetActive);
-$('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.addEventListener('click',()=>nudgeActive(0,2));$('nudgeLeft')?.addEventListener('click',()=>nudgeActive(-2,0));$('nudgeRight')?.addEventListener('click',()=>nudgeActive(2,0));$('nudgeCenter')?.addEventListener('click',alignActive);
-"""
-          if marker not in s: raise SystemExit('reset listener marker not found')
-          s=s.replace(marker,insert,1)
-
-          old="""editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer();if(!l)return;snapshot();const p=pointerToCanvas(e);dragState={start:p,x:l.x||0,y:l.y||0};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),r=editorRect(),dx=(p.x-dragState.start.x)/Math.max(1,r.w)*200,dy=(p.y-dragState.start.y)/Math.max(1,r.h)*200;l.x=Math.max(-100,Math.min(100,dragState.x+dx));l.y=Math.max(-100,Math.min(100,dragState.y+dy));drawEditor();renderLayerPanel();rebuildGarmentPreview();});editorCanvas.addEventListener('pointerup',e=>{dragState=null;editorCanvas.releasePointerCapture(e.pointerId);editorCanvas.classList.remove('dragging');});"""
-          new="""editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=18;snapshot();let mode='move',corner=null;if(cropMode&&l.type==='image'){const hs=[[q.x,q.y,'tl'],[q.x+q.w,q.y,'tr'],[q.x,q.y+q.h,'bl'],[q.x+q.w,q.y+q.h,'br']];const hit=hs.find(h=>near(h[0],h[1]));if(hit){mode='crop';corner=hit[2];}}else if(near(q.x+q.w,q.y+q.h)){mode='resize';}dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});
-editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;if(dragState.mode==='move'){l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));}else if(dragState.mode==='resize'){const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);l.scale=Math.max(.2,Math.min(2.2,dragState.scale*d1/d0));}else if(dragState.mode==='crop'&&l.type==='image'){const c={...dragState.crop},fx=dx/Math.max(40,q.w),fy=dy/Math.max(40,q.h),corner=dragState.corner;if(corner.includes('l'))c.left=Math.max(0,Math.min(.45,(dragState.crop.left||0)+fx));if(corner.includes('r'))c.right=Math.max(0,Math.min(.45,(dragState.crop.right||0)-fx));if(corner.includes('t'))c.top=Math.max(0,Math.min(.45,(dragState.crop.top||0)+fy));if(corner.includes('b'))c.bottom=Math.max(0,Math.min(.45,(dragState.crop.bottom||0)-fy));if(c.left+c.right<.9&&c.top+c.bottom<.9)l.crop=c;}drawEditor();renderLayerPanel();rebuildGarmentPreview();});
-editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});"""
-          if old not in s: raise SystemExit('pointer handler block not found')
-          s=s.replace(old,new,1)
-
-          # Exit crop mode if non-image or switching zone/product.
-          s=s.replace("function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];", "function selectProduct(id){cropMode=false;product=catalog.find(p=>p.id===id)||catalog[0];",1)
-          s=s.replace("function selectZone(z){activeZone=z;", "function selectZone(z){cropMode=false;activeZone=z;",1)
-
-          p.write_text(s)
-          PY
+      - name: Apply patch
+        run: python3 scripts/phase1_2_patch.py
       - name: Syntax check
         run: |
           cp v20/editor.js /tmp/editor.mjs
