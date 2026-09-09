@@ -1,8 +1,58 @@
 const $=id=>document.getElementById(id);
 const SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
-const STRIPE_TSHIRT_TEST_LINK='https://buy.stripe.com/test_7sY00d7B1ecEdmm2OYaVa00';
+const STRIPE_TSHIRT_TEST_LINK='https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01';
+const MQD_PRICE_VERSION='2026-09-09-v2';
+const MQD_PRICES={
+  'tshirt':50,
+  'long-sleeve-tshirt':60,
+  'short-sleeve-polo':60,
+  'long-sleeve-polo':70,
+  'fleece-hoodie':90,
+  'lightweight-jacket':90,
+  'mask':25,
+  'hood-mask-shirt':70,
+  'shorts':40,
+  'sweat-pants':60,
+  'hooded-long-sleeve':70,
+  'hat':35
+};
 
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
+function priceFor(id,fallback=0){return Object.prototype.hasOwnProperty.call(MQD_PRICES,id)?MQD_PRICES[id]:Number(fallback)||0;}
+
+function syncStoredCatalogPrices(){
+  try{
+    const raw=localStorage.getItem('mqd-catalog');
+    if(!raw)return;
+    const catalog=JSON.parse(raw);
+    if(!Array.isArray(catalog))return;
+    let changed=false;
+    for(const p of catalog){
+      if(Object.prototype.hasOwnProperty.call(MQD_PRICES,p.id)&&Number(p.price)!==MQD_PRICES[p.id]){p.price=MQD_PRICES[p.id];changed=true;}
+    }
+    if(changed)localStorage.setItem('mqd-catalog',JSON.stringify(catalog));
+  }catch(e){console.warn('MQD catalog price sync skipped',e);}
+}
+
+function applyPriceOverridesToUI(){
+  const sel=$('productSelect');
+  if(!sel)return;
+  for(const option of sel.options){
+    const price=MQD_PRICES[option.value];
+    if(price==null)continue;
+    const base=option.textContent.replace(/\s+—\s+\$[0-9,.]+(?:\.\d{2})?$/,'');
+    option.textContent=`${base} — $${price.toFixed(2)}`;
+  }
+}
+
+function migratePriceVersion(){
+  syncStoredCatalogPrices();
+  const current=localStorage.getItem('mqd-price-version');
+  if(current!==MQD_PRICE_VERSION){
+    localStorage.removeItem('mqd-cart');
+    localStorage.setItem('mqd-price-version',MQD_PRICE_VERSION);
+  }
+}
 
 async function captureDesignJSON(){
   const exportBtn=$('saveDesign');
@@ -19,7 +69,9 @@ async function captureDesignJSON(){
   if(!capturedHref) throw new Error('Could not capture the current design.');
   const response=await fetch(capturedHref);
   if(!response.ok) throw new Error('Could not read the current design.');
-  return await response.json();
+  const payload=await response.json();
+  if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
+  return payload;
 }
 
 function openDraftDB(){
@@ -77,7 +129,10 @@ function mockupBlob(){
 }
 
 function cartItems(){
-  try{return JSON.parse(localStorage.getItem('mqd-cart')||'[]')}catch{return[]}
+  try{
+    const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');
+    return Array.isArray(items)?items.map(x=>({...x,price:priceFor(x.productId,x.price)})):[];
+  }catch{return[]}
 }
 function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));}
 function updateCartButton(){const b=$('cartButton');if(b)b.textContent='Cart ('+cartItems().length+')';}
@@ -112,6 +167,7 @@ async function addToCart(){
   btn.disabled=true;btn.textContent='Adding…';
   try{
     const payload=await captureDesignJSON();
+    if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
     let result=null;
     let pendingSync=false;
     let backendError='';
@@ -133,7 +189,7 @@ async function addToCart(){
       orderNumber:result?.orderNumber||('LOCAL-'+localId.slice(0,8).toUpperCase()),
       productId:payload.product?.id,
       productName:payload.product?.name,
-      price:Number(payload.product?.price)||0,
+      price:priceFor(payload.product?.id,payload.product?.price),
       addedAt:new Date().toISOString(),
       pendingSync,
       draftKey,
@@ -164,8 +220,8 @@ function showCart(){
     alert(summary+'\n\nCheckout is temporarily blocked because at least one design has not synced to production storage yet.');
     return;
   }
-  if(items.length!==1||items[0].productId!=='tshirt'||Number(items[0].price)!==39){
-    alert(summary+'\n\nPhase 1 Stripe checkout currently supports one $39 All-Over Print T-Shirt at a time.');
+  if(items.length!==1||items[0].productId!=='tshirt'||Number(items[0].price)!==50){
+    alert(summary+'\n\nPhase 1 Stripe checkout currently supports one $50 All-Over Print T-Shirt at a time.');
     return;
   }
 
@@ -174,6 +230,14 @@ function showCart(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
+  migratePriceVersion();
+  applyPriceOverridesToUI();
+  const select=$('productSelect');
+  if(select){
+    const observer=new MutationObserver(()=>applyPriceOverridesToUI());
+    observer.observe(select,{childList:true,subtree:true,characterData:true});
+    select.addEventListener('change',()=>setTimeout(applyPriceOverridesToUI,0));
+  }
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);
   $('cartButton')?.addEventListener('click',showCart);
