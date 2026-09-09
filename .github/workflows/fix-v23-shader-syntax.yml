@@ -1,0 +1,47 @@
+name: Fix v23 T-shirt shader compile error
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-v23-shader-syntax.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Fix GLSL zone condition syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text(encoding='utf-8')
+          before=s
+          s=s.replace('if.zone==1)', 'if(zone==1)')
+          s=s.replace('if.zone==2 || zone==3)', 'if(zone==2 || zone==3)')
+          if s==before:
+              raise SystemExit('Expected broken GLSL conditions were not found')
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Verify JavaScript and GLSL patch markers
+        run: |
+          node --check v20/editor.js
+          ! grep -F "if.zone==" v20/editor.js
+          grep -F "if(zone==1)" v20/editor.js
+          grep -F "if(zone==2 || zone==3)" v20/editor.js
+
+      - name: Commit shader fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Fix T-shirt panel shader compilation" || exit 0
+          git push
