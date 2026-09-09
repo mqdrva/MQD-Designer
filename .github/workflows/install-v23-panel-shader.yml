@@ -11,183 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Replace T-shirt triangle splitting with continuous panel shader
+      - name: Patch continuous T-shirt panel shader
         shell: python
         run: |
           from pathlib import Path
-          import re
-
-          path = Path('v20/editor.js')
-          text = path.read_text()
-
-          text = text.replace(
-              "const MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';",
-              "const MQD_TSHIRT_ZONE_CALIBRATION='v23.0-single-mesh-panel-shader';"
-          )
+          import re, base64
+          path=Path('v20/editor.js')
+          text=path.read_text()
+          text=text.replace("const MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';","const MQD_TSHIRT_ZONE_CALIBRATION='v23.0-single-mesh-panel-shader';")
           if "let tshirtShaderState=null;" not in text:
-              text = text.replace(
-                  "const tshirtZoneMeshes=new Map();\n",
-                  "const tshirtZoneMeshes=new Map();\nlet tshirtShaderState=null;\n"
-              )
-
-          replacement = r'''function splitTshirtGeometry(sourceMesh){
-  const geometry=sourceMesh.geometry;
-  if(!geometry?.getAttribute('position'))return false;
-  geometry.computeBoundingBox();
-  const bb=geometry.boundingBox.clone();
-  const size=bb.getSize(new THREE.Vector3());
-  const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
-  const material=base?.clone?base.clone():new THREE.MeshStandardMaterial({roughness:.88,metalness:0});
-
-  // A single material now owns the whole shirt.  Zone selection happens per
-  // fragment instead of per triangle, so the Front/Collar and Body/Sleeve
-  // boundaries cannot create the saw-tooth gaps that triangle splitting did.
-  if(material.color)material.color.set('#ffffff');
-  material.vertexColors=false;
-  material.map=null;
-  material.emissiveMap=null;
-  material.alphaMap=null;
-  if('roughness' in material)material.roughness=.88;
-  if('metalness' in material)material.metalness=0;
-
-  const white=()=>{
-    const t=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1,THREE.RGBAFormat);
-    t.colorSpace=THREE.SRGBColorSpace;t.needsUpdate=true;return t;
-  };
-  const uniforms={
-    mqdFront:{value:white()},mqdBack:{value:white()},
-    mqdLeft:{value:white()},mqdRight:{value:white()},mqdCollar:{value:white()},
-    mqdBoundsMin:{value:bb.min.clone()},mqdBoundsSize:{value:size.clone()}
-  };
-
-  material.onBeforeCompile=shader=>{
-    Object.assign(shader.uniforms,uniforms);
-    shader.vertexShader=shader.vertexShader
-      .replace('#include <common>','#include <common>\nvarying vec3 vMqdLocalPos;')
-      .replace('#include <begin_vertex>','#include <begin_vertex>\nvMqdLocalPos = position;');
-
-    shader.fragmentShader=shader.fragmentShader
-      .replace('#include <common>',`#include <common>
-varying vec3 vMqdLocalPos;
-uniform sampler2D mqdFront;
-uniform sampler2D mqdBack;
-uniform sampler2D mqdLeft;
-uniform sampler2D mqdRight;
-uniform sampler2D mqdCollar;
-uniform vec3 mqdBoundsMin;
-uniform vec3 mqdBoundsSize;
-
-int mqdZoneIndex(vec3 p){
-  vec3 q=(p-mqdBoundsMin)/max(mqdBoundsSize,vec3(0.00001));
-  float xc=abs(q.x-0.5)*2.0;
-  float yn=q.y;
-  float zn=(q.z-0.5)*2.0;
-
-  // Tight neck ring: everything immediately outside this ring remains Front
-  // or Back, eliminating the white shelf that used to sit below the collar.
-  float neck=(xc/0.305)*(xc/0.305)+(zn/0.50)*(zn/0.50);
-  bool collar=(yn>0.905 && xc<0.37 && neck>0.12 && neck<1.52);
-  if(collar)return 4;
-
-  // Curved shoulder-to-underarm seam.  The threshold grows toward the
-  // underarm, so sleeve color cannot spill down the torso side wall.
-  float sleeveEdge=0.405 + clamp(0.92-yn,0.0,0.44)*0.62;
-  bool sleeve=(yn>0.485 && xc>sleeveEdge);
-  if(sleeve)return q.x<0.5 ? 3 : 2; // wearer's Right is screen-left
-
-  // Every remaining fragment belongs to exactly one torso side.  There are
-  // deliberately no unassigned fragments, so no white cracks can appear.
-  return zn>=-0.015 ? 0 : 1;
-}
-
-vec2 mqdZoneUv(int zone,vec3 p){
-  vec3 q=(p-mqdBoundsMin)/max(mqdBoundsSize,vec3(0.00001));
-  if(zone==0)return vec2(clamp(q.x,0.0,1.0),clamp(q.y,0.0,1.0));
-  if(zone==1)return vec2(clamp(1.0-q.x,0.0,1.0),clamp(q.y,0.0,1.0));
-  if(zone==2 || zone==3){
-    bool left=(zone==2);
-    vec2 shoulder=left?vec2(0.66,0.83):vec2(0.34,0.83);
-    vec2 cuff=left?vec2(0.99,0.58):vec2(0.01,0.58);
-    vec2 d=cuff-shoulder;
-    float along=clamp(dot(q.xy-shoulder,d)/max(dot(d,d),0.00001),0.0,1.0);
-    float around=left?clamp(q.z,0.0,1.0):clamp(1.0-q.z,0.0,1.0);
-    return vec2(along,around);
-  }
-  float angle=atan((q.z-0.5)*2.0,(q.x-0.5)*2.0)/(6.28318530718)+0.5;
-  float ringV=clamp((q.y-0.895)/0.105,0.0,1.0);
-  return vec2(fract(angle),ringV);
-}`)
-      .replace('#include <map_fragment>',`int mqdZone=mqdZoneIndex(vMqdLocalPos);
-vec2 mqdUv=mqdZoneUv(mqdZone,vMqdLocalPos);
-vec4 mqdTexel;
-if(mqdZone==0)mqdTexel=texture2D(mqdFront,mqdUv);
-else if(mqdZone==1)mqdTexel=texture2D(mqdBack,mqdUv);
-else if(mqdZone==2)mqdTexel=texture2D(mqdLeft,mqdUv);
-else if(mqdZone==3)mqdTexel=texture2D(mqdRight,mqdUv);
-else mqdTexel=texture2D(mqdCollar,mqdUv);
-diffuseColor *= mqdTexel;`);
-    tshirtShaderState.shader=shader;
-  };
-  material.customProgramCacheKey=()=>MQD_TSHIRT_ZONE_CALIBRATION;
-  material.needsUpdate=true;
-
-  sourceMesh.material=material;
-  sourceMesh.visible=true;
-  tshirtZoneMeshes.clear();
-  for(const zone of ['Front','Back','Left Sleeve','Right Sleeve','Collar'])tshirtZoneMeshes.set(zone,sourceMesh);
-  tshirtShaderState={mesh:sourceMesh,material,uniforms,textures:new Map(),shader:null,bounds:bb};
-  console.info('MQD continuous T-shirt panel shader ready',MQD_TSHIRT_ZONE_CALIBRATION);
-  return true;
-}
-
-function disposeTshirtShaderState(){
-  if(!tshirtShaderState)return;
-  for(const tex of tshirtShaderState.textures.values())tex?.dispose?.();
-  for(const u of ['mqdFront','mqdBack','mqdLeft','mqdRight','mqdCollar']){
-    const tex=tshirtShaderState.uniforms?.[u]?.value;
-    if(tex&&!tshirtShaderState.textures.has(tex))tex.dispose?.();
-  }
-  tshirtShaderState=null;
-  tshirtZoneMeshes.clear();
-}
-function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}'''
-
-          pattern = re.compile(r"function uvForZone\(zone,x,y,z,b\)\{.*?\n\}\nfunction disposeZoneTexture\(mesh\)\{const map=mesh\?\.material\?\.map;if\(map\)\{mesh\.material\.map=null;map\.dispose\(\);\}\}", re.S)
-          text, n = pattern.subn(replacement, text, count=1)
-          if n != 1:
-              raise SystemExit(f'Could not replace old T-shirt split engine: {n}')
-
-          new_update = r'''function updateTshirtZoneTextures(){
-  if(product.id!=='tshirt'||!tshirtShaderState)return false;
-  const slots={Front:'mqdFront',Back:'mqdBack','Left Sleeve':'mqdLeft','Right Sleeve':'mqdRight',Collar:'mqdCollar'};
-  for(const zone of product.zones){
-    const slot=slots[zone];if(!slot)continue;
-    const old=tshirtShaderState.textures.get(zone);if(old)old.dispose();
-    const canvas=makeCleanZoneDesignCanvas(zone,1600);
-    const tex=new THREE.CanvasTexture(canvas);
-    tex.colorSpace=THREE.SRGBColorSpace;
-    tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
-    tex.minFilter=THREE.LinearMipmapLinearFilter;
-    tex.magFilter=THREE.LinearFilter;
-    tex.generateMipmaps=true;
-    tex.needsUpdate=true;
-    tshirtShaderState.textures.set(zone,tex);
-    tshirtShaderState.uniforms[slot].value=tex;
-    if(tshirtShaderState.shader)tshirtShaderState.shader.uniforms[slot].value=tex;
-  }
-  tshirtShaderState.material.needsUpdate=false;
-  return true;
-}'''
-          pattern2 = re.compile(r"function updateTshirtZoneTextures\(\)\{.*?\n\}", re.S)
-          text, n2 = pattern2.subn(new_update, text, count=1)
-          if n2 != 1:
-              raise SystemExit(f'Could not replace texture updater: {n2}')
-
-          text = text.replace(
-              "function loadGarment(){if(!renderer)init3D();if(garment){",
-              "function loadGarment(){if(!renderer)init3D();disposeTshirtShaderState();if(garment){"
-          )
-
+              text=text.replace("const tshirtZoneMeshes=new Map();\n","const tshirtZoneMeshes=new Map();\nlet tshirtShaderState=null;\n")
+          replacement=base64.b64decode("ZnVuY3Rpb24gc3BsaXRUc2hpcnRHZW9tZXRyeShzb3VyY2VNZXNoKXsKICBjb25zdCBnZW9tZXRyeT1zb3VyY2VNZXNoLmdlb21ldHJ5OwogIGlmKCFnZW9tZXRyeT8uZ2V0QXR0cmlidXRlKCdwb3NpdGlvbicpKXJldHVybiBmYWxzZTsKICBnZW9tZXRyeS5jb21wdXRlQm91bmRpbmdCb3goKTsKICBjb25zdCBiYj1nZW9tZXRyeS5ib3VuZGluZ0JveC5jbG9uZSgpOwogIGNvbnN0IHNpemU9YmIuZ2V0U2l6ZShuZXcgVEhSRUUuVmVjdG9yMygpKTsKICBjb25zdCBiYXNlPUFycmF5LmlzQXJyYXkoc291cmNlTWVzaC5tYXRlcmlhbCk/c291cmNlTWVzaC5tYXRlcmlhbFswXTpzb3VyY2VNZXNoLm1hdGVyaWFsOwogIGNvbnN0IG1hdGVyaWFsPWJhc2U/LmNsb25lP2Jhc2UuY2xvbmUoKTpuZXcgVEhSRUUuTWVzaFN0YW5kYXJkTWF0ZXJpYWwoe3JvdWdobmVzczouODgsbWV0YWxuZXNzOjB9KTsKCiAgLy8gQSBzaW5nbGUgbWF0ZXJpYWwgbm93IG93bnMgdGhlIHdob2xlIHNoaXJ0LiBab25lIHNlbGVjdGlvbiBoYXBwZW5zIHBlcgogIC8vIGZyYWdtZW50IGluc3RlYWQgb2YgcGVyIHRyaWFuZ2xlLCBzbyBGcm9udC9Db2xsYXIgYW5kIEJvZHkvU2xlZXZlCiAgLy8gYm91bmRhcmllcyBzdGF5IGNvbnRpbnVvdXMgcmF0aGVyIHRoYW4gZm9sbG93aW5nIHRyaWFuZ2xlIGVkZ2VzLgogIGlmKG1hdGVyaWFsLmNvbG9yKW1hdGVyaWFsLmNvbG9yLnNldCgnI2ZmZmZmZicpOwogIG1hdGVyaWFsLnZlcnRleENvbG9ycz1mYWxzZTsKICBtYXRlcmlhbC5tYXA9bnVsbDsKICBtYXRlcmlhbC5lbWlzc2l2ZU1hcD1udWxsOwogIG1hdGVyaWFsLmFscGhhTWFwPW51bGw7CiAgaWYoJ3JvdWdobmVzcycgaW4gbWF0ZXJpYWwpbWF0ZXJpYWwucm91Z2huZXNzPS44ODsKICBpZignbWV0YWxuZXNzJyBpbiBtYXRlcmlhbCltYXRlcmlhbC5tZXRhbG5lc3M9MDsKCiAgY29uc3Qgd2hpdGU9KCk9PnsKICAgIGNvbnN0IHQ9bmV3IFRIUkVFLkRhdGFUZXh0dXJlKG5ldyBVaW50OEFycmF5KFsyNTUsMjU1LDI1NSwyNTVdKSwxLDEsVEhSRUUuUkdCQUZvcm1hdCk7CiAgICB0LmNvbG9yU3BhY2U9VEhSRUUuU1JHQkNvbG9yU3BhY2U7dC5uZWVkc1VwZGF0ZT10cnVlO3JldHVybiB0OwogIH07CiAgY29uc3QgdW5pZm9ybXM9ewogICAgbXFkRnJvbnQ6e3ZhbHVlOndoaXRlKCl9LG1xZEJhY2s6e3ZhbHVlOndoaXRlKCl9LAogICAgbXFkTGVmdDp7dmFsdWU6d2hpdGUoKX0sbXFkUmlnaHQ6e3ZhbHVlOndoaXRlKCl9LG1xZENvbGxhcjp7dmFsdWU6d2hpdGUoKX0sCiAgICBtcWRCb3VuZHNNaW46e3ZhbHVlOmJiLm1pbi5jbG9uZSgpfSxtcWRCb3VuZHNTaXplOnt2YWx1ZTpzaXplLmNsb25lKCl9CiAgfTsKCiAgbWF0ZXJpYWwub25CZWZvcmVDb21waWxlPXNoYWRlcj0+ewogICAgT2JqZWN0LmFzc2lnbihzaGFkZXIudW5pZm9ybXMsdW5pZm9ybXMpOwogICAgc2hhZGVyLnZlcnRleFNoYWRlcj1zaGFkZXIudmVydGV4U2hhZGVyCiAgICAgIC5yZXBsYWNlKCcjaW5jbHVkZSA8Y29tbW9uPicsJyNpbmNsdWRlIDxjb21tb24+XG52YXJ5aW5nIHZlYzMgdk1xZExvY2FsUG9zOycpCiAgICAgIC5yZXBsYWNlKCcjaW5jbHVkZSA8YmVnaW5fdmVydGV4PicsJyNpbmNsdWRlIDxiZWdpbl92ZXJ0ZXg+XG52TXFkTG9jYWxQb3MgPSBwb3NpdGlvbjsnKTsKCiAgICBzaGFkZXIuZnJhZ21lbnRTaGFkZXI9c2hhZGVyLmZyYWdtZW50U2hhZGVyCiAgICAgIC5yZXBsYWNlKCcjaW5jbHVkZSA8Y29tbW9uPicsYCNpbmNsdWRlIDxjb21tb24+CnZhcnlpbmcgdmVjMyB2TXFkTG9jYWxQb3M7CnVuaWZvcm0gc2FtcGxlcjJEIG1xZEZyb250Owp1bmlmb3JtIHNhbXBsZXIyRCBtcWRCYWNrOwp1bmlmb3JtIHNhbXBsZXIyRCBtcWRMZWZ0Owp1bmlmb3JtIHNhbXBsZXIyRCBtcWRSaWdodDsKdW5pZm9ybSBzYW1wbGVyMkQgbXFkQ29sbGFyOwp1bmlmb3JtIHZlYzMgbXFkQm91bmRzTWluOwp1bmlmb3JtIHZlYzMgbXFkQm91bmRzU2l6ZTsKCmludCBtcWRab25lSW5kZXgodmVjMyBwKXsKICB2ZWMzIHE9KHAtbXFkQm91bmRzTWluKS9tYXgobXFkQm91bmRzU2l6ZSx2ZWMzKDAuMDAwMDEpKTsKICBmbG9hdCB4Yz1hYnMocS54LTAuNSkqMi4wOwogIGZsb2F0IHluPXEueTsKICBmbG9hdCB6bj0ocS56LTAuNSkqMi4wOwoKICAvLyBUaWdodCBjb2xsYXIgcmluZy4gRXZlcnl0aGluZyBpbW1lZGlhdGVseSBvdXRzaWRlIHRoaXMgcmluZyBmYWxscyBiYWNrCiAgLy8gdG8gRnJvbnQvQmFjaywgc28gdGhlcmUgaXMgbm8gdW5hc3NpZ25lZCB3aGl0ZSBzaGVsZiBiZWxvdyB0aGUgY29sbGFyLgogIGZsb2F0IG5lY2s9KHhjLzAuMzA1KSooeGMvMC4zMDUpKyh6bi8wLjUwKSooem4vMC41MCk7CiAgYm9vbCBjb2xsYXI9KHluPjAuOTA1ICYmIHhjPDAuMzcgJiYgbmVjaz4wLjEyICYmIG5lY2s8MS41Mik7CiAgaWYoY29sbGFyKXJldHVybiA0OwoKICAvLyBDdXJ2ZWQgc2hvdWxkZXItdG8tdW5kZXJhcm0gc2VhbS4gVGhlIGN1dG9mZiB3aWRlbnMgdG93YXJkIHRoZSB1bmRlcmFybQogIC8vIHNvIHNsZWV2ZSBjb2xvciBjYW5ub3Qgc3BpbGwgZG93biB0aGUgdG9yc28gc2lkZSB3YWxsLgogIGZsb2F0IHNsZWV2ZUVkZ2U9MC40MDUgKyBjbGFtcCgwLjkyLXluLDAuMCwwLjQ0KSowLjYyOwogIGJvb2wgc2xlZXZlPSh5bj4wLjQ4NSAmJiB4Yz5zbGVldmVFZGdlKTsKICBpZihzbGVldmUpcmV0dXJuIHEueDwwLjUgPyAzIDogMjsgLy8gd2VhcmVyJ3MgUmlnaHQgaXMgc2NyZWVuLWxlZnQKCiAgLy8gRXZlcnkgcmVtYWluaW5nIGZyYWdtZW50IGJlbG9uZ3MgdG8gZXhhY3RseSBvbmUgdG9yc28gc2lkZS4KICByZXR1cm4gem4+PS0wLjAxNSA/IDAgOiAxOwp9Cgp2ZWMyIG1xZFpvbmVVdihpbnQgem9uZSx2ZWMzIHApewogIHZlYzMgcT0ocC1tcWRCb3VuZHNNaW4pL21heChtcWRCb3VuZHNTaXplLHZlYzMoMC4wMDAwMSkpOwogIGlmKHpvbmU9PTApcmV0dXJuIHZlYzIoY2xhbXAocS54LDAuMCwxLjApLGNsYW1wKHEueSwwLjAsMS4wKSk7CiAgaWYuem9uZT09MSlyZXR1cm4gdmVjMihjbGFtcCgxLjAtcS54LDAuMCwxLjApLGNsYW1wKHEueSwwLjAsMS4wKSk7CiAgaWYuem9uZT09MiB8fCB6b25lPT0zKXsKICAgIGJvb2wgbGVmdD0oem9uZT09Mik7CiAgICB2ZWMyIHNob3VsZGVyPWxlZnQ/dmVjMigwLjY2LDAuODMpOnZlYzIoMC4zNCwwLjgzKTsKICAgIHZlYzIgY3VmZj1sZWZ0P3ZlYzIoMC45OSwwLjU4KTp2ZWMyKDAuMDEsMC41OCk7CiAgICB2ZWMyIGQ9Y3VmZi1zaG91bGRlcjsKICAgIGZsb2F0IGFsb25nPWNsYW1wKGRvdChxLnh5LXNob3VsZGVyLGQpL21heChkb3QoZCxkKSwwLjAwMDAxKSwwLjAsMS4wKTsKICAgIGZsb2F0IGFyb3VuZD1sZWZ0P2NsYW1wKHEueiwwLjAsMS4wKTpjbGFtcCgxLjAtcS56LDAuMCwxLjApOwogICAgcmV0dXJuIHZlYzIoYWxvbmcsYXJvdW5kKTsKICB9CiAgZmxvYXQgYW5nbGU9YXRhbigocS56LTAuNSkqMi4wLChxLngtMC41KSoyLjApLyg2LjI4MzE4NTMwNzE4KSswLjU7CiAgZmxvYXQgcmluZ1Y9Y2xhbXAoKHEueS0wLjg5NSkvMC4xMDUsMC4wLDEuMCk7CiAgcmV0dXJuIHZlYzIoZnJhY3QoYW5nbGUpLHJpbmdWKTsKfWApCiAgICAgIC5yZXBsYWNlKCcjaW5jbHVkZSA8bWFwX2ZyYWdtZW50PicsYGludCBtcWRab25lPW1xZFpvbmVJbmRleCh2TXFkTG9jYWxQb3MpOwp2ZWMyIG1xZFV2PW1xZFpvbmVVdihtcWRab25lLHZNcWRMb2NhbFBvcyk7CnZlYzQgbXFkVGV4ZWw7CmlmKG1xZFpvbmU9PTApbXFkVGV4ZWw9dGV4dHVyZTJEKG1xZEZyb250LG1xZFV2KTsKZWxzZSBpZihtcWRab25lPT0xKW1xZFRleGVsPXRleHR1cmUyRChtcWRCYWNrLG1xZFV2KTsKZWxzZSBpZihtcWRab25lPT0yKW1xZFRleGVsPXRleHR1cmUyRChtcWRMZWZ0LG1xZFV2KTsKZWxzZSBpZihtcWRab25lPT0zKW1xZFRleGVsPXRleHR1cmUyRChtcWRSaWdodCxtcWRVdik7CmVsc2UgbXFkVGV4ZWw9dGV4dHVyZTJEKG1xZENvbGxhcixtcWRVdik7CmRpZmZ1c2VDb2xvciAqPSBtcWRUZXhlbDtgKTsKICAgIHRzaGlydFNoYWRlclN0YXRlLnNoYWRlcj1zaGFkZXI7CiAgfTsKICBtYXRlcmlhbC5jdXN0b21Qcm9ncmFtQ2FjaGVLZXk9KCk9Pk1RRF9UU0hJUlRfWk9ORV9DQUxJQlJBVElPTjsKICBtYXRlcmlhbC5uZWVkc1VwZGF0ZT10cnVlOwoKICBzb3VyY2VNZXNoLm1hdGVyaWFsPW1hdGVyaWFsOwogIHNvdXJjZU1lc2gudmlzaWJsZT10cnVlOwogIHRzaGlydFpvbmVNZXNoZXMuY2xlYXIoKTsKICBmb3IoY29uc3Qgem9uZSBvZiBbJ0Zyb250JywnQmFjaycsJ0xlZnQgU2xlZXZlJywnUmlnaHQgU2xlZXZlJywnQ29sbGFyJ10pdHNoaXJ0Wm9uZU1lc2hlcy5zZXQoem9uZSxzb3VyY2VNZXNoKTsKICB0c2hpcnRTaGFkZXJTdGF0ZT17bWVzaDpzb3VyY2VNZXNoLG1hdGVyaWFsLHVuaWZvcm1zLHRleHR1cmVzOm5ldyBNYXAoKSxzaGFkZXI6bnVsbCxib3VuZHM6YmJ9OwogIGNvbnNvbGUuaW5mbygnTVFEIGNvbnRpbnVvdXMgVC1zaGlydCBwYW5lbCBzaGFkZXIgcmVhZHknLE1RRF9UU0hJUlRfWk9ORV9DQUxJQlJBVElPTik7CiAgcmV0dXJuIHRydWU7Cn0KCmZ1bmN0aW9uIGRpc3Bvc2VUc2hpcnRTaGFkZXJTdGF0ZSgpewogIGlmKCF0c2hpcnRTaGFkZXJTdGF0ZSlyZXR1cm47CiAgZm9yKGNvbnN0IHRleCBvZiB0c2hpcnRTaGFkZXJTdGF0ZS50ZXh0dXJlcy52YWx1ZXMoKSl0ZXg/LmRpc3Bvc2U/LigpOwogIGZvcihjb25zdCB1IG9mIFsnbXFkRnJvbnQnLCdtcWRCYWNrJywnbXFkTGVmdCcsJ21xZFJpZ2h0JywnbXFkQ29sbGFyJ10pewogICAgY29uc3QgdGV4PXRzaGlydFNoYWRlclN0YXRlLnVuaWZvcm1zPy5bdV0/LnZhbHVlOwogICAgaWYodGV4KXRleC5kaXNwb3NlPy4oKTsKICB9CiAgdHNoaXJ0U2hhZGVyU3RhdGU9bnVsbDsKICB0c2hpcnRab25lTWVzaGVzLmNsZWFyKCk7Cn0KZnVuY3Rpb24gZGlzcG9zZVpvbmVUZXh0dXJlKG1lc2gpe2NvbnN0IG1hcD1tZXNoPy5tYXRlcmlhbD8ubWFwO2lmKG1hcCl7bWVzaC5tYXRlcmlhbC5tYXA9bnVsbDttYXAuZGlzcG9zZSgpO319","utf-8")
+          pattern=re.compile(r"function uvForZone\(zone,x,y,z,b\)\{.*?\n\}\nfunction disposeZoneTexture\(mesh\)\{const map=mesh\?\.material\?\.map;if\(map\)\{mesh\.material\.map=null;map\.dispose\(\);\}\}",re.S)
+          text,n=pattern.subn(replacement,text,count=1)
+          if n!=1: raise SystemExit(f'old T-shirt engine block not found: {n}')
+          new_update=base64.b64decode("ZnVuY3Rpb24gdXBkYXRlVHNoaXJ0Wm9uZVRleHR1cmVzKCl7CiAgaWYocHJvZHVjdC5pZCE9PSd0c2hpcnQnfHwhdHNoaXJ0U2hhZGVyU3RhdGUpcmV0dXJuIGZhbHNlOwogIGNvbnN0IHNsb3RzPXtGcm9udDonbXFkRnJvbnQnLEJhY2s6J21xZEJhY2snLCdMZWZ0IFNsZWV2ZSc6J21xZExlZnQnLCdSaWdodCBTbGVldmUnOidtcWRSaWdodCcsQ29sbGFyOidtcWRDb2xsYXInfTsKICBmb3IoY29uc3Qgem9uZSBvZiBwcm9kdWN0LnpvbmVzKXsKICAgIGNvbnN0IHNsb3Q9c2xvdHNbem9uZV07aWYoIXNsb3QpY29udGludWU7CiAgICBjb25zdCBvbGQ9dHNoaXJ0U2hhZGVyU3RhdGUudGV4dHVyZXMuZ2V0KHpvbmUpO2lmKG9sZClvbGQuZGlzcG9zZSgpOwogICAgY29uc3QgY2FudmFzPW1ha2VDbGVhblpvbmVEZXNpZ25DYW52YXMoem9uZSwxNjAwKTsKICAgIGNvbnN0IHRleD1uZXcgVEhSRUUuQ2FudmFzVGV4dHVyZShjYW52YXMpOwogICAgdGV4LmNvbG9yU3BhY2U9VEhSRUUuU1JHQkNvbG9yU3BhY2U7CiAgICB0ZXguYW5pc290cm9weT1yZW5kZXJlci5jYXBhYmlsaXRpZXMuZ2V0TWF4QW5pc290cm9weSgpOwogICAgdGV4Lm1pbkZpbHRlcj1USFJFRS5MaW5lYXJNaXBtYXBMaW5lYXJGaWx0ZXI7CiAgICB0ZXgubWFnRmlsdGVyPVRIUkVFLkxpbmVhckZpbHRlcjsKICAgIHRleC5nZW5lcmF0ZU1pcG1hcHM9dHJ1ZTsKICAgIHRleC5uZWVkc1VwZGF0ZT10cnVlOwogICAgdHNoaXJ0U2hhZGVyU3RhdGUudGV4dHVyZXMuc2V0KHpvbmUsdGV4KTsKICAgIHRzaGlydFNoYWRlclN0YXRlLnVuaWZvcm1zW3Nsb3RdLnZhbHVlPXRleDsKICAgIGlmKHRzaGlydFNoYWRlclN0YXRlLnNoYWRlcil0c2hpcnRTaGFkZXJTdGF0ZS5zaGFkZXIudW5pZm9ybXNbc2xvdF0udmFsdWU9dGV4OwogIH0KICByZXR1cm4gdHJ1ZTsKfQ==","utf-8")
+          pattern2=re.compile(r"function updateTshirtZoneTextures\(\)\{.*?\n\}",re.S)
+          text,n2=pattern2.subn(new_update,text,count=1)
+          if n2!=1: raise SystemExit(f'texture updater not found: {n2}')
+          text=text.replace("function loadGarment(){if(!renderer)init3D();if(garment){","function loadGarment(){if(!renderer)init3D();disposeTshirtShaderState();if(garment){")
           path.write_text(text)
       - name: Verify editor syntax
         run: node --check v20/editor.js
