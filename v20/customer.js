@@ -41,7 +41,8 @@ function applyPriceOverridesToUI(){
     const price=MQD_PRICES[option.value];
     if(price==null)continue;
     const base=option.textContent.replace(/\s+—\s+\$[0-9,.]+(?:\.\d{2})?$/,'');
-    option.textContent=`${base} — $${price.toFixed(2)}`;
+    const target=`${base} — $${price.toFixed(2)}`;
+    if(option.textContent!==target)option.textContent=target;
   }
 }
 
