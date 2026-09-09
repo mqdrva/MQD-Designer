@@ -32,19 +32,23 @@ function openDraftDB(){
   });
 }
 
+async function savePayloadToDrafts(key,payload){
+  const db=await openDraftDB();
+  return await new Promise((resolve,reject)=>{
+    const tx=db.transaction('drafts','readwrite');
+    tx.objectStore('drafts').put(payload,key);
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
 async function saveDraft(){
   const btn=$('saveDraft');
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Saving…';
   try{
     const payload=await captureDesignJSON();
-    const db=await openDraftDB();
-    await new Promise((resolve,reject)=>{
-      const tx=db.transaction('drafts','readwrite');
-      tx.objectStore('drafts').put(payload,payload.product?.id||'current');
-      tx.oncomplete=resolve;
-      tx.onerror=()=>reject(tx.error);
-    });
+    await savePayloadToDrafts(payload.product?.id||'current',payload);
     btn.textContent='Saved ✓';
     setTimeout(()=>btn.textContent=old,1200);
   }catch(err){
@@ -77,8 +81,7 @@ function cartItems(){
 function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));}
 function updateCartButton(){const b=$('cartButton');if(b)b.textContent='Cart ('+cartItems().length+')';}
 
-async function submitDesignToBackend(){
-  const payload=await captureDesignJSON();
+async function submitDesignToBackend(payload){
   const clean=structuredClone(payload);
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
@@ -88,7 +91,6 @@ async function submitDesignToBackend(){
       const filename=layer.filename||'artwork.png';
       form.append('asset',blob,filename);
       form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
-      delete layer.src;
     }
   }
   const mockup=await mockupBlob();
@@ -96,8 +98,11 @@ async function submitDesignToBackend(){
   form.append('payload',JSON.stringify(clean,(k,v)=>k==='src'||k==='image'?undefined:v));
   const response=await fetch(SUBMIT_URL,{method:'POST',body:form});
   const result=await response.json().catch(()=>({}));
-  if(!response.ok||!result.ok) throw new Error(result.error||'Design submission failed');
-  return {result,payload};
+  if(!response.ok||!result.ok){
+    const detail=[result.error,result.stage&&`stage: ${result.stage}`,result.code&&`code: ${result.code}`].filter(Boolean).join(' · ');
+    throw new Error(detail||`Design submission failed (${response.status})`);
+  }
+  return result;
 }
 
 async function addToCart(){
@@ -105,12 +110,38 @@ async function addToCart(){
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Adding…';
   try{
-    const {result,payload}=await submitDesignToBackend();
+    const payload=await captureDesignJSON();
+    let result=null;
+    let pendingSync=false;
+    let backendError='';
+    try{
+      result=await submitDesignToBackend(payload);
+    }catch(err){
+      pendingSync=true;
+      backendError=err?.message||String(err);
+      console.warn('MQD backend submission deferred:',err);
+    }
+
+    const localId=crypto.randomUUID();
+    const draftKey='cart:'+localId;
+    await savePayloadToDrafts(draftKey,payload);
+
     const items=cartItems();
-    items.push({designId:result.designId,orderNumber:result.orderNumber,productId:payload.product?.id,productName:payload.product?.name,price:Number(payload.product?.price)||0,addedAt:new Date().toISOString()});
+    items.push({
+      designId:result?.designId||localId,
+      orderNumber:result?.orderNumber||('LOCAL-'+localId.slice(0,8).toUpperCase()),
+      productId:payload.product?.id,
+      productName:payload.product?.name,
+      price:Number(payload.product?.price)||0,
+      addedAt:new Date().toISOString(),
+      pendingSync,
+      draftKey,
+      backendError
+    });
     saveCart(items);updateCartButton();
     btn.textContent='Added ✓';
     setTimeout(()=>btn.textContent=old,1200);
+    if(pendingSync) alert('Added to cart. This design is saved safely on this device and will be synced to production storage when the backend connection is available.');
   }catch(err){
     console.error(err);btn.textContent=old;
     alert('Could not add this design to cart: '+err.message);
@@ -121,7 +152,7 @@ function showCart(){
   const items=cartItems();
   if(!items.length){alert('Your cart is empty.');return;}
   const total=items.reduce((n,x)=>n+(Number(x.price)||0),0);
-  alert(items.map((x,i)=>`${i+1}. ${x.productName} — $${Number(x.price).toFixed(2)}\nRef: ${x.orderNumber}`).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}\n\nStripe checkout is the next connection.`);
+  alert(items.map((x,i)=>`${i+1}. ${x.productName} — $${Number(x.price).toFixed(2)}\nRef: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}\n\nStripe checkout is the next connection.`);
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
