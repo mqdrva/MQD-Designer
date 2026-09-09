@@ -1,0 +1,83 @@
+name: Install customer mode and mockup PNG
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/customer-mode-mockup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch customer-facing controls and mockup capture
+        shell: python
+        run: |
+          from pathlib import Path
+
+          index = Path('index.html')
+          s = index.read_text(encoding='utf-8')
+          old = '<div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="loadDesign" class="btn">Load Design</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>'
+          new = '<div class="top-actions"><button id="downloadMockup" class="btn primary">Download Mockup PNG</button><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Save Design</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>'
+          if old not in s:
+              raise SystemExit('top-actions marker not found')
+          s = s.replace(old, new, 1)
+          index.write_text(s, encoding='utf-8')
+
+          css = Path('v20/editor.css')
+          s = css.read_text(encoding='utf-8')
+          marker = '.upload-input{display:none}'
+          replacement = marker + '\n.owner-only{display:none!important}body.owner-mode .owner-only{display:inline-flex!important}'
+          if replacement not in s:
+              if marker not in s:
+                  raise SystemExit('CSS marker not found')
+              s = s.replace(marker, replacement, 1)
+          css.write_text(s, encoding='utf-8')
+
+          js = Path('v20/editor.js')
+          s = js.read_text(encoding='utf-8')
+
+          marker = "const $=id=>document.getElementById(id);"
+          replacement = marker + "\nconst ownerMode=new URLSearchParams(location.search).get('owner')==='1';\ndocument.body.classList.toggle('owner-mode',ownerMode);"
+          if replacement not in s:
+              if marker not in s:
+                  raise SystemExit('owner mode marker not found')
+              s = s.replace(marker, replacement, 1)
+
+          old = "renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});"
+          new = "renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('renderer marker not found')
+
+          marker = "function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}"
+          addition = marker + "\nfunction downloadMockupPNG(){\n if(!renderer||!garment)return;\n renderer.render(scene,camera);\n const src=renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;\n const c=out.getContext('2d');c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);c.drawImage(src,0,0,out.width,out.height);\n out.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=product.id+'-mockup.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);},'image/png');\n}\n$('downloadMockup').onclick=downloadMockupPNG;"
+          if "function downloadMockupPNG()" not in s:
+              if marker not in s:
+                  raise SystemExit('fitGarment marker not found')
+              s = s.replace(marker, addition, 1)
+
+          js.write_text(s, encoding='utf-8')
+
+      - name: Syntax check
+        run: |
+          node --check v20/editor.js
+          test -f index.html
+          test -f v20/editor.css
+
+      - name: Commit customer mode
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v20/editor.js v20/editor.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Add customer mockup PNG download and hide owner tools"
+          git push origin main
