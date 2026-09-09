@@ -296,10 +296,8 @@ function splitTshirtGeometry(sourceMesh){
   material.onBeforeCompile=shader=>{
     Object.assign(shader.uniforms,uniforms);
     shader.vertexShader=shader.vertexShader
-      .replace('#include <common>','#include <common>
-varying vec3 vMqdLocalPos;')
-      .replace('#include <begin_vertex>','#include <begin_vertex>
-vMqdLocalPos = position;');
+      .replace('#include <common>','#include <common>\nvarying vec3 vMqdLocalPos;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvMqdLocalPos = position;');
 
     shader.fragmentShader=shader.fragmentShader
       .replace('#include <common>',`#include <common>
