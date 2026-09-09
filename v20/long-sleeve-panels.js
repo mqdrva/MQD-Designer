@@ -3,10 +3,13 @@ import {partitionWithRules} from './panels.js';
 // Calibrated for the supplied long-sleeve-tshirt.glb, in mesh-local units.
 // These exclusive geometry masks share clipped edges. Body textures never
 // project onto sleeve/collar triangles; each panel owns its own material.
+// Bend the separator through the measured torso/forearm gap below the armpit.
+// A single shoulder plane cuts through the inward-facing elbow surface.
+const sleeveEdge=y=>y>=0?.425-.04*y:.425-.175*y;
 const rules=[
  {zone:4,tests:[v=>v[1]+.40*v[2]-.755,v=>1-(v[0]/.225)**2-((v[2]+.08)/.24)**2]},
- {zone:2,tests:[v=>v[0]+.13*v[1]-.49]},
- {zone:3,tests:[v=>-v[0]+.13*v[1]-.49]},
+ {zone:2,tests:[v=>v[0]-sleeveEdge(v[1])]},
+ {zone:3,tests:[v=>-v[0]-sleeveEdge(v[1])]},
  {zone:0,tests:[v=>v[2]+.025+.12*Math.max(0,v[1])]}
 ];
 export function partitionLongSleeveTriangle(triangle){return partitionWithRules(triangle,rules);}
