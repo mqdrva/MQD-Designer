@@ -1,0 +1,27 @@
+from pathlib import Path
+
+p = Path('v20/editor.js')
+s = p.read_text(encoding='utf-8')
+
+s = s.replace("let tshirtShaderState=null;\n", "")
+s = s.replace("const MQD_TSHIRT_ZONE_CALIBRATION='v23.0-single-mesh-panel-shader';", "const MQD_TSHIRT_ZONE_CALIBRATION='v22.2-stable-visible-renderer';")
+s = s.replace("function loadGarment(){if(!renderer)init3D();disposeTshirtShaderState();if(garment){", "function loadGarment(){if(!renderer)init3D();if(garment){")
+
+start = s.find('function splitTshirtGeometry(sourceMesh){')
+end = s.find('function findLargestMesh(){', start)
+if start < 0 or end < 0:
+    raise SystemExit('Could not locate current T-shirt renderer block')
+
+replacement = r'''function uvForZone(zone,x,y,z,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y);let u=.5,v=.5;if(zone==='Front'||zone==='Back'){u=(x-b.min.x)/sx;v=(y-b.min.y)/sy;if(zone==='Back')u=1-u;}else if(zone==='Left Sleeve'||zone==='Right Sleeve'){const left=zone==='Left Sleeve',shoulder={x:left?-.36:.36,y:.66},cuff={x:left?-.64:.64,y:.28},dx=cuff.x-shoulder.x,dy=cuff.y-shoulder.y,len2=dx*dx+dy*dy,px=x-shoulder.x,py=y-shoulder.y,along=Math.max(0,Math.min(1,(px*dx+py*dy)/len2)),len=Math.sqrt(len2),perp=(-dy/len)*px+(dx/len)*py,angle=Math.atan2(z,perp);u=(angle+Math.PI)/(Math.PI*2);v=1-along;}else if(zone==='Collar'){u=(Math.atan2(z,x)+Math.PI)/(Math.PI*2);v=(y-b.min.y)/sy;}return[Math.max(0,Math.min(1,u)),Math.max(0,Math.min(1,v))];}
+function splitTshirtGeometry(sourceMesh){
+  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position'))return false;if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index,triCount=index?index.count/3:pos.count/3;geometry.computeBoundingBox();const bb=geometry.boundingBox.clone(),names=['Front','Back','Left Sleeve','Right Sleeve','Collar'],zoneIndex=new Map(names.map((n,i)=>[n,i])),faces=names.map(()=>[]),bounds=names.map(()=>({min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}})),vid=(t,k)=>index?index.getX(t*3+k):t*3+k;
+  for(let t=0;t<triCount;t++){const a=vid(t,0),b=vid(t,1),c=vid(t,2),cx=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3,cy=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3,cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3,name=classifyTshirtTriangle(cx,cy,cz,bb),zi=zoneIndex.get(name);faces[zi].push(t);const zb=bounds[zi];for(const vi of[a,b,c]){const x=pos.getX(vi),y=pos.getY(vi),z=pos.getZ(vi);zb.min.x=Math.min(zb.min.x,x);zb.min.y=Math.min(zb.min.y,y);zb.min.z=Math.min(zb.min.z,z);zb.max.x=Math.max(zb.max.x,x);zb.max.y=Math.max(zb.max.y,y);zb.max.z=Math.max(zb.max.z,z);}}
+  const parent=sourceMesh.parent;if(!parent)return false;tshirtZoneGroup=new THREE.Group();tshirtZoneGroup.name='MQD_Tshirt_Zones';tshirtZoneGroup.position.copy(sourceMesh.position);tshirtZoneGroup.quaternion.copy(sourceMesh.quaternion);tshirtZoneGroup.scale.copy(sourceMesh.scale);parent.add(tshirtZoneGroup);const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
+  names.forEach((name,zi)=>{const remap=new Int32Array(pos.count);remap.fill(-1);const P=[],N=[],UV=[],I=[];let next=0,zb=bounds[zi];for(const t of faces[zi])for(let k=0;k<3;k++){const old=vid(t,k);let ni=remap[old];if(ni<0){ni=next++;remap[old]=ni;const x=pos.getX(old),y=pos.getY(old),z=pos.getZ(old);P.push(x,y,z);N.push(normal.getX(old),normal.getY(old),normal.getZ(old));const uv=uvForZone(name,x,y,z,zb);UV.push(uv[0],uv[1]);}I.push(ni);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));g.setIndex(I);g.computeBoundingBox();g.computeBoundingSphere();const m=base?.clone?base.clone():new THREE.MeshStandardMaterial({roughness:.88,metalness:0});if(m.color)m.color.set('#fff');for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;if('roughness'in m)m.roughness=.88;if('metalness'in m)m.metalness=0;m.needsUpdate=true;const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+name.replace(/\s+/g,'_');mesh.castShadow=sourceMesh.castShadow;mesh.receiveShadow=sourceMesh.receiveShadow;tshirtZoneGroup.add(mesh);tshirtZoneMeshes.set(name,mesh);});sourceMesh.visible=false;console.info('MQD stable UV material zones ready',Object.fromEntries([...tshirtZoneMeshes].map(([k,v])=>[k,v.geometry.index.count/3])));return tshirtZoneMeshes.size===5;
+}
+function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
+function updateTshirtZoneTextures(){if(product.id!=='tshirt'||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}
+'''
+
+s = s[:start] + replacement + s[end:]
+p.write_text(s, encoding='utf-8')
