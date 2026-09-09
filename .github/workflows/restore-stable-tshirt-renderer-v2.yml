@@ -1,0 +1,40 @@
+name: Restore stable T-shirt renderer v2
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-stable-tshirt-renderer-v2.yml'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore only the stable garment loader
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          stable="""function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}"""
+          pattern=r"function loadGarment\(\)\{.*?\n\nfunction selectProduct"
+          m=re.search(pattern,s,re.S)
+          if not m: raise SystemExit('loadGarment function boundary not found')
+          s=s[:m.start()]+stable+'\n\nfunction selectProduct'+s[m.end():]
+          marker="const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';"
+          lock="\n// LOCKED after renderer regression: do not alter the T-shirt GLB load/split path while adding editor UI features.\nconst MQD_TSHIRT_RENDERER_LOCK='stable-v1';"
+          if marker in s and 'MQD_TSHIRT_RENDERER_LOCK' not in s:s=s.replace(marker,marker+lock,1)
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+      - name: Commit stable renderer lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Restore stable T-shirt renderer and lock load path"
+          git push
