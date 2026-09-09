@@ -335,8 +335,8 @@ int mqdZoneIndex(vec3 p){
 vec2 mqdZoneUv(int zone,vec3 p){
   vec3 q=(p-mqdBoundsMin)/max(mqdBoundsSize,vec3(0.00001));
   if(zone==0)return vec2(clamp(q.x,0.0,1.0),clamp(q.y,0.0,1.0));
-  if.zone==1)return vec2(clamp(1.0-q.x,0.0,1.0),clamp(q.y,0.0,1.0));
-  if.zone==2 || zone==3){
+  if(zone==1)return vec2(clamp(1.0-q.x,0.0,1.0),clamp(q.y,0.0,1.0));
+  if(zone==2 || zone==3){
     bool left=(zone==2);
     vec2 shoulder=left?vec2(0.66,0.83):vec2(0.34,0.83);
     vec2 cuff=left?vec2(0.99,0.58):vec2(0.01,0.58);
