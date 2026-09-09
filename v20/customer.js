@@ -116,6 +116,33 @@ async function dataUrlToBlob(src){
   return await r.blob();
 }
 
+function openOriginalArtworkDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('mqd-upload-originals',1);
+    req.onupgradeneeded=()=>{
+      if(!req.result.objectStoreNames.contains('files'))req.result.createObjectStore('files');
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function originalArtworkBlob(filename){
+  if(!filename)return null;
+  try{
+    const db=await openOriginalArtworkDB();
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction('files','readonly');
+      const req=tx.objectStore('files').get(filename);
+      req.onsuccess=()=>resolve(req.result?.file||null);
+      req.onerror=()=>reject(req.error);
+    });
+  }catch(err){
+    console.warn('Full-resolution original lookup skipped',err);
+    return null;
+  }
+}
+
 function mockupBlob(){
   return new Promise(resolve=>{
     const src=$('webgl');
@@ -143,8 +170,9 @@ async function submitDesignToBackend(payload){
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
     for(const layer of state.layers||[]){
       if(layer.type!=='image'||!layer.src) continue;
-      const blob=await dataUrlToBlob(layer.src);
       const filename=layer.filename||'artwork.png';
+      const original=await originalArtworkBlob(filename);
+      const blob=original||await dataUrlToBlob(layer.src);
       form.append('asset',blob,filename);
       form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
     }
