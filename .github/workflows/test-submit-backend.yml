@@ -1,0 +1,16 @@
+name: Test MQD submit backend
+on:
+  push:
+    paths:
+      - '.github/workflows/test-submit-backend.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          curl -sS -i 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design'
+      - name: Minimal submission
+        run: |
+          PAYLOAD='{"schema":"mqd-design-v1","engine":{"calibration":"health-test"},"product":{"id":"tshirt","name":"All-Over Print T-Shirt","price":39},"design":{"zones":{"Front":{"background":"#FFFFFF","layers":[]}}}}'
+          curl -sS -i -X POST 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design' -F "payload=$PAYLOAD"
