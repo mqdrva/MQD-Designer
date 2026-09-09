@@ -1,0 +1,56 @@
+name: Install v25 exact T-shirt collar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-v25-exact-collar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install topology-calibrated collar isolation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p=Path('v20/editor.js')
+          s=p.read_text(encoding='utf-8')
+
+          old="import {panelNames, partitionTriangle, panelUv} from './panels.js';"
+          new="import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';\nimport {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';"
+          if old in s:
+              s=s.replace(old,new,1)
+          elif "tshirt-collar-mask.js" not in s:
+              raise SystemExit('Could not patch imports')
+
+          s=s.replace("const MQD_TSHIRT_ZONE_CALIBRATION='v24-clipped-visual-panels';","const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';")
+
+          old_loop=""" const count=index?index.count:pos.count;\n for(let t=0;t<count;t+=3){\n  const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});\n  for(const [zi,poly] of partitionTriangle(triangle)){"""
+          new_loop=""" const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=faceCount===TSHIRT_FACE_COUNT;\n if(!useExactCollar)console.warn('MQD collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);\n for(let t=0;t<count;t+=3){\n  const faceIndex=(t/3)|0;\n  const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});\n  const parts=useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);\n  for(const [zi,poly] of parts){"""
+          if old_loop not in s:
+              if 'const parts=useExactCollar?' not in s:
+                  raise SystemExit('Could not locate splitTshirtGeometry loop')
+          else:
+              s=s.replace(old_loop,new_loop,1)
+
+          p.write_text(s,encoding='utf-8')
+
+      - name: Verify JavaScript syntax
+        run: node --check v20/editor.js && node --check v20/panels.js && node --check v20/tshirt-collar-mask.js
+
+      - name: Commit phase 1 T-shirt collar isolation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Isolate T-shirt collar with exact mesh topology" || exit 0
+          git push
