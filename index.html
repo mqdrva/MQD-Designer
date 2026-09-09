@@ -11,7 +11,7 @@
 <body>
 <header>
   <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><select id="productSelect" class="product-select"></select></div>
-  <div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>
+  <div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="loadDesign" class="btn">Load Design</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>
 </header>
 <div class="app">
   <section class="preview-pane">
@@ -39,6 +39,7 @@
       <button id="addTextBtn" class="add-card"><span class="ico">T</span><span>Add Text</span></button>
     </div>
     <input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">
+    <input id="designUpload" class="upload-input" type="file" accept="application/json,.json">
     <div class="section"><div class="section-title"><span class="caret">⌄</span> Background</div><div class="row"><input id="zoneColor" class="color-input" type="color" value="#ffffff"><input id="zoneHex" class="input" value="#FFFFFF" maxlength="7"><button id="applyAll" class="apply-all">Apply All</button></div><div class="subtle" style="margin-top:6px">Background is clipped to this print zone only.</div></div>
     <div class="section"><div class="section-title"><span class="caret">⌄</span> Layers</div><div id="layers" class="layers"></div><div id="emptyLayers" class="empty">No artwork in this zone yet.</div><div id="layerControls" class="layer-controls hidden"><div id="selectedLayerLabel" class="layer-name">Layer 1</div><div class="range-line"><span>Left / Right</span><input id="layerX" type="range" min="-100" max="100" value="0"><strong id="layerXVal">0</strong></div><div class="range-line"><span>Up / Down</span><input id="layerY" type="range" min="-100" max="100" value="0"><strong id="layerYVal">0</strong></div><div class="range-line"><span>Size</span><input id="layerScale" type="range" min="20" max="220" value="100"><strong id="layerScaleVal">100</strong></div><div class="range-line"><span>Rotate</span><input id="layerRotation" type="range" min="-180" max="180" value="0"><strong id="layerRotationVal">0°</strong></div><div class="action-row"><button id="fillLayer" class="btn">Fill</button><button id="toggleLayer" class="btn">Hide</button><button id="deleteLayer" class="btn danger">Delete</button></div></div></div>
     <div class="section"><div class="section-title"><span class="caret">⌄</span> Design status</div><div class="status"><div><span>Product</span><strong id="statusProduct">T-Shirt</strong></div><div><span>Active area</span><strong id="statusZone">Front</strong></div><div><span>Artwork layers</span><strong id="statusLayers">0</strong></div></div></div>

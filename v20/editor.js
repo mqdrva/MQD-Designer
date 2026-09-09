@@ -322,8 +322,32 @@ $('fillLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.x=0;
 function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
 editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer();if(!l)return;snapshot();const p=pointerToCanvas(e);dragState={start:p,x:l.x||0,y:l.y||0};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),r=editorRect(),dx=(p.x-dragState.start.x)/Math.max(1,r.w)*200,dy=(p.y-dragState.start.y)/Math.max(1,r.h)*200;l.x=Math.max(-100,Math.min(100,dragState.x+dx));l.y=Math.max(-100,Math.min(100,dragState.y+dy));drawEditor();renderLayerPanel();rebuildGarmentPreview();});editorCanvas.addEventListener('pointerup',e=>{dragState=null;editorCanvas.releasePointerCapture(e.pointerId);editorCanvas.classList.remove('dragging');});
 
-function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}
-$('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};
+function designJSON(){
+ const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));
+ const templates=Object.fromEntries(product.zones.map(z=>[z,product.templates?.[z]||null]));
+ return{schema:'mqd-design-v1',engine:{calibration:product.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview'},product:{id:product.id,name:product.name,category:product.category,price:product.price,model:product.model},activeZone,templates,design:clean[product.id]||{},savedAt:new Date().toISOString()};
+}
+function recomputeLayerSeq(){
+ let max=0;
+ Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>(z.layers||[]).forEach(l=>{const m=String(l.id||'').match(/^layer-(\d+)$/);if(m)max=Math.max(max,Number(m[1]));})));
+ layerSeq=max+1;
+}
+function downloadJsonFile(name,data){
+ const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+$('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
+$('loadDesign').onclick=()=>$('designUpload').click();
+$('designUpload').onchange=async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  const payload=JSON.parse(await f.text()),pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
+  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
+  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design file.');
+  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
+  recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();alert('Design loaded.');
+ }catch(err){console.error(err);alert('Design could not be loaded: '+err.message);}finally{e.target.value='';}
+};
 function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(','),bin=atob(b),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]});}
 $('downloadPack').onclick=async()=>{
  const button=$('downloadPack');button.disabled=true;$('productSelect').disabled=true;
@@ -354,6 +378,8 @@ $('downloadPack').onclick=async()=>{
    const c=document.createElement('canvas');c.width=t?.width||2048;c.height=t?.height||2048;drawProductionZone(c.getContext('2d'),z,c.width,c.height);
    root.file(`zones/${folder}.png`,new Uint8Array(await dataUrlBlob(c.toDataURL('image/png')).arrayBuffer()));
   }
+  const manifest={schema:'mqd-production-v1',generatedAt:new Date().toISOString(),engineCalibration:selected.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview',product:{id:selected.id,name:selected.name,category:selected.category,price:selected.price,model:selected.model},zones:selected.zones.map(z=>({name:z,template:selected.templates?.[z]||null,backgroundHex:colors[z]||'#FFFFFF'}))};
+  root.file('manifest.json',JSON.stringify(manifest,null,2));
   root.file('background-colors.json',JSON.stringify(colors,null,2));
   root.file('background-colors.txt',Object.entries(colors).map(([z,c])=>z+': '+c).join('\n')+'\n');
   root.file('design.json',JSON.stringify(metadata,null,2));
