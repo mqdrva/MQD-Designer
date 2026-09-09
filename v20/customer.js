@@ -1,6 +1,19 @@
 const $=id=>document.getElementById(id);
 const SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
-const STRIPE_TSHIRT_TEST_LINK='https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01';
+const STRIPE_TEST_LINKS={
+  'tshirt':'https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01',
+  'long-sleeve-tshirt':'https://buy.stripe.com/test_9B67sFg7x1pS96689iaVa02',
+  'short-sleeve-polo':'https://buy.stripe.com/test_eVq28l8F56Kc1DEfBKaVa03',
+  'long-sleeve-polo':'https://buy.stripe.com/test_5kQ8wJ4oP3y00zA75eaVa04',
+  'fleece-hoodie':'https://buy.stripe.com/test_cNi14h3kL4C46XY61aaVa05',
+  'lightweight-jacket':'https://buy.stripe.com/test_4gMbIV08z9WofuuexGaVa06',
+  'mask':'https://buy.stripe.com/test_14A00d3kLgkM4PQ3T2aVa07',
+  'hood-mask-shirt':'https://buy.stripe.com/test_3cI6oBaNd3y00zA61aaVa08',
+  'shorts':'https://buy.stripe.com/test_3cI28l9J95G80zA1KUaVa09',
+  'sweat-pants':'https://buy.stripe.com/test_fZu14hbRh7Og966cpyaVa0a',
+  'hooded-long-sleeve':'https://buy.stripe.com/test_bJe3cp2gH4C46XY2OYaVa0b',
+  'hat':'https://buy.stripe.com/test_6oUaER3kL1pS0zA89iaVa0c'
+};
 const MQD_PRICE_VERSION='2026-09-09-v2';
 const MQD_PRICES={
   'tshirt':50,
@@ -235,8 +248,10 @@ async function addToCart(){
 }
 
 function stripeCheckoutUrl(item){
-  const join=STRIPE_TSHIRT_TEST_LINK.includes('?')?'&':'?';
-  return STRIPE_TSHIRT_TEST_LINK+join+'client_reference_id='+encodeURIComponent(item.orderNumber||item.designId||'MQD');
+  const base=STRIPE_TEST_LINKS[item?.productId];
+  if(!base)return'';
+  const join=base.includes('?')?'&':'?';
+  return base+join+'client_reference_id='+encodeURIComponent(item.orderNumber||item.designId||'MQD');
 }
 
 function showCart(){
@@ -249,13 +264,18 @@ function showCart(){
     alert(summary+'\n\nCheckout is temporarily blocked because at least one design has not synced to production storage yet.');
     return;
   }
-  if(items.length!==1||items[0].productId!=='tshirt'||Number(items[0].price)!==50){
-    alert(summary+'\n\nPhase 1 Stripe checkout currently supports one $50 All-Over Print T-Shirt at a time.');
+  if(items.length!==1){
+    alert(summary+'\n\nSandbox checkout currently supports one customized product per checkout. Complete this order, then create the next design.');
+    return;
+  }
+  const item=items[0],checkoutUrl=stripeCheckoutUrl(item);
+  if(!checkoutUrl){
+    alert(summary+'\n\nStripe sandbox checkout is not configured for this product yet.');
     return;
   }
 
   const proceed=confirm(summary+'\n\nContinue to secure Stripe TEST checkout?\n\nNo real money will be charged in sandbox mode.');
-  if(proceed) window.location.assign(stripeCheckoutUrl(items[0]));
+  if(proceed) window.location.assign(checkoutUrl);
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
