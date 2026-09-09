@@ -27,7 +27,7 @@ let catalog=JSON.parse(localStorage.getItem('mqd-catalog')||'null')||seed;
 let product=catalog[0],activeZone=product.zones[0],activeLayerId=null,layerSeq=1;
 const designs={};
 const history=[],future=[];
-let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;
+let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null,cropMode=false;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
 const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';
@@ -171,7 +171,17 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
-function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
+function makeCleanZoneDesignCanvas(zone,maxSide=1600){
+  const rec=ensureTemplateImage(zone);
+  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
+    const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height;
+    const ratio=rec.bounds.w/Math.max(1,rec.bounds.h);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}
+    const scale=Math.max(w/rec.bounds.w,h/rec.bounds.h),fullW=Math.max(1,Math.round(sw*scale)),fullH=Math.max(1,Math.round(sh*scale));
+    const full=renderMaskedZoneCanvas(zone,fullW,fullH,false),b=scaleBounds(rec.bounds,sw,sh,fullW,fullH);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(full,b.x,b.y,b.w,b.h,0,0,w,h);return c;
+  }
+  const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;
+}
 
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
@@ -270,7 +280,15 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   }
   targetCtx.restore();
 }
-function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);}
+function activeLayerScreenRect(){
+  const l=activeLayer();if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
+  if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
+  const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
+  if(l.type==='image'&&l.image){const crop=l.crop||{left:0,top:0,right:0,bottom:0},left=Number(crop.left)||0,top=Number(crop.top)||0,right=Number(crop.right)||0,bottom=Number(crop.bottom)||0,sw=Math.max(1,l.image.width*(1-left-right)),sh=Math.max(1,l.image.height*(1-top-bottom)),base=Math.max(b.w/sw,b.h/sh),scale=base*(l.scale||1);return{x:cx-sw*scale/2,y:cy-sh*scale/2,w:sw*scale,h:sh*scale,cx,cy,b};}
+  const fs=Math.max(18,b.w*.10*(l.scale||1));return{x:cx-b.w*.22,y:cy-fs*.75,w:b.w*.44,h:fs*1.5,cx,cy,b};
+}
+function drawSelectionOverlay(){const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.strokeStyle=cropMode&&l.type==='image'?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.strokeRect(q.x,q.y,q.w,q.h);ctx.setLineDash([]);const handles=cropMode&&l.type==='image'?[[q.x,q.y],[q.x+q.w,q.y],[q.x,q.y+q.h],[q.x+q.w,q.y+q.h]]:[[q.x+q.w,q.y+q.h]];for(const [x,y] of handles){ctx.fillStyle='#fff';ctx.strokeStyle=cropMode?'#ff6b00':'#1b78ff';ctx.lineWidth=2;ctx.beginPath();ctx.rect(x-6,y-6,12,12);ctx.fill();ctx.stroke();}ctx.restore();}
+function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();}
 function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
 
@@ -283,7 +301,7 @@ function renderLayerPanel(){
   arr.forEach(l=>{const d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'');d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${l.visible===false?' · hidden':''}</div></div><span>${l.type==='image'?'▧':'T'}</span></div>`;d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();};wrap.appendChild(d);});
   const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}
   $('selectedLayerLabel').textContent=l.label;$('layerX').value=l.x||0;$('layerY').value=l.y||0;$('layerScale').value=Math.round((l.scale||1)*100);$('layerRotation').value=l.rotation||0;$('layerXVal').textContent=l.x||0;$('layerYVal').textContent=l.y||0;$('layerScaleVal').textContent=Math.round((l.scale||1)*100);$('layerRotationVal').textContent=(l.rotation||0)+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';
-  const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);
+  const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);$('imageQuickControls')?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
 }
 
@@ -360,8 +378,8 @@ function rebuildGarmentPreview(){if(product.id==='tshirt'&&tshirtZoneMeshes.size
 
 function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
 
-function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
-function selectZone(z){activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
+function selectProduct(id){cropMode=false;product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
+function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
 function addImage(src,filename){const img=new Image();img.onload=()=>{snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
 function addText(){const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
@@ -374,7 +392,9 @@ function flipActive(axis){const l=requireImageLayer();if(!l)return;snapshot();l[
 function alignActive(){const l=activeLayer();if(!l)return;snapshot();l.x=0;l.y=0;renderAll();}
 function duplicateActive(){const l=activeLayer();if(!l)return;snapshot();const copy={...l,id:'layer-'+layerSeq++,label:nextLabel(),x:(l.x||0)+6,y:(l.y||0)+6,crop:l.crop?{...l.crop}:undefined};zoneState().layers.push(copy);activeLayerId=copy.id;renderAll();}
 function cloneActiveToAllZones(){const l=activeLayer();if(!l)return;snapshot();for(const z of product.zones){if(z===activeZone)continue;const target=zoneState(z);const copy={...l,id:'layer-'+layerSeq++,label:'Layer '+(target.layers.length+1),crop:l.crop?{...l.crop}:undefined};target.layers.push(copy);}renderAll();}
-function cropActive(){const l=requireImageLayer();if(!l)return;const current=l.crop||{top:0,right:0,bottom:0,left:0};const fmt=v=>Math.round((Number(v)||0)*100);const entered=prompt('Crop percentages: top, right, bottom, left',fmt(current.top)+', '+fmt(current.right)+', '+fmt(current.bottom)+', '+fmt(current.left));if(entered===null)return;const a=entered.split(',').map(v=>Number(v.trim()));if(a.length!==4||a.some(v=>!Number.isFinite(v)||v<0||v>45)){alert('Use four percentages from 0 to 45, for example: 10, 5, 10, 5');return;}snapshot();l.crop={top:a[0]/100,right:a[1]/100,bottom:a[2]/100,left:a[3]/100};renderAll();}
+function cropActive(){const l=requireImageLayer();if(!l)return;cropMode=!cropMode;renderLayerPanel();drawEditor();}
+function nudgeActive(dx,dy){const l=activeLayer();if(!l)return;snapshot();l.x=Math.max(-100,Math.min(100,(Number(l.x)||0)+dx));l.y=Math.max(-100,Math.min(100,(Number(l.y)||0)+dy));renderAll();}
+
 function resetActive(){const l=activeLayer();if(!l)return;snapshot();Object.assign(l,{x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false});if(l.type==='image')l.crop={left:0,top:0,right:0,bottom:0};renderAll();}
 $('flipXTool')?.addEventListener('click',()=>flipActive('flipX'));
 $('flipYTool')?.addEventListener('click',()=>flipActive('flipY'));
@@ -383,6 +403,7 @@ $('cloneAllTool')?.addEventListener('click',cloneActiveToAllZones);
 $('cropTool')?.addEventListener('click',cropActive);
 $('duplicateTool')?.addEventListener('click',duplicateActive);
 $('resetTool')?.addEventListener('click',resetActive);
+$('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.addEventListener('click',()=>nudgeActive(0,2));$('nudgeLeft')?.addEventListener('click',()=>nudgeActive(-2,0));$('nudgeRight')?.addEventListener('click',()=>nudgeActive(2,0));$('nudgeCenter')?.addEventListener('click',alignActive);
 
 function initTextFonts(){const sel=$('textFont');if(!sel)return;sel.innerHTML=TEXT_FONTS.map(f=>`<option value="${f}">${f}</option>`).join('');}
 function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'&&document.fonts?.load)document.fonts.load(`32px "${val}"`).finally(()=>renderAll());else renderAll();}
@@ -402,7 +423,9 @@ $('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').on
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();const arr=zoneState().layers;arr.splice(arr.findIndex(x=>x.id===l.id),1);activeLayerId=arr.at(-1)?.id||null;renderAll();};$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
 function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
-editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer();if(!l)return;snapshot();const p=pointerToCanvas(e);dragState={start:p,x:l.x||0,y:l.y||0};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),r=editorRect(),dx=(p.x-dragState.start.x)/Math.max(1,r.w)*200,dy=(p.y-dragState.start.y)/Math.max(1,r.h)*200;l.x=Math.max(-100,Math.min(100,dragState.x+dx));l.y=Math.max(-100,Math.min(100,dragState.y+dy));drawEditor();renderLayerPanel();rebuildGarmentPreview();});editorCanvas.addEventListener('pointerup',e=>{dragState=null;editorCanvas.releasePointerCapture(e.pointerId);editorCanvas.classList.remove('dragging');});
+editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=18;snapshot();let mode='move',corner=null;if(cropMode&&l.type==='image'){const hs=[[q.x,q.y,'tl'],[q.x+q.w,q.y,'tr'],[q.x,q.y+q.h,'bl'],[q.x+q.w,q.y+q.h,'br']];const hit=hs.find(h=>near(h[0],h[1]));if(hit){mode='crop';corner=hit[2];}}else if(near(q.x+q.w,q.y+q.h)){mode='resize';}dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});
+editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;if(dragState.mode==='move'){l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));}else if(dragState.mode==='resize'){const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);l.scale=Math.max(.2,Math.min(2.2,dragState.scale*d1/d0));}else if(dragState.mode==='crop'&&l.type==='image'){const c={...dragState.crop},fx=dx/Math.max(40,q.w),fy=dy/Math.max(40,q.h),corner=dragState.corner;if(corner.includes('l'))c.left=Math.max(0,Math.min(.45,(dragState.crop.left||0)+fx));if(corner.includes('r'))c.right=Math.max(0,Math.min(.45,(dragState.crop.right||0)-fx));if(corner.includes('t'))c.top=Math.max(0,Math.min(.45,(dragState.crop.top||0)+fy));if(corner.includes('b'))c.bottom=Math.max(0,Math.min(.45,(dragState.crop.bottom||0)-fy));if(c.left+c.right<.9&&c.top+c.bottom<.9)l.crop=c;}drawEditor();renderLayerPanel();rebuildGarmentPreview();});
+editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
 
 function designJSON(){
  const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));
