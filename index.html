@@ -3,370 +3,50 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Morales Quality Designs — Custom AOP Studio</title>
+<title>Morales Quality Designs — AOP Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{--ink:#111;--muted:#6d6e73;--line:#e7e7ea;--paper:#f7f7f8;--accent:#c91f26;--soft:#fff;--good:#1a7f37}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}button,input,select,textarea{font:inherit}.hidden{display:none!important}
-.topbar{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:20}.topbar img{height:48px;width:auto}.top-actions{display:flex;gap:10px;align-items:center}.pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}.pill.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
-.app{min-height:calc(100vh - 72px);display:grid;grid-template-columns:280px 1fr 330px}.panel{background:#fff;border-right:1px solid var(--line);padding:18px;overflow:auto}.panel.right{border-right:0;border-left:1px solid var(--line)}
-.kicker{text-transform:uppercase;letter-spacing:.09em;font-size:11px;color:var(--muted);font-weight:800}.title{font-size:24px;font-weight:800;margin:8px 0}.small{font-size:12px;line-height:1.45;color:var(--muted)}.section{padding:18px 0;border-top:1px solid var(--line)}.section:first-child{border-top:0;padding-top:0}.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#707177;font-weight:800;margin-bottom:9px}.product-list{display:grid;gap:8px}.product-btn{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 12px;cursor:pointer}.product-btn.active{border-color:var(--ink);background:#111;color:#fff}.product-btn .sub{font-size:11px;opacity:.65;margin-top:4px}.zones{display:grid;grid-template-columns:1fr 1fr;gap:8px}.zone{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px;cursor:pointer;font-size:12px;text-align:left}.zone.active{background:#111;color:#fff;border-color:#111}
-.row{display:flex;gap:8px}.row>*{flex:1}.btn{width:100%;border:1px solid #d9d9dd;background:#fff;border-radius:10px;padding:11px 12px;cursor:pointer;font-weight:700}.btn.primary{background:#111;color:#fff;border-color:#111}.btn.danger{color:#a8181e}.input,select,textarea{width:100%;border:1px solid #d9d9dd;border-radius:10px;padding:10px;background:#fff}.control{margin-top:9px}.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.swatch{height:34px;border-radius:9px;border:2px solid #ddd;cursor:pointer}.swatch.active{outline:2px solid #111;outline-offset:2px}
-.scene{position:relative;min-width:0;background:radial-gradient(circle at 50% 38%,#fff 0%,#ececef 72%)}canvas{display:block;width:100%;height:100%}.scene-badge{position:absolute;left:18px;top:18px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:999px;padding:9px 12px;font-size:11px;font-weight:800;z-index:2}.scene-help{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:999px;padding:9px 12px;font-size:11px;color:#666;z-index:2;white-space:nowrap}
-.card{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff}.price{font-size:24px;font-weight:800}.meta{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.preview{height:170px;border:1px solid var(--line);border-radius:12px;background:#f4f4f5;overflow:hidden;margin-top:10px}.preview img{width:100%;height:100%;object-fit:cover}.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:12px}.stat:last-child{border-bottom:0}
-.overlay{position:fixed;inset:0;background:rgba(15,16,18,.48);display:flex;align-items:flex-start;justify-content:center;padding:28px;z-index:40}.modal{width:min(1200px,100%);max-height:calc(100vh - 56px);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.25);display:flex;flex-direction:column}.modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.modal-body{padding:20px;overflow:auto}.admin-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:18px}.product-table{display:grid;gap:8px}.product-row{display:grid;grid-template-columns:1.2fr .7fr .9fr auto;gap:10px;align-items:center;border:1px solid var(--line);padding:10px;border-radius:12px}.zone-chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:11px;border:1px solid var(--line);padding:5px 8px;border-radius:999px;background:#fafafa}.admin-note{font-size:12px;color:var(--muted);line-height:1.5;background:#f8f8f9;border-radius:12px;padding:12px}.template-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fafafa}.template-card img{width:100%;height:110px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid #eee}.template-meta{font-size:11px;color:#666;margin-top:7px;line-height:1.35}
-.layer-list{display:grid;gap:7px;margin-top:8px}.layer-item{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;cursor:pointer}.layer-item.active{border-color:#111;background:#f2f2f3}.layer-name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layer-zone{font-size:10px;color:var(--muted);margin-top:2px}.layer-controls{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fafafa}.range-row{display:grid;grid-template-columns:64px 1fr 42px;align-items:center;gap:7px;margin-top:8px;font-size:11px}.range-row input[type=range]{width:100%}.layer-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:10px}.hint-box{font-size:11px;line-height:1.4;color:var(--muted);background:#f7f7f8;border-radius:10px;padding:9px}
-
-@media(max-width:1020px){.app{grid-template-columns:240px 1fr}.panel.right{display:none}}@media(max-width:760px){.topbar{padding:0 12px}.topbar img{height:40px}.app{grid-template-columns:1fr}.panel{display:none}.scene{height:calc(100vh - 72px)}}
-</style>
+<link rel="stylesheet" href="/v20/editor.css">
 </head>
 <body>
-<header class="topbar">
-  <img src="/assets/brand-logo.png" alt="Morales Quality Designs">
-  <div class="top-actions"><button class="pill" id="openAdmin">Product Admin</button><button class="pill primary" id="downloadPackTop">Download Production ZIP</button></div>
+<header>
+  <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><select id="productSelect" class="product-select"></select></div>
+  <div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>
 </header>
 <div class="app">
-  <aside class="panel">
-    <div class="section">
-      <div class="kicker">Morales Quality Designs</div><div class="title">AOP Studio</div>
-      <div class="small">One designer for every garment. Edit product names and print zones from Product Admin.</div>
+  <section class="preview-pane">
+    <div class="pane-head"><div class="seg"><button class="active">3D</button><button disabled>Mockup</button></div></div>
+    <canvas id="webgl" class="webgl"></canvas>
+    <div class="viewer-hint">Drag to rotate · Scroll to zoom</div>
+  </section>
+  <section class="canvas-pane">
+    <div class="editor-toolbar">
+      <button class="tool" disabled>Flip X</button><button class="tool" disabled>Flip Y</button><button class="tool" disabled>Align</button><button class="tool" disabled>Clone</button><button class="tool" disabled>Crop</button><button class="tool" disabled>Duplicate</button><button class="tool" disabled>Tiling</button><button class="tool" disabled>Reset</button><button class="tool" disabled>Sharpen</button><button class="tool" disabled>Segment</button>
     </div>
-    <div class="section"><div class="label">Product</div><div id="productList" class="product-list"></div></div>
-    <div class="section"><div class="label">Printable areas</div><div id="zones" class="zones"></div></div>
-    <div class="section"><div class="label">Artwork</div><input id="artUpload" type="file" accept="image/png,image/jpeg,image/webp" class="input"><div class="row control"><button class="btn" id="addText">Add Text</button><button class="btn" id="reset">Reset</button></div></div><div class="section"><div class="label">Layers — <span id="layerZoneLabel">Front</span></div><div id="layerEmpty" class="hint-box">Upload artwork or add text to this print zone. Layers in other zones stay separate.</div><div id="layerList" class="layer-list"></div><div id="layerControls" class="layer-controls hidden"><div style="font-size:12px;font-weight:800" id="selectedLayerName">Selected layer</div><div class="range-row"><span>Left / Right</span><input id="layerX" type="range" min="-100" max="100" value="0"><strong id="layerXVal">0</strong></div><div class="range-row"><span>Up / Down</span><input id="layerY" type="range" min="-100" max="100" value="0"><strong id="layerYVal">0</strong></div><div class="range-row"><span>Size</span><input id="layerScale" type="range" min="10" max="160" value="70"><strong id="layerScaleVal">70</strong></div><div class="range-row"><span>Rotate</span><input id="layerRotation" type="range" min="-180" max="180" value="0"><strong id="layerRotationVal">0°</strong></div><div class="layer-actions"><button class="btn" id="fillLayer">Fill Area</button><button class="btn" id="toggleLayer">Hide</button><button class="btn danger" id="deleteLayer">Delete</button></div></div></div>
-    <div class="section"><div class="label">Selected area background</div><div id="swatches" class="swatches"></div><div class="row control" style="align-items:center"><input id="zoneColorPicker" type="color" value="#ffffff" style="height:42px;padding:3px;border:1px solid #d9d9dd;border-radius:10px;background:#fff"><input id="zoneHex" class="input" value="#FFFFFF" maxlength="7" aria-label="Background hex color"></div><div class="small" style="margin-top:7px">Color applies only to the selected print zone.</div></div>
-  </aside>
-  <main class="scene"><div class="scene-badge" id="sceneBadge">3D AOP GARMENT EDITOR</div><div class="scene-help">Drag to rotate · Scroll to zoom · Select a printable area</div><canvas id="webgl"></canvas></main>
-  <aside class="panel right">
-    <div class="card"><div class="meta"><div><div class="kicker" id="category">Custom Apparel</div><div style="font-size:18px;font-weight:800;margin-top:5px" id="productName">T-Shirt</div></div><div class="price" id="price">$39</div></div></div>
-    <div class="section"><div class="label">Production template</div><div id="templatePanel" class="card"></div></div><div class="section"><div class="label">Current artwork</div><div class="preview" id="artworkPreview"><div id="previewEmpty" style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;color:#888;font-size:12px">No artwork uploaded yet</div><img id="previewImage" alt="Uploaded artwork preview" style="display:none"></div><div class="small" style="margin-top:9px">Uploaded customer artwork will appear here and be applied to the selected garment area.</div></div>
-    <div class="section"><div class="label">Design status</div><div class="stat"><span>Active area</span><strong id="activeLabel">Front</strong></div><div class="stat"><span>Artwork layers</span><strong id="layerCount">0</strong></div><div class="stat"><span>Production size</span><strong>2048 × 2048</strong></div></div>
-    <div class="section"><button class="btn primary" id="downloadPack">Download Production ZIP</button><button class="btn" id="saveDesign" style="margin-top:8px">Save Design JSON</button><div class="small" style="margin-top:10px">Production template references are attached by zone where supplied; final factory flats still require verified UV-to-pattern placement.</div></div>
+    <div class="editor-wrap">
+      <div id="zoneRail" class="zone-rail"></div>
+      <div class="workarea">
+        <div class="zone-title"><strong id="zoneName">Front</strong> · <span id="zoneSize">3763 × 4992 px</span></div>
+        <canvas id="editorCanvas" width="760" height="860"></canvas>
+      </div>
+      <div class="zoom-stack"><button id="zoomIn" class="round-control">+</button><button id="zoomOut" class="round-control">−</button></div>
+      <div class="bottom-controls"><div class="toolbox"><button id="undo" class="small-square">↶</button><span>Undo</span></div><div class="toolbox"><button id="redo" class="small-square">↷</button><span>Redo</span></div><div class="toolbox"><button id="gridToggle" class="small-square">#</button><span>Gridlines</span></div></div>
+    </div>
+  </section>
+  <aside class="control-pane">
+    <div class="add-grid">
+      <button id="addImageBtn" class="add-card"><span class="ico">▧</span><span>Add Image</span></button>
+      <button id="addTextBtn" class="add-card"><span class="ico">T</span><span>Add Text</span></button>
+    </div>
+    <input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">
+    <div class="section"><div class="section-title"><span class="caret">⌄</span> Background</div><div class="row"><input id="zoneColor" class="color-input" type="color" value="#ffffff"><input id="zoneHex" class="input" value="#FFFFFF" maxlength="7"><button id="applyAll" class="apply-all">Apply All</button></div><div class="subtle" style="margin-top:6px">Background is clipped to this print zone only.</div></div>
+    <div class="section"><div class="section-title"><span class="caret">⌄</span> Layers</div><div id="layers" class="layers"></div><div id="emptyLayers" class="empty">No artwork in this zone yet.</div><div id="layerControls" class="layer-controls hidden"><div id="selectedLayerLabel" class="layer-name">Layer 1</div><div class="range-line"><span>Left / Right</span><input id="layerX" type="range" min="-100" max="100" value="0"><strong id="layerXVal">0</strong></div><div class="range-line"><span>Up / Down</span><input id="layerY" type="range" min="-100" max="100" value="0"><strong id="layerYVal">0</strong></div><div class="range-line"><span>Size</span><input id="layerScale" type="range" min="20" max="220" value="100"><strong id="layerScaleVal">100</strong></div><div class="range-line"><span>Rotate</span><input id="layerRotation" type="range" min="-180" max="180" value="0"><strong id="layerRotationVal">0°</strong></div><div class="action-row"><button id="fillLayer" class="btn">Fill</button><button id="toggleLayer" class="btn">Hide</button><button id="deleteLayer" class="btn danger">Delete</button></div></div></div>
+    <div class="section"><div class="section-title"><span class="caret">⌄</span> Design status</div><div class="status"><div><span>Product</span><strong id="statusProduct">T-Shirt</strong></div><div><span>Active area</span><strong id="statusZone">Front</strong></div><div><span>Artwork layers</span><strong id="statusLayers">0</strong></div></div></div>
   </aside>
 </div>
-<div id="adminOverlay" class="overlay hidden"><div class="modal"><div class="modal-head"><div><div class="kicker">Store Management</div><div style="font-size:22px;font-weight:800;margin-top:4px">Product Catalog</div></div><button class="pill" id="closeAdmin">Close</button></div><div class="modal-body"><div class="admin-grid"><div><div class="card"><div class="label">Edit selected product</div><input id="adminName" class="input" placeholder="Product name"><div class="control"><input id="adminCategory" class="input" placeholder="Category"></div><div class="control"><input id="adminPrice" class="input" type="number" step="0.01" placeholder="Price"></div><div class="label" style="margin-top:14px">Printable zones</div><div id="adminZones" class="zone-chips"></div><div class="row control"><button class="btn" id="addZone">Add Zone</button><button class="btn" id="saveProduct">Save Product</button></div></div><div class="admin-note" style="margin-top:12px">You can change a product name, category, price, or printable-zone list without changing the GLB. Future garments can be added here by supplying a new GLB path in the catalog data.</div></div><div><div class="label">Catalog</div><div id="adminProductList" class="product-table"></div></div></div></div></div></div>
+<div id="adminOverlay" class="overlay hidden"><div class="modal"><div class="modal-head"><div><strong>Product Admin</strong><div class="subtle">Edit catalog names, prices and printable zones.</div></div><button id="closeAdmin" class="btn">Close</button></div><div class="modal-body"><div class="admin-grid"><div class="card"><label class="subtle">Product name</label><input id="adminName" class="input"><label class="subtle" style="display:block;margin-top:10px">Category</label><input id="adminCategory" class="input"><label class="subtle" style="display:block;margin-top:10px">Price</label><input id="adminPrice" class="input" type="number" step="0.01"><div class="subtle" style="margin-top:12px">Printable zones</div><div id="adminZones" class="chips" style="margin-top:7px"></div><div class="row" style="margin-top:12px"><button id="addZone" class="btn">Add Zone</button><button id="saveProductAdmin" class="btn primary">Save</button></div></div><div><div id="adminList"></div></div></div></div></div></div>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script type="module">
-import * as THREE from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
-
-
-const zoneLayerState={};
-const zoneBackgroundState={};
-let activeLayerId=null;
-let decalTarget=null;
-let decalGroup=null;
-let layerSeq=1;
-function ensureZoneBackgroundState(){if(!zoneBackgroundState[product.id])zoneBackgroundState[product.id]={};for(const z of product.zones)if(!zoneBackgroundState[product.id][z])zoneBackgroundState[product.id][z]='#FFFFFF';return zoneBackgroundState[product.id];}
-function ensureZoneState(){if(!zoneLayerState[product.id])zoneLayerState[product.id]={};ensureZoneBackgroundState();for(const z of product.zones){if(!zoneLayerState[product.id][z])zoneLayerState[product.id][z]=[];const arr=zoneLayerState[product.id][z];for(let i=arr.length-1;i>=0;i--){const l=arr[i];if(l.type==='background'){zoneBackgroundState[product.id][z]=normalizeHex(l.color||'#FFFFFF')||'#FFFFFF';if(l.mesh&&decalGroup){decalGroup.remove(l.mesh);l.mesh.geometry?.dispose();l.mesh.material?.dispose();}l.texture?.dispose?.();arr.splice(i,1);}}}}
-function currentZoneLayers(){ensureZoneState();return zoneLayerState[product.id][activeZone]||[];}
-function allProductLayers(){ensureZoneState();return product.zones.flatMap(z=>zoneLayerState[product.id][z]||[]).filter(l=>l.type!=='background');}
-function syncLegacyLayers(){layers=allProductLayers().map(l=>({id:l.id,type:l.type,zone:l.zone,name:l.name,text:l.text,x:l.x,y:l.y,scale:l.scale,rotation:l.rotation,visible:l.visible}));}
-function clearDecals(){if(decalGroup){scene.remove(decalGroup);decalGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}})}decalGroup=new THREE.Group();decalGroup.name='MQD_ZONE_ARTWORK';scene.add(decalGroup);}
-function findDecalTarget(){let best=null,bestScore=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3());const score=sz.x*sz.y*sz.z;if(score>bestScore){bestScore=score;best=o}});return best;}
-function makeTextTexture(text){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);x.fillStyle='#111';x.font='bold 180px Inter, sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(text,512,256,950);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;}
-function makeColorTexture(color){const c=document.createElement('canvas');c.width=32;c.height=32;const x=c.getContext('2d');x.fillStyle=color;x.fillRect(0,0,32,32);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
-function layerTexture(layer){if(layer.texture)return layer.texture;if(layer.type==='text')layer.texture=makeTextTexture(layer.text||'Text');if(layer.type==='background')layer.texture=makeColorTexture(layer.color||'#ffffff');return layer.texture;}
-function zoneProjection(layer){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());const nx=layer.x/100,ny=layer.y/100,sc=layer.type==='background'?1.12:Math.max(.08,layer.scale/100),r=THREE.MathUtils.degToRad(layer.rotation||0);let pos=new THREE.Vector3(),ori=new THREE.Euler(),dims=new THREE.Vector3();const z=layer.zone;
-if(z==='Back'){pos.set(c.x+nx*size.x*.25,c.y+ny*size.y*.30,box.min.z-size.z*.08);ori.set(0,Math.PI,r);dims.set(size.x*.56*sc,size.y*.92*sc,size.z*1.6)}
-else if(z==='Left Sleeve'){pos.set(box.min.x-size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z+nx*size.z*.18);ori.set(0,-Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
-else if(z==='Right Sleeve'){pos.set(box.max.x+size.x*.01,c.y+size.y*.19+ny*size.y*.13,c.z-nx*size.z*.18);ori.set(0,Math.PI/2,r);dims.set(size.z*.95*sc,size.y*.34*sc,size.x*.26)}
-else if(z==='Collar'){pos.set(c.x+nx*size.x*.12,box.max.y+size.y*.005,c.z+ny*size.z*.12);ori.set(-Math.PI/2,0,r);dims.set(size.x*.28*sc,size.z*1.15*sc,size.y*.15)}
-else{pos.set(c.x+nx*size.x*.25,c.y-size.y*.015+ny*size.y*.28,box.max.z+size.z*.08);ori.set(0,0,r);dims.set(size.x*.56*sc,size.y*.94*sc,size.z*1.6)}
-return{pos,ori,dims};}
-function rebuildLayerDecal(layer){if(!decalTarget||!decalGroup||!layer)return;if(layer.mesh){decalGroup.remove(layer.mesh);layer.mesh.geometry.dispose();layer.mesh.material.dispose();layer.mesh=null}if(layer.visible===false)return;const tex=layerTexture(layer);if(!tex)return;const q=zoneProjection(layer);try{const geo=new DecalGeometry(decalTarget,q.pos,q.ori,q.dims);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.8,metalness:0});applyDecalZoneMask(mat,layer);const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=layer.type==='background'?5:10;layer.mesh=mesh;decalGroup.add(mesh)}catch(e){console.warn('Artwork projection failed',e)}}
-function rebuildAllDecals(){if(!garment)return;if(!decalGroup)clearDecals();allProductLayers().forEach(rebuildLayerDecal);}
-function selectLayer(id){activeLayerId=id;renderLayerEditor();}
-function activeLayer(){return currentZoneLayers().find(l=>l.id===activeLayerId)||null;}
-function renderLayerEditor(){ensureZoneState();const list=$('layerList'),empty=$('layerEmpty'),controlsEl=$('layerControls');if(!list)return;$('layerZoneLabel').textContent=activeZone;list.innerHTML='';const zs=currentZoneLayers().filter(l=>l.type!=='background');empty.classList.toggle('hidden',zs.length>0);zs.forEach(l=>{const row=document.createElement('div');row.className='layer-item'+(l.id===activeLayerId?' active':'');row.innerHTML=`<div style="min-width:0"><div class="layer-name">${escapeHtml(l.name||l.text||'Artwork')}</div><div class="layer-zone">${escapeHtml(l.zone)}${l.visible===false?' · hidden':''}</div></div><span>${l.type==='text'?'T':'▧'}</span>`;row.onclick=()=>selectLayer(l.id);list.appendChild(row)});const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l)return;$('selectedLayerName').textContent=l.name||l.text||'Selected layer';$('layerX').value=l.x;$('layerY').value=l.y;$('layerScale').value=l.scale;$('layerRotation').value=l.rotation;$('layerXVal').textContent=l.x;$('layerYVal').textContent=l.y;$('layerScaleVal').textContent=l.scale;$('layerRotationVal').textContent=l.rotation+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';}
-function updateActiveLayer(prop,value){const l=activeLayer();if(!l)return;l[prop]=value;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor();updateStats();}
-function addZoneLayer(layer){ensureZoneState();layer.id='layer-'+layerSeq++;layer.zone=activeZone;layer.x=0;layer.y=0;layer.scale=layer.type==='background'?140:(layer.type==='image'?100:70);layer.rotation=0;layer.visible=true;if(layer.type==='background')zoneLayerState[product.id][activeZone].unshift(layer);else zoneLayerState[product.id][activeZone].push(layer);activeLayerId=layer.id;syncLegacyLayers();rebuildLayerDecal(layer);renderLayerEditor();updateStats();}
-function bindLayerControls(){[['layerX','x'],['layerY','y'],['layerScale','scale'],['layerRotation','rotation']].forEach(([id,p])=>{$(id)?.addEventListener('input',e=>updateActiveLayer(p,Number(e.target.value)))});$('deleteLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;if(l.mesh){decalGroup.remove(l.mesh);l.mesh.geometry.dispose();l.mesh.material.dispose()}const arr=currentZoneLayers(),i=arr.findIndex(x=>x.id===l.id);if(i>=0)arr.splice(i,1);activeLayerId=arr.at(-1)?.id||null;syncLegacyLayers();renderLayerEditor();updateStats()});$('fillLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;l.x=0;l.y=0;l.rotation=0;l.scale=(l.zone==='Left Sleeve'||l.zone==='Right Sleeve'||l.zone==='Collar')?115:140;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor();updateStats()});$('toggleLayer')?.addEventListener('click',()=>{const l=activeLayer();if(!l)return;l.visible=l.visible===false;rebuildLayerDecal(l);syncLegacyLayers();renderLayerEditor()});}
-
-const seed=[
-{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',price:39,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
- 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
- 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
- 'Left Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
- 'Right Sleeve':{path:'/assets/templates/tshirt/sleeve.png',width:2841,height:1702},
- 'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
-}},
-{id:'long-sleeve-tshirt',name:'Long Sleeve T-Shirt',category:'Long Sleeve',price:49,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-tshirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
- 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
- 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
- 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Collar':{path:'/assets/templates/tshirt/collar.png',width:3276,height:435}
-}},
-{id:'short-sleeve-polo',name:'Short Sleeve Polo',category:'Polos',price:54,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/short-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
- 'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
- 'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
- 'Left Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
- 'Right Sleeve':{path:'/assets/templates/polo/sleeve.png',width:2930,height:1740},
- 'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
-}},
-{id:'long-sleeve-polo',name:'Long Sleeve Polo',category:'Polos',price:59,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/long-sleeve-polo.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],templates:{
- 'Front':{path:'/assets/templates/polo/front.png',width:3730,height:4980},
- 'Back':{path:'/assets/templates/polo/back.png',width:3730,height:5080},
- 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Collar':{path:'/assets/templates/polo/collar.png',width:3180,height:1130}
-}},
-{id:'fleece-hoodie',name:'Fleece Hoodie',category:'Hoodies',price:69,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/fleece-hoodie.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
- 'Front':{path:'/assets/templates/hoodie/front.png',width:3865,height:3884},
- 'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
- 'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
- 'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
- 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
-}},
-{id:'lightweight-jacket',name:'Lightweight Jacket',category:'Jackets',price:79,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/lightweight-jacket.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
- 'Front':{path:'/assets/templates/rain-jacket/front.png',width:4220,height:4740},
- 'Back':{path:'/assets/templates/hoodie/back.png',width:3865,height:4006},
- 'Left Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
- 'Right Sleeve':{path:'/assets/templates/hoodie/sleeve.png',width:3276,height:6124},
- 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
-}},
-{id:'mask',name:'Mask',category:'Accessories',price:19,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/mask.glb',zones:['Entire Mask'],templates:{
- 'Entire Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full mask design area.'}
-}},
-{id:'hood-mask-shirt',name:'Long Sleeve Shirt With Hood And Built-In Mask',category:'Long Sleeve',price:64,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hood-mask-shirt.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood','Built-In Mask'],templates:{
- 'Front':{path:'/assets/tshirt/front.png',width:3763,height:4992},
- 'Back':{path:'/assets/tshirt/back.png',width:3750,height:5011},
- 'Left Sleeve':{path:'/assets/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Right Sleeve':{path:'/assets/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Hood':{path:'/assets/hoodie/hood.png',width:4684,height:2073},
- 'Built-In Mask':{shape:'rectangle',width:3100,height:3110,notes:'Single rectangular printable zone covering the full built-in mask design area; uses the confirmed mask production size.'}
-}},
-{id:'shorts',name:'Shorts',category:'Bottoms',price:44,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/shorts.glb',zones:['Front','Back'],templates:{
- 'Front':{path:'/assets/templates/shorts/front.png',width:2145,height:3480},
- 'Back':{path:'/assets/templates/shorts/back.png',width:2455,height:3650}
-}},
-{id:'sweat-pants',name:'Sweat Pants',category:'Bottoms',price:54,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/sweat-pants.glb',zones:['Front','Back'],templates:{
- 'Front':{path:'/assets/templates/sweat-pants/front.png',width:3670,height:5960},
- 'Back':{path:'/assets/templates/sweat-pants/back.png',width:3670,height:5960}
-}},
-{id:'hooded-long-sleeve',name:'Long Sleeve Shirt With Hood',category:'Long Sleeve',price:59,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hooded-long-sleeve.glb',zones:['Front','Back','Left Sleeve','Right Sleeve','Hood'],templates:{
- 'Front':{path:'/assets/templates/tshirt/front.png',width:3763,height:4992},
- 'Back':{path:'/assets/templates/tshirt/back.png',width:3750,height:5011},
- 'Left Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Right Sleeve':{path:'/assets/templates/long-sleeve/sleeve.png',width:2690,height:4120},
- 'Hood':{path:'/assets/templates/hoodie/hood.png',width:4684,height:2073}
-}},
-{id:'hat',name:'Hat',category:'Headwear',price:34,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb',zones:['Front Panel','Top of Bill'],templates:{
- 'Front Panel':{path:'/assets/templates/hat/front-panel.png',width:1151,height:1050},
- 'Top of Bill':{path:'/assets/templates/hat/top-of-bill.png',width:1169,height:941}
-}}
-];
-const colors=['#ffffff','#111111','#7a0f14','#1e3a5f','#56704d'];
-function templateFor(p,z){return p.templates?.[z]||null}
-
-function ensureSupabaseGarmentModel(){
-  if(product?.model){
-    const file = product.model.split('/').pop();
-    if(file && file.endsWith('.glb')) product.model = getSupabaseGarmentUrl(file);
-  }
-}
-
-function renderTemplatePanel(){
- const el=$('templatePanel'); if(!el)return;
- const t=templateFor(product,activeZone);
- if(!t){
-   el.innerHTML='<div class="small">No factory-authoritative template attached to this zone yet. The zone is available in the designer, but production export remains provisional.</div>';
-   return;
- }
- if(t.shape==='rectangle' && (!t.width || !t.height)){
-   el.innerHTML=`<div class="template-card"><div style="font-size:28px;line-height:1;margin-bottom:8px">▭</div><div class="template-meta"><strong>${escapeHtml(activeZone)}</strong><br>Shape: single rectangle covering the design area<br>Exact factory pixel size: to be supplied by production source<br><em>${escapeHtml(t.notes||'')}</em></div></div>`;
-   return;
- }
- el.innerHTML=`<div class="template-card"><img src="${t.path}" alt="${escapeHtml(activeZone)} production template"><div class="template-meta"><strong>${escapeHtml(activeZone)}</strong><br>Maximum artwork: ${t.width.toLocaleString()} × ${t.height.toLocaleString()} px<br><a href="${t.path}" target="_blank" rel="noopener">Open template</a></div></div>`;
-}
-let catalog=JSON.parse(localStorage.getItem('mqd-catalog')||'null')||seed;
-let product=catalog[0],activeZone=product.zones[0],layers=[];
-let scene,camera,renderer,controls,garment=null,designCanvas,designCtx,designTexture,baseImage=null;
-const $=id=>document.getElementById(id);
-function persist(){localStorage.setItem('mqd-catalog',JSON.stringify(catalog))}
-function currentProduct(){return catalog.find(x=>x.id===product.id)||catalog[0]}
-function renderCatalog(){
- const list=$('productList');list.innerHTML='';catalog.forEach(p=>{const b=document.createElement('button');b.className='product-btn'+(p.id===product.id?' active':'');b.innerHTML='<div>'+escapeHtml(p.name)+'</div><div class="sub">'+escapeHtml(p.category)+' · $'+Number(p.price).toFixed(2)+'</div>';b.onclick=()=>selectProduct(p.id);list.appendChild(b)});
-}
-function zoneColorValue(zone){ensureZoneBackgroundState();return normalizeHex(zoneBackgroundState[product.id][zone]||'#FFFFFF')||'#FFFFFF';}
-function applyZoneBackgroundColors(){
- if(!garment)return;
- ensureZoneBackgroundState();
- garment.traverse(o=>{
-  if(!o.isMesh||!o.geometry)return;
-  const g=o.geometry;const pos=g.getAttribute('position');if(!pos)return;
-  let normal=g.getAttribute('normal');if(!normal){g.computeVertexNormals();normal=g.getAttribute('normal')}
-  g.computeBoundingBox();const b=g.boundingBox;const sx=Math.max(.0001,b.max.x-b.min.x),sy=Math.max(.0001,b.max.y-b.min.y);const cx=(b.max.x+b.min.x)/2;
-  let col=g.getAttribute('color');if(!col||col.count!==pos.count){col=new THREE.BufferAttribute(new Float32Array(pos.count*3),3);g.setAttribute('color',col)}
-  const white=new THREE.Color('#FFFFFF'),frontC=new THREE.Color(zoneColorValue('Front')),backC=new THREE.Color(zoneColorValue('Back')),leftC=new THREE.Color(zoneColorValue('Left Sleeve')),rightC=new THREE.Color(zoneColorValue('Right Sleeve')),collarC=new THREE.Color(zoneColorValue('Collar'));
-  const torsoHalf=sx*.29, neckHalfX=sx*.13, neckStart=b.max.y-sy*.10;
-  for(let i=0;i<pos.count;i++){
-   const x=pos.getX(i),y=pos.getY(i),nz=normal?normal.getZ(i):0;let c=white;
-   const inTorso=Math.abs(x-cx)<=torsoHalf;
-   const inNeckPocket=(y>=neckStart&&Math.abs(x-cx)<=neckHalfX);
-   if(product.zones.includes('Collar')&&inNeckPocket&&y>b.max.y-sy*.075)c=collarC;
-   else if(product.zones.includes('Front')&&inTorso&&nz>=0.0&&!inNeckPocket)c=frontC;
-   else if(product.zones.includes('Back')&&inTorso&&nz<0.0&&!inNeckPocket)c=backC;
-   else if(product.zones.includes('Left Sleeve')&&x<cx-torsoHalf)c=leftC;
-   else if(product.zones.includes('Right Sleeve')&&x>cx+torsoHalf)c=rightC;
-   col.setXYZ(i,c.r,c.g,c.b);
-  }
-  col.needsUpdate=true;
-  const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.vertexColors=true;if(m.color)m.color.set('#FFFFFF');m.needsUpdate=true});
- });
-}
-function applyDecalZoneMask(mat,layer){
- if(!garment||!layer||layer.zone!=='Front')return;
- const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
- const neckCenterY=box.max.y-size.y*.045,neckHalfY=size.y*.065,neckHalfX=size.x*.135,torsoHalfX=size.x*.30;
- mat.onBeforeCompile=shader=>{
-  shader.uniforms.mqdCenterX={value:center.x};shader.uniforms.mqdTorsoHalfX={value:torsoHalfX};shader.uniforms.mqdNeckCenterY={value:neckCenterY};shader.uniforms.mqdNeckHalfX={value:neckHalfX};shader.uniforms.mqdNeckHalfY={value:neckHalfY};
-  shader.vertexShader='varying vec3 vMqdWorldPos;\n'+shader.vertexShader;
-  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvMqdWorldPos=(modelMatrix*vec4(position,1.0)).xyz;');
-  shader.fragmentShader='varying vec3 vMqdWorldPos;\nuniform float mqdCenterX;\nuniform float mqdTorsoHalfX;\nuniform float mqdNeckCenterY;\nuniform float mqdNeckHalfX;\nuniform float mqdNeckHalfY;\n'+shader.fragmentShader;
-  shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>',`#include <alphatest_fragment>
-if(abs(vMqdWorldPos.x-mqdCenterX)>mqdTorsoHalfX) discard;
-float mqdNX=(vMqdWorldPos.x-mqdCenterX)/mqdNeckHalfX;
-float mqdNY=(vMqdWorldPos.y-mqdNeckCenterY)/mqdNeckHalfY;
-if((mqdNX*mqdNX+mqdNY*mqdNY)<1.0) discard;`);
- };
- mat.customProgramCacheKey=()=>`mqd-front-mask-v3`;
- mat.needsUpdate=true;
-}
-function renderZones(){
- $('zones').innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone'+(z===activeZone?' active':'');b.textContent=z;b.onclick=()=>{activeZone=z;activeLayerId=currentZoneLayers().filter(l=>l.type!=='background').at(-1)?.id||currentZoneLayers().at(-1)?.id||null;renderZones();renderSwatches();renderLayerEditor();updateStats()};$('zones').appendChild(b)});
-}
-function setZoneBackground(c){const hex=normalizeHex(c);if(!hex)return;ensureZoneBackgroundState();zoneBackgroundState[product.id][activeZone]=hex;applyZoneBackgroundColors();syncZoneColorInputs();updateStats();}
-function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null}
-function syncZoneColorInputs(){ensureZoneBackgroundState();const c=zoneColorValue(activeZone);const picker=$('zoneColorPicker'),hex=$('zoneHex');if(picker)picker.value=c.toLowerCase();if(hex)hex.value=c;}
-function renderSwatches(){ $('swatches').innerHTML='';const current=zoneColorValue(activeZone);colors.forEach(c=>{const b=document.createElement('button');b.className='swatch'+(current.toLowerCase()===c.toLowerCase()?' active':'');b.style.background=c;b.title=c;b.onclick=()=>{setZoneBackground(c);renderSwatches()};$('swatches').appendChild(b)});syncZoneColorInputs()}
-function updateStats(){ renderTemplatePanel(); $('activeLabel').textContent=activeZone; $('layerCount').textContent=allProductLayers().length; $('productName').textContent=product.name; $('price').textContent='$'+Number(product.price).toFixed(2);$('category').textContent=product.category; }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function fitObject(obj){const box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());const max=Math.max(size.x,size.y,size.z);obj.position.sub(center);camera.position.set(0,max*0.5,max*2.25);camera.near=max/100;camera.far=max*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update()}
-async function loadGarment(){
- if(!renderer)init3D();
- if(garment){scene.remove(garment);garment.traverse(o=>{if(o.geometry)o.geometry.dispose(); if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}});garment=null}
- new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitObject(garment);prepareDesignTexture();applyZoneBackgroundColors();decalTarget=findDecalTarget();clearDecals();rebuildAllDecals();renderLayerEditor();},undefined,e=>console.error(e));
-}
-function prepareDesignTexture(){
- designCanvas=document.createElement('canvas');
- designCanvas.width=2048;designCanvas.height=2048;
- designCtx=designCanvas.getContext('2d');
- designCtx.imageSmoothingEnabled=true;
- designCtx.imageSmoothingQuality='high';
- designCtx.fillStyle='#ffffff';designCtx.fillRect(0,0,2048,2048);
- baseImage=null;
- designTexture=new THREE.CanvasTexture(designCanvas);
- designTexture.colorSpace=THREE.SRGBColorSpace;
- designTexture.anisotropy=renderer.capabilities.getMaxAnisotropy();
- designTexture.minFilter=THREE.LinearMipmapLinearFilter;
- designTexture.magFilter=THREE.LinearFilter;
- designTexture.generateMipmaps=true;
- designTexture.needsUpdate=true;
- garment.traverse(o=>{
-   if(!o.isMesh)return;
-   const mats=Array.isArray(o.material)?o.material:[o.material];
-   mats.forEach(m=>{if(!('mqdOriginalMap' in m.userData))m.userData.mqdOriginalMap=m.map||null});
- });
-}
-function applyDesignTexture(){
- if(!garment||!designTexture)return;
- garment.traverse(o=>{
-   if(!o.isMesh)return;
-   const mats=Array.isArray(o.material)?o.material:[o.material];
-   mats.forEach(m=>{
-     if(!('mqdOriginalMap' in m.userData))m.userData.mqdOriginalMap=m.map||null;
-     m.map=designTexture;
-     if(m.color)m.color.set(0xffffff);
-     m.needsUpdate=true;
-   });
- });
-}
-function init3D(){
- const canvas=$('webgl');
- renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
- renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
- renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
- renderer.outputColorSpace=THREE.SRGBColorSpace;
- renderer.toneMapping=THREE.ACESFilmicToneMapping;
- renderer.toneMappingExposure=1.05;
- scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(35,canvas.clientWidth/canvas.clientHeight,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.minDistance=.25;controls.maxDistance=8;
- scene.add(new THREE.HemisphereLight(0xffffff,0x555555,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);const fill=new THREE.DirectionalLight(0xffffff,1.2);fill.position.set(-3,1,-2);scene.add(fill);
- const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();
- const loop=()=>{controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)};loop();
-}
-function nextArtworkLayerName(){return 'Layer '+(currentZoneLayers().filter(l=>l.type!=='background').length+1)}
-function addImage(src){const img=new Image();img.onload=()=>{const tex=new THREE.Texture(img);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();addZoneLayer({type:'image',name:nextArtworkLayerName(),texture:tex,src});const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.src=src;preview.style.display='block'}if(empty)empty.style.display='none';};img.src=src}
-$('artUpload').addEventListener('change',e=>{const f=e.target.files[0];if(f)addImage(URL.createObjectURL(f))});
-$('zoneColorPicker')?.addEventListener('input',e=>{$('zoneHex').value=e.target.value.toUpperCase()});
-$('zoneColorPicker')?.addEventListener('change',e=>{const c=e.target.value.toUpperCase();setZoneBackground(c);$('zoneHex').value=c;renderSwatches()});
-$('zoneHex')?.addEventListener('change',e=>{const c=normalizeHex(e.target.value);if(!c){syncZoneColorInputs();return}setZoneBackground(c);$('zoneColorPicker').value=c.toLowerCase();renderSwatches()});
-
-$('addText').onclick=()=>{const text=prompt('Text to add');if(!text)return;addZoneLayer({type:'text',name:text,text});};
-$('reset').onclick=()=>{ensureZoneState();const arr=currentZoneLayers();arr.forEach(l=>{if(l.mesh){decalGroup?.remove(l.mesh);l.mesh.geometry.dispose();l.mesh.material.dispose()}});zoneLayerState[product.id][activeZone]=[];activeLayerId=null;syncLegacyLayers();const preview=$('previewImage'),empty=$('previewEmpty');if(preview){preview.removeAttribute('src');preview.style.display='none'}if(empty)empty.style.display='flex';renderLayerEditor();updateStats()}
-function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];ensureZoneState();activeLayerId=currentZoneLayers().at(-1)?.id||null;syncLegacyLayers();renderCatalog();renderZones();renderLayerEditor();updateStats();loadGarment()}
-async function saveDesign(){const data={product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,layers,zoneBackgrounds:{...(zoneBackgroundState[product.id]||{})},createdAt:new Date().toISOString()};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click()}
-function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(',');const bin=atob(b);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]})}
-async function downloadPack(){
- if(!designCanvas)return;
- const zip=new JSZip();
- const root=zip.folder((product.id||'design')+'-production');
- root.file('master-preview-2048.png',dataUrlBlob(designCanvas.toDataURL('image/png')));
- const productionFolder=root.folder('zones');
- for(const z of product.zones){
-   const t=templateFor(product,z);
-   const safe=z.toLowerCase().replace(/[^a-z0-9]+/g,'-');
-   if(t?.path){
-     try{
-       const resp=await fetch(t.path);
-       if(resp.ok)root.file(`${safe}-template-reference${t.path.toLowerCase().endsWith('.jpg')?'.jpg':'.png'}`,await resp.blob());
-     }catch(e){console.warn('Template fetch failed',z,e)}
-   }
-   if(t && t.width && t.height){
-     const c=document.createElement('canvas'); c.width=t.width; c.height=t.height;
-     const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
-     const scale=Math.min((c.width*0.65)/designCanvas.width,(c.height*0.65)/designCanvas.height);
-     const w=designCanvas.width*scale,h=designCanvas.height*scale;
-     x.drawImage(designCanvas,(c.width-w)/2,(c.height-h)/2,w,h);
-     productionFolder.file(`${safe}-artwork-preview.png`,dataUrlBlob(c.toDataURL('image/png')));
-   }else if(t?.shape==='rectangle'){
-     productionFolder.file(`${safe}-artwork-rectangle-provisional.png`,dataUrlBlob(designCanvas.toDataURL('image/png')));
-   }else{
-     productionFolder.file(`${safe}-provisional.png`,dataUrlBlob(designCanvas.toDataURL('image/png')));
-   }
- }
- root.file('production-spec.json',JSON.stringify({
-   product,
-   productionTemplateStatus:'Configured from supplied production templates where available; remaining zones stay provisional until their source dimensions/UV placement are verified.',
-   notes:'Template previews preserve the supplied reference images. Dimension-matched artwork previews are not factory-ready flats until UV-to-pattern placement is verified.',
-   zones:product.zones,
-   zoneBackgrounds:{...(zoneBackgroundState[product.id]||{})},
-   generatedAt:new Date().toISOString()
- },null,2));
- if(garment){const resp=await fetch(product.model);if(resp.ok)root.file(product.id+'.glb',await resp.blob())}
- const blob=await zip.generateAsync({type:'blob'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();
-}
-$('downloadPack').onclick=downloadPack;$('downloadPackTop').onclick=downloadPack;$('saveDesign').onclick=saveDesign;
-function renderAdmin(){const list=$('adminProductList');list.innerHTML='';catalog.forEach(p=>{const row=document.createElement('div');row.className='product-row';row.innerHTML='<div><strong>'+escapeHtml(p.name)+'</strong><div class="small">'+escapeHtml(p.category)+'</div></div><div>$'+Number(p.price).toFixed(2)+'</div><div class="small">'+p.zones.length+' zones</div><button class="btn">Edit</button>';row.querySelector('button').onclick=()=>loadAdmin(p.id);list.appendChild(row)})}
-function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminName').value=p.name;$('adminCategory').value=p.category;$('adminPrice').value=p.price;$('adminZones').innerHTML='';p.zones.forEach(z=>{const chip=document.createElement('span');chip.className='chip';chip.innerHTML=escapeHtml(z)+' <button style="border:0;background:transparent;cursor:pointer" aria-label="remove">×</button>';chip.querySelector('button').onclick=()=>{p.zones=p.zones.filter(x=>x!==z);if(p.id===product.id){product=p;activeZone=p.zones[0]||'';renderZones();updateStats()};renderAdmin();loadAdmin(p.id)};$('adminZones').appendChild(chip)});$('saveProduct').dataset.id=id}
-$('saveProduct').onclick=()=>{const p=catalog.find(x=>x.id===$('saveProduct').dataset.id);if(!p)return;p.name=$('adminName').value.trim()||p.name;p.category=$('adminCategory').value.trim()||p.category;p.price=Number($('adminPrice').value)||p.price;persist();if(product.id===p.id){product=p;renderCatalog();renderZones();updateStats()};renderAdmin();alert('Product saved.')};
-$('addZone').onclick=()=>{const name=prompt('Zone name');const id=$('saveProduct').dataset.id;const p=catalog.find(x=>x.id===id);if(!p||!name)return;p.zones.push(name.trim());persist();renderAdmin();loadAdmin(id);if(product.id===id){product=p;renderZones();updateStats()}};
-$('openAdmin').onclick=()=>{$('adminOverlay').classList.remove('hidden');renderAdmin();loadAdmin(product.id)};$('closeAdmin').onclick=()=>{$('adminOverlay').classList.add('hidden')};$('adminOverlay').addEventListener('click',e=>{if(e.target===$('adminOverlay'))$('adminOverlay').classList.add('hidden')});
-bindLayerControls();ensureZoneState();renderCatalog();renderZones();renderSwatches();renderLayerEditor();updateStats();selectProduct(product.id);
-</script>
-
-<section class="card" style="margin-top:14px">
-  <div class="label">UV calibration workspace</div><div class="small" style="margin-top:6px">Garments are hosted in Supabase Storage; the live designer loads the public GLB assets directly from the <code>garments</code> bucket.</div><div class="small" style="margin-top:6px"><strong>Corrected Lightweight Jacket GLB installed.</strong> UV occupancy was regenerated from the replacement asset.</div>
-  <div class="small">
-    Every garment now has a UV occupancy diagnostic and a production-mapping manifest.
-    Use these diagnostics to verify each printable zone against the physical factory pattern before enabling final production exports.
-  </div>
-</section>
+<script type="module" src="/v20/editor.js"></script>
 </body>
 </html>
