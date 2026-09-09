@@ -1,0 +1,41 @@
+name: Fix v25 T-shirt 2D 3D texture alignment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v25-texture-y-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Align CanvasTexture orientation with 2D editor
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text(encoding='utf-8')
+          old="const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;"
+          new="const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;"
+          if old not in s:
+              raise SystemExit('Expected T-shirt texture creation code was not found')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Check JavaScript syntax
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+      - name: Commit alignment fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Align T-shirt 3D texture with 2D editor"
+          git push
