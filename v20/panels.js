@@ -2,10 +2,9 @@
 // Clip crossing triangles so neighboring panels share the same edge.
 export const panelNames=['Front','Back','Left Sleeve','Right Sleeve','Collar'];
 const planes=[
-  // Collar: keep a narrow neckline ring and taper its side width toward the
-  // lower/front seam. This removes the vertical blocky "tabs" that appeared
-  // beside the neck while preserving the smooth lower collar arc and the
-  // already-correct sleeve/body seam.
+  // Legacy/fallback collar heuristic. Exact MQD T-shirt builds use the
+  // precomputed physical collar-face mask instead; this stays as a fallback
+  // if the GLB topology ever changes.
   {zone:4,tests:[
     v=>v[1]+.55*v[2]-.785,
     v=>.855-(v[1]+.55*v[2]),
@@ -15,6 +14,12 @@ const planes=[
       return half-Math.abs(v[0]);
     }
   ]},
+  {zone:2,tests:[v=>v[0]+.16*v[1]-.445]},
+  {zone:3,tests:[v=>-v[0]+.16*v[1]-.445]},
+  {zone:0,tests:[v=>v[2]+.06+.12*Math.max(0,v[1])]}
+];
+const bodyPlanes=[
+  // Keep the already-good sleeve/body seam exactly as calibrated.
   {zone:2,tests:[v=>v[0]+.16*v[1]-.445]},
   {zone:3,tests:[v=>-v[0]+.16*v[1]-.445]},
   {zone:0,tests:[v=>v[2]+.06+.12*Math.max(0,v[1])]}
@@ -31,9 +36,9 @@ function split(poly,distance){
  }
  return[inside,outside];
 }
-export function partitionTriangle(triangle){
+function partitionWithRules(triangle,rules){
  let remaining=[triangle];const result=[];
- for(const rule of planes){
+ for(const rule of rules){
   const next=[];
   for(const poly of remaining){
    let candidate=poly;
@@ -48,6 +53,8 @@ export function partitionTriangle(triangle){
  for(const poly of remaining)result.push([1,poly]);
  return result;
 }
+export function partitionTriangle(triangle){return partitionWithRules(triangle,planes);}
+export function partitionBodyTriangle(triangle){return partitionWithRules(triangle,bodyPlanes);}
 export function panelUv(zone,x,y,z,b){
  const clamp=v=>Math.max(0,Math.min(1,v));
  if(zone==='Front'||zone==='Back')return[clamp(zone==='Back'?1-(x-b.min.x)/(b.max.x-b.min.x):(x-b.min.x)/(b.max.x-b.min.x)),clamp((y-b.min.y)/(b.max.y-b.min.y))];
@@ -57,5 +64,7 @@ export function panelUv(zone,x,y,z,b){
   const around=(Math.atan2(z+.055,(-dy*px+dx*py)/len)+Math.PI)/(2*Math.PI);
   return[around,1-along];
  }
- return[(Math.atan2(z+.07,x)+Math.PI)/(2*Math.PI),clamp((y+.55*z-.785)/.07)];
+ // Collar: map around the neck circumference; V follows the isolated rib height.
+ const u=(Math.atan2(z+.07,x)+Math.PI)/(2*Math.PI),bh=Math.max(1e-6,b.max.y-b.min.y);
+ return[u,clamp((y-b.min.y)/bh)];
 }
