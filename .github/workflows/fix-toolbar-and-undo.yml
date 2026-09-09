@@ -1,0 +1,45 @@
+name: Fix toolbar and undo restore
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-toolbar-and-undo.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch toolbar and undo state
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Keep only toolbar actions that are currently implemented.
+          p=Path('index.html')
+          s=p.read_text()
+          old='''<button id="flipXTool" class="tool">Flip X</button><button id="flipYTool" class="tool">Flip Y</button><button id="alignTool" class="tool">Align</button><button id="cloneAllTool" class="tool">Clone All</button><button id="cropTool" class="tool">Crop</button><button id="duplicateTool" class="tool">Duplicate</button><button class="tool" disabled>Tiling</button><button id="resetTool" class="tool">Reset</button><button class="tool" disabled>Sharpen</button><button class="tool" disabled>Segment</button>'''
+          new='''<button id="flipXTool" class="tool">Flip X</button><button id="flipYTool" class="tool">Flip Y</button><button id="alignTool" class="tool">Align</button><button id="cloneAllTool" class="tool">Clone All</button><button id="cropTool" class="tool">Crop</button><button id="duplicateTool" class="tool">Duplicate</button><button id="resetTool" class="tool">Reset</button>'''
+          if old not in s:
+              raise SystemExit('current toolbar block not found')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          old="""function snapshot(){history.push(JSON.stringify(designs));if(history.length>30)history.shift();future.length=0;}\nfunction undo(){if(!history.length)return;future.push(JSON.stringify(designs));const prev=JSON.parse(history.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,prev);repairImageObjects();renderAll();}\nfunction redo(){if(!future.length)return;history.push(JSON.stringify(designs));const next=JSON.parse(future.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,next);repairImageObjects();renderAll();}\n"""
+          new="""function cloneDesignState(source=designs){\n  const out={};\n  for(const [pid,ps] of Object.entries(source||{})){\n    out[pid]={...ps,zones:{}};\n    for(const [zone,z] of Object.entries(ps.zones||{})){\n      out[pid].zones[zone]={...z,layers:(z.layers||[]).map(l=>({...l,crop:l.crop?{...l.crop}:l.crop,image:l.image||null}))};\n    }\n  }\n  return out;\n}\nfunction restoreDesignState(state){\n  Object.keys(designs).forEach(k=>delete designs[k]);\n  Object.assign(designs,cloneDesignState(state));\n  if(activeLayerId&&!activeLayer())activeLayerId=zoneState().layers.at(-1)?.id||null;\n}\nfunction snapshot(){history.push(cloneDesignState());if(history.length>30)history.shift();future.length=0;}\nfunction undo(){if(!history.length)return;future.push(cloneDesignState());restoreDesignState(history.pop());renderAll();}\nfunction redo(){if(!future.length)return;history.push(cloneDesignState());restoreDesignState(future.pop());renderAll();}\n"""
+          if old not in s:
+              raise SystemExit('undo/redo block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Syntax check
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v20/editor.js
+          git commit -m "Clean toolbar and preserve artwork through undo redo"
+          git push
