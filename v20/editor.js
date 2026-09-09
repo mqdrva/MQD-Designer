@@ -26,6 +26,7 @@ const history=[],future=[];
 let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
+const MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';
 let colorRaf=0;
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
@@ -45,13 +46,21 @@ function ensureTemplateImage(zone=activeZone){
   const t=product.templates?.[zone];
   if(!t?.path)return null;
   if(templateCache.has(t.path))return templateCache.get(t.path);
-  const rec={img:null,maskCanvas:null,bounds:null,status:'loading'};
+  const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(t.path,rec);
   const img=new Image();
   img.onload=()=>{
     rec.img=img;
-    try{const built=buildTemplateMask(img);rec.maskCanvas=built.maskCanvas;rec.bounds=built.bounds;rec.status='ready';}
-    catch(err){console.warn('Template mask build failed',t.path,err);rec.status='guide-only';}
+    try{
+      const built=buildTemplateMask(img);
+      rec.maskCanvas=built.maskCanvas;
+      rec.cutlineCanvas=built.cutlineCanvas;
+      rec.bounds=built.bounds;
+      rec.status='ready';
+    }catch(err){
+      console.warn('Template mask build failed',t.path,err);
+      rec.status='guide-only';
+    }
     if(zone===activeZone)drawEditor();
   };
   img.onerror=()=>{rec.status='error';};
@@ -65,22 +74,49 @@ function buildTemplateMask(img){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
-  const data=sx.getImageData(0,0,w,h).data;
+  const pixels=sx.getImageData(0,0,w,h).data;
   const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
-  for(let i=0,p=0;i<data.length;i+=4,p++){
-    const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3],lum=(r+g+b)/3;
-    const redInk=r>165&&g<155&&b<155;
+  const cut=document.createElement('canvas');cut.width=w;cut.height=h;
+  const cx=cut.getContext('2d'),cutData=cx.createImageData(w,h);
+
+  for(let i=0,p=0;i<pixels.length;i+=4,p++){
+    const r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3],lum=(r+g+b)/3;
+    const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
     blocked[p]=(a>15&&(lum<232||redInk))?1:0;
+    if(redInk){
+      cutData.data[i]=235;
+      cutData.data[i+1]=35;
+      cutData.data[i+2]=45;
+      cutData.data[i+3]=255;
+    }
   }
+  cx.putImageData(cutData,0,0);
+
   let head=0,tail=0;
   const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
-  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-  while(head<tail){const idx=queue[head++],x=idx%w,y=(idx/w)|0;if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);}
-  const mask=document.createElement('canvas');mask.width=w;mask.height=h;const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+  while(head<tail){
+    const idx=queue[head++],x=idx%w,y=(idx/w)|0;
+    if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);
+  }
+
+  const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+  const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
   let minX=w,minY=h,maxX=-1,maxY=-1;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const idx=y*w+x,o=idx*4;if(!outside[idx]){out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}}
-  if(maxX<minX||maxY<minY){minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);}else mx.putImageData(out,0,0);
-  return{maskCanvas:mask,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const idx=y*w+x,o=idx*4;
+    if(!outside[idx]){
+      out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+      minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+    }
+  }
+  if(maxX<minX||maxY<minY){
+    minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);
+  }else{
+    mx.putImageData(out,0,0);
+  }
+  return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
 }
 function scaleBounds(b,sw,sh,dw,dh){return{x:b.x/sw*dw,y:b.y/sh*dh,w:b.w/sw*dw,h:b.h/sh*dh};}
 function drawLayerStack(c,zone,b){
@@ -147,10 +183,52 @@ function traceZonePath(c,zone,w,h){
 }
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
-  const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);targetCtx.save();targetCtx.clearRect(0,0,w,h);targetCtx.translate(w/2,h/2);targetCtx.scale(editorZoom,editorZoom);targetCtx.translate(-w/2,-h/2);
+  const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
+  targetCtx.save();
+  targetCtx.clearRect(0,0,w,h);
+  targetCtx.translate(w/2,h/2);
+  targetCtx.scale(editorZoom,editorZoom);
+  targetCtx.translate(-w/2,-h/2);
   if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
-  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){const source=renderMaskedZoneCanvas(activeZone,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,false);targetCtx.drawImage(source,r.x,r.y,r.w,r.h);targetCtx.save();targetCtx.globalAlpha=.72;targetCtx.globalCompositeOperation='multiply';targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);targetCtx.restore();}
-  else{targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.clip();drawLayerStack(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});targetCtx.restore();}
+
+  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
+    const source=renderMaskedZoneCanvas(activeZone,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,false);
+    targetCtx.drawImage(source,r.x,r.y,r.w,r.h);
+
+    // Keep the familiar product-template details faint, but do not rely on
+    // multiply blending for the red production seam lines.
+    targetCtx.save();
+    targetCtx.globalAlpha=.34;
+    targetCtx.globalCompositeOperation='multiply';
+    targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);
+    targetCtx.restore();
+
+    // Production cut/sew lines are always drawn last in true red so they stay
+    // visible over black, white, artwork or any other customer background.
+    if(rec.cutlineCanvas){
+      targetCtx.save();
+      targetCtx.globalAlpha=1;
+      targetCtx.globalCompositeOperation='source-over';
+      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+      targetCtx.restore();
+    }
+  }else{
+    targetCtx.save();
+    targetCtx.translate(r.x,r.y);
+    traceZonePath(targetCtx,activeZone,r.w,r.h);
+    targetCtx.clip();
+    drawLayerStack(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});
+    targetCtx.restore();
+    // Fallback red guide for zones without a production-template bitmap.
+    targetCtx.save();
+    targetCtx.translate(r.x,r.y);
+    targetCtx.setLineDash([12,9]);
+    targetCtx.strokeStyle='#EB232D';
+    targetCtx.lineWidth=2;
+    traceZonePath(targetCtx,activeZone,r.w,r.h);
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
   targetCtx.restore();
 }
 function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);}
@@ -166,7 +244,24 @@ function renderAll(){renderProducts();renderZones();renderLayerPanel();renderSta
 
 
 function findPrimaryMesh(root=garment){let best=null,score=-1;root?.traverse(o=>{if(!o.isMesh||!o.geometry?.getAttribute('position'))return;const count=o.geometry.index?o.geometry.index.count:o.geometry.getAttribute('position').count;if(count>score){score=count;best=o;}});return best;}
-function classifyTshirtTriangle(cx,cy,cz,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y),sz=Math.max(1e-6,b.max.z-b.min.z),xn=Math.abs(cx-(b.min.x+b.max.x)/2)/(sx/2),yn=(cy-b.min.y)/sy,zn=(cz-(b.min.z+b.max.z)/2)/sz;if(yn>.86&&xn<.36)return'Collar';if(xn>.58&&yn>.55)return cx<0?'Left Sleeve':'Right Sleeve';return zn>=0?'Front':'Back';}
+function classifyTshirtTriangle(cx,cy,cz,b){
+  const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y),sz=Math.max(1e-6,b.max.z-b.min.z);
+  const centerX=(b.min.x+b.max.x)/2,centerZ=(b.min.z+b.max.z)/2;
+  const xn=Math.abs(cx-centerX)/(sx/2),yn=(cy-b.min.y)/sy,zn=(cz-centerZ)/(sz/2);
+
+  // The collar is a narrow ring at the very top of the garment.  The old
+  // rectangular test (yn>.86 && xn<.36) swallowed a large block of upper
+  // chest geometry, creating the white band below the collar.  Restrict it
+  // to the actual neck-ring neighborhood so Front reaches the collar seam.
+  const neckRing=(xn/.30)*(xn/.30)+(zn/.46)*(zn/.46);
+  if(yn>.925&&xn<.34&&neckRing>.18&&neckRing<1.72)return'Collar';
+
+  // Zone names are from the wearer's perspective.  When the garment faces
+  // the camera, the wearer's RIGHT sleeve is on screen-left (negative X).
+  if(xn>.56&&yn>.52)return cx<centerX?'Right Sleeve':'Left Sleeve';
+
+  return zn>=0?'Front':'Back';
+}
 function uvForZone(zone,x,y,z,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y);let u=.5,v=.5;if(zone==='Front'||zone==='Back'){u=(x-b.min.x)/sx;v=(y-b.min.y)/sy;if(zone==='Back')u=1-u;}else if(zone==='Left Sleeve'||zone==='Right Sleeve'){const left=zone==='Left Sleeve',shoulder={x:left?-.36:.36,y:.66},cuff={x:left?-.64:.64,y:.28},dx=cuff.x-shoulder.x,dy=cuff.y-shoulder.y,len2=dx*dx+dy*dy,px=x-shoulder.x,py=y-shoulder.y,along=Math.max(0,Math.min(1,(px*dx+py*dy)/len2)),len=Math.sqrt(len2),perp=(-dy/len)*px+(dx/len)*py,angle=Math.atan2(z,perp);u=(angle+Math.PI)/(Math.PI*2);v=1-along;}else if(zone==='Collar'){u=(Math.atan2(z,x)+Math.PI)/(Math.PI*2);v=(y-b.min.y)/sy;}return[Math.max(0,Math.min(1,u)),Math.max(0,Math.min(1,v))];}
 function splitTshirtGeometry(sourceMesh){
   const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position'))return false;if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index,triCount=index?index.count/3:pos.count/3;geometry.computeBoundingBox();const bb=geometry.boundingBox.clone(),names=['Front','Back','Left Sleeve','Right Sleeve','Collar'],zoneIndex=new Map(names.map((n,i)=>[n,i])),faces=names.map(()=>[]),bounds=names.map(()=>({min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}})),vid=(t,k)=>index?index.getX(t*3+k):t*3+k;
