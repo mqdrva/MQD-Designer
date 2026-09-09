@@ -10,7 +10,12 @@ jobs:
       - name: Health check
         run: |
           curl -sS -i 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design'
-      - name: Minimal submission
+      - name: Full submission with artwork and mockup
         run: |
-          PAYLOAD='{"schema":"mqd-design-v1","engine":{"calibration":"health-test"},"product":{"id":"tshirt","name":"All-Over Print T-Shirt","price":39},"design":{"zones":{"Front":{"background":"#FFFFFF","layers":[]}}}}'
-          curl -sS -i -X POST 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design' -F "payload=$PAYLOAD"
+          printf '\x89PNG\r\n\x1a\n' > tiny.png
+          PAYLOAD='{"schema":"mqd-design-v1","engine":{"calibration":"health-test-full"},"product":{"id":"tshirt","name":"All-Over Print T-Shirt","price":39},"design":{"zones":{"Front":{"background":"#112233","layers":[{"id":"layer-1","type":"image","label":"Layer 1","x":0,"y":0,"scale":1,"rotation":0,"visible":true}]}}}}'
+          curl -sS -i -X POST 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design' \
+            -F "payload=$PAYLOAD" \
+            -F 'assetMeta={"zone":"Front","layerId":"layer-1","label":"Layer 1","x":0,"y":0,"scale":1,"rotation":0,"visible":true}' \
+            -F 'asset=@tiny.png;type=image/png;filename=test-artwork.png' \
+            -F 'mockup=@tiny.png;type=image/png;filename=test-mockup.png'
