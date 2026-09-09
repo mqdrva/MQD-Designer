@@ -1,0 +1,223 @@
+name: Fix T-shirt seam mapping and cut lines
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v22-tshirt-seams.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch T-shirt front collar seam, sleeve sides and 2D cut lines
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('v20/editor.js')
+          s = p.read_text(encoding='utf-8')
+
+          def replace_function(src, name, new_code):
+              marker = f'function {name}('
+              start = src.find(marker)
+              if start < 0:
+                  raise SystemExit(f'Missing function: {name}')
+              brace = src.find('{', start)
+              depth = 0
+              end = None
+              for i in range(brace, len(src)):
+                  if src[i] == '{':
+                      depth += 1
+                  elif src[i] == '}':
+                      depth -= 1
+                      if depth == 0:
+                          end = i + 1
+                          break
+              if end is None:
+                  raise SystemExit(f'Could not parse function: {name}')
+              return src[:start] + new_code.strip() + src[end:]
+
+          s = replace_function(s, 'ensureTemplateImage', r'''
+          function ensureTemplateImage(zone=activeZone){
+            const t=product.templates?.[zone];
+            if(!t?.path)return null;
+            if(templateCache.has(t.path))return templateCache.get(t.path);
+            const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
+            templateCache.set(t.path,rec);
+            const img=new Image();
+            img.onload=()=>{
+              rec.img=img;
+              try{
+                const built=buildTemplateMask(img);
+                rec.maskCanvas=built.maskCanvas;
+                rec.cutlineCanvas=built.cutlineCanvas;
+                rec.bounds=built.bounds;
+                rec.status='ready';
+              }catch(err){
+                console.warn('Template mask build failed',t.path,err);
+                rec.status='guide-only';
+              }
+              if(zone===activeZone)drawEditor();
+            };
+            img.onerror=()=>{rec.status='error';};
+            img.src=t.path;
+            return rec;
+          }
+          ''')
+
+          s = replace_function(s, 'buildTemplateMask', r'''
+          function buildTemplateMask(img){
+            const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+            const src=document.createElement('canvas');src.width=w;src.height=h;
+            const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
+            const pixels=sx.getImageData(0,0,w,h).data;
+            const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
+            const cut=document.createElement('canvas');cut.width=w;cut.height=h;
+            const cx=cut.getContext('2d'),cutData=cx.createImageData(w,h);
+
+            for(let i=0,p=0;i<pixels.length;i+=4,p++){
+              const r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3],lum=(r+g+b)/3;
+              const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
+              blocked[p]=(a>15&&(lum<232||redInk))?1:0;
+              if(redInk){
+                cutData.data[i]=235;
+                cutData.data[i+1]=35;
+                cutData.data[i+2]=45;
+                cutData.data[i+3]=255;
+              }
+            }
+            cx.putImageData(cutData,0,0);
+
+            let head=0,tail=0;
+            const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
+            for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+            for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+            while(head<tail){
+              const idx=queue[head++],x=idx%w,y=(idx/w)|0;
+              if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);
+            }
+
+            const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+            const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+            let minX=w,minY=h,maxX=-1,maxY=-1;
+            for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+              const idx=y*w+x,o=idx*4;
+              if(!outside[idx]){
+                out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+                minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+              }
+            }
+            if(maxX<minX||maxY<minY){
+              minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);
+            }else{
+              mx.putImageData(out,0,0);
+            }
+            return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+          }
+          ''')
+
+          s = replace_function(s, 'drawZoneComposite', r'''
+          function drawZoneComposite(targetCtx,w,h,includeGuides=false){
+            const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
+            targetCtx.save();
+            targetCtx.clearRect(0,0,w,h);
+            targetCtx.translate(w/2,h/2);
+            targetCtx.scale(editorZoom,editorZoom);
+            targetCtx.translate(-w/2,-h/2);
+            if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
+
+            if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
+              const source=renderMaskedZoneCanvas(activeZone,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,false);
+              targetCtx.drawImage(source,r.x,r.y,r.w,r.h);
+
+              // Keep the familiar product-template details faint, but do not rely on
+              // multiply blending for the red production seam lines.
+              targetCtx.save();
+              targetCtx.globalAlpha=.34;
+              targetCtx.globalCompositeOperation='multiply';
+              targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);
+              targetCtx.restore();
+
+              // Production cut/sew lines are always drawn last in true red so they stay
+              // visible over black, white, artwork or any other customer background.
+              if(rec.cutlineCanvas){
+                targetCtx.save();
+                targetCtx.globalAlpha=1;
+                targetCtx.globalCompositeOperation='source-over';
+                targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+                targetCtx.restore();
+              }
+            }else{
+              targetCtx.save();
+              targetCtx.translate(r.x,r.y);
+              traceZonePath(targetCtx,activeZone,r.w,r.h);
+              targetCtx.clip();
+              drawLayerStack(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});
+              targetCtx.restore();
+              // Fallback red guide for zones without a production-template bitmap.
+              targetCtx.save();
+              targetCtx.translate(r.x,r.y);
+              targetCtx.setLineDash([12,9]);
+              targetCtx.strokeStyle='#EB232D';
+              targetCtx.lineWidth=2;
+              traceZonePath(targetCtx,activeZone,r.w,r.h);
+              targetCtx.stroke();
+              targetCtx.restore();
+            }
+            targetCtx.restore();
+          }
+          ''')
+
+          s = replace_function(s, 'classifyTshirtTriangle', r'''
+          function classifyTshirtTriangle(cx,cy,cz,b){
+            const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y),sz=Math.max(1e-6,b.max.z-b.min.z);
+            const centerX=(b.min.x+b.max.x)/2,centerZ=(b.min.z+b.max.z)/2;
+            const xn=Math.abs(cx-centerX)/(sx/2),yn=(cy-b.min.y)/sy,zn=(cz-centerZ)/(sz/2);
+
+            // The collar is a narrow ring at the very top of the garment.  The old
+            // rectangular test (yn>.86 && xn<.36) swallowed a large block of upper
+            // chest geometry, creating the white band below the collar.  Restrict it
+            // to the actual neck-ring neighborhood so Front reaches the collar seam.
+            const neckRing=(xn/.30)*(xn/.30)+(zn/.46)*(zn/.46);
+            if(yn>.925&&xn<.34&&neckRing>.18&&neckRing<1.72)return'Collar';
+
+            // Zone names are from the wearer's perspective.  When the garment faces
+            // the camera, the wearer's RIGHT sleeve is on screen-left (negative X).
+            if(xn>.56&&yn>.52)return cx<centerX?'Right Sleeve':'Left Sleeve';
+
+            return zn>=0?'Front':'Back';
+          }
+          ''')
+
+          # Mark this calibration in the file for easy future inspection.
+          marker="const tshirtZoneMeshes=new Map();"
+          if "MQD_TSHIRT_ZONE_CALIBRATION" not in s and marker in s:
+              s=s.replace(marker,marker+"\nconst MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';",1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Verify editor syntax
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Calibrate T-shirt collar seam, sleeves and cut lines"
+          git push origin main
