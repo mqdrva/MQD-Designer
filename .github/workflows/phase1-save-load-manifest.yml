@@ -1,4 +1,4 @@
-name: Install Phase 1 save-load and manifest
+name: Install customer save and cart
 
 on:
   push:
@@ -17,89 +17,48 @@ jobs:
         with:
           ref: main
 
-      - name: Patch Phase 1 functionality
+      - name: Patch customer controls
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
+          index=Path('index.html')
+          s=index.read_text(encoding='utf-8')
+          old='<div class="top-actions"><button id="downloadMockup" class="btn primary">Download Mockup PNG</button><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Save Design</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>'
+          new='<div class="top-actions"><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>'
+          if old in s:s=s.replace(old,new,1)
+          elif 'id="addToCart"' not in s:raise SystemExit('top actions not found')
+          index.write_text(s,encoding='utf-8')
 
-          index = Path('index.html')
-          s = index.read_text(encoding='utf-8')
-          old = '<div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>'
-          new = '<div class="top-actions"><button id="openAdmin" class="btn">Product Admin</button><button id="loadDesign" class="btn">Load Design</button><button id="saveDesign" class="btn">Save Design</button><button id="downloadPack" class="btn primary">Download Production ZIP</button></div>'
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif 'id="loadDesign"' not in s:
-              raise SystemExit('Top action marker not found')
-
-          old_upload = '<input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">'
-          new_upload = old_upload + '\n    <input id="designUpload" class="upload-input" type="file" accept="application/json,.json">'
-          if 'id="designUpload"' not in s:
-              if old_upload not in s:
-                  raise SystemExit('artUpload marker not found')
-              s = s.replace(old_upload, new_upload, 1)
-          index.write_text(s, encoding='utf-8')
-
-          p = Path('v20/editor.js')
-          s = p.read_text(encoding='utf-8')
-
-          old_design = "function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}"
-          new_design = """function designJSON(){
-           const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));
-           const templates=Object.fromEntries(product.zones.map(z=>[z,product.templates?.[z]||null]));
-           return{schema:'mqd-design-v1',engine:{calibration:product.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview'},product:{id:product.id,name:product.name,category:product.category,price:product.price,model:product.model},activeZone,templates,design:clean[product.id]||{},savedAt:new Date().toISOString()};
-          }"""
-          if old_design in s:
-              s = s.replace(old_design, new_design, 1)
-
-          old_save = "$('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};"
-          save_load = """function recomputeLayerSeq(){
-           let max=0;
-           Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>(z.layers||[]).forEach(l=>{const m=String(l.id||'').match(/^layer-(\\d+)$/);if(m)max=Math.max(max,Number(m[1]));})));
-           layerSeq=max+1;
-          }
-          function downloadJsonFile(name,data){
-           const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-           const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
-          }
-          $('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
-          $('loadDesign').onclick=()=>$('designUpload').click();
-          $('designUpload').onchange=async e=>{
-           const f=e.target.files?.[0];if(!f)return;
-           try{
-            const payload=JSON.parse(await f.text()),pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
-            if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
-            if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design file.');
-            snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
-            recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();alert('Design loaded.');
-           }catch(err){console.error(err);alert('Design could not be loaded: '+err.message);}finally{e.target.value='';}
-          };"""
-          if old_save in s:
-              s = s.replace(old_save, save_load, 1)
-          elif "$('loadDesign').onclick" not in s:
-              raise SystemExit('Save handler marker not found')
-
-          marker = "  root.file('background-colors.json',JSON.stringify(colors,null,2));"
-          manifest = "  const manifest={schema:'mqd-production-v1',generatedAt:new Date().toISOString(),engineCalibration:selected.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:'legacy-preview',product:{id:selected.id,name:selected.name,category:selected.category,price:selected.price,model:selected.model},zones:selected.zones.map(z=>({name:z,template:selected.templates?.[z]||null,backgroundHex:colors[z]||'#FFFFFF'}))};\n  root.file('manifest.json',JSON.stringify(manifest,null,2));\n"
-          if "root.file('manifest.json'" not in s:
-              if marker not in s:
-                  raise SystemExit('background-colors marker not found')
-              s = s.replace(marker, manifest + marker, 1)
-
-          p.write_text(s, encoding='utf-8')
+          p=Path('v20/editor.js')
+          s=p.read_text(encoding='utf-8')
+          anchor="$('downloadMockup').onclick=downloadMockupPNG;"
+          if 'const MQD_SUBMIT_URL=' not in s:
+            insert="""
+const MQD_SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
+function cartItems(){try{return JSON.parse(localStorage.getItem('mqd-cart')||'[]')}catch{return[]}}
+function updateCartButton(){const b=$('cartButton');if(b)b.textContent='Cart ('+cartItems().length+')';}
+function saveCustomerDraft(){try{localStorage.setItem('mqd-draft-'+product.id,JSON.stringify(designJSON()));const b=$('saveDraft'),old=b.textContent;b.textContent='Saved ✓';setTimeout(()=>b.textContent=old,1200);}catch(e){console.error(e);alert('This design is too large to save on this device. It can still be added to cart.');}}
+function currentMockupBlob(){return new Promise(resolve=>{if(!renderer||!garment)return resolve(null);renderer.render(scene,camera);const src=renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;const c=out.getContext('2d');c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);c.drawImage(src,0,0);out.toBlob(resolve,'image/png');});}
+async function submitCustomerDesign(){const payload=designJSON(),form=new FormData();form.append('payload',JSON.stringify(payload,(k,v)=>k==='src'||k==='image'?undefined:v));const mockup=await currentMockupBlob();if(mockup)form.append('mockup',mockup,product.id+'-mockup.png');for(const zone of Object.keys(payload.design.zones||{})){const live=stateFor().zones?.[zone];for(const layer of live?.layers||[]){if(layer.type!=='image'||!layer.src)continue;const blob=layer.src.startsWith('data:')?dataUrlBlob(layer.src):await fetch(layer.src).then(r=>{if(!r.ok)throw new Error('Could not prepare artwork');return r.blob();});form.append('asset',blob,layer.filename||'artwork.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));}}const response=await fetch(MQD_SUBMIT_URL,{method:'POST',body:form});const result=await response.json().catch(()=>({}));if(!response.ok||!result.ok)throw new Error(result.error||'Design submission failed');return result;}
+$('saveDraft').onclick=saveCustomerDraft;
+$('addToCart').onclick=async()=>{const b=$('addToCart'),old=b.textContent;b.disabled=true;b.textContent='Adding…';try{const result=await submitCustomerDesign(),cart=cartItems();cart.push({designId:result.designId,orderNumber:result.orderNumber,productId:product.id,productName:product.name,price:Number(product.price)||0});localStorage.setItem('mqd-cart',JSON.stringify(cart));updateCartButton();b.textContent='Added ✓';setTimeout(()=>b.textContent=old,1200);}catch(e){console.error(e);b.textContent=old;alert('Could not add this design to cart: '+e.message);}finally{b.disabled=false;}};
+$('cartButton').onclick=()=>{const cart=cartItems();if(!cart.length)return alert('Your cart is empty.');const total=cart.reduce((n,x)=>n+(Number(x.price)||0),0);alert(cart.map((x,i)=>(i+1)+'. '+x.productName+' — $'+Number(x.price).toFixed(2)+'\\nRef: '+x.orderNumber).join('\\n\\n')+'\\n\\nSubtotal: $'+total.toFixed(2)+'\\n\\nCheckout will be connected to Stripe next.');};
+updateCartButton();
+"""
+            if anchor not in s:raise SystemExit('mockup handler not found')
+            s=s.replace(anchor,anchor+'\n'+insert,1)
+          p.write_text(s,encoding='utf-8')
           PY
 
       - name: Syntax check
-        run: |
-          node --check v20/editor.js
-          node --check v20/panels.js
-          test -f v20/tshirt-collar-mask.js
+        run: node --check v20/editor.js
 
-      - name: Commit Phase 1 functionality
+      - name: Commit installed customer controls
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html v20/editor.js
           git diff --cached --quiet && exit 0
-          git commit -m "Finish T-shirt save load and production manifest"
+          git commit -m "Add customer save design and add-to-cart flow"
           git push origin main
