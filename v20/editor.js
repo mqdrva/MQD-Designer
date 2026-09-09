@@ -33,6 +33,9 @@ const tshirtZoneMeshes=new Map();
 const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';
 // LOCKED after renderer regression: do not alter the T-shirt GLB load/split path while adding editor UI features.
 const MQD_TSHIRT_RENDERER_LOCK='stable-v1';
+// LOCKED: 3D T-shirt zone textures must stay in the stable rectangular UV frame.
+// 2D template clipping/cropping is editor-only and must not redefine the 3D UV texture frame.
+const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';
 let colorRaf=0;
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
@@ -175,17 +178,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
-function makeCleanZoneDesignCanvas(zone,maxSide=1600){
-  const rec=ensureTemplateImage(zone);
-  if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
-    const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height;
-    const ratio=rec.bounds.w/Math.max(1,rec.bounds.h);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}
-    const scale=Math.max(w/rec.bounds.w,h/rec.bounds.h),fullW=Math.max(1,Math.round(sw*scale)),fullH=Math.max(1,Math.round(sh*scale));
-    const full=renderMaskedZoneCanvas(zone,fullW,fullH,false),b=scaleBounds(rec.bounds,sw,sh,fullW,fullH);
-    const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(full,b.x,b.y,b.w,b.h,0,0,w,h);return c;
-  }
-  const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;
-}
+function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
 
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
