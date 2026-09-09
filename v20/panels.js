@@ -2,15 +2,18 @@
 // Clip crossing triangles so neighboring panels share the same edge.
 export const panelNames=['Front','Back','Left Sleeve','Right Sleeve','Collar'];
 const planes=[
-  // Collar: keep only a narrow neckline ring. The lower plane is the
-  // front/collar seam; the upper plane prevents the Collar zone from
-  // swallowing the inner neck/upper chest. Leave the sleeve/body planes
-  // untouched because their side seam is already calibrated correctly.
+  // Collar: keep a narrow neckline ring and taper its side width toward the
+  // lower/front seam. This removes the vertical blocky "tabs" that appeared
+  // beside the neck while preserving the smooth lower collar arc and the
+  // already-correct sleeve/body seam.
   {zone:4,tests:[
     v=>v[1]+.55*v[2]-.785,
     v=>.855-(v[1]+.55*v[2]),
-    v=>.205-v[0],
-    v=>.205+v[0]
+    v=>{
+      const s=v[1]+.55*v[2];
+      const half=.12+1.22*(s-.785);
+      return half-Math.abs(v[0]);
+    }
   ]},
   {zone:2,tests:[v=>v[0]+.16*v[1]-.445]},
   {zone:3,tests:[v=>-v[0]+.16*v[1]-.445]},
