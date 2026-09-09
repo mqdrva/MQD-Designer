@@ -1,4 +1,5 @@
-import {panelNames, partitionTriangle, panelUv} from './panels.js';
+import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
+import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -27,7 +28,7 @@ const history=[],future=[];
 let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
-const MQD_TSHIRT_ZONE_CALIBRATION='v24-clipped-visual-panels';
+const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';
 let colorRaf=0;
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
@@ -268,10 +269,13 @@ function splitTshirtGeometry(sourceMesh){
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
  const buffers=panelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
- const count=index?index.count:pos.count;
+ const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=faceCount===TSHIRT_FACE_COUNT;
+ if(!useExactCollar)console.warn('MQD collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);
  for(let t=0;t<count;t+=3){
+  const faceIndex=(t/3)|0;
   const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});
-  for(const [zi,poly] of partitionTriangle(triangle)){
+  const parts=useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
+  for(const [zi,poly] of parts){
    const out=buffers[zi];
    for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
     out.P.push(...v.slice(0,3));const length=Math.hypot(...v.slice(3))||1;out.N.push(...v.slice(3).map(n=>n/length));
