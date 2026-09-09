@@ -2,8 +2,16 @@
 // Clip crossing triangles so neighboring panels share the same edge.
 export const panelNames=['Front','Back','Left Sleeve','Right Sleeve','Collar'];
 const planes=[
-  // Collar: follow the neckline slope and keep shoulders in the torso.
-  {zone:4,tests:[v=>v[1]+.55*v[2]-.785,v=>.205-v[0],v=>.205+v[0]]},
+  // Collar: keep only a narrow neckline ring. The lower plane is the
+  // front/collar seam; the upper plane prevents the Collar zone from
+  // swallowing the inner neck/upper chest. Leave the sleeve/body planes
+  // untouched because their side seam is already calibrated correctly.
+  {zone:4,tests:[
+    v=>v[1]+.55*v[2]-.785,
+    v=>.855-(v[1]+.55*v[2]),
+    v=>.205-v[0],
+    v=>.205+v[0]
+  ]},
   {zone:2,tests:[v=>v[0]+.16*v[1]-.445]},
   {zone:3,tests:[v=>-v[0]+.16*v[1]-.445]},
   {zone:0,tests:[v=>v[2]+.06+.12*Math.max(0,v[1])]}
@@ -46,5 +54,5 @@ export function panelUv(zone,x,y,z,b){
   const around=(Math.atan2(z+.055,(-dy*px+dx*py)/len)+Math.PI)/(2*Math.PI);
   return[around,1-along];
  }
- return[(Math.atan2(z+.07,x)+Math.PI)/(2*Math.PI),clamp((y+.55*z-.785)/.08)];
+ return[(Math.atan2(z+.07,x)+Math.PI)/(2*Math.PI),clamp((y+.55*z-.785)/.07)];
 }
