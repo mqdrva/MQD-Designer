@@ -1,0 +1,200 @@
+name: Install v23 single-mesh panel shader
+on:
+  push:
+    paths:
+      - '.github/workflows/install-v23-panel-shader.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace T-shirt triangle splitting with continuous panel shader
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('v20/editor.js')
+          text = path.read_text()
+
+          text = text.replace(
+              "const MQD_TSHIRT_ZONE_CALIBRATION='v22.1-collar-ring-sleeve-perspective';",
+              "const MQD_TSHIRT_ZONE_CALIBRATION='v23.0-single-mesh-panel-shader';"
+          )
+          if "let tshirtShaderState=null;" not in text:
+              text = text.replace(
+                  "const tshirtZoneMeshes=new Map();\n",
+                  "const tshirtZoneMeshes=new Map();\nlet tshirtShaderState=null;\n"
+              )
+
+          replacement = r'''function splitTshirtGeometry(sourceMesh){
+  const geometry=sourceMesh.geometry;
+  if(!geometry?.getAttribute('position'))return false;
+  geometry.computeBoundingBox();
+  const bb=geometry.boundingBox.clone();
+  const size=bb.getSize(new THREE.Vector3());
+  const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
+  const material=base?.clone?base.clone():new THREE.MeshStandardMaterial({roughness:.88,metalness:0});
+
+  // A single material now owns the whole shirt.  Zone selection happens per
+  // fragment instead of per triangle, so the Front/Collar and Body/Sleeve
+  // boundaries cannot create the saw-tooth gaps that triangle splitting did.
+  if(material.color)material.color.set('#ffffff');
+  material.vertexColors=false;
+  material.map=null;
+  material.emissiveMap=null;
+  material.alphaMap=null;
+  if('roughness' in material)material.roughness=.88;
+  if('metalness' in material)material.metalness=0;
+
+  const white=()=>{
+    const t=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1,THREE.RGBAFormat);
+    t.colorSpace=THREE.SRGBColorSpace;t.needsUpdate=true;return t;
+  };
+  const uniforms={
+    mqdFront:{value:white()},mqdBack:{value:white()},
+    mqdLeft:{value:white()},mqdRight:{value:white()},mqdCollar:{value:white()},
+    mqdBoundsMin:{value:bb.min.clone()},mqdBoundsSize:{value:size.clone()}
+  };
+
+  material.onBeforeCompile=shader=>{
+    Object.assign(shader.uniforms,uniforms);
+    shader.vertexShader=shader.vertexShader
+      .replace('#include <common>','#include <common>\nvarying vec3 vMqdLocalPos;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvMqdLocalPos = position;');
+
+    shader.fragmentShader=shader.fragmentShader
+      .replace('#include <common>',`#include <common>
+varying vec3 vMqdLocalPos;
+uniform sampler2D mqdFront;
+uniform sampler2D mqdBack;
+uniform sampler2D mqdLeft;
+uniform sampler2D mqdRight;
+uniform sampler2D mqdCollar;
+uniform vec3 mqdBoundsMin;
+uniform vec3 mqdBoundsSize;
+
+int mqdZoneIndex(vec3 p){
+  vec3 q=(p-mqdBoundsMin)/max(mqdBoundsSize,vec3(0.00001));
+  float xc=abs(q.x-0.5)*2.0;
+  float yn=q.y;
+  float zn=(q.z-0.5)*2.0;
+
+  // Tight neck ring: everything immediately outside this ring remains Front
+  // or Back, eliminating the white shelf that used to sit below the collar.
+  float neck=(xc/0.305)*(xc/0.305)+(zn/0.50)*(zn/0.50);
+  bool collar=(yn>0.905 && xc<0.37 && neck>0.12 && neck<1.52);
+  if(collar)return 4;
+
+  // Curved shoulder-to-underarm seam.  The threshold grows toward the
+  // underarm, so sleeve color cannot spill down the torso side wall.
+  float sleeveEdge=0.405 + clamp(0.92-yn,0.0,0.44)*0.62;
+  bool sleeve=(yn>0.485 && xc>sleeveEdge);
+  if(sleeve)return q.x<0.5 ? 3 : 2; // wearer's Right is screen-left
+
+  // Every remaining fragment belongs to exactly one torso side.  There are
+  // deliberately no unassigned fragments, so no white cracks can appear.
+  return zn>=-0.015 ? 0 : 1;
+}
+
+vec2 mqdZoneUv(int zone,vec3 p){
+  vec3 q=(p-mqdBoundsMin)/max(mqdBoundsSize,vec3(0.00001));
+  if(zone==0)return vec2(clamp(q.x,0.0,1.0),clamp(q.y,0.0,1.0));
+  if(zone==1)return vec2(clamp(1.0-q.x,0.0,1.0),clamp(q.y,0.0,1.0));
+  if(zone==2 || zone==3){
+    bool left=(zone==2);
+    vec2 shoulder=left?vec2(0.66,0.83):vec2(0.34,0.83);
+    vec2 cuff=left?vec2(0.99,0.58):vec2(0.01,0.58);
+    vec2 d=cuff-shoulder;
+    float along=clamp(dot(q.xy-shoulder,d)/max(dot(d,d),0.00001),0.0,1.0);
+    float around=left?clamp(q.z,0.0,1.0):clamp(1.0-q.z,0.0,1.0);
+    return vec2(along,around);
+  }
+  float angle=atan((q.z-0.5)*2.0,(q.x-0.5)*2.0)/(6.28318530718)+0.5;
+  float ringV=clamp((q.y-0.895)/0.105,0.0,1.0);
+  return vec2(fract(angle),ringV);
+}`)
+      .replace('#include <map_fragment>',`int mqdZone=mqdZoneIndex(vMqdLocalPos);
+vec2 mqdUv=mqdZoneUv(mqdZone,vMqdLocalPos);
+vec4 mqdTexel;
+if(mqdZone==0)mqdTexel=texture2D(mqdFront,mqdUv);
+else if(mqdZone==1)mqdTexel=texture2D(mqdBack,mqdUv);
+else if(mqdZone==2)mqdTexel=texture2D(mqdLeft,mqdUv);
+else if(mqdZone==3)mqdTexel=texture2D(mqdRight,mqdUv);
+else mqdTexel=texture2D(mqdCollar,mqdUv);
+diffuseColor *= mqdTexel;`);
+    tshirtShaderState.shader=shader;
+  };
+  material.customProgramCacheKey=()=>MQD_TSHIRT_ZONE_CALIBRATION;
+  material.needsUpdate=true;
+
+  sourceMesh.material=material;
+  sourceMesh.visible=true;
+  tshirtZoneMeshes.clear();
+  for(const zone of ['Front','Back','Left Sleeve','Right Sleeve','Collar'])tshirtZoneMeshes.set(zone,sourceMesh);
+  tshirtShaderState={mesh:sourceMesh,material,uniforms,textures:new Map(),shader:null,bounds:bb};
+  console.info('MQD continuous T-shirt panel shader ready',MQD_TSHIRT_ZONE_CALIBRATION);
+  return true;
+}
+
+function disposeTshirtShaderState(){
+  if(!tshirtShaderState)return;
+  for(const tex of tshirtShaderState.textures.values())tex?.dispose?.();
+  for(const u of ['mqdFront','mqdBack','mqdLeft','mqdRight','mqdCollar']){
+    const tex=tshirtShaderState.uniforms?.[u]?.value;
+    if(tex&&!tshirtShaderState.textures.has(tex))tex.dispose?.();
+  }
+  tshirtShaderState=null;
+  tshirtZoneMeshes.clear();
+}
+function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}'''
+
+          pattern = re.compile(r"function uvForZone\(zone,x,y,z,b\)\{.*?\n\}\nfunction disposeZoneTexture\(mesh\)\{const map=mesh\?\.material\?\.map;if\(map\)\{mesh\.material\.map=null;map\.dispose\(\);\}\}", re.S)
+          text, n = pattern.subn(replacement, text, count=1)
+          if n != 1:
+              raise SystemExit(f'Could not replace old T-shirt split engine: {n}')
+
+          new_update = r'''function updateTshirtZoneTextures(){
+  if(product.id!=='tshirt'||!tshirtShaderState)return false;
+  const slots={Front:'mqdFront',Back:'mqdBack','Left Sleeve':'mqdLeft','Right Sleeve':'mqdRight',Collar:'mqdCollar'};
+  for(const zone of product.zones){
+    const slot=slots[zone];if(!slot)continue;
+    const old=tshirtShaderState.textures.get(zone);if(old)old.dispose();
+    const canvas=makeCleanZoneDesignCanvas(zone,1600);
+    const tex=new THREE.CanvasTexture(canvas);
+    tex.colorSpace=THREE.SRGBColorSpace;
+    tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+    tex.minFilter=THREE.LinearMipmapLinearFilter;
+    tex.magFilter=THREE.LinearFilter;
+    tex.generateMipmaps=true;
+    tex.needsUpdate=true;
+    tshirtShaderState.textures.set(zone,tex);
+    tshirtShaderState.uniforms[slot].value=tex;
+    if(tshirtShaderState.shader)tshirtShaderState.shader.uniforms[slot].value=tex;
+  }
+  tshirtShaderState.material.needsUpdate=false;
+  return true;
+}'''
+          pattern2 = re.compile(r"function updateTshirtZoneTextures\(\)\{.*?\n\}", re.S)
+          text, n2 = pattern2.subn(new_update, text, count=1)
+          if n2 != 1:
+              raise SystemExit(f'Could not replace texture updater: {n2}')
+
+          text = text.replace(
+              "function loadGarment(){if(!renderer)init3D();if(garment){",
+              "function loadGarment(){if(!renderer)init3D();disposeTshirtShaderState();if(garment){"
+          )
+
+          path.write_text(text)
+      - name: Verify editor syntax
+        run: node --check v20/editor.js
+      - name: Commit v23 engine
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Use continuous panel shader for T-shirt zones" || exit 0
+          git push
