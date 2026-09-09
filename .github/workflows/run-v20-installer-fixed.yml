@@ -1,0 +1,48 @@
+name: Run fixed template editor v20 installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/run-v20-installer-fixed.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Extract and install v20 payloads
+        shell: python
+        run: |
+          import base64, gzip, re
+          from pathlib import Path
+
+          installer = Path('.github/workflows/install-template-editor-v20.yml').read_text()
+
+          def extract(name):
+              m = re.search(rf"{name} = '''([A-Za-z0-9+/=]+)'''", installer)
+              if not m:
+                  raise SystemExit(f'{name} payload not found')
+              data = m.group(1).rstrip('=')
+              data += '=' * (-len(data) % 4)
+              return gzip.decompress(base64.b64decode(data))
+
+          Path('index.html').write_bytes(extract('index_b64'))
+          Path('v20').mkdir(exist_ok=True)
+          Path('v20/editor.js').write_bytes(extract('js_b64'))
+
+      - name: Validate JavaScript
+        run: node --check v20/editor.js
+
+      - name: Commit template-first editor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v20/editor.js v20/editor.css
+          git commit -m "Refactor designer to template-first editor"
+          git push origin main
