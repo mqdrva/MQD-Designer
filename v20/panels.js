@@ -36,7 +36,7 @@ function split(poly,distance){
  }
  return[inside,outside];
 }
-function partitionWithRules(triangle,rules){
+export function partitionWithRules(triangle,rules){
  let remaining=[triangle];const result=[];
  for(const rule of rules){
   const next=[];
