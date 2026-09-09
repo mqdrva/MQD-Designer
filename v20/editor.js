@@ -1,3 +1,4 @@
+import {panelNames, partitionTriangle, panelUv} from './panels.js';
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -26,7 +27,7 @@ const history=[],future=[];
 let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
-const MQD_TSHIRT_ZONE_CALIBRATION='v22.2-stable-visible-renderer';
+const MQD_TSHIRT_ZONE_CALIBRATION='v24-clipped-visual-panels';
 let colorRaf=0;
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
@@ -262,33 +263,39 @@ function zonePlacement(zone){
 }
 
 function findPrimaryMesh(root=garment){let best=null,score=-1;root?.traverse(o=>{if(!o.isMesh||!o.geometry?.getAttribute('position'))return;const count=o.geometry.index?o.geometry.index.count:o.geometry.getAttribute('position').count;if(count>score){score=count;best=o;}});return best;}
-function classifyTshirtTriangle(cx,cy,cz,b){
-  const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y),sz=Math.max(1e-6,b.max.z-b.min.z);
-  const centerX=(b.min.x+b.max.x)/2,centerZ=(b.min.z+b.max.z)/2;
-  const xn=Math.abs(cx-centerX)/(sx/2),yn=(cy-b.min.y)/sy,zn=(cz-centerZ)/(sz/2);
-
-  // The collar is a narrow ring at the very top of the garment.  The old
-  // rectangular test (yn>.86 && xn<.36) swallowed a large block of upper
-  // chest geometry, creating the white band below the collar.  Restrict it
-  // to the actual neck-ring neighborhood so Front reaches the collar seam.
-  const neckRing=(xn/.30)*(xn/.30)+(zn/.46)*(zn/.46);
-  if(yn>.925&&xn<.34&&neckRing>.18&&neckRing<1.72)return'Collar';
-
-  // Zone names are from the wearer's perspective.  When the garment faces
-  // the camera, the wearer's RIGHT sleeve is on screen-left (negative X).
-  if(xn>.56&&yn>.52)return cx<centerX?'Right Sleeve':'Left Sleeve';
-
-  return zn>=0?'Front':'Back';
-}
-function uvForZone(zone,x,y,z,b){const sx=Math.max(1e-6,b.max.x-b.min.x),sy=Math.max(1e-6,b.max.y-b.min.y);let u=.5,v=.5;if(zone==='Front'||zone==='Back'){u=(x-b.min.x)/sx;v=(y-b.min.y)/sy;if(zone==='Back')u=1-u;}else if(zone==='Left Sleeve'||zone==='Right Sleeve'){const left=zone==='Left Sleeve',shoulder={x:left?-.36:.36,y:.66},cuff={x:left?-.64:.64,y:.28},dx=cuff.x-shoulder.x,dy=cuff.y-shoulder.y,len2=dx*dx+dy*dy,px=x-shoulder.x,py=y-shoulder.y,along=Math.max(0,Math.min(1,(px*dx+py*dy)/len2)),len=Math.sqrt(len2),perp=(-dy/len)*px+(dx/len)*py,angle=Math.atan2(z,perp);u=(angle+Math.PI)/(Math.PI*2);v=1-along;}else if(zone==='Collar'){u=(Math.atan2(z,x)+Math.PI)/(Math.PI*2);v=(y-b.min.y)/sy;}return[Math.max(0,Math.min(1,u)),Math.max(0,Math.min(1,v))];}
 function splitTshirtGeometry(sourceMesh){
-  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position'))return false;if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index,triCount=index?index.count/3:pos.count/3;geometry.computeBoundingBox();const bb=geometry.boundingBox.clone(),names=['Front','Back','Left Sleeve','Right Sleeve','Collar'],zoneIndex=new Map(names.map((n,i)=>[n,i])),faces=names.map(()=>[]),bounds=names.map(()=>({min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}})),vid=(t,k)=>index?index.getX(t*3+k):t*3+k;
-  for(let t=0;t<triCount;t++){const a=vid(t,0),b=vid(t,1),c=vid(t,2),cx=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3,cy=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3,cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3,name=classifyTshirtTriangle(cx,cy,cz,bb),zi=zoneIndex.get(name);faces[zi].push(t);const zb=bounds[zi];for(const vi of[a,b,c]){const x=pos.getX(vi),y=pos.getY(vi),z=pos.getZ(vi);zb.min.x=Math.min(zb.min.x,x);zb.min.y=Math.min(zb.min.y,y);zb.min.z=Math.min(zb.min.z,z);zb.max.x=Math.max(zb.max.x,x);zb.max.y=Math.max(zb.max.y,y);zb.max.z=Math.max(zb.max.z,z);}}
-  const parent=sourceMesh.parent;if(!parent)return false;tshirtZoneGroup=new THREE.Group();tshirtZoneGroup.name='MQD_Tshirt_Zones';tshirtZoneGroup.position.copy(sourceMesh.position);tshirtZoneGroup.quaternion.copy(sourceMesh.quaternion);tshirtZoneGroup.scale.copy(sourceMesh.scale);parent.add(tshirtZoneGroup);const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
-  names.forEach((name,zi)=>{const remap=new Int32Array(pos.count);remap.fill(-1);const P=[],N=[],UV=[],I=[];let next=0,zb=bounds[zi];for(const t of faces[zi])for(let k=0;k<3;k++){const old=vid(t,k);let ni=remap[old];if(ni<0){ni=next++;remap[old]=ni;const x=pos.getX(old),y=pos.getY(old),z=pos.getZ(old);P.push(x,y,z);N.push(normal.getX(old),normal.getY(old),normal.getZ(old));const uv=uvForZone(name,x,y,z,zb);UV.push(uv[0],uv[1]);}I.push(ni);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));g.setIndex(I);g.computeBoundingBox();g.computeBoundingSphere();const m=base?.clone?base.clone():new THREE.MeshStandardMaterial({roughness:.88,metalness:0});if(m.color)m.color.set('#fff');for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;if('roughness'in m)m.roughness=.88;if('metalness'in m)m.metalness=0;m.needsUpdate=true;const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+name.replace(/\s+/g,'_');mesh.castShadow=sourceMesh.castShadow;mesh.receiveShadow=sourceMesh.receiveShadow;tshirtZoneGroup.add(mesh);tshirtZoneMeshes.set(name,mesh);});sourceMesh.visible=false;console.info('MQD stable UV material zones ready',Object.fromEntries([...tshirtZoneMeshes].map(([k,v])=>[k,v.geometry.index.count/3])));return tshirtZoneMeshes.size===5;
+ const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position')||!sourceMesh.parent)return false;
+ if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
+ const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
+ const buffers=panelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
+ const count=index?index.count:pos.count;
+ for(let t=0;t<count;t+=3){
+  const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});
+  for(const [zi,poly] of partitionTriangle(triangle)){
+   const out=buffers[zi];
+   for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
+    out.P.push(...v.slice(0,3));const length=Math.hypot(...v.slice(3))||1;out.N.push(...v.slice(3).map(n=>n/length));
+    ['x','y','z'].forEach((axis,j)=>{out.min[axis]=Math.min(out.min[axis],v[j]);out.max[axis]=Math.max(out.max[axis],v[j]);});
+   }
+  }
+ }
+ if(buffers.some(b=>!b.P.length))return false;
+ const group=new THREE.Group();group.name='MQD_Tshirt_Zones';group.position.copy(sourceMesh.position);group.quaternion.copy(sourceMesh.quaternion);group.scale.copy(sourceMesh.scale);
+ const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
+ buffers.forEach((b,zi)=>{
+  for(let i=0;i<b.P.length;i+=3)b.UV.push(...panelUv(panelNames[zi],...b.P.slice(i,i+3),b));
+  // Unwrap triangles across the angular seam without stretching across the entire texture.
+  if(zi>=2)for(let i=0;i<b.UV.length;i+=6){const us=[b.UV[i],b.UV[i+2],b.UV[i+4]];if(Math.max(...us)-Math.min(...us)>.5)for(let k=0;k<6;k+=2)if(b.UV[i+k]<.5)b.UV[i+k]+=1;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(b.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(b.N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(b.UV,2));g.computeBoundingBox();g.computeBoundingSphere();
+  const m=base?.clone?base.clone():new THREE.MeshStandardMaterial();m.color.set('#fff');m.vertexColors=false;
+  for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;
+  m.roughness=.88;m.metalness=0;m.needsUpdate=true;
+  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+panelNames[zi].replace(/\s+/g,'_');group.add(mesh);tshirtZoneMeshes.set(panelNames[zi],mesh);
+ });
+ sourceMesh.parent.add(group);tshirtZoneGroup=group;sourceMesh.visible=false;return true;
 }
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
-function updateTshirtZoneTextures(){if(product.id!=='tshirt'||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}
+function updateTshirtZoneTextures(){if(product.id!=='tshirt'||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}
 function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),v=s.x*s.y*s.z;if(v>score){score=v;best=o;}});return best;}
 function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
 function rebuildGarmentPreview(){if(product.id==='tshirt'&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}
@@ -298,13 +305,13 @@ function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);g
 function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
 function selectZone(z){activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
-function addImage(src){const img=new Image();img.onload=()=>{snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),src,image:img,x:0,y:0,scale:1,rotation:0,visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
+function addImage(src,filename){const img=new Image();img.onload=()=>{snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
 function addText(){const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
 function updateLayer(prop,val){const l=activeLayer();if(!l)return;l[prop]=val;renderLayerPanel();drawEditor();rebuildGarmentPreview();}
 function setBackground(hex,record=true){const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildGarmentPreview();}
 function applyBackgroundAll(){const c=normalizeHex($('zoneHex').value);if(!c)return;snapshot();product.zones.forEach(z=>{const old=activeZone;activeZone=z;zoneState().background=c;activeZone=old;});renderAll();}
 
-$('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').onclick=()=>$('artUpload').click();$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>addImage(rd.result);rd.readAsDataURL(f);e.target.value='';};$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
+$('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').onclick=()=>$('artUpload').click();$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>addImage(rd.result,f.name);rd.readAsDataURL(f);e.target.value='';};$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
 [['layerX','x',Number],['layerY','y',Number],['layerScale','scale',v=>Number(v)/100],['layerRotation','rotation',Number]].forEach(([id,p,fn])=>$(id).oninput=e=>updateLayer(p,fn(e.target.value)));
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();const arr=zoneState().layers;arr.splice(arr.findIndex(x=>x.id===l.id),1);activeLayerId=arr.at(-1)?.id||null;renderAll();};$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
@@ -314,7 +321,43 @@ editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer();if(!l)retu
 function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}
 $('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};
 function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(','),bin=atob(b),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]});}
-$('downloadPack').onclick=async()=>{const zip=new JSZip(),root=zip.folder(product.id+'-production'),old=activeZone;for(const z of product.zones){activeZone=z;const t=templateFor(z),w=t?.width||2048,h=t?.height||2048,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),oldZoom=editorZoom;editorZoom=1;drawProductionZone(x,z,w,h);editorZoom=oldZoom;root.file(`zones/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,dataUrlBlob(c.toDataURL('image/png')));if(t?.path){try{const r=await fetch(t.path);if(r.ok)root.file(`template-references/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,await r.blob());}catch{}}}activeZone=old;root.file('design.json',JSON.stringify(designJSON(),null,2));try{const r=await fetch(product.model);if(r.ok)root.file(product.id+'.glb',await r.blob());}catch{}const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();renderAll();};
+$('downloadPack').onclick=async()=>{
+ const button=$('downloadPack');button.disabled=true;$('productSelect').disabled=true;
+ const selected=product,oldZone=activeZone,zip=new JSZip(),root=zip.folder(selected.id+'-production');
+ try{
+  const metadata=designJSON(),colors={};
+  for(const [zoneIndex,z] of selected.zones.entries()){
+   const folder=String(zoneIndex+1).padStart(2,'0')+'-'+z.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+   const state=zoneState(z);colors[z]=state.background||'#FFFFFF';
+   root.file(`original-assets/${folder}/background-hex.txt`,colors[z]+'\n');
+   const layers=[];
+   for(const [i,l] of state.layers.entries()){
+    const info=JSON.parse(JSON.stringify(l,(k,v)=>k==='image'||k==='src'?undefined:v));
+    if(l.type==='image'&&l.src){
+     const blob=l.src.startsWith('data:')?dataUrlBlob(l.src):await fetch(l.src).then(r=>{if(!r.ok)throw new Error('Unable to download original artwork');return r.blob();});
+     const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[blob.type]||'bin';
+     const name=String(i+1).padStart(2,'0')+'-'+(l.filename||l.label||'artwork').replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/\.[^.]+$/,'')+'.'+ext;
+     root.file(`original-assets/${folder}/${name}`,new Uint8Array(await blob.arrayBuffer()));info.originalFile=name;
+    }
+    layers.push(info);
+   }
+   root.file(`original-assets/${folder}/layers.json`,JSON.stringify(layers,null,2));
+   const t=selected.templates?.[z];
+   if(t?.path){const response=await fetch(t.path);if(!response.ok)throw new Error('Template could not be downloaded: '+z);root.file(`template-references/${folder}.png`,new Uint8Array(await response.arrayBuffer()));
+    const rec=ensureTemplateImage(z);if(rec?.status==='loading')await new Promise((resolve,reject)=>{const started=Date.now();const timer=setInterval(()=>{if(rec.status!=='loading'){clearInterval(timer);resolve();}else if(Date.now()-started>15000){clearInterval(timer);reject(new Error('Template is still loading: '+z));}},50);});
+    if(rec?.status!=='ready')throw new Error('Template is not ready: '+z);
+   }
+   const c=document.createElement('canvas');c.width=t?.width||2048;c.height=t?.height||2048;drawProductionZone(c.getContext('2d'),z,c.width,c.height);
+   root.file(`zones/${folder}.png`,new Uint8Array(await dataUrlBlob(c.toDataURL('image/png')).arrayBuffer()));
+  }
+  root.file('background-colors.json',JSON.stringify(colors,null,2));
+  root.file('background-colors.txt',Object.entries(colors).map(([z,c])=>z+': '+c).join('\n')+'\n');
+  root.file('design.json',JSON.stringify(metadata,null,2));
+  root.file('README.txt','Original uploaded files and per-zone HEX colors are in original-assets. Text, placement, visibility, scale and rotation are in each layers.json. Zone PNGs are design references for your manual print sizing and preparation. The 3D preview is a visual approximation.\n');
+  const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=selected.id+'-production.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ }catch(error){console.error(error);alert('Export could not finish: '+error.message);}
+ finally{activeZone=oldZone;button.disabled=false;$('productSelect').disabled=false;}
+};
 
 function renderAdmin(){const list=$('adminList');list.innerHTML='';catalog.forEach(p=>{const d=document.createElement('div');d.className='product-row';d.innerHTML=`<div><strong>${escapeHtml(p.name)}</strong><div class="subtle">${escapeHtml(p.category)} · $${Number(p.price).toFixed(2)}</div></div><button class="btn">Edit</button>`;d.querySelector('button').onclick=()=>loadAdmin(p.id);list.appendChild(d);});}
 function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminName').value=p.name;$('adminCategory').value=p.category;$('adminPrice').value=p.price;$('adminZones').innerHTML='';p.zones.forEach(z=>{const s=document.createElement('span');s.className='chip';s.textContent=z;$('adminZones').appendChild(s);});$('saveProductAdmin').dataset.id=id;}
