@@ -23,7 +23,8 @@ let catalog=JSON.parse(localStorage.getItem('mqd-catalog')||'null')||seed;
 let product=catalog[0],activeZone=product.zones[0],activeLayerId=null,layerSeq=1;
 const designs={};
 const history=[],future=[];
-let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=false,dragState=null;
+let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null;
+const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
 
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
@@ -36,6 +37,43 @@ function snapshot(){history.push(JSON.stringify(designs));if(history.length>30)h
 function undo(){if(!history.length)return;future.push(JSON.stringify(designs));const prev=JSON.parse(history.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,prev);repairImageObjects();renderAll();}
 function redo(){if(!future.length)return;history.push(JSON.stringify(designs));const next=JSON.parse(future.pop());Object.keys(designs).forEach(k=>delete designs[k]);Object.assign(designs,next);repairImageObjects();renderAll();}
 function repairImageObjects(){Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>z.layers?.forEach(l=>{if(l.type==='image'&&l.src&&!l.image){const img=new Image();img.onload=renderAll;img.src=l.src;l.image=img;}})));}
+
+function ensureTemplateImage(zone=activeZone){
+  const t=product.templates?.[zone];
+  if(!t?.path)return null;
+  if(templateCache.has(t.path))return templateCache.get(t.path);
+  const rec={img:null,status:'loading'};templateCache.set(t.path,rec);
+  const img=new Image();
+  img.onload=()=>{rec.img=img;rec.status='ready';if(zone===activeZone)drawEditor();};
+  img.onerror=()=>{rec.status='error';};
+  img.src=t.path;
+  return rec;
+}
+function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
+function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
+function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
+  const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
+  const tw=t?.width||1000,th=t?.height||1000,scale=Math.min(maxW/tw,maxH/th),dw=Math.round(tw*scale),dh=Math.round(th*scale);
+  return{x:Math.round((w-dw)/2),y:Math.round((h-dh)/2),w:dw,h:dh};
+}
+function drawGridLines(c,r){
+  const step=Math.max(24,Math.round(Math.min(r.w,r.h)/14));c.save();c.strokeStyle='rgba(0,0,0,.075)';c.lineWidth=1;
+  for(let x=r.x;x<=r.x+r.w;x+=step){c.beginPath();c.moveTo(x,r.y);c.lineTo(x,r.y+r.h);c.stroke();}
+  for(let y=r.y;y<=r.y+r.h;y+=step){c.beginPath();c.moveTo(r.x,y);c.lineTo(r.x+r.w,y);c.stroke();}c.restore();
+}
+function drawTemplateGuide(c,zone,r,alpha=.46){
+  const img=templateImageFor(zone);if(!img)return;c.save();c.globalAlpha=alpha;c.globalCompositeOperation='multiply';c.drawImage(img,r.x,r.y,r.w,r.h);c.restore();
+}
+function drawZoneLayersRect(c,zone,r){
+  const z=stateFor().zones[zone]||{background:'#FFFFFF',layers:[]};c.fillStyle=z.background||'#FFFFFF';c.fillRect(r.x,r.y,r.w,r.h);
+  (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();const cx=r.x+r.w/2+(l.x||0)*r.w/200,cy=r.y+r.h/2+(l.y||0)*r.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
+    if(l.type==='image'&&l.image){const base=Math.max(r.w/l.image.width,r.h/l.image.height),scale=base*(l.scale||1),iw=l.image.width*scale,ih=l.image.height*scale;c.drawImage(l.image,-iw/2,-ih/2,iw,ih);}
+    else if(l.type==='text'){const fs=Math.max(26,r.w*.10*(l.scale||1));c.fillStyle=l.color||'#111';c.font=`800 ${fs}px Inter, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(l.text||'Text',0,0,r.w*.85);}c.restore();});
+}
+function drawProductionZone(c,zone,w,h){
+  c.clearRect(0,0,w,h);c.save();traceZonePath(c,zone,w,h);c.clip();drawZoneLayersRect(c,zone,{x:0,y:0,w,h});c.restore();
+}
+
 
 function traceZonePath(c,zone,w,h){
   c.beginPath();
@@ -64,18 +102,20 @@ function traceZonePath(c,zone,w,h){
 }
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
-  const z=zoneState();targetCtx.save();targetCtx.clearRect(0,0,w,h);targetCtx.translate(w/2,h/2);targetCtx.scale(editorZoom,editorZoom);targetCtx.translate(-w/2,-h/2);
-  const r={x:w*.08,y:h*.05,w:w*.84,h:h*.90};
-  targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.clip();targetCtx.fillStyle=z.background||'#FFFFFF';targetCtx.fillRect(0,0,r.w,r.h);
-  z.layers.forEach(l=>{if(l.visible===false)return;targetCtx.save();const cx=r.w/2+(l.x||0)*r.w/200,cy=r.h/2+(l.y||0)*r.h/200;targetCtx.translate(cx,cy);targetCtx.rotate((l.rotation||0)*Math.PI/180);
-    if(l.type==='image'&&l.image){const base=Math.max(r.w/l.image.width,r.h/l.image.height);const scale=base*(l.scale||1);const iw=l.image.width*scale,ih=l.image.height*scale;targetCtx.drawImage(l.image,-iw/2,-ih/2,iw,ih);}else if(l.type==='text'){const fs=Math.max(28,r.w*.10*(l.scale||1));targetCtx.fillStyle=l.color||'#111';targetCtx.font=`800 ${fs}px Inter, sans-serif`;targetCtx.textAlign='center';targetCtx.textBaseline='middle';targetCtx.fillText(l.text||'Text',0,0,r.w*.85);}targetCtx.restore();});
-  targetCtx.restore();
-  targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.strokeStyle='#232323';targetCtx.lineWidth=3;targetCtx.stroke();if(includeGuides){targetCtx.setLineDash([12,9]);targetCtx.strokeStyle='#d91e18';targetCtx.lineWidth=2;traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.stroke();targetCtx.setLineDash([]);}targetCtx.restore();
-  if(showGrid&&includeGuides){targetCtx.save();targetCtx.strokeStyle='rgba(0,0,0,.10)';targetCtx.lineWidth=1;for(let x=0;x<w;x+=40){targetCtx.beginPath();targetCtx.moveTo(x,0);targetCtx.lineTo(x,h);targetCtx.stroke();}for(let y=0;y<h;y+=40){targetCtx.beginPath();targetCtx.moveTo(0,y);targetCtx.lineTo(w,y);targetCtx.stroke();}targetCtx.restore();}
+  const r=editorRect(activeZone,w,h);targetCtx.save();targetCtx.clearRect(0,0,w,h);targetCtx.translate(w/2,h/2);targetCtx.scale(editorZoom,editorZoom);targetCtx.translate(-w/2,-h/2);
+  if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
+  drawTemplateGuide(targetCtx,activeZone,r,.25);
+  targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.clip();drawZoneLayersRect(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});targetCtx.restore();
+  drawTemplateGuide(targetCtx,activeZone,r,.50);
+  if(!templateImageFor(activeZone)){targetCtx.save();targetCtx.translate(r.x,r.y);traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.strokeStyle='#222';targetCtx.lineWidth=2.4;targetCtx.stroke();targetCtx.setLineDash([12,9]);targetCtx.strokeStyle='#d91e18';targetCtx.lineWidth=1.8;traceZonePath(targetCtx,activeZone,r.w,r.h);targetCtx.stroke();targetCtx.restore();}
   targetCtx.restore();
 }
 function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);}
-function makeZoneTextureCanvas(zone){const old=activeZone;activeZone=zone;const c=document.createElement('canvas');c.width=1024;c.height=1024;const x=c.getContext('2d');const oldZoom=editorZoom;editorZoom=1;drawZoneComposite(x,c.width,c.height,false);editorZoom=oldZoom;activeZone=old;return c;}
+function makeZoneTextureCanvas(zone){
+  const t=product.templates?.[zone],maxSide=1400,ratio=t?.width&&t?.height?t.width/t.height:1;
+  let w=1024,h=1024;if(ratio>=1){w=maxSide;h=Math.max(320,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(320,Math.round(maxSide*ratio));}
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawZoneLayersRect(x,zone,{x:0,y:0,w,h});return c;
+}
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
 
 function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — $${Number(p.price).toFixed(2)}`;sel.appendChild(o);});sel.value=product.id;}
@@ -88,13 +128,26 @@ function renderAll(){renderProducts();renderZones();renderLayerPanel();renderSta
 function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
 function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}
 function clearDecals(){while(decalGroup.children.length){const o=decalGroup.children[0];decalGroup.remove(o);o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map?.dispose();m.dispose();});}}
-function zonePlacement(zone){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3()),p=new THREE.Vector3(),r=new THREE.Euler(),d=new THREE.Vector3();if(zone==='Back'){p.set(c.x,c.y-size.y*.01,box.min.z-size.z*.05);r.set(0,Math.PI,0);d.set(size.x*.64,size.y*.83,size.z*1.5);}else if(zone==='Left Sleeve'){p.set(box.min.x,c.y+size.y*.17,c.z);r.set(0,-Math.PI/2,0);d.set(size.z*.95,size.y*.34,size.x*.28);}else if(zone==='Right Sleeve'){p.set(box.max.x,c.y+size.y*.17,c.z);r.set(0,Math.PI/2,0);d.set(size.z*.95,size.y*.34,size.x*.28);}else if(zone==='Collar'){p.set(c.x,box.max.y-size.y*.04,c.z+size.z*.12);r.set(-Math.PI/2,0,0);d.set(size.x*.32,size.z*1.0,size.y*.13);}else if(zone==='Hood'){p.set(c.x,c.y+size.y*.31,box.min.z);r.set(0,Math.PI,0);d.set(size.x*.56,size.y*.31,size.z*.9);}else{p.set(c.x,c.y-size.y*.01,box.max.z+size.z*.05);r.set(0,0,0);d.set(size.x*.64,size.y*.83,size.z*1.5);}return{p,r,d};}
+function zonePlacement(zone){
+  const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3()),p=new THREE.Vector3(),r=new THREE.Euler(),d=new THREE.Vector3();
+  const torso=/tshirt|polo|hooded-long-sleeve|hood-mask-shirt/.test(product.id),bottom=/shorts|sweat-pants/.test(product.id);
+  if(zone==='Back'){p.set(c.x,c.y-size.y*(bottom?.01:.015),box.min.z-size.z*.04);r.set(0,Math.PI,0);d.set(size.x*(bottom?.76:torso?.61:.67),size.y*(bottom?.90:torso?.80:.76),size.z*1.35);}
+  else if(zone==='Left Sleeve'){p.set(box.min.x,c.y+size.y*.17,c.z);r.set(0,-Math.PI/2,0);d.set(size.z*.96,size.y*(torso?.35:.40),size.x*.30);}
+  else if(zone==='Right Sleeve'){p.set(box.max.x,c.y+size.y*.17,c.z);r.set(0,Math.PI/2,0);d.set(size.z*.96,size.y*(torso?.35:.40),size.x*.30);}
+  else if(zone==='Collar'){p.set(c.x,box.max.y-size.y*.035,c.z+size.z*.10);r.set(-Math.PI/2,0,0);d.set(size.x*.34,size.z*1.0,size.y*.12);}
+  else if(zone==='Hood'){p.set(c.x,c.y+size.y*.31,box.min.z);r.set(0,Math.PI,0);d.set(size.x*.58,size.y*.32,size.z*.92);}
+  else if(zone==='Front Panel'){p.set(c.x,c.y+size.y*.14,box.max.z+size.z*.15);d.set(size.x*.44,size.y*.32,size.z*.72);}
+  else if(zone==='Top of Bill'){p.set(c.x,c.y-size.y*.03,box.max.z+size.z*.20);r.set(-Math.PI/2,0,0);d.set(size.x*.48,size.z*.46,size.y*.14);}
+  else if(zone==='Entire Mask'||zone==='Built-In Mask'){p.set(c.x,c.y,box.max.z+size.z*.06);d.set(size.x*.54,size.y*.30,size.z*.48);}
+  else{p.set(c.x,c.y-size.y*(bottom?.01:.015),box.max.z+size.z*.04);d.set(size.x*(bottom?.76:torso?.61:.67),size.y*(bottom?.90:torso?.80:.76),size.z*1.35);}
+  return{p,r,d};
+}
 function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),v=s.x*s.y*s.z;if(v>score){score=v;best=o;}});return best;}
 function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
-function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>m.dispose?.());});garment=null;}clearDecals();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map=null;if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});rebuildDecals();},undefined,e=>console.error(e));}
+function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>m.dispose?.());});garment=null;}clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map=null;if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});rebuildDecals();},undefined,e=>console.error(e));}
 
-function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;renderAll();loadGarment();}
-function selectZone(z){activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;renderAll();}
+function selectProduct(id){product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
+function selectZone(z){activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
 function addImage(src){const img=new Image();img.onload=()=>{snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),src,image:img,x:0,y:0,scale:1,rotation:0,visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
 function addText(){const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
@@ -112,7 +165,7 @@ editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer();if(!l)retu
 function designJSON(){const clean=JSON.parse(JSON.stringify(designs,(k,v)=>k==='image'?undefined:v));return{product:{id:product.id,name:product.name,category:product.category,price:product.price},activeZone,design:clean[product.id]||{},createdAt:new Date().toISOString()};}
 $('saveDesign').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(designJSON(),null,2)],{type:'application/json'}));a.download=product.id+'-design.json';a.click();};
 function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(','),bin=atob(b),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]});}
-$('downloadPack').onclick=async()=>{const zip=new JSZip(),root=zip.folder(product.id+'-production'),old=activeZone;for(const z of product.zones){activeZone=z;const t=templateFor(z),w=t?.width||2048,h=t?.height||2048,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),oldZoom=editorZoom;editorZoom=1;drawZoneComposite(x,w,h,false);editorZoom=oldZoom;root.file(`zones/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,dataUrlBlob(c.toDataURL('image/png')));if(t?.path){try{const r=await fetch(t.path);if(r.ok)root.file(`template-references/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,await r.blob());}catch{}}}activeZone=old;root.file('design.json',JSON.stringify(designJSON(),null,2));try{const r=await fetch(product.model);if(r.ok)root.file(product.id+'.glb',await r.blob());}catch{}const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();renderAll();};
+$('downloadPack').onclick=async()=>{const zip=new JSZip(),root=zip.folder(product.id+'-production'),old=activeZone;for(const z of product.zones){activeZone=z;const t=templateFor(z),w=t?.width||2048,h=t?.height||2048,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),oldZoom=editorZoom;editorZoom=1;drawProductionZone(x,z,w,h);editorZoom=oldZoom;root.file(`zones/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,dataUrlBlob(c.toDataURL('image/png')));if(t?.path){try{const r=await fetch(t.path);if(r.ok)root.file(`template-references/${z.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`,await r.blob());}catch{}}}activeZone=old;root.file('design.json',JSON.stringify(designJSON(),null,2));try{const r=await fetch(product.model);if(r.ok)root.file(product.id+'.glb',await r.blob());}catch{}const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=product.id+'-production.zip';a.click();renderAll();};
 
 function renderAdmin(){const list=$('adminList');list.innerHTML='';catalog.forEach(p=>{const d=document.createElement('div');d.className='product-row';d.innerHTML=`<div><strong>${escapeHtml(p.name)}</strong><div class="subtle">${escapeHtml(p.category)} · $${Number(p.price).toFixed(2)}</div></div><button class="btn">Edit</button>`;d.querySelector('button').onclick=()=>loadAdmin(p.id);list.appendChild(d);});}
 function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminName').value=p.name;$('adminCategory').value=p.category;$('adminPrice').value=p.price;$('adminZones').innerHTML='';p.zones.forEach(z=>{const s=document.createElement('span');s.className='chip';s.textContent=z;$('adminZones').appendChild(s);});$('saveProductAdmin').dataset.id=id;}
