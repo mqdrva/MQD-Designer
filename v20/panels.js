@@ -59,11 +59,15 @@ export function panelUv(zone,x,y,z,b){
  const clamp=v=>Math.max(0,Math.min(1,v));
  if(zone==='Front'||zone==='Back')return[clamp(zone==='Back'?1-(x-b.min.x)/(b.max.x-b.min.x):(x-b.min.x)/(b.max.x-b.min.x)),clamp((y-b.min.y)/(b.max.y-b.min.y))];
  if(zone.includes('Sleeve')){
-  const sign=zone==='Left Sleeve'?1:-1,px=sign*x-.34,py=y-.68,dx=.25,dy=-.43,len=Math.hypot(dx,dy);
-  const along=clamp((px*dx+py*dy)/(len*len));
+  const sign=zone==='Left Sleeve'?1:-1,dx=.25,dy=-.43,len=Math.hypot(dx,dy);
+  const project=(xx,yy)=>{const px=sign*xx-.34,py=yy-.68;return(px*dx+py*dy)/(len*len);};
+  const raw=project(x,y),range=[project(b.min.x,b.min.y),project(b.min.x,b.max.y),project(b.max.x,b.min.y),project(b.max.x,b.max.y)];
+  const minAlong=Math.min(...range),maxAlong=Math.max(...range),along=clamp((raw-minAlong)/Math.max(1e-6,maxAlong-minAlong));
+  const px=sign*x-.34,py=y-.68;
   const around=(Math.atan2(z+.055,(-dy*px+dx*py)/len)+Math.PI)/(2*Math.PI);
-  // The supplied T-shirt's left sleeve runs opposite the flat artwork frame.
-  // Mirror only its U coordinate so text/images stay readable while the 2D editor remains normal.
+  // Left sleeve UVs run opposite the flat artwork frame on this supplied GLB.
+  // Mirror only U there; V is normalized to the physical sleeve length so the
+  // same x/y layer position used in the 2D template lands at the same height in 3D.
   const u=zone==='Left Sleeve'?1-around:around;
   return[clamp(u),1-along];
  }
