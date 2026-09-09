@@ -1,0 +1,87 @@
+name: Add text controls
+on:
+  push:
+    paths:
+      - '.github/workflows/add-text-controls.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add text editor controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # ---- index.html ----
+          p=Path('index.html')
+          s=p.read_text()
+          old_fonts='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
+          new_fonts='<link href="https://fonts.googleapis.com/css2?family=Inter&family=Roboto&family=Open+Sans&family=Lato&family=Montserrat&family=Poppins&family=Oswald&family=Raleway&family=Merriweather&family=Playfair+Display&family=Nunito&family=Ubuntu&family=PT+Sans&family=Source+Sans+3&family=Noto+Sans&family=Noto+Serif&family=Rubik&family=Work+Sans&family=DM+Sans&family=Manrope&family=Bebas+Neue&family=Anton&family=Archivo&family=Cabin&family=Karla&family=Mulish&family=Quicksand&family=Fira+Sans&family=Hind&family=Arvo&family=Bitter&family=Libre+Baskerville&family=Libre+Franklin&family=Josefin+Sans&family=Exo+2&family=Barlow&family=Barlow+Condensed&family=Fjalla+One&family=Titillium+Web&family=Yanone+Kaffeesatz&family=Abril+Fatface&family=Lobster&family=Pacifico&family=Dancing+Script&family=Permanent+Marker&family=Caveat&family=Cinzel&family=Cormorant+Garamond&family=Space+Grotesk&family=League+Spartan&display=swap" rel="stylesheet">'
+          if old_fonts in s:
+              s=s.replace(old_fonts,new_fonts,1)
+
+          action='<div class="action-row"><button id="fillLayer" class="btn">Fill</button><button id="toggleLayer" class="btn">Hide</button><button id="deleteLayer" class="btn danger">Delete</button></div>'
+          text_controls='''<div id="textControls" class="hidden" style="margin-top:12px;padding-top:12px;border-top:1px solid #ececec;display:grid;gap:9px"><label class="subtle">Text</label><input id="textValue" class="input" type="text" value="Text"><label class="subtle">Font</label><select id="textFont" class="input"></select><div class="row"><div style="flex:1"><label class="subtle">Fill color</label><input id="textColor" class="color-input" type="color" value="#111111"></div><div style="flex:1"><label class="subtle">Stroke color</label><input id="textStrokeColor" class="color-input" type="color" value="#FFFFFF"></div></div><div class="range-line"><span>Stroke</span><input id="textStrokeWidth" type="range" min="0" max="20" value="0"><strong id="textStrokeWidthVal">0</strong></div><div class="range-line"><span>Spacing</span><input id="textLetterSpacing" type="range" min="-10" max="30" value="0"><strong id="textLetterSpacingVal">0</strong></div><div class="row"><button id="textBold" class="btn" type="button">Bold</button><button id="textItalic" class="btn" type="button">Italic</button><select id="textAlign" class="input"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div></div>'''
+          if 'id="textControls"' not in s:
+              if action not in s: raise SystemExit('layer action row not found')
+              s=s.replace(action,text_controls+action,1)
+          p.write_text(s)
+
+          # ---- editor.js ----
+          p=Path('v20/editor.js')
+          s=p.read_text()
+
+          font_const="""const TEXT_FONTS=['Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Oswald','Raleway','Merriweather','Playfair Display','Nunito','Ubuntu','PT Sans','Source Sans 3','Noto Sans','Noto Serif','Rubik','Work Sans','DM Sans','Manrope','Bebas Neue','Anton','Archivo','Cabin','Karla','Mulish','Quicksand','Fira Sans','Hind','Arvo','Bitter','Libre Baskerville','Libre Franklin','Josefin Sans','Exo 2','Barlow','Barlow Condensed','Fjalla One','Titillium Web','Yanone Kaffeesatz','Abril Fatface','Lobster','Pacifico','Dancing Script','Permanent Marker','Caveat','Cinzel','Cormorant Garamond','Space Grotesk','League Spartan'];\n"""
+          marker="const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');\n"
+          if 'const TEXT_FONTS=' not in s:
+              if marker not in s: raise SystemExit('font insertion marker not found')
+              s=s.replace(marker,marker+font_const,1)
+
+          helper="""function drawTextLayer(c,l,b){\n  const fs=Math.max(18,b.w*.10*(l.scale||1));\n  const font=l.font||'Inter',weight=l.bold===false?400:(l.weight||800),style=l.italic?'italic':'normal';\n  c.font=`${style} ${weight} ${fs}px \"${font}\", sans-serif`;\n  c.textAlign=l.align||'center';c.textBaseline='middle';\n  if('letterSpacing' in c)c.letterSpacing=`${fs*((Number(l.letterSpacing)||0)/100)}px`;\n  const text=l.text||'Text',maxWidth=b.w*.85,stroke=Math.max(0,Number(l.strokeWidth)||0);\n  if(stroke>0){c.strokeStyle=l.strokeColor||'#FFFFFF';c.lineWidth=Math.max(1,fs*(stroke/100));c.lineJoin='round';c.strokeText(text,0,0,maxWidth);}\n  c.fillStyle=l.color||'#111111';c.fillText(text,0,0,maxWidth);\n}\n"""
+          marker2='function drawLayerStack(c,zone,b){\n'
+          if 'function drawTextLayer(' not in s:
+              if marker2 not in s: raise SystemExit('drawLayerStack marker not found')
+              s=s.replace(marker2,helper+marker2,1)
+
+          old1="else if(l.type==='text'){const fs=Math.max(24,b.w*.10*(l.scale||1));c.fillStyle=l.color||'#111';c.font=`800 ${fs}px Inter, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(l.text||'Text',0,0,b.w*.84);}"
+          new1="else if(l.type==='text'){drawTextLayer(c,l,b);}"
+          if old1 in s:s=s.replace(old1,new1,1)
+          old2="else if(l.type==='text'){const fs=Math.max(26,r.w*.10*(l.scale||1));c.fillStyle=l.color||'#111';c.font=`800 ${fs}px Inter, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(l.text||'Text',0,0,r.w*.85);}"
+          new2="else if(l.type==='text'){drawTextLayer(c,l,r);}"
+          if old2 in s:s=s.replace(old2,new2,1)
+          if old1 in s or old2 in s: raise SystemExit('text draw replacement incomplete')
+
+          old_add="function addText(){const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}"
+          new_add="function addText(){const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}"
+          if old_add not in s: raise SystemExit('addText function not found')
+          s=s.replace(old_add,new_add,1)
+
+          start=s.find('function renderLayerPanel(){')
+          end=s.find('\nfunction renderStatus()',start)
+          if start<0 or end<0: raise SystemExit('renderLayerPanel block not found')
+          new_render="""function renderLayerPanel(){\n  const wrap=$('layers'),empty=$('emptyLayers'),controlsEl=$('layerControls'),textControls=$('textControls');\n  wrap.innerHTML='';const arr=zoneState().layers;empty.classList.toggle('hidden',arr.length>0);\n  arr.forEach(l=>{const d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'');d.innerHTML=`<div class=\"layer-head\"><div><div class=\"layer-name\">${escapeHtml(l.label)}</div><div class=\"layer-meta\">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${l.visible===false?' · hidden':''}</div></div><span>${l.type==='image'?'▧':'T'}</span></div>`;d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();};wrap.appendChild(d);});\n  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}\n  $('selectedLayerLabel').textContent=l.label;$('layerX').value=l.x||0;$('layerY').value=l.y||0;$('layerScale').value=Math.round((l.scale||1)*100);$('layerRotation').value=l.rotation||0;$('layerXVal').textContent=l.x||0;$('layerYVal').textContent=l.y||0;$('layerScaleVal').textContent=Math.round((l.scale||1)*100);$('layerRotationVal').textContent=(l.rotation||0)+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';\n  const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);\n  if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}\n}\n"""
+          s=s[:start]+new_render+s[end:]
+
+          anchor="$('productSelect').onchange=e=>selectProduct(e.target.value);"
+          controls="""function initTextFonts(){const sel=$('textFont');if(!sel)return;sel.innerHTML=TEXT_FONTS.map(f=>`<option value=\"${f}\">${f}</option>`).join('');}\nfunction updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'&&document.fonts?.load)document.fonts.load(`32px \"${val}\"`).finally(()=>renderAll());else renderAll();}\n$('textValue')?.addEventListener('input',e=>updateTextProp('text',e.target.value));\n$('textFont')?.addEventListener('change',e=>updateTextProp('font',e.target.value));\n$('textColor')?.addEventListener('input',e=>updateTextProp('color',e.target.value.toUpperCase()));\n$('textStrokeColor')?.addEventListener('input',e=>updateTextProp('strokeColor',e.target.value.toUpperCase()));\n$('textStrokeWidth')?.addEventListener('input',e=>updateTextProp('strokeWidth',Number(e.target.value)));\n$('textLetterSpacing')?.addEventListener('input',e=>updateTextProp('letterSpacing',Number(e.target.value)));\n$('textBold')?.addEventListener('click',()=>{const l=activeLayer();if(!l||l.type!=='text')return;snapshot();l.bold=l.bold===false;renderAll();});\n$('textItalic')?.addEventListener('click',()=>{const l=activeLayer();if(!l||l.type!=='text')return;snapshot();l.italic=!l.italic;renderAll();});\n$('textAlign')?.addEventListener('change',e=>updateTextProp('align',e.target.value));\ninitTextFonts();\n\n"""
+          if 'function initTextFonts()' not in s:
+              if anchor not in s: raise SystemExit('text control event anchor not found')
+              s=s.replace(anchor,controls+anchor,1)
+
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+      - name: Commit text controls
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v20/editor.js
+          git commit -m "Add 50 fonts and full text styling controls"
+          git push
