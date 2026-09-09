@@ -1,0 +1,42 @@
+name: Restore stable T-shirt renderer
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-stable-tshirt-renderer.yml'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore last known good T-shirt load path only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          bad="""function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){
+    garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{for(const key of['map','emissiveMap','alphaMap'])if(m[key])m[key]=null;if(m.color)m.color.set('#ffffff');m.needsUpdate=true;});});
+    const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);
+  }rebuildGarmentPreview();},undefined,e=>console.error(e));}"""
+          good="""function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}tshirtZoneMeshes.clear();tshirtZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(product.id==='tshirt'){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}"""
+          if bad not in s:
+              raise SystemExit('Current stripped-map T-shirt load block not found; refusing broad edit')
+          s=s.replace(bad,good,1)
+          marker="const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';"
+          if marker in s and 'MQD_TSHIRT_RENDERER_LOCK' not in s:
+              s=s.replace(marker,marker+"\n// Renderer lock: keep the T-shirt GLB load/split path unchanged unless a regression test proves a replacement is safe.\nconst MQD_TSHIRT_RENDERER_LOCK='stable-v1';",1)
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          cp v20/editor.js /tmp/editor.mjs
+          node --check /tmp/editor.mjs
+      - name: Commit restored renderer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v20/editor.js
+          git commit -m "Restore and lock stable T-shirt renderer"
+          git push
