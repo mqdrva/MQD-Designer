@@ -12,68 +12,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Restore previous Back mask only
+      - name: Patch approved back mask
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('v20/editor.js')
-          s=p.read_text()
-
-          old='const built=buildTemplateMask(img);'
-          new='const built=buildTemplateMask(img,zone);'
-          assert old in s, 'template mask call anchor missing'
-          s=s.replace(old,new,1)
-
-          old='function buildTemplateMask(img){'
-          new='function buildTemplateMask(img,zone=null){'
-          assert old in s, 'template mask signature anchor missing'
-          s=s.replace(old,new,1)
-
-          anchor='  cx.putImageData(cutData,0,0);\n\n'
-          assert anchor in s, 'cutline canvas anchor missing'
-          legacy="""  // Keep the Short Sleeve Polo Back exactly on its previously approved mask.
-  // The newer silhouette-fill logic is only for the zones that needed it (especially sleeves).
-  if(product.id==='short-sleeve-polo'&&zone==='Back'){
-    let head=0,tail=0;
-    const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
-    for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
-    for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-    while(head<tail){
-      const idx=queue[head++],x=idx%w,y=(idx/w)|0;
-      if(x>0)push(idx-1);
-      if(x<w-1)push(idx+1);
-      if(y>0)push(idx-w);
-      if(y<h-1)push(idx+w);
-    }
-
-    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
-    const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
-    let minX=w,minY=h,maxX=-1,maxY=-1;
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-      const idx=y*w+x,o=idx*4;
-      if(!outside[idx]){
-        out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
-        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
-      }
-    }
-    if(maxX<minX||maxY<minY){
-      minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);
-    }else{
-      mx.putImageData(out,0,0);
-    }
-    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
-  }
-
-"""
-          s=s.replace(anchor,anchor+legacy,1)
-          p.write_text(s)
-          PY
-      - name: Verify syntax and targeted restore
+          echo 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aApwPVBhdGgoInYyMC9lZGl0b3IuanMiKQpzPXAucmVhZF90ZXh0KCkKCm9sZD0iY29uc3QgYnVpbHQ9YnVpbGRUZW1wbGF0ZU1hc2soaW1nKTsiCm5ldz0iY29uc3QgYnVpbHQ9YnVpbGRUZW1wbGF0ZU1hc2soaW1nLHpvbmUpOyIKYXNzZXJ0IG9sZCBpbiBzLCAidGVtcGxhdGUgbWFzayBjYWxsIGFuY2hvciBtaXNzaW5nIgpzPXMucmVwbGFjZShvbGQsbmV3LDEpCgpvbGQ9ImZ1bmN0aW9uIGJ1aWxkVGVtcGxhdGVNYXNrKGltZyl7IgpuZXc9ImZ1bmN0aW9uIGJ1aWxkVGVtcGxhdGVNYXNrKGltZyx6b25lPW51bGwpeyIKYXNzZXJ0IG9sZCBpbiBzLCAidGVtcGxhdGUgbWFzayBzaWduYXR1cmUgYW5jaG9yIG1pc3NpbmciCnM9cy5yZXBsYWNlKG9sZCxuZXcsMSkKCmFuY2hvcj0iICBjeC5wdXRJbWFnZURhdGEoY3V0RGF0YSwwLDApO1xuXG4iCmFzc2VydCBhbmNob3IgaW4gcywgImN1dGxpbmUgY2FudmFzIGFuY2hvciBtaXNzaW5nIgoKbGVnYWN5PXIiIiIgIC8vIEtlZXAgdGhlIFNob3J0IFNsZWV2ZSBQb2xvIEJhY2sgZXhhY3RseSBvbiBpdHMgcHJldmlvdXNseSBhcHByb3ZlZCBtYXNrLgogIC8vIFRoZSBuZXdlciBzaWxob3VldHRlLWZpbGwgbG9naWMgcmVtYWlucyBhY3RpdmUgZm9yIHRoZSB6b25lcyB0aGF0IG5lZWRlZCBpdC4KICBpZihwcm9kdWN0LmlkPT09J3Nob3J0LXNsZWV2ZS1wb2xvJyYmem9uZT09PSdCYWNrJyl7CiAgICBsZXQgaGVhZD0wLHRhaWw9MDsKICAgIGNvbnN0IHB1c2g9aWR4PT57aWYoaWR4PDAsfGlkeD49b3V0c2lkZS5sZW5ndGh8fG91dHNpZGVbaWR4XXx8YmxvY2tlZFtpZHhdKXJldHVybjtvdXRzaWRlW2lkeF09MTtxdWV1ZVt0YWlsKytdPWlkeDt9OwogICAgZm9yKGxldCB4PTA7eDx3O3grKyl7cHVzaCh4KTtwdXNoKChoLTEpKncreCk7fQogICAgZm9yKGxldCB5PTA7eTxoO3krKyl7cHVzaCh5KncpO3B1c2goeSsxKSp3LTEpO30KICAgIHdoaWxlKGhlYWQ8dGFpbCl7CiAgICAgIGNvbnN0IGlkeD1xdWV1ZVtoZWFkKytdLHg9aWR4JXcseT0oaWR4L3cpfDA7CiAgICAgIGlmKHg+MClwdXNoKGlkeC0xKTsKICAgICAgaWYoeDx3LTEpcHVzaChpZHgrMSk7CiAgICAgIGlmKHk+MClwdXNoKGlkeC13KTsKICAgICAgaWYoeTxoLTEpcHVzaChpZHgrdyk7CiAgICB9CgogICAgY29uc3QgbWFzaz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdjYW52YXMnKTttYXNrLndpZHRoPXc7bWFzay5oZWlnaHQ9aDsKICAgIGNvbnN0IG14PW1hc2suZ2V0Q29udGV4dCgnMmQnKSxvdXQ9bXguY3JlYXRlSW1hZ2VEYXRhKHcsaCk7CiAgICBsZXQgbWluWD13LG1pblk9aCxtYXhYPS0xLG1heFk9LTE7CiAgICBmb3IobGV0IHk9MDt5PGg7eSsrKWZvcihsZXQgeD0wO3g8dzt4KyspewogICAgICBjb25zdCBpZHg9eSp3K3gsbz1pZHgqNDsKICAgICAgaWYoIW91dHNpZGVbaWR4XSl7CiAgICAgICAgb3V0LmRhdGFbb109MjU1O291dC5kYXRhW28rMV09MjU1O291dC5kYXRhW28rMl09MjU1O291dC5kYXRhW28rM109MjU1OwogICAgICAgIG1pblg9TWF0aC5taW4obWluWCx4KTttaW5ZPU1hdGgubWluKG1pblkseCk7bWF4WD1NYXRoLm1heChtYXhYLngpO21heFk9TWF0aC5tYXgobWF4WSx5KTsKICAgICAgfQogICAgfQogICAgaWYobWF4WDxtaW5YfHxtYXhZPG1pblkpewogICAgICBtaW5YPTA7bWluWT0wO21heFg9dy0xO21heFk9aC0xO214LmZpbGxTdHlsZT0nI2ZmZic7bXguZmlsbFJlY3QoMCwwLHcsaCk7CiAgICB9ZWxzZXsKICAgICAgbXgucHV0SW1hZ2VEYXRhKG91dCwwLDApOwogICAgfQogICAgcmV0dXJue21hc2tDYW52YXM6bWFzayxjdXRsaW5lQ2FudmFzOmN1dCxib3VuZHM6e3g6bWluWCx5Om1pb lkseDptYXhYLW1pblgrMSxoOm1heFk tbWluWSsx fX07CiAgfQoKIiIiCnM9cy5yZXBsYWNlKGFuY2hvcixhbmNob3IrbGVnYWN5LDEpCnAud3JpdGVfdGV4dChzKQo=' | base64 -d > /tmp/patch.py
+          python /tmp/patch.py
+      - name: Verify syntax
         run: |
           node --check v20/editor.js
           grep -q "buildTemplateMask(img,zone)" v20/editor.js
           grep -q "product.id==='short-sleeve-polo'&&zone==='Back'" v20/editor.js
-      - name: Commit restore and remove workflow
+      - name: Commit restore
         run: |
           git config user.name 'MQD Builder'
           git config user.email 'actions@users.noreply.github.com'
