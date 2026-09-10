@@ -1,4 +1,5 @@
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
+import {partitionLongSleevePoloTriangle} from './long-sleeve-polo-panels.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
@@ -42,7 +43,7 @@ const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
 const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';
 // Long Sleeve Polo Phase 1: inherit the frozen long-sleeve isolation logic.
-const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-phase1';
+const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-v2-exclusive-zones';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -132,6 +133,39 @@ function buildTemplateMask(img,zone=null){
     }
   }
   cx.putImageData(cutData,0,0);
+
+  // Long Sleeve Polo Back: derive the fill only from the true red production
+  // outline. Dilate the dashed cutline just enough to close dash gaps, then
+  // flood-fill from the outside. This prevents helper text/graphics from becoming
+  // the mask while preserving the neckline opening and full back silhouette.
+  if(product.id==='long-sleeve-polo'&&zone==='Back'){
+    let barrier=new Uint8Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
+      if(a>15&&r>170&&g<145&&b<145&&r>g*1.35)barrier[y*w+x]=1;
+    }
+    const passes=Math.max(18,Math.min(42,Math.round(Math.min(w,h)*.008)));
+    for(let pass=0;pass<passes;pass++){
+      const next=barrier.slice();
+      for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+        const idx=y*w+x;
+        if(barrier[idx])continue;
+        if(barrier[idx-1]||barrier[idx+1]||barrier[idx-w]||barrier[idx+w]||
+           barrier[idx-w-1]||barrier[idx-w+1]||barrier[idx+w-1]||barrier[idx+w+1])next[idx]=1;
+      }
+      barrier=next;
+    }
+    const outSide=new Uint8Array(w*h),q=new Int32Array(w*h);let head=0,tail=0;
+    const push=idx=>{if(idx<0||idx>=outSide.length||outSide[idx]||barrier[idx])return;outSide[idx]=1;q[tail++]=idx;};
+    for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+    for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+    while(head<tail){const idx=q[head++],x=idx%w,y=(idx/w)|0;if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);}
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d'),out=mx.createImageData(w,h);let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const idx=y*w+x,o=idx*4;if(!outSide[idx]){out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}}
+    if(maxX<minX||maxY<minY){minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);}else mx.putImageData(out,0,0);
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  }
 
   // Keep the Short Sleeve Polo Back exactly on its previously approved mask.
   // The newer silhouette-fill logic remains active for the zones that needed it.
@@ -565,7 +599,7 @@ function splitTshirtGeometry(sourceMesh){
  for(let t=0;t<count;t+=3){
   const faceIndex=(t/3)|0;
   const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});
-  const parts=(longSleeve||longSleevePolo)?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
+  const parts=longSleevePolo?partitionLongSleevePoloTriangle(triangle):longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
   for(const [zi,poly] of parts){
    const out=buffers[zi];
    for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
