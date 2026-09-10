@@ -1,4 +1,4 @@
-name: Enable Long Sleeve Polo isolated renderer
+name: Apply shared cutline contrast patch
 on:
   push:
     paths:
@@ -12,59 +12,54 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Enable isolated renderer for Long Sleeve Polo
+      - name: Keep production cutlines visible on every fill color
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('v20/editor.js')
           s=p.read_text()
-
-          marker="const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';"
-          assert marker in s, 'Short Sleeve Polo calibration marker missing'
-          if "MQD_LONG_SLEEVE_POLO_CALIBRATION" not in s:
-              s=s.replace(marker,marker+"\n// Long Sleeve Polo Phase 1: inherit the frozen long-sleeve isolation logic.\nconst MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-phase1';",1)
-
-          old=" const longSleeve=product.id==='long-sleeve-tshirt';\n const shortPolo=product.id==='short-sleeve-polo';"
-          new=" const longSleeve=product.id==='long-sleeve-tshirt';\n const longSleevePolo=product.id==='long-sleeve-polo';\n const shortPolo=product.id==='short-sleeve-polo';"
-          assert old in s, 'Long sleeve split anchor missing'
-          s=s.replace(old,new,1)
-
-          old=" const parts=longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);"
-          new=" const parts=(longSleeve||longSleevePolo)?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);"
-          assert old in s, 'Panel partition anchor missing'
-          s=s.replace(old,new,1)
-
-          old="  for(let i=0;i<b.P.length;i+=3)b.UV.push(...(longSleeve?longSleevePanelUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));"
-          new="  for(let i=0;i<b.P.length;i+=3)b.UV.push(...((longSleeve||longSleevePolo)?longSleevePanelUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));"
-          assert old in s, 'Panel UV anchor missing'
-          s=s.replace(old,new,1)
-
-          old="function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;"
-          new="function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;"
-          assert old in s, 'Texture renderer anchor missing'
-          s=s.replace(old,new,1)
-
-          old="function rebuildGarmentPreview(){if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}"
-          new="function rebuildGarmentPreview(){if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}"
-          assert old in s, 'Preview renderer anchor missing'
-          s=s.replace(old,new,1)
-
-          old="if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}"
-          new="if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}"
-          assert old in s, 'Garment split anchor missing'
-          s=s.replace(old,new,1)
-
-          p.write_text(s)
+          old="""    if(rec.cutlineCanvas){
+      targetCtx.save();
+      targetCtx.globalAlpha=1;
+      targetCtx.globalCompositeOperation='source-over';
+      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+      targetCtx.restore();
+    }
+"""
+          new="""    if(rec.cutlineCanvas){
+      targetCtx.save();
+      targetCtx.globalAlpha=1;
+      targetCtx.globalCompositeOperation='source-over';
+      // Preserve true-red production cut/sew lines while keeping them readable
+      // over red, dark, or visually similar customer background colors.
+      targetCtx.shadowColor='rgba(255,255,255,.98)';
+      targetCtx.shadowBlur=5;
+      targetCtx.shadowOffsetX=0;
+      targetCtx.shadowOffsetY=0;
+      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+      targetCtx.shadowBlur=0;
+      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+      targetCtx.restore();
+    }
+"""
+          if old not in s:
+              if "targetCtx.shadowColor='rgba(255,255,255,.98)'" in s:
+                  raise SystemExit(0)
+              raise SystemExit('Production cutline draw block not found')
+          p.write_text(s.replace(old,new,1))
           PY
-      - name: Verify syntax
+      - name: Verify syntax and contrast patch
         run: |
           node --check v20/editor.js
-          grep -q "MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-phase1'" v20/editor.js
-          grep -q "'long-sleeve-polo'" v20/editor.js
-      - name: Commit calibration
+          grep -q "targetCtx.shadowColor='rgba(255,255,255,.98)'" v20/editor.js
+      - name: Commit shared editor fix
         run: |
+          if git diff --quiet -- v20/editor.js; then
+            echo 'Cutline contrast patch already present.'
+            exit 0
+          fi
           git config user.name 'MQD Builder'
           git config user.email 'actions@users.noreply.github.com'
           git add v20/editor.js
-          git commit -m 'Enable isolated Long Sleeve Polo renderer'
+          git commit -m 'Keep 2D production cutlines visible on all colors'
           git push origin main
