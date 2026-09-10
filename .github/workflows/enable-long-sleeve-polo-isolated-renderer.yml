@@ -1,10 +1,13 @@
-name: Apply shared cutline contrast patch
+name: Apply Long Sleeve Polo isolation v2
+
 on:
   push:
     paths:
       - '.github/workflows/enable-long-sleeve-polo-isolated-renderer.yml'
+
 permissions:
   contents: write
+
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -12,31 +15,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Keep production cutlines visible on every fill color
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('v20/editor.js')
-          s=p.read_text()
-          old="    if(rec.cutlineCanvas){\n      targetCtx.save();\n      targetCtx.globalAlpha=1;\n      targetCtx.globalCompositeOperation='source-over';\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.restore();\n    }\n"
-          new="    if(rec.cutlineCanvas){\n      targetCtx.save();\n      targetCtx.globalAlpha=1;\n      targetCtx.globalCompositeOperation='source-over';\n      // Preserve true-red production cut/sew lines while keeping them readable over similar fill colors.\n      targetCtx.shadowColor='rgba(255,255,255,.98)';\n      targetCtx.shadowBlur=5;\n      targetCtx.shadowOffsetX=0;\n      targetCtx.shadowOffsetY=0;\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.shadowBlur=0;\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.restore();\n    }\n"
-          if old in s:
-              p.write_text(s.replace(old,new,1))
-          elif "targetCtx.shadowColor='rgba(255,255,255,.98)'" not in s:
-              raise SystemExit('Production cutline draw block not found')
-          PY
-      - name: Verify syntax and contrast patch
+      - name: Apply Long Sleeve Polo v2 patch
+        run: python3 .github/scripts/fix_long_sleeve_polo_v2.py
+      - name: Verify patch
         run: |
           node --check v20/editor.js
-          grep -q "targetCtx.shadowColor='rgba(255,255,255,.98)'" v20/editor.js
-      - name: Commit shared editor fix
+          node --check v20/long-sleeve-polo-panels.js
+          grep -q "partitionLongSleevePoloTriangle" v20/editor.js
+          grep -q "isolated-long-sleeve-polo-v2-exclusive-zones" v20/editor.js
+          grep -q "product.id==='long-sleeve-polo'&&zone==='Back'" v20/editor.js
+      - name: Commit Long Sleeve Polo fix
         run: |
-          if git diff --quiet -- v20/editor.js; then
-            echo 'Cutline contrast patch already present.'
-            exit 0
-          fi
           git config user.name 'MQD Builder'
           git config user.email 'actions@users.noreply.github.com'
-          git add v20/editor.js
-          git commit -m 'Keep 2D production cutlines visible on all colors'
+          git add v20/editor.js v20/long-sleeve-polo-panels.js
+          if git diff --cached --quiet; then
+            echo 'Long Sleeve Polo v2 patch already applied.'
+            exit 0
+          fi
+          git commit -m 'Fix Long Sleeve Polo zone isolation and back mask'
           git push origin main
