@@ -1,0 +1,89 @@
+name: Enable Long Sleeve Polo Isolated Renderer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/enable-long-sleeve-polo-isolated-renderer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Long Sleeve Polo renderer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          panels=Path('v20/long-sleeve-panels.js')
+          ps=panels.read_text()
+          old="""const rules=[
+ {zone:4,tests:[v=>v[1]+.40*v[2]-.755,v=>1-(v[0]/.225)**2-((v[2]+.08)/.24)**2]},
+ {zone:2,tests:[v=>v[0]-sleeveEdge(v[1])]},
+ {zone:3,tests:[v=>-v[0]-sleeveEdge(v[1])]},
+ {zone:0,tests:[v=>v[2]+.025+.12*Math.max(0,v[1])]}
+];
+export function partitionLongSleeveTriangle(triangle){return partitionWithRules(triangle,rules);}
+"""
+          new="""const rules=[
+ {zone:4,tests:[v=>v[1]+.40*v[2]-.755,v=>1-(v[0]/.225)**2-((v[2]+.08)/.24)**2]},
+ {zone:2,tests:[v=>v[0]-sleeveEdge(v[1])]},
+ {zone:3,tests:[v=>-v[0]-sleeveEdge(v[1])]},
+ {zone:0,tests:[v=>v[2]+.025+.12*Math.max(0,v[1])]}
+];
+const bodyRules=[
+ {zone:2,tests:[v=>v[0]-sleeveEdge(v[1])]},
+ {zone:3,tests:[v=>-v[0]-sleeveEdge(v[1])]},
+ {zone:0,tests:[v=>v[2]+.025+.12*Math.max(0,v[1])]}
+];
+export function partitionLongSleeveTriangle(triangle){return partitionWithRules(triangle,rules);}
+export function partitionLongSleeveBodyTriangle(triangle){return partitionWithRules(triangle,bodyRules);}
+"""
+          if old not in ps:
+              raise SystemExit('Long sleeve panel rules block not found')
+          panels.write_text(ps.replace(old,new,1))
+
+          p=Path('v20/editor.js')
+          s=p.read_text()
+
+          replacements=[
+            ("import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';",
+             "import {partitionLongSleeveTriangle,partitionLongSleeveBodyTriangle,longSleevePanelUv} from './long-sleeve-panels.js';"),
+            ("const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';",
+             "const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';\n// Long Sleeve Polo Phase 1: inherit the frozen long-sleeve body/sleeve isolation while keeping polo templates.\nconst MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-phase1';"),
+            (" const longSleeve=product.id==='long-sleeve-tshirt';\n const shortPolo=product.id==='short-sleeve-polo';",
+             " const longSleeve=product.id==='long-sleeve-tshirt';\n const longSleevePolo=product.id==='long-sleeve-polo';\n const shortPolo=product.id==='short-sleeve-polo';"),
+            (" const parts=longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);",
+             " const parts=longSleevePolo?partitionLongSleeveTriangle(triangle):longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);"),
+            ("  for(let i=0;i<b.P.length;i+=3)b.UV.push(...(longSleeve?longSleevePanelUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));",
+             "  for(let i=0;i<b.P.length;i+=3)b.UV.push(...((longSleeve||longSleevePolo)?longSleevePanelUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));"),
+            ("function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;",
+             "function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;"),
+            ("function rebuildGarmentPreview(){if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}",
+             "function rebuildGarmentPreview(){if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}rebuildDecals();}"),
+            ("if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}",
+             "if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}")
+          ]
+
+          for old,new in replacements:
+              if old not in s:
+                  raise SystemExit('Expected editor block not found: '+old[:90])
+              s=s.replace(old,new,1)
+
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          node --check v20/editor.js
+          node --check v20/long-sleeve-panels.js
+      - name: Commit renderer patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v20/editor.js v20/long-sleeve-panels.js
+          git commit -m 'Enable isolated Long Sleeve Polo renderer'
+          git push
