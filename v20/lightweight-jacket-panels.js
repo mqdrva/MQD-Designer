@@ -1,31 +1,39 @@
 import {partitionWithRules} from './panels.js';
 
 // Lightweight Jacket only.
-// Tightened against the supplied front/back/side references:
-// black body reaching cleanly to the armholes, red sleeves, red hood.
+// Calibrated to the supplied front/back/side reference mockups.
 export const lightweightJacketPanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
 
-// Let the hood drop lower at center and rise smoothly toward both shoulders.
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+
+// The hood narrows sharply where it meets the body, then widens higher up.
+// This removes the red shoulder/yoke band while preserving the deep center
+// drop of the hood seen in the supplied rear reference.
+const hoodHalfWidth=v=>{
+  const t=clamp((v[1]-.36)/.38);
+  return .205+.145*t;
+};
 const hoodLowerEdge=v=>
-  .37 + 2.20*v[0]*v[0] + .52*Math.max(0,v[2]+.13);
+  .335 + 1.95*v[0]*v[0] + .48*Math.max(0,v[2]+.12);
 
 const hoodRule={zone:4,tests:[
   v=>v[1]-hoodLowerEdge(v),
-  v=>.36-Math.abs(v[0])
+  v=>hoodHalfWidth(v)-Math.abs(v[0])
 ]};
 
-// Keep the body panel wide across the shoulders and sidewall, matching the
-// reference mockups. The sleeve boundary stays close to the true armhole seam
-// instead of cutting inward across the upper shoulder.
+// Pull the sleeve ownership inward to the physical armhole and keep the full
+// sleeve cylinder red all the way through the cuff. The previous boundary was
+// too far outward and left black strips on the inner sleeves/cuffs.
 const sleeveEdge=v=>{
   const y=v[1];
-  const depth=Math.min(.034,Math.abs(v[2])*.13);
-  if(y>.52){
-    const t=Math.min(1,(y-.52)/.30);
-    return .472-.035*t*t+depth;
+  const depth=-Math.min(.020,Math.abs(v[2])*.055);
+  if(y>.58){
+    const t=clamp((y-.58)/.24);
+    return .395-.035*t+depth;
   }
-  if(y>.08)return .472+depth;
-  return .478+.030*Math.max(0,-y)+depth;
+  if(y>.18)return .395+depth;
+  if(y>-.38)return .365+depth;
+  return .340+depth;
 };
 
 const rules=[
@@ -33,8 +41,7 @@ const rules=[
   {zone:2,tests:[v=>v[0]-sleeveEdge(v)]},
   {zone:3,tests:[v=>-v[0]-sleeveEdge(v)]},
 
-  // Preserve independent Front and Back body panels while keeping the side
-  // transition centered on the garment.
+  // Front owns the forward half; all remaining body geometry is Back.
   {zone:0,tests:[v=>v[2]-.004+.205*Math.max(0,v[1])]}
 ];
 
