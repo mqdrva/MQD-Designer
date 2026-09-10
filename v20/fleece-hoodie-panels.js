@@ -3,6 +3,7 @@ import {partitionWithRules} from './panels.js';
 // Fleece Hoodie only. These rules are intentionally isolated from every
 // approved garment renderer. The supplied hoodie GLB is one mesh, so each
 // triangle is clipped into exactly one of five physical print zones.
+// Redeploy trigger after Vercel Pro upgrade: 2026-09-10.
 export const hoodiePanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
 
 // Keep Hood on the actual upper shell while returning the upper chest to the
