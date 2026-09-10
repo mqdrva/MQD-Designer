@@ -18,35 +18,12 @@ jobs:
           from pathlib import Path
           p=Path('v20/editor.js')
           s=p.read_text()
-          old="""    if(rec.cutlineCanvas){
-      targetCtx.save();
-      targetCtx.globalAlpha=1;
-      targetCtx.globalCompositeOperation='source-over';
-      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
-      targetCtx.restore();
-    }
-"""
-          new="""    if(rec.cutlineCanvas){
-      targetCtx.save();
-      targetCtx.globalAlpha=1;
-      targetCtx.globalCompositeOperation='source-over';
-      // Preserve true-red production cut/sew lines while keeping them readable
-      // over red, dark, or visually similar customer background colors.
-      targetCtx.shadowColor='rgba(255,255,255,.98)';
-      targetCtx.shadowBlur=5;
-      targetCtx.shadowOffsetX=0;
-      targetCtx.shadowOffsetY=0;
-      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
-      targetCtx.shadowBlur=0;
-      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
-      targetCtx.restore();
-    }
-"""
-          if old not in s:
-              if "targetCtx.shadowColor='rgba(255,255,255,.98)'" in s:
-                  raise SystemExit(0)
+          old="    if(rec.cutlineCanvas){\n      targetCtx.save();\n      targetCtx.globalAlpha=1;\n      targetCtx.globalCompositeOperation='source-over';\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.restore();\n    }\n"
+          new="    if(rec.cutlineCanvas){\n      targetCtx.save();\n      targetCtx.globalAlpha=1;\n      targetCtx.globalCompositeOperation='source-over';\n      // Preserve true-red production cut/sew lines while keeping them readable over similar fill colors.\n      targetCtx.shadowColor='rgba(255,255,255,.98)';\n      targetCtx.shadowBlur=5;\n      targetCtx.shadowOffsetX=0;\n      targetCtx.shadowOffsetY=0;\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.shadowBlur=0;\n      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);\n      targetCtx.restore();\n    }\n"
+          if old in s:
+              p.write_text(s.replace(old,new,1))
+          elif "targetCtx.shadowColor='rgba(255,255,255,.98)'" not in s:
               raise SystemExit('Production cutline draw block not found')
-          p.write_text(s.replace(old,new,1))
           PY
       - name: Verify syntax and contrast patch
         run: |
