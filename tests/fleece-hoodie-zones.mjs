@@ -26,11 +26,14 @@ assert.equal(zoneAt(.18,.56,.18),0,'upper front beside hood opening must be Fron
 assert.equal(zoneAt(0,0,.30),0,'front torso must be Front');
 assert.equal(zoneAt(0,0,-.30),1,'rear torso must be Back');
 
-// Body panels stay slightly wider with clean sleeve separation.
-assert.equal(zoneAt(.38,.48,.20),0,'front panel must stay wide to the armhole');
-assert.equal(zoneAt(.38,.48,-.20),1,'back panel must stay wide to the armhole');
-assert.equal(zoneAt(.44,.48,.05),2,'outer upper left arm must be Left Sleeve');
-assert.equal(zoneAt(-.44,.48,.05),3,'outer upper right arm must be Right Sleeve');
+// Body panels now hug the garment outline more tightly and own the sidewall,
+// eliminating sleeve color showing through beside the black body.
+assert.equal(zoneAt(.44,.48,.20),0,'front panel must extend to the armhole');
+assert.equal(zoneAt(.44,.48,-.20),1,'back panel must extend to the armhole');
+assert.equal(zoneAt(.45,.10,.20),0,'front sidewall must remain Front');
+assert.equal(zoneAt(.45,.10,-.20),1,'back sidewall must remain Back');
+assert.equal(zoneAt(.49,.48,.05),2,'outer upper left arm must remain Left Sleeve');
+assert.equal(zoneAt(-.49,.48,.05),3,'outer upper right arm must remain Right Sleeve');
 assert.equal(zoneAt(.68,-.40,.05),2,'positive-X arm must be Left Sleeve');
 assert.equal(zoneAt(-.68,-.40,.05),3,'negative-X arm must be Right Sleeve');
 
@@ -42,4 +45,4 @@ for(const [zone,poly] of crossing){
   assert.ok(zone>=0&&zone<5);
   assert.ok(poly.length>=3);
 }
-console.log('Fleece Hoodie approved-reference calibration tests passed.');
+console.log('Fleece Hoodie tight back silhouette and no-side-bleed tests passed.');
