@@ -1,0 +1,83 @@
+name: Restore Short Sleeve Polo back mask
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-polo-back-mask.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Restore previous Back mask only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text()
+
+          old='const built=buildTemplateMask(img);'
+          new='const built=buildTemplateMask(img,zone);'
+          assert old in s, 'template mask call anchor missing'
+          s=s.replace(old,new,1)
+
+          old='function buildTemplateMask(img){'
+          new='function buildTemplateMask(img,zone=null){'
+          assert old in s, 'template mask signature anchor missing'
+          s=s.replace(old,new,1)
+
+          anchor='  cx.putImageData(cutData,0,0);\n\n'
+          assert anchor in s, 'cutline canvas anchor missing'
+          legacy="""  // Keep the Short Sleeve Polo Back exactly on its previously approved mask.
+  // The newer silhouette-fill logic is only for the zones that needed it (especially sleeves).
+  if(product.id==='short-sleeve-polo'&&zone==='Back'){
+    let head=0,tail=0;
+    const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
+    for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+    for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+    while(head<tail){
+      const idx=queue[head++],x=idx%w,y=(idx/w)|0;
+      if(x>0)push(idx-1);
+      if(x<w-1)push(idx+1);
+      if(y>0)push(idx-w);
+      if(y<h-1)push(idx+w);
+    }
+
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+    let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const idx=y*w+x,o=idx*4;
+      if(!outside[idx]){
+        out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      }
+    }
+    if(maxX<minX||maxY<minY){
+      minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);
+    }else{
+      mx.putImageData(out,0,0);
+    }
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  }
+
+"""
+          s=s.replace(anchor,anchor+legacy,1)
+          p.write_text(s)
+          PY
+      - name: Verify syntax and targeted restore
+        run: |
+          node --check v20/editor.js
+          grep -q "buildTemplateMask(img,zone)" v20/editor.js
+          grep -q "product.id==='short-sleeve-polo'&&zone==='Back'" v20/editor.js
+      - name: Commit restore and remove workflow
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/restore-polo-back-mask.yml
+          git add v20/editor.js
+          git commit -m 'Restore approved Short Sleeve Polo back mask'
+          git push origin main
