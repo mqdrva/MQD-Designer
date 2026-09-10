@@ -601,8 +601,51 @@ function applyBackgroundAll(){const c=normalizeHex($('zoneHex').value);if(!c)ret
 function requireImageLayer(){const l=activeLayer();return l&&l.type==='image'?l:null;}
 function flipActive(axis){const l=requireImageLayer();if(!l)return;snapshot();l[axis]=!l[axis];renderAll();}
 function alignActive(){const l=activeLayer();if(!l)return;snapshot();l.x=0;l.y=0;renderAll();}
-function duplicateActive(){const l=activeLayer();if(!l||!canAddLayer())return;snapshot();const copy={...l,id:'layer-'+layerSeq++,label:nextLabel(),x:(l.x||0)+6,y:(l.y||0)+6,crop:l.crop?{...l.crop}:undefined};zoneState().layers.push(copy);activeLayerId=copy.id;renderAll();}
-function cloneActiveToAllZones(){const l=activeLayer();if(!l)return;const available=product.zones.filter(z=>z!==activeZone&&zoneState(z).layers.length<MAX_ZONE_LAYERS);if(!available.length){alert('The other print zones are already at the 6-layer limit.');return;}snapshot();for(const z of available){const target=zoneState(z);const copy={...l,id:'layer-'+layerSeq++,label:'Layer '+(target.layers.length+1),crop:l.crop?{...l.crop}:undefined};target.layers.push(copy);}renderAll();}
+function duplicateLayerIntoZone(source,zone,{offset=false}={}){
+  const target=zoneState(zone);
+  if(target.layers.length>=MAX_ZONE_LAYERS)return false;
+  const copy={...source,id:'layer-'+layerSeq++,label:'Layer '+(target.layers.length+1),crop:source.crop?{...source.crop}:undefined};
+  if(offset){copy.x=(source.x||0)+6;copy.y=(source.y||0)+6;}
+  target.layers.push(copy);
+  return copy;
+}
+function duplicateActive(){const l=activeLayer();if(!l||!canAddLayer())return;snapshot();const copy=duplicateLayerIntoZone(l,activeZone,{offset:true});if(!copy)return;activeLayerId=copy.id;renderAll();}
+function duplicateActiveToZone(zone){
+  const l=activeLayer();
+  if(!l||!product.zones.includes(zone))return;
+  const target=zoneState(zone);
+  if(target.layers.length>=MAX_ZONE_LAYERS){alert(zone+' is already at the 6-layer limit.');return;}
+  snapshot();
+  const copy=duplicateLayerIntoZone(l,zone,{offset:zone===activeZone});
+  if(zone===activeZone&&copy)activeLayerId=copy.id;
+  renderAll();
+}
+function cloneActiveToAllZones(){
+  const l=activeLayer();if(!l)return;
+  const available=product.zones.filter(z=>zoneState(z).layers.length<MAX_ZONE_LAYERS);
+  if(!available.length){alert('All print zones are already at the 6-layer limit.');return;}
+  snapshot();
+  let currentCopy=null;
+  for(const z of available){const copy=duplicateLayerIntoZone(l,z,{offset:z===activeZone});if(z===activeZone)currentCopy=copy;}
+  if(currentCopy)activeLayerId=currentCopy.id;
+  renderAll();
+}
+function closeDuplicateMenu(){document.getElementById('duplicateZoneMenu')?.remove();}
+function openDuplicateMenu(){
+  const l=activeLayer();if(!l)return;
+  const btn=$('duplicateTool');if(!btn)return;
+  closeDuplicateMenu();
+  const menu=document.createElement('div');menu.id='duplicateZoneMenu';
+  Object.assign(menu.style,{position:'fixed',zIndex:'120',minWidth:'210px',padding:'8px',background:'#fff',border:'1px solid #e1e1e1',borderRadius:'12px',boxShadow:'0 12px 32px rgba(0,0,0,.16)'});
+  const r=btn.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(innerWidth-226,r.left+r.width/2-105))+'px';menu.style.top=(r.bottom+8)+'px';
+  const add=(label,handler,strong=false)=>{const b=document.createElement('button');b.type='button';b.textContent=label;Object.assign(b.style,{display:'block',width:'100%',border:'0',background:'#fff',padding:'11px 12px',borderRadius:'8px',textAlign:'left',cursor:'pointer',fontWeight:strong?'800':'500',color:'#222'});b.onmouseenter=()=>b.style.background='#f6f6f6';b.onmouseleave=()=>b.style.background='#fff';b.onclick=e=>{e.stopPropagation();closeDuplicateMenu();handler();};menu.appendChild(b);};
+  add('Same Zone',()=>duplicateActive());
+  for(const z of product.zones.filter(z=>z!==activeZone))add('To '+z,()=>duplicateActiveToZone(z));
+  const line=document.createElement('div');Object.assign(line.style,{height:'1px',background:'#ececec',margin:'6px 4px'});menu.appendChild(line);
+  add('To All Zones',()=>cloneActiveToAllZones(),true);
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',closeDuplicateMenu,{once:true}),0);
+}
 function cropActive(){const l=requireImageLayer();if(!l)return;cropMode=!cropMode;renderLayerPanel();drawEditor();}
 function nudgeActive(dx,dy){const l=activeLayer();if(!l)return;snapshot();l.x=Math.max(-100,Math.min(100,(Number(l.x)||0)+dx));l.y=Math.max(-100,Math.min(100,(Number(l.y)||0)+dy));renderAll();}
 
@@ -612,7 +655,7 @@ $('flipYTool')?.addEventListener('click',()=>flipActive('flipY'));
 $('alignTool')?.addEventListener('click',alignActive);
 $('cloneAllTool')?.addEventListener('click',cloneActiveToAllZones);
 $('cropTool')?.addEventListener('click',cropActive);
-$('duplicateTool')?.addEventListener('click',duplicateActive);
+$('duplicateTool')?.addEventListener('click',e=>{e.stopPropagation();openDuplicateMenu();});
 $('resetTool')?.addEventListener('click',resetActive);
 $('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.addEventListener('click',()=>nudgeActive(0,2));$('nudgeLeft')?.addEventListener('click',()=>nudgeActive(-2,0));$('nudgeRight')?.addEventListener('click',()=>nudgeActive(2,0));$('nudgeCenter')?.addEventListener('click',alignActive);
 
