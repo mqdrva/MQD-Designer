@@ -8,19 +8,16 @@ export const hoodiePanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood
 // Keep Hood on the actual upper shell while returning the upper chest to the
 // body panels so Front can connect naturally beneath the hood opening.
 const hoodRule={zone:4,tests:[
-  v=>v[1]-.445,
-  v=>1-(v[0]/.315)**2-((v[2]+.115)/.345)**2
+  v=>.315-Math.abs(v[0]),
+  v=>v[1]-(.39+2*v[0]*v[0]+.55*Math.max(0,v[2]+.15))
 ]};
 
 // Fleece Hoodie sleeves only. Pull the arm/body seam inward at the shoulder and
 // underarm so the sleeve owns the complete arm surface instead of allowing
 // Front/Back color to intrude into the inner sleeve.
-const sleeveEdge=y=>{
-  if(y>=.48)return .275;
-  if(y>=.20)return .295;
-  if(y>=0)return .315-.01*y;
-  return .37-.09*y;
-};
+// Continuous raglan seam: shoulder to underarm, then outside the torso.
+// Discontinuous height bands previously cut staircase-shaped strips into it.
+const sleeveEdge=y=>y>=0?.44-.25*y:.44-.025*y;
 
 const rules=[
   hoodRule,
