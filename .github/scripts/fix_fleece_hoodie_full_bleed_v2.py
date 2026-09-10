@@ -1,92 +1,133 @@
 from pathlib import Path
+import re
+
+# Fleece Hoodie only. Do not touch any approved garment renderer modules.
+panels = Path('v20/fleece-hoodie-panels.js')
+panels.write_text("""import {partitionWithRules} from './panels.js';
+
+// Fleece Hoodie only. These rules are intentionally isolated from every
+// approved garment renderer. The supplied hoodie GLB is one mesh, so each
+// triangle is clipped into exactly one of five physical print zones.
+export const hoodiePanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
+
+// Keep Hood on the actual upper shell, but raise its lower capture so the
+// Front/Back panels continue higher and meet the hood opening instead of
+// stopping low across the upper chest.
+const hoodRule={zone:4,tests:[
+  v=>v[1]-.505,
+  v=>1-(v[0]/.300)**2-((v[2]+.120)/.330)**2
+]};
+
+// Widen the body panels to the real armhole seam. Sleeves are still evaluated
+// first, so they remain fully isolated, but they no longer steal the upper
+// chest/shoulder area and make the Front look artificially narrow.
+const sleeveEdge=v=>{
+  const y=v[1],z=Math.abs(v[2]);
+  let base;
+  if(y>=.48)base=.350;
+  else if(y>=.20)base=.365;
+  else if(y>=0)base=.375-.01*y;
+  else base=.405-.06*y;
+  return base+Math.min(.045,z*.13);
+};
+
+const rules=[
+  hoodRule,
+  {zone:2,tests:[v=>v[0]-sleeveEdge(v)]},
+  {zone:3,tests:[v=>-v[0]-sleeveEdge(v)]},
+
+  // Keep the Front face high beneath the hood opening.
+  {zone:0,tests:[v=>v[2]-.004+.195*Math.max(0,v[1])]}
+];
+
+export function partitionFleeceHoodieTriangle(triangle){
+  return partitionWithRules(triangle,rules);
+}
+""")
 
 editor = Path('v20/editor.js')
 s = editor.read_text()
 
-# Fleece Hoodie only. Bump the calibration marker without touching frozen renderers.
-s = s.replace(
-    "const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v1-exclusive-five-zones';",
-    "const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v2-cutline-full-bleed';"
+# Bump only the Hoodie calibration marker.
+s = re.sub(
+    r"const MQD_FLEECE_HOODIE_CALIBRATION='[^']+';",
+    "const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v4-raised-wide-front-solid-cutline-sleeves';",
+    s,
+    count=1,
 )
 
-marker = "  cx.putImageData(cutData,0,0);\n\n"
-insert = r'''  // Fleece Hoodie sleeves: build the printable mask from the ACTUAL red
-  // production cutline, not from the largest generic ink component. The old
-  // generic detector was locking onto an interior graphic and creating the
-  // blue/red circular blob seen in the editor. Work on a small raster so the
-  // dashed outline can be closed efficiently even when the production file is
-  // several thousand pixels tall, then scale the finished mask back up.
+# Replace the prior Hoodie sleeve cutline reconstruction with a stable,
+# Hoodie-only silhouette mask that fills the entire printable sleeve interior.
+start = s.find("  // Fleece Hoodie sleeves:")
+end = s.find("  // Long Sleeve Polo Back:", start)
+if start < 0 or end < 0:
+    raise SystemExit('Fleece Hoodie sleeve mask block not found')
+
+replacement = r'''  // Fleece Hoodie sleeves: solid-fill the complete printable sleeve interior.
+  // The production template has a long opening in its dashed red cutline, which
+  // makes flood-fill/connected-component approaches collapse into outline-only
+  // regions. Use the calibrated sleeve silhouette for the fill, then draw the
+  // original red production cutline on top as the guide.
   if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
-    const mw=320,mh=Math.max(96,Math.round(h/w*mw));
-    let barrier=new Uint8Array(mw*mh);
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
-      if(a>15&&r>170&&g<145&&b<145&&r>g*1.35){
-        const xx=Math.min(mw-1,Math.floor(x*mw/w)),yy=Math.min(mh-1,Math.floor(y*mh/h));
-        barrier[yy*mw+xx]=1;
-      }
-    }
-
-    // Close the dashed red production line. This is intentionally performed on
-    // the reduced mask instead of the full 3276x6124 artwork canvas.
-    const passes=6;
-    for(let pass=0;pass<passes;pass++){
-      const next=barrier.slice();
-      for(let y=1;y<mh-1;y++)for(let x=1;x<mw-1;x++){
-        const idx=y*mw+x;if(barrier[idx])continue;
-        if(barrier[idx-1]||barrier[idx+1]||barrier[idx-mw]||barrier[idx+mw]||
-           barrier[idx-mw-1]||barrier[idx-mw+1]||barrier[idx+mw-1]||barrier[idx+mw+1])next[idx]=1;
-      }
-      barrier=next;
-    }
-
-    const outsideSmall=new Uint8Array(mw*mh),q=new Int32Array(mw*mh);let head=0,tail=0;
-    const push=idx=>{if(idx<0||idx>=outsideSmall.length||outsideSmall[idx]||barrier[idx])return;outsideSmall[idx]=1;q[tail++]=idx;};
-    for(let x=0;x<mw;x++){push(x);push((mh-1)*mw+x);}
-    for(let y=0;y<mh;y++){push(y*mw);push(y*mw+mw-1);}
-    while(head<tail){const idx=q[head++],x=idx%mw,y=(idx/mw)|0;if(x>0)push(idx-1);if(x<mw-1)push(idx+1);if(y>0)push(idx-mw);if(y<mh-1)push(idx+mw);}
-
-    const small=document.createElement('canvas');small.width=mw;small.height=mh;
-    const sm=small.getContext('2d'),si=sm.createImageData(mw,mh);
-    let minX=mw,minY=mh,maxX=-1,maxY=-1,area=0;
-    for(let y=0;y<mh;y++)for(let x=0;x<mw;x++){
-      const idx=y*mw+x,o=idx*4;
-      if(!outsideSmall[idx]){
-        si.data[o]=255;si.data[o+1]=255;si.data[o+2]=255;si.data[o+3]=255;area++;
-        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
-      }
-    }
-    sm.putImageData(si,0,0);
-
-    // Safety fallback: if a future template changes enough that its dashed line
-    // cannot be closed, use the known sleeve silhouette rather than an interior
-    // graphic. This still avoids the circular/blob mask failure.
-    if(area<mw*mh*.08||area>mw*mh*.90){
-      sm.clearRect(0,0,mw,mh);sm.fillStyle='#fff';traceZonePath(sm,zone,mw,mh);sm.fill();
-      minX=Math.round(mw*.10);maxX=Math.round(mw*.92);minY=Math.round(mh*.08);maxY=Math.round(mh*.92);
-    }
-
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
-    const mx=mask.getContext('2d');mx.imageSmoothingEnabled=true;mx.imageSmoothingQuality='high';mx.drawImage(small,0,0,w,h);
+    const mx=mask.getContext('2d');
+    mx.fillStyle='#fff';
+    mx.beginPath();
+    // Calibrated directly to /assets/templates/hoodie/sleeve.png.
+    mx.moveTo(w*.315,h*.905);
+    mx.lineTo(w*.205,h*.305);
+    mx.bezierCurveTo(w*.31,h*.292,w*.415,h*.235,w*.455,h*.135);
+    mx.lineTo(w*.485,h*.052);
+    mx.lineTo(w*.605,h*.083);
+    mx.bezierCurveTo(w*.615,h*.175,w*.665,h*.235,w*.845,h*.292);
+    mx.lineTo(w*.758,h*.775);
+    mx.lineTo(w*.758,h*.920);
+    mx.lineTo(w*.330,h*.920);
+    mx.closePath();
+    mx.fill();
+
     return{maskCanvas:mask,cutlineCanvas:cut,bounds:{
-      x:minX/mw*w,y:minY/mh*h,w:(maxX-minX+1)/mw*w,h:(maxY-minY+1)/mh*h
+      x:w*.205,
+      y:h*.052,
+      w:w*(.845-.205),
+      h:h*(.920-.052)
     }};
   }
 
 '''
-
-if "product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')" not in s:
-    if marker not in s:
-        raise SystemExit('buildTemplateMask insertion marker not found')
-    s = s.replace(marker, marker + insert, 1)
-
+s = s[:start] + replacement + s[end:]
 editor.write_text(s)
 
-# Keep the Hoodie-only geometry regression test aligned with the tighter seam.
+# Hoodie-only regression checks for the wider/high front and isolated sleeves.
 test = Path('tests/fleece-hoodie-zones.mjs')
-t = test.read_text()
-t = t.replace(
-    "assert.equal(zoneAt(.33,.50,.35),0,'front shoulder must not be captured by Hood');",
-    "assert.equal(zoneAt(.20,.50,.35),0,'central upper front must remain Front');\nassert.equal(zoneAt(.30,.50,.05),2,'inner upper left arm must belong to Left Sleeve');\nassert.equal(zoneAt(-.30,.50,.05),3,'inner upper right arm must belong to Right Sleeve');"
-)
-test.write_text(t)
+test.write_text("""import assert from 'node:assert/strict';
+import {partitionFleeceHoodieTriangle,hoodiePanelNames} from '../v20/fleece-hoodie-panels.js';
+
+function zoneAt(x,y,z){
+  const v=[x,y,z,0,0,1];
+  const parts=partitionFleeceHoodieTriangle([v,v,v]);
+  assert.equal(parts.length,1);
+  return parts[0][0];
+}
+
+assert.deepEqual(hoodiePanelNames,['Front','Back','Left Sleeve','Right Sleeve','Hood']);
+assert.equal(zoneAt(0,.70,-.10),4,'upper center must be Hood');
+assert.equal(zoneAt(0,0,.30),0,'front torso must be Front');
+assert.equal(zoneAt(0,0,-.30),1,'rear torso must be Back');
+assert.equal(zoneAt(.68,-.40,.05),2,'positive-X arm must be Left Sleeve');
+assert.equal(zoneAt(-.68,-.40,.05),3,'negative-X arm must be Right Sleeve');
+assert.equal(zoneAt(.20,.49,.30),0,'upper front must rise to the hood opening');
+assert.equal(zoneAt(.34,.50,.25),0,'front shoulder/chest must remain wide');
+assert.equal(zoneAt(.46,.50,.05),2,'outer upper left arm must remain Left Sleeve');
+assert.equal(zoneAt(-.46,.50,.05),3,'outer upper right arm must remain Right Sleeve');
+
+const crossing=partitionFleeceHoodieTriangle([
+  [-.05,0,-.08,0,0,1],[.05,0,-.08,0,0,1],[0,0,.08,0,0,1]
+]);
+assert.ok(crossing.length>=2,'front/back crossing triangle should be clipped, not overlap');
+for(const [zone,poly] of crossing){
+  assert.ok(zone>=0&&zone<5);
+  assert.ok(poly.length>=3);
+}
+console.log('Fleece Hoodie raised/wide front and sleeve isolation tests passed.');
+""")
