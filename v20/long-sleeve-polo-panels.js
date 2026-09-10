@@ -1,42 +1,37 @@
 import {partitionWithRules} from './panels.js';
 
-// Long Sleeve Polo only.
-// Keep the collar isolated while allowing the Front/Back body panels to rise
-// tight to the physical collar seam and extend farther toward each armhole.
-const sleeveEdge = y => y >= 0 ? 0.455 - 0.028 * y : 0.455 - 0.038 * y;
-
-const rules = [
-  {
-    zone: 4,
-    tests: [
-      // Tighten collar ownership so flat upper-chest/upper-back faces remain body.
-      v => v[1] + 0.34 * v[2] - 0.715,
-      // Keep only the actual neck/collar neighborhood instead of the broad shoulder shelf.
-      v => 1 - (v[0] / 0.305) ** 2 - ((v[2] + 0.060) / 0.270) ** 2
-    ]
-  },
-  {
-    zone: 2,
-    tests: [
-      // Sleeve starts farther outward so the body reaches the armhole seam cleanly.
-      v => v[0] - sleeveEdge(v[1])
-    ]
-  },
-  {
-    zone: 3,
-    tests: [
-      v => -v[0] - sleeveEdge(v[1])
-    ]
-  },
-  {
-    zone: 0,
-    tests: [
-      // Preserve the existing front/back split.
-      v => v[2] + 0.022 + 0.108 * Math.max(0, v[1])
-    ]
-  }
+// Long Sleeve Polo only. Do not reuse these seams for the frozen
+// Long Sleeve T-Shirt renderer. The polo sleeves sit closer to the
+// torso and its folded collar extends wider/lower than the tee rib.
+function interpolate(value,points){
+ if(value<=points[0][0])return points[0][1];
+ for(let i=1;i<points.length;i++)if(value<=points[i][0]){
+  const [a,b]=points[i-1],[c,d]=points[i];return b+(d-b)*(value-a)/(c-a);
+ }
+ return points.at(-1)[1];
+}
+// Shoulder-to-underarm curve from the supplied front/back reference. Below
+// the underarm the boundary stays outside the torso, including the hem.
+const sleeveSeam=[[-1,.50],[-.5,.455],[0,.395],[.2,.39],[.4,.46],[.7,.56],[.95,.62]];
+const sleeveEdge=y=>interpolate(y,sleeveSeam);
+// Follow the folded collar tips and neck band instead of coloring a broad
+// ellipse across the chest and shoulders. Blend around the side of the neck.
+const collarFront=[[0,.742],[.022,.742],[.04,.782],[.105,.648],[.24,.7884]];
+const collarEdge=v=>{
+ const front=interpolate(Math.abs(v[0]),collarFront);
+ const blend=Math.max(0,Math.min(1,(v[2]+.04)/.08));
+ return .805*(1-blend)+front*blend;
+};
+const rules=[
+  {zone:4,tests:[
+    v=>.24-Math.abs(v[0]),
+    v=>v[1]-collarEdge(v)
+  ]},
+  {zone:2,tests:[v=>v[0]-sleeveEdge(v[1])]},
+  {zone:3,tests:[v=>-v[0]-sleeveEdge(v[1])]},
+  {zone:0,tests:[v=>v[2]+.025+.11*Math.max(0,v[1])]}
 ];
 
 export function partitionLongSleevePoloTriangle(triangle){
-  return partitionWithRules(triangle, rules);
+  return partitionWithRules(triangle,rules);
 }
