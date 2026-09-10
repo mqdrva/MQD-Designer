@@ -1,0 +1,52 @@
+name: Calibrate Short Sleeve Polo isolated zones
+on:
+  push:
+    paths:
+      - '.github/workflows/calibrate-short-sleeve-polo.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Enable isolated five-zone renderer for Short Sleeve Polo
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          old="if(!['tshirt','long-sleeve-tshirt'].includes(product.id)||!tshirtZoneMeshes.size)return false;"
+          new="if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;"
+          assert old in s, 'isolated texture condition anchor missing'
+          s=s.replace(old,new,1)
+
+          old="if(['tshirt','long-sleeve-tshirt'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}"
+          new="if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}"
+          assert old in s, 'preview isolation condition anchor missing'
+          s=s.replace(old,new,1)
+
+          old="if(['tshirt','long-sleeve-tshirt'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}"
+          new="if(['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}"
+          assert old in s, 'garment split condition anchor missing'
+          s=s.replace(old,new,1)
+
+          marker="const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';"
+          assert marker in s, 'renderer lock marker missing'
+          s=s.replace(marker,marker+"\n// Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.\n// T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.\nconst MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-reference-v1';",1)
+          p.write_text(s)
+          PY
+      - name: Verify syntax and targeted scope
+        run: |
+          node --check v20/editor.js
+          grep -q "MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-reference-v1'" v20/editor.js
+          grep -q "'tshirt','long-sleeve-tshirt','short-sleeve-polo'" v20/editor.js
+      - name: Commit calibration
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add v20/editor.js
+          git commit -m 'Isolate Short Sleeve Polo print zones like reference T-shirt'
+          git push origin main
