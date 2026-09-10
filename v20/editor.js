@@ -1,6 +1,7 @@
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
+import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -39,7 +40,7 @@ const MQD_TSHIRT_RENDERER_LOCK='stable-v1';
 const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';
 // Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
-const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-reference-v1';
+const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v2';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -422,16 +423,18 @@ function zonePlacement(zone){
 function findPrimaryMesh(root=garment){let best=null,score=-1;root?.traverse(o=>{if(!o.isMesh||!o.geometry?.getAttribute('position'))return;const count=o.geometry.index?o.geometry.index.count:o.geometry.getAttribute('position').count;if(count>score){score=count;best=o;}});return best;}
 function splitTshirtGeometry(sourceMesh){
  const longSleeve=product.id==='long-sleeve-tshirt';
+ const shortPolo=product.id==='short-sleeve-polo';
  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position')||!sourceMesh.parent)return false;
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
  const buffers=panelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
- const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=!longSleeve&&faceCount===TSHIRT_FACE_COUNT;
- if(!longSleeve&&!useExactCollar)console.warn('MQD collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);
+ const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=product.id==='tshirt'&&faceCount===TSHIRT_FACE_COUNT,useExactPoloCollar=shortPolo&&faceCount===POLO_FACE_COUNT;
+ if(product.id==='tshirt'&&!useExactCollar)console.warn('MQD T-shirt collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);
+ if(shortPolo&&!useExactPoloCollar)console.warn('MQD Short Sleeve Polo collar topology mask disabled: expected',POLO_FACE_COUNT,'faces but found',faceCount);
  for(let t=0;t<count;t+=3){
   const faceIndex=(t/3)|0;
   const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});
-  const parts=longSleeve?partitionLongSleeveTriangle(triangle):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
+  const parts=longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
   for(const [zi,poly] of parts){
    const out=buffers[zi];
    for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
