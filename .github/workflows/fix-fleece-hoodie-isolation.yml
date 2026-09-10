@@ -1,0 +1,36 @@
+name: Fix Fleece Hoodie Zone Isolation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-fleece-hoodie-isolation.yml'
+      - '.github/scripts/fix_fleece_hoodie_isolation.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply Fleece Hoodie-only patch
+        run: python3 .github/scripts/fix_fleece_hoodie_isolation.py
+      - name: Verify Hoodie isolation code
+        run: |
+          node --check v20/editor.js
+          node --check v20/fleece-hoodie-panels.js
+          node tests/fleece-hoodie-zones.mjs
+      - name: Commit Hoodie-only renderer changes
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add v20/editor.js v20/fleece-hoodie-panels.js tests/fleece-hoodie-zones.mjs
+          if git diff --cached --quiet; then
+            echo 'Fleece Hoodie patch already applied.'
+            exit 0
+          fi
+          git commit -m 'Isolate Fleece Hoodie hood and print zones'
+          git push origin main
