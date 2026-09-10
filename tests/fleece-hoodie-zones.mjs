@@ -9,6 +9,12 @@ function zoneAt(x,y,z){
 }
 
 assert.deepEqual(hoodiePanelNames,['Front','Back','Left Sleeve','Right Sleeve','Hood']);
+assert.equal(zoneAt(0,-.80,-.20),0,'rear waistband belongs to Front as requested');
+assert.equal(zoneAt(.44,-.80,0),0,'side waistband must not become a sleeve');
+assert.equal(zoneAt(.66,-.80,.1),2,'left cuff remains Left Sleeve');
+assert.equal(zoneAt(-.66,-.80,.1),3,'right cuff remains Right Sleeve');
+assert.equal(zoneAt(.1,.42,-.3),4,'rounded rear hood tip remains Hood');
+assert.equal(zoneAt(.29,.53,-.2),1,'shoulder below hood belongs to Back');
 
 // Hood follows the approved rear/side silhouette.
 assert.equal(zoneAt(0,.43,-.20),4,'lower rear-center hood must remain Hood');
