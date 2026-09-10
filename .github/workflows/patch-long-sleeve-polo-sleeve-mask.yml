@@ -1,0 +1,56 @@
+name: Patch Long Sleeve Polo sleeve masks
+
+on:
+  push:
+    branches:
+      - garment/long-sleeve-polo
+    paths:
+      - '.github/workflows/patch-long-sleeve-polo-sleeve-mask.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: garment/long-sleeve-polo
+
+      - name: Fill Long Sleeve Polo sleeve templates from red cutlines
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          old="if(product.id==='long-sleeve-polo'&&zone==='Back'){"
+          new="if(product.id==='long-sleeve-polo'&&['Back','Left Sleeve','Right Sleeve'].includes(zone)){"
+          if old not in s:
+              if new in s:
+                  raise SystemExit(0)
+              raise SystemExit('Long Sleeve Polo red-cutline mask block not found')
+          s=s.replace(old,new,1)
+          s=s.replace(
+              '// Long Sleeve Polo Back: derive the fill only from the true red production\n  // outline. Dilate the dashed cutline just enough to close dash gaps, then\n  // flood-fill from the outside. This prevents helper text/graphics from becoming\n  // the mask while preserving the neckline opening and full back silhouette.',
+              '// Long Sleeve Polo Back and long sleeves: derive the fill only from the true red\n  // production outline. Dilate dashed cutlines just enough to close dash gaps, then\n  // flood-fill from the outside. This keeps helper graphics out of the fill mask and\n  // makes each selected background color fill the complete production silhouette.'
+          )
+          p.write_text(s)
+          PY
+
+      - name: Verify editor syntax
+        run: |
+          node --check v20/editor.js
+          grep -Fq "['Back','Left Sleeve','Right Sleeve'].includes(zone)" v20/editor.js
+
+      - name: Commit isolated garment fix
+        run: |
+          if git diff --quiet -- v20/editor.js; then
+            echo 'Long Sleeve Polo sleeve-mask fix already present.'
+            exit 0
+          fi
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add v20/editor.js
+          git commit -m 'Fill Long Sleeve Polo sleeves inside production cutlines'
+          git push origin HEAD:garment/long-sleeve-polo
