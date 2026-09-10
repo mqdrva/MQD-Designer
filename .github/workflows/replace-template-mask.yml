@@ -1,0 +1,173 @@
+name: Replace buildTemplateMask implementation
+on:
+  push:
+    paths:
+      - '.github/workflows/replace-template-mask.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Replace buildTemplateMask
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('v20/editor.js')
+          s=p.read_text()
+          new_func=r'''function buildTemplateMask(img){
+  const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  const src=document.createElement('canvas');src.width=w;src.height=h;
+  const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
+  const pixels=sx.getImageData(0,0,w,h).data;
+
+  const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
+  const cut=document.createElement('canvas');cut.width=w;cut.height=h;
+  const cx=cut.getContext('2d'),cutData=cx.createImageData(w,h);
+
+  for(let i=0,p=0;i<pixels.length;i+=4,p++){
+    const r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3],lum=(r+g+b)/3;
+    const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
+
+    // Any strong template ink counts as a possible outline candidate.
+    blocked[p]=(a>15&&(lum<245||redInk))?1:0;
+
+    if(redInk){
+      cutData.data[i]=235;
+      cutData.data[i+1]=35;
+      cutData.data[i+2]=45;
+      cutData.data[i+3]=255;
+    }
+  }
+  cx.putImageData(cutData,0,0);
+
+  // Build the fill mask from the LARGEST connected outline component.
+  // That gives us the sleeve/body silhouette instead of the helper text.
+  const barrier=new Uint8Array(w*h);
+  const seen=new Uint8Array(w*h);
+  const componentQueue=new Int32Array(w*h);
+  let largest=[];
+
+  const neighbors=(idx)=>{
+    const x=idx%w,y=(idx/w)|0,arr=[];
+    for(let dy=-1;dy<=1;dy++){
+      for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        const nx=x+dx,ny=y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        arr.push(ny*w+nx);
+      }
+    }
+    return arr;
+  };
+
+  for(let i=0;i<blocked.length;i++){
+    if(!blocked[i]||seen[i])continue;
+    let head=0,tail=0;
+    const points=[];
+    seen[i]=1;
+    componentQueue[tail++]=i;
+
+    while(head<tail){
+      const idx=componentQueue[head++];
+      points.push(idx);
+      for(const n of neighbors(idx)){
+        if(blocked[n]&&!seen[n]){
+          seen[n]=1;
+          componentQueue[tail++]=n;
+        }
+      }
+    }
+
+    if(points.length>largest.length)largest=points;
+  }
+
+  largest.forEach(idx=>{barrier[idx]=1;});
+
+  // Close outline gaps so the silhouette becomes one closed printable shape.
+  const closePasses=Math.max(8,Math.min(18,Math.round(Math.min(w,h)*0.03)));
+  for(let pass=0;pass<closePasses;pass++){
+    const next=barrier.slice();
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+      const idx=y*w+x;
+      if(barrier[idx])continue;
+      let count=0;
+      if(barrier[idx-1])count++;
+      if(barrier[idx+1])count++;
+      if(barrier[idx-w])count++;
+      if(barrier[idx+w])count++;
+      if(barrier[idx-w-1])count++;
+      if(barrier[idx-w+1])count++;
+      if(barrier[idx+w-1])count++;
+      if(barrier[idx+w+1])count++;
+      if(count>=3)next[idx]=1;
+    }
+    barrier.set(next);
+  }
+
+  let head=0,tail=0;
+  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||barrier[idx])return;outside[idx]=1;queue[tail++]=idx;};
+  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+  while(head<tail){
+    const idx=queue[head++],x=idx%w,y=(idx/w)|0;
+    if(x>0)push(idx-1);
+    if(x<w-1)push(idx+1);
+    if(y>0)push(idx-w);
+    if(y<h-1)push(idx+w);
+  }
+
+  const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+  const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+  let minX=w,minY=h,maxX=-1,maxY=-1;
+
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const idx=y*w+x,o=idx*4;
+    if(!outside[idx]){
+      out.data[o]=255;
+      out.data[o+1]=255;
+      out.data[o+2]=255;
+      out.data[o+3]=255;
+      minX=Math.min(minX,x);
+      minY=Math.min(minY,y);
+      maxX=Math.max(maxX,x);
+      maxY=Math.max(maxY,y);
+    }
+  }
+
+  if(maxX<minX||maxY<minY){
+    minX=0;minY=0;maxX=w-1;maxY=h-1;
+    mx.fillStyle='#fff';
+    mx.fillRect(0,0,w,h);
+  }else{
+    mx.putImageData(out,0,0);
+  }
+
+  return {
+    maskCanvas:mask,
+    cutlineCanvas:cut,
+    bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}
+  };
+}'''
+          pattern=r"function buildTemplateMask\(img\)\{.*?\n\}\nfunction scaleBounds"
+          repl=new_func+"\nfunction scaleBounds"
+          s2,n=re.subn(pattern,repl,s,count=1,flags=re.S)
+          assert n==1, f'buildTemplateMask replacement count was {n}'
+          p.write_text(s2)
+          PY
+      - name: Verify syntax
+        run: |
+          node --check v20/editor.js
+          grep -q 'Build the fill mask from the LARGEST connected outline component' v20/editor.js
+      - name: Commit replacement and remove workflow
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/replace-template-mask.yml
+          git add v20/editor.js
+          git commit -m 'Replace template mask with sleeve silhouette fill logic'
+          git push origin main
