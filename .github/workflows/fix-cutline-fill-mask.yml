@@ -18,31 +18,22 @@ jobs:
           from pathlib import Path
           p=Path('v20/editor.js')
           s=p.read_text()
-
-          old="const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);"
-          new="const blocked=new Uint8Array(w*h),cutBarrier=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);"
+          old='const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);'
+          new='const blocked=new Uint8Array(w*h),cutBarrier=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);'
           assert old in s, 'mask array anchor missing'
           s=s.replace(old,new,1)
-
-          old="""    blocked[p]=(a>15&&(lum<232||redInk))?1:0;
-    if(redInk){"""
-          new="""    blocked[p]=(a>15&&(lum<232||redInk))?1:0;
-    cutBarrier[p]=redInk?1:0;
-    if(redInk){"""
+          old='    blocked[p]=(a>15&&(lum<232||redInk))?1:0;'
+          new=old+'\n    cutBarrier[p]=redInk?1:0;'
           assert old in s, 'red cutline detection anchor missing'
           s=s.replace(old,new,1)
-
-          old="""  let barrier=blocked;
-  for(let pass=0;pass<2;pass++){"""
-          new="""  // The customer background must be defined by the RED production cut line,
-  // not by helper words, green outlines or other template artwork. The cut line
-  // is dashed, so close its small gaps before flooding from the page edge.
-  let barrier=cutBarrier;
-  const closePasses=Math.max(6,Math.min(14,Math.round(Math.min(w,h)*0.026)));
-  for(let pass=0;pass<closePasses;pass++){"""
-          assert old in s, 'barrier anchor missing'
+          old='  let barrier=blocked;'
+          new='  let barrier=cutBarrier;'
+          assert old in s, 'barrier source anchor missing'
           s=s.replace(old,new,1)
-
+          old='  for(let pass=0;pass<2;pass++){'
+          new='  const closePasses=Math.max(6,Math.min(14,Math.round(Math.min(w,h)*0.026)));\n  for(let pass=0;pass<closePasses;pass++){'
+          assert old in s, 'barrier closing anchor missing'
+          s=s.replace(old,new,1)
           p.write_text(s)
           PY
       - name: Verify targeted fix
