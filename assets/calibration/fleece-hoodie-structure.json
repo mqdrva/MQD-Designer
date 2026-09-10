@@ -1,0 +1,62 @@
+{
+  "productId": "fleece-hoodie",
+  "glbVersion": 2,
+  "byteLength": 22749192,
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "meshCount": 1,
+  "nodeCount": 1,
+  "materialCount": 1,
+  "meshes": [
+    {
+      "meshIndex": 0,
+      "name": "model",
+      "primitives": [
+        {
+          "primitive": 0,
+          "positionAccessor": 0,
+          "normalAccessor": 1,
+          "uvAccessor": 2,
+          "indexAccessor": 3,
+          "vertexCount": 294895,
+          "indexCount": 1500000,
+          "positionMin": [
+            -0.7715694904327393,
+            -0.8630663156509399,
+            -0.4196483790874481
+          ],
+          "positionMax": [
+            0.7709826231002808,
+            0.8614109754562378,
+            0.4203454554080963
+          ],
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "nodeIndex": 0,
+      "name": "model",
+      "mesh": 0,
+      "children": [],
+      "translation": null,
+      "rotation": null,
+      "scale": null
+    }
+  ],
+  "materials": [
+    {
+      "materialIndex": 0,
+      "name": "model"
+    }
+  ]
+}
