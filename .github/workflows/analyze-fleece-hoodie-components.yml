@@ -1,0 +1,79 @@
+name: Analyze Fleece Hoodie Components
+
+on:
+  push:
+    paths:
+      - '.github/workflows/analyze-fleece-hoodie-components.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Analyze Fleece Hoodie topology only
+        run: |
+          python3 - <<'PY'
+          import json, struct, urllib.request, math
+          from pathlib import Path
+          url='https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/fleece-hoodie.glb'
+          raw=urllib.request.urlopen(url,timeout=60).read()
+          off=12; doc=None; binchunk=None
+          while off < len(raw):
+              length,kind=struct.unpack_from('<II',raw,off); off+=8
+              chunk=raw[off:off+length]; off+=length
+              if kind==0x4E4F534A: doc=json.loads(chunk.decode('utf-8').rstrip('\x00 \t\r\n'))
+              elif kind==0x004E4942: binchunk=chunk
+          if not doc or binchunk is None: raise SystemExit('Invalid GLB chunks')
+          accessors=doc['accessors']; views=doc['bufferViews']; prim=doc['meshes'][0]['primitives'][0]
+          def read_accessor(ai):
+              a=accessors[ai]; v=views[a['bufferView']]; ct=a['componentType']; typ=a['type']; count=a['count']
+              comps={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4}[typ]
+              fmt={5120:'b',5121:'B',5122:'h',5123:'H',5125:'I',5126:'f'}[ct]
+              cs=struct.calcsize('<'+fmt); stride=v.get('byteStride',cs*comps)
+              start=v.get('byteOffset',0)+a.get('byteOffset',0); out=[]
+              for i in range(count):
+                  out.append(struct.unpack_from('<'+fmt*comps,binchunk,start+i*stride))
+              return out
+          pos=read_accessor(prim['attributes']['POSITION']); inds=[x[0] for x in read_accessor(prim['indices'])]
+          n=len(pos); parent=list(range(n)); rank=[0]*n
+          def find(a):
+              while parent[a]!=a:
+                  parent[a]=parent[parent[a]]; a=parent[a]
+              return a
+          def union(a,b):
+              ra,rb=find(a),find(b)
+              if ra==rb:return
+              if rank[ra]<rank[rb]:ra,rb=rb,ra
+              parent[rb]=ra
+              if rank[ra]==rank[rb]:rank[ra]+=1
+          for i in range(0,len(inds),3):
+              a,b,c=inds[i:i+3]; union(a,b);union(b,c)
+          tri_counts={}; used=set(inds)
+          for i in range(0,len(inds),3):
+              r=find(inds[i]); tri_counts[r]=tri_counts.get(r,0)+1
+          verts_by={}
+          for vi in used: verts_by.setdefault(find(vi),[]).append(vi)
+          comps=[]
+          gmin=[min(p[j] for p in pos) for j in range(3)]; gmax=[max(p[j] for p in pos) for j in range(3)]
+          for r,vs in verts_by.items():
+              mn=[min(pos[i][j] for i in vs) for j in range(3)]; mx=[max(pos[i][j] for i in vs) for j in range(3)]
+              center=[sum(pos[i][j] for i in vs)/len(vs) for j in range(3)]
+              q=[(center[j]-gmin[j])/max(1e-9,gmax[j]-gmin[j]) for j in range(3)]
+              comps.append({'root':r,'triangles':tri_counts.get(r,0),'vertices':len(vs),'min':mn,'max':mx,'center':center,'normalizedCenter':q})
+          comps.sort(key=lambda c:c['triangles'],reverse=True)
+          out={'productId':'fleece-hoodie','componentCount':len(comps),'globalMin':gmin,'globalMax':gmax,'topComponents':comps[:40]}
+          Path('assets/calibration/fleece-hoodie-components.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Commit component analysis
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/calibration/fleece-hoodie-components.json
+          git commit -m 'Analyze Fleece Hoodie topology components'
+          git push origin main
