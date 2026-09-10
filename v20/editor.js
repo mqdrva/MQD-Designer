@@ -48,7 +48,7 @@ const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-b
 // Long Sleeve Polo Phase 1: inherit the frozen long-sleeve isolation logic.
 const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-v2-exclusive-zones';
 // Fleece Hoodie only: frozen garments above do not enter this renderer.
-const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v2-cutline-full-bleed';
+const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v3-wide-raised-front-solid-sleeves';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -139,66 +139,94 @@ function buildTemplateMask(img,zone=null){
   }
   cx.putImageData(cutData,0,0);
 
-  // Fleece Hoodie sleeves: build the printable mask from the ACTUAL red
-  // production cutline, not from the largest generic ink component. The old
-  // generic detector was locking onto an interior graphic and creating the
-  // blue/red circular blob seen in the editor. Work on a small raster so the
-  // dashed outline can be closed efficiently even when the production file is
-  // several thousand pixels tall, then scale the finished mask back up.
+  // Fleece Hoodie sleeves: fill the complete printable silhouette INSIDE the
+  // actual red production cutline. The source sleeve template has a large break
+  // in one side of the dashed outline, so flood-fill can leak out and leave only
+  // the red outline visible. Reconstruct the two cut edges by scanline and bridge
+  // missing dash/gap rows, then fill between those edges.
   if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
-    const mw=320,mh=Math.max(96,Math.round(h/w*mw));
-    let barrier=new Uint8Array(mw*mh);
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
-      if(a>15&&r>170&&g<145&&b<145&&r>g*1.35){
-        const xx=Math.min(mw-1,Math.floor(x*mw/w)),yy=Math.min(mh-1,Math.floor(y*mh/h));
-        barrier[yy*mw+xx]=1;
+    const mw=360,mh=Math.max(120,Math.round(h/w*mw));
+    const reduced=document.createElement('canvas');reduced.width=mw;reduced.height=mh;
+    const rx=reduced.getContext('2d',{willReadFrequently:true});
+    rx.imageSmoothingEnabled=true;
+    rx.drawImage(cut,0,0,mw,mh);
+    const rp=rx.getImageData(0,0,mw,mh).data;
+
+    const left=Array(mh).fill(-1),right=Array(mh).fill(-1);
+    for(let y=0;y<mh;y++){
+      let lo=mw,hi=-1;
+      for(let x=0;x<mw;x++){
+        const i=(y*mw+x)*4;
+        if(rp[i+3]>30){lo=Math.min(lo,x);hi=Math.max(hi,x);}
       }
+      // Require meaningful separation so a single dashed side is not mistaken
+      // for the complete sleeve width on that row.
+      if(hi>=0&&hi-lo>mw*.055){left[y]=lo;right[y]=hi;}
     }
 
-    // Close the dashed red production line. This is intentionally performed on
-    // the reduced mask instead of the full 3276x6124 artwork canvas.
-    const passes=6;
-    for(let pass=0;pass<passes;pass++){
-      const next=barrier.slice();
-      for(let y=1;y<mh-1;y++)for(let x=1;x<mw-1;x++){
-        const idx=y*mw+x;if(barrier[idx])continue;
-        if(barrier[idx-1]||barrier[idx+1]||barrier[idx-mw]||barrier[idx+mw]||
-           barrier[idx-mw-1]||barrier[idx-mw+1]||barrier[idx+mw-1]||barrier[idx+mw+1])next[idx]=1;
-      }
-      barrier=next;
-    }
-
-    const outsideSmall=new Uint8Array(mw*mh),q=new Int32Array(mw*mh);let head=0,tail=0;
-    const push=idx=>{if(idx<0||idx>=outsideSmall.length||outsideSmall[idx]||barrier[idx])return;outsideSmall[idx]=1;q[tail++]=idx;};
-    for(let x=0;x<mw;x++){push(x);push((mh-1)*mw+x);}
-    for(let y=0;y<mh;y++){push(y*mw);push(y*mw+mw-1);}
-    while(head<tail){const idx=q[head++],x=idx%mw,y=(idx/mw)|0;if(x>0)push(idx-1);if(x<mw-1)push(idx+1);if(y>0)push(idx-mw);if(y<mh-1)push(idx+mw);}
+    let first=left.findIndex(v=>v>=0),last=-1;
+    for(let y=mh-1;y>=0;y--){if(left[y]>=0){last=y;break;}}
 
     const small=document.createElement('canvas');small.width=mw;small.height=mh;
-    const sm=small.getContext('2d'),si=sm.createImageData(mw,mh);
-    let minX=mw,minY=mh,maxX=-1,maxY=-1,area=0;
-    for(let y=0;y<mh;y++)for(let x=0;x<mw;x++){
-      const idx=y*mw+x,o=idx*4;
-      if(!outsideSmall[idx]){
-        si.data[o]=255;si.data[o+1]=255;si.data[o+2]=255;si.data[o+3]=255;area++;
-        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
-      }
-    }
-    sm.putImageData(si,0,0);
+    const sm=small.getContext('2d');
 
-    // Safety fallback: if a future template changes enough that its dashed line
-    // cannot be closed, use the known sleeve silhouette rather than an interior
-    // graphic. This still avoids the circular/blob mask failure.
-    if(area<mw*mh*.08||area>mw*mh*.90){
-      sm.clearRect(0,0,mw,mh);sm.fillStyle='#fff';traceZonePath(sm,zone,mw,mh);sm.fill();
-      minX=Math.round(mw*.10);maxX=Math.round(mw*.92);minY=Math.round(mh*.08);maxY=Math.round(mh*.92);
+    if(first<0||last<=first){
+      // Conservative Hoodie-only fallback if the production guide is replaced.
+      sm.fillStyle='#fff';traceZonePath(sm,zone,mw,mh);sm.fill();
+      first=Math.round(mh*.08);last=Math.round(mh*.92);
+      for(let y=first;y<=last;y++){left[y]=Math.round(mw*.14);right[y]=Math.round(mw*.90);}
+    }else{
+      // Bridge the large open section and normal dashed-line gaps by
+      // interpolating between the nearest valid cutline rows.
+      for(let y=first;y<=last;y++){
+        if(left[y]>=0)continue;
+        let up=y-1,down=y+1;
+        while(up>=first&&left[up]<0)up--;
+        while(down<=last&&left[down]<0)down++;
+        if(up>=first&&down<=last){
+          const q=(y-up)/(down-up);
+          left[y]=left[up]+(left[down]-left[up])*q;
+          right[y]=right[up]+(right[down]-right[up])*q;
+        }else if(up>=first){
+          left[y]=left[up];right[y]=right[up];
+        }else if(down<=last){
+          left[y]=left[down];right[y]=right[down];
+        }
+      }
+
+      // Light smoothing follows the real cutline while removing dashed-edge
+      // stair stepping. It does not expand the artwork outside the red edge.
+      const sl=left.slice(),sr=right.slice();
+      for(let y=first;y<=last;y++){
+        let a=0,b=0,n=0;
+        for(let yy=Math.max(first,y-2);yy<=Math.min(last,y+2);yy++){
+          if(left[yy]>=0){a+=left[yy];b+=right[yy];n++;}
+        }
+        if(n){sl[y]=a/n;sr[y]=b/n;}
+      }
+
+      sm.fillStyle='#fff';
+      sm.beginPath();
+      sm.moveTo(sl[first],first);
+      for(let y=first+1;y<=last;y++)sm.lineTo(sl[y],y);
+      for(let y=last;y>=first;y--)sm.lineTo(sr[y],y);
+      sm.closePath();
+      sm.fill();
+      for(let y=first;y<=last;y++){left[y]=sl[y];right[y]=sr[y];}
+    }
+
+    let minX=mw,maxX=0;
+    for(let y=first;y<=last;y++){
+      if(left[y]>=0){minX=Math.min(minX,left[y]);maxX=Math.max(maxX,right[y]);}
     }
 
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
-    const mx=mask.getContext('2d');mx.imageSmoothingEnabled=true;mx.imageSmoothingQuality='high';mx.drawImage(small,0,0,w,h);
+    const mx=mask.getContext('2d');
+    mx.imageSmoothingEnabled=true;mx.imageSmoothingQuality='high';
+    mx.drawImage(small,0,0,w,h);
+
     return{maskCanvas:mask,cutlineCanvas:cut,bounds:{
-      x:minX/mw*w,y:minY/mh*h,w:(maxX-minX+1)/mw*w,h:(maxY-minY+1)/mh*h
+      x:minX/mw*w,y:first/mh*h,w:(maxX-minX)/mw*w,h:(last-first+1)/mh*h
     }};
   }
 

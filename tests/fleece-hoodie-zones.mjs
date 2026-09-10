@@ -14,9 +14,15 @@ assert.equal(zoneAt(0,0,.30),0,'front torso must be Front');
 assert.equal(zoneAt(0,0,-.30),1,'rear torso must be Back');
 assert.equal(zoneAt(.68,-.40,.05),2,'positive-X arm must be Left Sleeve');
 assert.equal(zoneAt(-.68,-.40,.05),3,'negative-X arm must be Right Sleeve');
-assert.equal(zoneAt(.20,.50,.35),0,'central upper front must remain Front');
-assert.equal(zoneAt(.30,.50,.05),2,'inner upper left arm must belong to Left Sleeve');
-assert.equal(zoneAt(-.30,.50,.05),3,'inner upper right arm must belong to Right Sleeve');
+
+// Raised/wider front: body-facing upper chest reaches the hood and shoulder.
+assert.equal(zoneAt(0,.46,.05),0,'front must reach high beneath Hood');
+assert.equal(zoneAt(.34,.50,.30),0,'upper front chest must stay wide');
+assert.equal(zoneAt(-.34,.50,.30),0,'upper front chest must stay wide on both sides');
+
+// Sleeve isolation remains intact on the side-facing arm surface.
+assert.equal(zoneAt(.30,.50,.05),2,'inner upper left arm must remain Left Sleeve');
+assert.equal(zoneAt(-.30,.50,.05),3,'inner upper right arm must remain Right Sleeve');
 
 const crossing=partitionFleeceHoodieTriangle([
   [-.05,0,-.08,0,0,1],[.05,0,-.08,0,0,1],[0,0,.08,0,0,1]
