@@ -431,6 +431,13 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
       targetCtx.save();
       targetCtx.globalAlpha=1;
       targetCtx.globalCompositeOperation='source-over';
+      // Preserve true-red production cut/sew lines while keeping them readable over similar fill colors.
+      targetCtx.shadowColor='rgba(255,255,255,.98)';
+      targetCtx.shadowBlur=5;
+      targetCtx.shadowOffsetX=0;
+      targetCtx.shadowOffsetY=0;
+      targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
+      targetCtx.shadowBlur=0;
       targetCtx.drawImage(rec.cutlineCanvas,r.x,r.y,r.w,r.h);
       targetCtx.restore();
     }
