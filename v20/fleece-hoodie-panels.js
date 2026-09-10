@@ -5,9 +5,9 @@ import {partitionWithRules} from './panels.js';
 // triangle is clipped into exactly one of five physical print zones.
 export const hoodiePanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
 
-// Match the approved reference mockups: the hood drops lower at rear center,
-// rises toward the shoulders, and leaves the front collar/chest pieces with
-// Front so there are no white holes beside the hood opening.
+// Match the approved green/black reference mockups: the hood drops lower at
+// rear center, rises toward the shoulders, and leaves the front collar/chest
+// pieces with Front so there are no white holes beside the hood opening.
 const hoodLowerEdge=v=>
   .39+2*v[0]*v[0]+.55*Math.max(0,v[2]+.15);
 
@@ -16,13 +16,18 @@ const hoodRule={zone:4,tests:[
   v=>.315-Math.abs(v[0])
 ]};
 
-// Keep the body/sleeve seam nearly vertical like the approved front/back/side
-// mockups. This makes Front and Back slightly wider while keeping each sleeve
-// completely separate.
+// Pull the Front/Back body farther outward to the true armhole and side seam.
+// The depth allowance specifically closes the red/green slivers that can show
+// through beside a black body when the model is viewed from the back or side.
+// Above the shoulder, the edge still curves inward to preserve the sleeve cap
+// shape from the approved reference mockups.
 const sleeveEdge=v=>{
-  const y=v[1];
-  if(y>.48){const t=Math.min(1,(y-.48)/.32);return .43-.15*t*t;}
-  return .43+.055*Math.max(0,-y);
+  const y=v[1],depth=Math.min(.030,Math.abs(v[2])*.12);
+  if(y>.48){
+    const t=Math.min(1,(y-.48)/.32);
+    return .447-.125*t*t+depth;
+  }
+  return .455+.040*Math.max(0,-y)+depth;
 };
 
 const rules=[
@@ -30,7 +35,7 @@ const rules=[
   {zone:2,tests:[v=>v[0]-sleeveEdge(v)]},
   {zone:3,tests:[v=>-v[0]-sleeveEdge(v)]},
 
-  // The user keeps the complete waistband in Front; no sixth print zone.
+  // Keep the complete waistband in Front; no sixth print zone.
   // Sleeves are removed first so their cuffs remain independent.
   {zone:0,tests:[v=>-.72-v[1]]},
 
