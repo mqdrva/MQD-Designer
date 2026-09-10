@@ -1,6 +1,7 @@
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
 import {partitionLongSleevePoloTriangle} from './long-sleeve-polo-panels.js';
 import {partitionFleeceHoodieTriangle,hoodiePanelNames} from './fleece-hoodie-panels.js';
+import {traceFleeceHoodieTemplate} from './fleece-hoodie-template.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
@@ -88,14 +89,16 @@ function repairImageObjects(){Object.values(designs).forEach(ps=>Object.values(p
 function ensureTemplateImage(zone=activeZone){
   const t=product.templates?.[zone];
   if(!t?.path)return null;
-  if(templateCache.has(t.path))return templateCache.get(t.path);
+  const templateProductId=product.id;
+  const cacheKey=templateProductId==='fleece-hoodie'?'fleece-hoodie:'+t.path:t.path;
+  if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
-  templateCache.set(t.path,rec);
+  templateCache.set(cacheKey,rec);
   const img=new Image();
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img,zone);
+      const built=buildTemplateMask(img,zone,templateProductId);
       rec.maskCanvas=built.maskCanvas;
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
@@ -113,7 +116,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img,zone=null){
+function buildTemplateMask(img,zone=null,templateProductId=product.id){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -139,67 +142,12 @@ function buildTemplateMask(img,zone=null){
   }
   cx.putImageData(cutData,0,0);
 
-  // Fleece Hoodie sleeves: build the printable mask from the ACTUAL red
-  // production cutline, not from the largest generic ink component. The old
-  // generic detector was locking onto an interior graphic and creating the
-  // blue/red circular blob seen in the editor. Work on a small raster so the
-  // dashed outline can be closed efficiently even when the production file is
-  // several thousand pixels tall, then scale the finished mask back up.
-  if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
-    const mw=320,mh=Math.max(96,Math.round(h/w*mw));
-    let barrier=new Uint8Array(mw*mh);
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
-      if(a>15&&r>170&&g<145&&b<145&&r>g*1.35){
-        const xx=Math.min(mw-1,Math.floor(x*mw/w)),yy=Math.min(mh-1,Math.floor(y*mh/h));
-        barrier[yy*mw+xx]=1;
-      }
-    }
-
-    // Close the dashed red production line. This is intentionally performed on
-    // the reduced mask instead of the full 3276x6124 artwork canvas.
-    const passes=6;
-    for(let pass=0;pass<passes;pass++){
-      const next=barrier.slice();
-      for(let y=1;y<mh-1;y++)for(let x=1;x<mw-1;x++){
-        const idx=y*mw+x;if(barrier[idx])continue;
-        if(barrier[idx-1]||barrier[idx+1]||barrier[idx-mw]||barrier[idx+mw]||
-           barrier[idx-mw-1]||barrier[idx-mw+1]||barrier[idx+mw-1]||barrier[idx+mw+1])next[idx]=1;
-      }
-      barrier=next;
-    }
-
-    const outsideSmall=new Uint8Array(mw*mh),q=new Int32Array(mw*mh);let head=0,tail=0;
-    const push=idx=>{if(idx<0||idx>=outsideSmall.length||outsideSmall[idx]||barrier[idx])return;outsideSmall[idx]=1;q[tail++]=idx;};
-    for(let x=0;x<mw;x++){push(x);push((mh-1)*mw+x);}
-    for(let y=0;y<mh;y++){push(y*mw);push(y*mw+mw-1);}
-    while(head<tail){const idx=q[head++],x=idx%mw,y=(idx/mw)|0;if(x>0)push(idx-1);if(x<mw-1)push(idx+1);if(y>0)push(idx-mw);if(y<mh-1)push(idx+mw);}
-
-    const small=document.createElement('canvas');small.width=mw;small.height=mh;
-    const sm=small.getContext('2d'),si=sm.createImageData(mw,mh);
-    let minX=mw,minY=mh,maxX=-1,maxY=-1,area=0;
-    for(let y=0;y<mh;y++)for(let x=0;x<mw;x++){
-      const idx=y*mw+x,o=idx*4;
-      if(!outsideSmall[idx]){
-        si.data[o]=255;si.data[o+1]=255;si.data[o+2]=255;si.data[o+3]=255;area++;
-        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
-      }
-    }
-    sm.putImageData(si,0,0);
-
-    // Safety fallback: if a future template changes enough that its dashed line
-    // cannot be closed, use the known sleeve silhouette rather than an interior
-    // graphic. This still avoids the circular/blob mask failure.
-    if(area<mw*mh*.08||area>mw*mh*.90){
-      sm.clearRect(0,0,mw,mh);sm.fillStyle='#fff';traceZonePath(sm,zone,mw,mh);sm.fill();
-      minX=Math.round(mw*.10);maxX=Math.round(mw*.92);minY=Math.round(mh*.08);maxY=Math.round(mh*.92);
-    }
-
+  if(templateProductId==='fleece-hoodie'){
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
-    const mx=mask.getContext('2d');mx.imageSmoothingEnabled=true;mx.imageSmoothingQuality='high';mx.drawImage(small,0,0,w,h);
-    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{
-      x:minX/mw*w,y:minY/mh*h,w:(maxX-minX+1)/mw*w,h:(maxY-minY+1)/mh*h
-    }};
+    const mx=mask.getContext('2d');traceFleeceHoodieTemplate(mx,zone,w,h);mx.fillStyle='#fff';mx.fill();
+    const alpha=mx.getImageData(0,0,w,h).data;let minX=w,minY=h,maxX=0,maxY=0;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(alpha[(y*w+x)*4+3]){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
   }
 
   // Long Sleeve Polo Back: derive the fill only from the true red production
