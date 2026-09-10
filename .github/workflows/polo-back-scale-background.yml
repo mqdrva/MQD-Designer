@@ -1,0 +1,71 @@
+name: Patch Short Sleeve Polo back alignment and artwork scaling
+on:
+  push:
+    paths:
+      - '.github/workflows/polo-back-scale-background.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch polo back alignment, image minimum size, and independent background/artwork compositing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Allow uploaded artwork to scale down to 5% from the UI.
+          p=Path('index.html')
+          s=p.read_text()
+          old='<input id="layerScale" type="range" min="20" max="220" value="100">'
+          new='<input id="layerScale" type="range" min="5" max="220" value="100">'
+          assert old in s, 'layer scale slider anchor missing'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('v20/editor.js')
+          s=p.read_text()
+
+          old="const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v2';"
+          new="const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';"
+          assert old in s, 'polo calibration marker missing'
+          s=s.replace(old,new,1)
+
+          # Keep artwork/text on a transparent layer so changing the zone background
+          # cannot rewrite or recolor the artwork itself.
+          anchor="function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}"
+          assert anchor in s, 'clean zone canvas anchor missing'
+          addition=anchor+"\nfunction makeCleanZoneArtworkCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false)return;x.save();const cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200;x.translate(cx,cy);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}"
+          s=s.replace(anchor,addition,1)
+
+          old="function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const design=makeCleanZoneDesignCanvas(zone,1600),canvas=document.createElement('canvas');canvas.width=design.width;canvas.height=design.height;const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);paint.drawImage(design,0,0);const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}"
+          new="function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const artwork=makeCleanZoneArtworkCanvas(zone,1600),canvas=document.createElement('canvas');canvas.width=artwork.width;canvas.height=artwork.height;const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;paint.drawImage(artwork,0,artworkY);const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}"
+          assert old in s, 'isolated texture function anchor missing'
+          s=s.replace(old,new,1)
+
+          # Match canvas drag-resize to the new 5% slider minimum.
+          old="l.scale=Math.max(.2,Math.min(2.2,dragState.scale*d1/d0));"
+          new="l.scale=Math.max(.05,Math.min(2.2,dragState.scale*d1/d0));"
+          assert old in s, 'drag resize minimum anchor missing'
+          s=s.replace(old,new,1)
+
+          p.write_text(s)
+          PY
+      - name: Verify targeted patch
+        run: |
+          node --check v20/editor.js
+          grep -q 'min="5" max="220"' index.html
+          grep -q "short-sleeve-polo'&&zone==='Back'?-canvas.height\*.08" v20/editor.js
+          grep -q "Math.max(.05,Math.min(2.2" v20/editor.js
+          grep -q "makeCleanZoneArtworkCanvas" v20/editor.js
+      - name: Commit patch and remove one-time workflow
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/polo-back-scale-background.yml
+          git add index.html v20/editor.js
+          git commit -m 'Align polo back artwork and allow smaller logos'
+          git push origin main
