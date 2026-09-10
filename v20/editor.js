@@ -134,11 +134,11 @@ function buildTemplateMask(img,zone=null){
   }
   cx.putImageData(cutData,0,0);
 
-  // Long Sleeve Polo Back: derive the fill only from the true red production
-  // outline. Dilate the dashed cutline just enough to close dash gaps, then
-  // flood-fill from the outside. This prevents helper text/graphics from becoming
-  // the mask while preserving the neckline opening and full back silhouette.
-  if(product.id==='long-sleeve-polo'&&zone==='Back'){
+  // Long Sleeve Polo Back and long sleeves: derive the fill only from the true red
+  // production outline. Dilate dashed cutlines just enough to close dash gaps, then
+  // flood-fill from the outside. This keeps helper graphics out of the fill mask and
+  // makes each selected background color fill the complete production silhouette.
+  if(product.id==='long-sleeve-polo'&&['Back','Left Sleeve','Right Sleeve'].includes(zone)){
     let barrier=new Uint8Array(w*h);
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
