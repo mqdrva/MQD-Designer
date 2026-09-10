@@ -134,11 +134,8 @@ function buildTemplateMask(img,zone=null){
   }
   cx.putImageData(cutData,0,0);
 
-  // Long Sleeve Polo Back and long sleeves: derive the fill only from the true red
-  // production outline. Dilate dashed cutlines just enough to close dash gaps, then
-  // flood-fill from the outside. This keeps helper graphics out of the fill mask and
-  // makes each selected background color fill the complete production silhouette.
-  if(product.id==='long-sleeve-polo'&&['Back','Left Sleeve','Right Sleeve'].includes(zone)){
+  // Long Sleeve Polo Back: keep the already-working Back 2D mask unchanged.
+  if(product.id==='long-sleeve-polo'&&zone==='Back'){
     let barrier=new Uint8Array(w*h);
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
@@ -165,6 +162,62 @@ function buildTemplateMask(img,zone=null){
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){const idx=y*w+x,o=idx*4;if(!outSide[idx]){out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}}
     if(maxX<minX||maxY<minY){minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);}else mx.putImageData(out,0,0);
     return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  }
+
+  // Long Sleeve Polo sleeves only: fill the full 2D sleeve silhouette out to
+  // the red production cutlines. 3D geometry/mapping is intentionally untouched.
+  if(product.id==='long-sleeve-polo'&&['Left Sleeve','Right Sleeve'].includes(zone)){
+    const rowMin=new Int32Array(h),rowMax=new Int32Array(h),hasRow=new Uint8Array(h);
+    rowMin.fill(w);rowMax.fill(-1);
+
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
+      const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
+      if(!redInk)continue;
+      hasRow[y]=1;
+      if(x<rowMin[y])rowMin[y]=x;
+      if(x>rowMax[y])rowMax[y]=x;
+    }
+
+    const valid=[];
+    for(let y=0;y<h;y++)if(hasRow[y]&&rowMax[y]>rowMin[y])valid.push(y);
+
+    if(valid.length>1){
+      const first=valid[0],last=valid[valid.length-1];
+
+      // Bridge dashed cutline gaps by interpolating the outer sleeve edges.
+      let prev=first;
+      for(let n=1;n<valid.length;n++){
+        const nextY=valid[n];
+        const gap=nextY-prev;
+        if(gap>1){
+          for(let y=prev+1;y<nextY;y++){
+            const t=(y-prev)/gap;
+            rowMin[y]=Math.round(rowMin[prev]+(rowMin[nextY]-rowMin[prev])*t);
+            rowMax[y]=Math.round(rowMax[prev]+(rowMax[nextY]-rowMax[prev])*t);
+            hasRow[y]=1;
+          }
+        }
+        prev=nextY;
+      }
+
+      const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+      const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+      let minX=w,minY=h,maxX=-1,maxY=-1;
+
+      for(let y=first;y<=last;y++){
+        if(!hasRow[y])continue;
+        const left=Math.max(0,rowMin[y]),right=Math.min(w-1,rowMax[y]);
+        for(let x=left;x<=right;x++){
+          const o=(y*w+x)*4;
+          out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+        }
+        minX=Math.min(minX,left);maxX=Math.max(maxX,right);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+      }
+
+      mx.putImageData(out,0,0);
+      return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+    }
   }
 
   // Keep the Short Sleeve Polo Back exactly on its previously approved mask.
