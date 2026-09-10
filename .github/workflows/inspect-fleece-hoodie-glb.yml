@@ -1,0 +1,88 @@
+name: Inspect Fleece Hoodie GLB
+
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-fleece-hoodie-glb.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Download and inspect Fleece Hoodie only
+        run: |
+          python3 - <<'PY'
+          import json, struct, urllib.request
+          from pathlib import Path
+
+          url='https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/fleece-hoodie.glb'
+          raw=urllib.request.urlopen(url, timeout=60).read()
+          if raw[:4] != b'glTF':
+              raise SystemExit('Not a GLB')
+          version,total=struct.unpack_from('<II', raw, 4)
+          off=12
+          doc=None
+          while off < len(raw):
+              length,kind=struct.unpack_from('<II', raw, off); off += 8
+              chunk=raw[off:off+length]; off += length
+              if kind == 0x4E4F534A:
+                  doc=json.loads(chunk.decode('utf-8').rstrip('\x00 \t\r\n'))
+                  break
+          if doc is None:
+              raise SystemExit('Missing GLB JSON chunk')
+
+          accessors=doc.get('accessors',[])
+          meshes=[]
+          for mi,m in enumerate(doc.get('meshes',[])):
+              prims=[]
+              for pi,p in enumerate(m.get('primitives',[])):
+                  pa=p.get('attributes',{}).get('POSITION')
+                  na=p.get('attributes',{}).get('NORMAL')
+                  ua=p.get('attributes',{}).get('TEXCOORD_0')
+                  ia=p.get('indices')
+                  pos=accessors[pa] if isinstance(pa,int) and pa < len(accessors) else {}
+                  idx=accessors[ia] if isinstance(ia,int) and ia < len(accessors) else {}
+                  prims.append({
+                    'primitive':pi,
+                    'positionAccessor':pa,
+                    'normalAccessor':na,
+                    'uvAccessor':ua,
+                    'indexAccessor':ia,
+                    'vertexCount':pos.get('count'),
+                    'indexCount':idx.get('count'),
+                    'positionMin':pos.get('min'),
+                    'positionMax':pos.get('max'),
+                    'material':p.get('material')
+                  })
+              meshes.append({'meshIndex':mi,'name':m.get('name'),'primitives':prims})
+
+          nodes=[]
+          for ni,n in enumerate(doc.get('nodes',[])):
+              nodes.append({
+                'nodeIndex':ni,'name':n.get('name'),'mesh':n.get('mesh'),
+                'children':n.get('children',[]),'translation':n.get('translation'),
+                'rotation':n.get('rotation'),'scale':n.get('scale')
+              })
+          materials=[{'materialIndex':i,'name':m.get('name')} for i,m in enumerate(doc.get('materials',[]))]
+          out={
+            'productId':'fleece-hoodie','glbVersion':version,'byteLength':total,
+            'scene':doc.get('scene'),'scenes':doc.get('scenes',[]),
+            'meshCount':len(meshes),'nodeCount':len(nodes),'materialCount':len(materials),
+            'meshes':meshes,'nodes':nodes,'materials':materials
+          }
+          Path('assets/calibration/fleece-hoodie-structure.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Commit diagnostic
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/calibration/fleece-hoodie-structure.json
+          git commit -m 'Inspect Fleece Hoodie GLB structure'
+          git push origin main
