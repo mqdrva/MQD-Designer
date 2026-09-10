@@ -87,7 +87,7 @@ function ensureTemplateImage(zone=activeZone){
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img);
+      const built=buildTemplateMask(img,zone);
       rec.maskCanvas=built.maskCanvas;
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
@@ -105,7 +105,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img){
+function buildTemplateMask(img,zone=null){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -130,6 +130,39 @@ function buildTemplateMask(img){
     }
   }
   cx.putImageData(cutData,0,0);
+
+  // Keep the Short Sleeve Polo Back exactly on its previously approved mask.
+  // The newer silhouette-fill logic remains active for the zones that needed it.
+  if(product.id==='short-sleeve-polo'&&zone==='Back'){
+    let head=0,tail=0;
+    const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
+    for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+    for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+    while(head<tail){
+      const idx=queue[head++],x=idx%w,y=(idx/w)|0;
+      if(x>0)push(idx-1);
+      if(x<w-1)push(idx+1);
+      if(y>0)push(idx-w);
+      if(y<h-1)push(idx+w);
+    }
+
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+    let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const idx=y*w+x,o=idx*4;
+      if(!outside[idx]){
+        out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      }
+    }
+    if(maxX<minX||maxY<minY){
+      minX=0;minY=0;maxX=w-1;maxY=h-1;mx.fillStyle='#fff';mx.fillRect(0,0,w,h);
+    }else{
+      mx.putImageData(out,0,0);
+    }
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  }
 
   // Build the fill mask from the LARGEST connected outline component.
   // That gives us the sleeve/body silhouette instead of the helper text.
