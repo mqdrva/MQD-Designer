@@ -565,7 +565,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // The physical sleeve/collar masks can contain blank internal regions.
     // Redraw text in the editor design frame so it is always easy to see and edit,
     // while the 3D/production rendering remains unchanged.
-    drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    if(product.id!=='fleece-hoodie')drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
@@ -737,7 +737,7 @@ function splitFleeceHoodieGeometry(sourceMesh){
  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position')||!sourceMesh.parent)return false;
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
- const buffers=hoodiePanelNames.map(()=>({P:[],N:[]}));
+ const buffers=hoodiePanelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
  const count=index?index.count:pos.count;
  for(let t=0;t<count;t+=3){
   const triangle=[0,1,2].map(k=>{const i=index?index.getX(t+k):t+k;return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i)];});
@@ -747,6 +747,7 @@ function splitFleeceHoodieGeometry(sourceMesh){
    for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
     out.P.push(v[0],v[1],v[2]);
     const length=Math.hypot(v[3],v[4],v[5])||1;out.N.push(v[3]/length,v[4]/length,v[5]/length);
+    ['x','y','z'].forEach((axis,j)=>{out.min[axis]=Math.min(out.min[axis],v[j]);out.max[axis]=Math.max(out.max[axis],v[j]);});
    }
   }
  }
@@ -754,11 +755,17 @@ function splitFleeceHoodieGeometry(sourceMesh){
  const group=new THREE.Group();group.name='MQD_Fleece_Hoodie_Zones';group.position.copy(sourceMesh.position);group.quaternion.copy(sourceMesh.quaternion);group.scale.copy(sourceMesh.scale);
  const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
  buffers.forEach((b,zi)=>{
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(b.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(b.N,3));g.computeBoundingBox();g.computeBoundingSphere();
+  const zone=hoodiePanelNames[zi];
+  if(zone.includes('Sleeve')){
+   for(let i=0;i<b.P.length;i+=3)b.UV.push(...longSleevePanelUv(zone,b.P[i],b.P[i+1],b.P[i+2],b));
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(b.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(b.N,3));
+  if(b.UV.length)g.setAttribute('uv',new THREE.Float32BufferAttribute(b.UV,2));
+  g.computeBoundingBox();g.computeBoundingSphere();
   const m=base?.clone?base.clone():new THREE.MeshStandardMaterial();
   for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;
-  if(m.color)m.color.set(zoneState(hoodiePanelNames[zi]).background||'#FFFFFF');m.roughness=.88;m.metalness=0;m.transparent=false;m.opacity=1;m.needsUpdate=true;
-  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_Hoodie_'+hoodiePanelNames[zi].replace(/\s+/g,'_');group.add(mesh);fleeceHoodieZoneMeshes.set(hoodiePanelNames[zi],mesh);
+  if(m.color)m.color.set(zoneState(zone).background||'#FFFFFF');m.roughness=.88;m.metalness=0;m.transparent=false;m.opacity=1;m.needsUpdate=true;
+  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_Hoodie_'+zone.replace(/\s+/g,'_');group.add(mesh);fleeceHoodieZoneMeshes.set(zone,mesh);
  });
  sourceMesh.parent.add(group);fleeceHoodieZoneGroup=group;sourceMesh.visible=false;garment.updateMatrixWorld(true);return true;
 }
@@ -772,8 +779,27 @@ function rebuildFleeceHoodiePreview(){
  if(product.id!=='fleece-hoodie'||!fleeceHoodieZoneMeshes.size)return false;
  clearDecals();updateFleeceHoodieZoneColors();garment.updateMatrixWorld(true);
  product.zones.forEach(zone=>{
-  const z=stateFor().zones[zone];if(!z?.layers?.some(l=>l.visible!==false))return;
   const target=fleeceHoodieZoneMeshes.get(zone);if(!target)return;
+  const z=stateFor().zones[zone],hasLayers=!!z?.layers?.some(l=>l.visible!==false);
+
+  // Sleeve artwork/text uses the isolated sleeve mesh UVs directly so it cannot
+  // miss the curved sleeve surface. The approved sleeve geometry is unchanged.
+  if(zone.includes('Sleeve')){
+   const oldMap=target.material?.map;
+   if(oldMap){target.material.map=null;oldMap.dispose?.();}
+   if(!hasLayers){
+    if(target.material?.color)target.material.color.set(zoneState(zone).background||'#FFFFFF');
+    target.material.needsUpdate=true;
+    return;
+   }
+   const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);
+   tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;tex.wrapS=THREE.RepeatWrapping;
+   tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
+   target.material.map=tex;if(target.material?.color)target.material.color.set('#FFFFFF');target.material.transparent=false;target.material.opacity=1;target.material.needsUpdate=true;
+   return;
+  }
+
+  if(!hasLayers)return;
   const canvas=makeCleanZoneArtworkCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
   const q=zonePlacement(zone);
   try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
