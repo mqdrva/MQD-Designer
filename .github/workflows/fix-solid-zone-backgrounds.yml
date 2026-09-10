@@ -18,69 +18,24 @@ jobs:
           from pathlib import Path
           p=Path('v20/editor.js')
           s=p.read_text()
-
-          old="""  let head=0,tail=0;
-  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
-  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
-  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-  while(head<tail){
-    const idx=queue[head++],x=idx%w,y=(idx/w)|0;
-    if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);
-  }
-"""
-          new="""  // Close tiny anti-aliased gaps in the production outline before flooding from
-  // the page edge. Without this, a small opening can let the outside flood leak
-  // through the garment piece and the selected background appears only on the
-  // template lettering/guide strokes instead of as one solid print-zone fill.
-  let barrier=blocked;
-  for(let pass=0;pass<2;pass++){
-    const next=barrier.slice();
-    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
-      const idx=y*w+x;
-      if(barrier[idx])continue;
-      if(barrier[idx-1]||barrier[idx+1]||barrier[idx-w]||barrier[idx+w]||barrier[idx-w-1]||barrier[idx-w+1]||barrier[idx+w-1]||barrier[idx+w+1])next[idx]=1;
-    }
-    barrier=next;
-  }
-
-  let head=0,tail=0;
-  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||barrier[idx])return;outside[idx]=1;queue[tail++]=idx;};
-  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
-  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-  while(head<tail){
-    const idx=queue[head++],x=idx%w,y=(idx/w)|0;
-    if(x>0)push(idx-1);if(x<w-1)push(idx+1);if(y>0)push(idx-w);if(y<h-1)push(idx+w);
-  }
-"""
-          assert old in s, 'template flood-fill anchor missing'
+          old='  let head=0,tail=0;'
+          new="  let barrier=blocked;\n  for(let pass=0;pass<2;pass++){\n    const next=barrier.slice();\n    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){\n      const idx=y*w+x;\n      if(barrier[idx])continue;\n      if(barrier[idx-1]||barrier[idx+1]||barrier[idx-w]||barrier[idx+w]||barrier[idx-w-1]||barrier[idx-w+1]||barrier[idx+w-1]||barrier[idx+w+1])next[idx]=1;\n    }\n    barrier=next;\n  }\n  let head=0,tail=0;"
+          assert old in s, 'template flood-fill start anchor missing'
           s=s.replace(old,new,1)
-
-          old="""    if(!zoneHasContent(activeZone)){
-      targetCtx.save();
-      targetCtx.globalAlpha=.34;
-      targetCtx.globalCompositeOperation='multiply';
-      targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);
-      targetCtx.restore();
-    }
-"""
-          new="""    const solidBackground=(zoneState(activeZone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF';
-    if(!solidBackground&&!zoneHasContent(activeZone)){
-      targetCtx.save();
-      targetCtx.globalAlpha=.34;
-      targetCtx.globalCompositeOperation='multiply';
-      targetCtx.drawImage(rec.img,r.x,r.y,r.w,r.h);
-      targetCtx.restore();
-    }
-"""
+          old='outside[idx]||blocked[idx]'
+          assert old in s, 'template flood-fill barrier anchor missing'
+          s=s.replace(old,'outside[idx]||barrier[idx]',1)
+          old='    if(!zoneHasContent(activeZone)){'
+          new="    const solidBackground=(zoneState(activeZone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF';\n    if(!solidBackground&&!zoneHasContent(activeZone)){"
           assert old in s, 'editor helper-art anchor missing'
           s=s.replace(old,new,1)
-
           p.write_text(s)
           PY
-      - name: Verify syntax and behavior markers
+      - name: Verify targeted patch
         run: |
           node --check v20/editor.js
           grep -q 'let barrier=blocked' v20/editor.js
+          grep -q 'outside\[idx\]||barrier\[idx\]' v20/editor.js
           grep -q 'const solidBackground=' v20/editor.js
       - name: Commit fix and remove one-time workflow
         run: |
