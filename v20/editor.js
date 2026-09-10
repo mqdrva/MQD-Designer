@@ -429,17 +429,6 @@ function traceZonePath(c,zone,w,h){
   }
 }
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
-function traceLongSleevePoloSleeve2D(c,w,h){
-  // 2D-only visual fill matching the Long Sleeve Polo sleeve cut silhouette.
-  // This is deliberately separate from production/3D texture generation.
-  c.beginPath();
-  c.moveTo(w*.29,h*.92);
-  c.lineTo(w*.17,h*.24);
-  c.bezierCurveTo(w*.29,h*.22,w*.35,h*.07,w*.50,h*.065);
-  c.bezierCurveTo(w*.65,h*.07,w*.71,h*.22,w*.83,h*.24);
-  c.lineTo(w*.71,h*.92);
-  c.closePath();
-}
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
   targetCtx.save();
@@ -448,18 +437,6 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   targetCtx.scale(editorZoom,editorZoom);
   targetCtx.translate(-w/2,-h/2);
   if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
-
-  // Long Sleeve Polo sleeves: 2D editor background fill only.
-  // Keep the approved 3D renderer and all production texture logic untouched.
-  if(product.id==='long-sleeve-polo'&&['Left Sleeve','Right Sleeve'].includes(activeZone)){
-    targetCtx.save();
-    targetCtx.translate(r.x,r.y);
-    traceLongSleevePoloSleeve2D(targetCtx,r.w,r.h);
-    targetCtx.clip();
-    targetCtx.fillStyle=zoneState(activeZone).background||'#FFFFFF';
-    targetCtx.fillRect(0,0,r.w,r.h);
-    targetCtx.restore();
-  }
 
   if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
     const source=renderMaskedZoneCanvas(activeZone,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,false);
