@@ -1,24 +1,24 @@
 import {partitionWithRules} from './panels.js';
 
 // Long Sleeve Polo only.
-// Keeps the collar isolated, cleans the body edge around the collar,
-// and lets the Front/Back panels reach farther toward the sleeve seam.
-const sleeveEdge = y => y >= 0 ? 0.438 - 0.030 * y : 0.438 - 0.040 * y;
+// Keep the collar isolated while allowing the Front/Back body panels to rise
+// tight to the physical collar seam and extend farther toward each armhole.
+const sleeveEdge = y => y >= 0 ? 0.455 - 0.028 * y : 0.455 - 0.038 * y;
 
 const rules = [
   {
     zone: 4,
     tests: [
-      // Expand collar ownership a bit so the body sits cleaner under it.
-      v => v[1] + 0.37 * v[2] - 0.672,
-      // Slightly wider/deeper collar envelope.
-      v => 1 - (v[0] / 0.338) ** 2 - ((v[2] + 0.055) / 0.320) ** 2
+      // Tighten collar ownership so flat upper-chest/upper-back faces remain body.
+      v => v[1] + 0.34 * v[2] - 0.715,
+      // Keep only the actual neck/collar neighborhood instead of the broad shoulder shelf.
+      v => 1 - (v[0] / 0.305) ** 2 - ((v[2] + 0.060) / 0.270) ** 2
     ]
   },
   {
     zone: 2,
     tests: [
-      // Push sleeve split outward so body reaches closer to sleeve seam.
+      // Sleeve starts farther outward so the body reaches the armhole seam cleanly.
       v => v[0] - sleeveEdge(v[1])
     ]
   },
@@ -31,7 +31,7 @@ const rules = [
   {
     zone: 0,
     tests: [
-      // Keep front/back split stable.
+      // Preserve the existing front/back split.
       v => v[2] + 0.022 + 0.108 * Math.max(0, v[1])
     ]
   }
