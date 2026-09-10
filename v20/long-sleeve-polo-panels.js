@@ -1,9 +1,10 @@
 import {partitionWithRules} from './panels.js';
 
 // Long Sleeve Polo only. Do not reuse these seams for the frozen
-// Long Sleeve T-Shirt renderer. The polo sleeves sit closer to the
-// torso and its folded collar extends wider/lower than the tee rib.
-const sleeveEdge=y=>y>=0 ? .405-.035*y : .405-.045*y;
+// Long Sleeve T-Shirt renderer. Keep the approved collar split unchanged.
+// Push the sleeve split outward so Front/Back own more of the shoulder/body
+// and meet the sleeves closer to the physical armhole seam.
+const sleeveEdge=y=>y>=0 ? .445-.035*y : .445-.045*y;
 const rules=[
   {zone:4,tests:[
     v=>v[1]+.34*v[2]-.690,
