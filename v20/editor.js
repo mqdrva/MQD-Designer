@@ -48,7 +48,7 @@ const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-b
 // Long Sleeve Polo Phase 1: inherit the frozen long-sleeve isolation logic.
 const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-v2-exclusive-zones';
 // Fleece Hoodie only: frozen garments above do not enter this renderer.
-const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v4-raised-wide-front-solid-cutline-sleeves';
+const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v7-reference-mockups-solid-back';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -140,16 +140,11 @@ function buildTemplateMask(img,zone=null){
   cx.putImageData(cutData,0,0);
 
   // Fleece Hoodie sleeves: solid-fill the complete printable sleeve interior.
-  // The production template has a long opening in its dashed red cutline, which
-  // makes flood-fill/connected-component approaches collapse into outline-only
-  // regions. Use the calibrated sleeve silhouette for the fill, then draw the
-  // original red production cutline on top as the guide.
   if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
     const mx=mask.getContext('2d');
     mx.fillStyle='#fff';
     mx.beginPath();
-    // Calibrated directly to /assets/templates/hoodie/sleeve.png.
     mx.moveTo(w*.315,h*.905);
     mx.lineTo(w*.205,h*.305);
     mx.bezierCurveTo(w*.31,h*.292,w*.415,h*.235,w*.455,h*.135);
@@ -167,6 +162,84 @@ function buildTemplateMask(img,zone=null){
       y:h*.052,
       w:w*(.845-.205),
       h:h*(.920-.052)
+    }};
+  }
+
+  // Fleece Hoodie Back: use the actual red production cutline as the authority.
+  // For each template row, find the left/right red cutline edges, interpolate
+  // across dashed gaps, then fill the full interior between them. This avoids
+  // the old circular/blob mask and follows the supplied cutline shape.
+  if(product.id==='fleece-hoodie'&&zone==='Back'){
+    const left=new Int32Array(h),right=new Int32Array(h);
+    left.fill(-1);right.fill(-1);
+    let yMin=h,yMax=-1;
+
+    for(let y=0;y<h;y++){
+      let lx=w,rx=-1;
+      for(let x=0;x<w;x++){
+        const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
+        const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
+        if(!redInk)continue;
+        if(x<w*.52)lx=Math.min(lx,x);
+        if(x>w*.48)rx=Math.max(rx,x);
+      }
+      if(lx<w)left[y]=lx;
+      if(rx>=0)right[y]=rx;
+      if(left[y]>=0||right[y]>=0){
+        yMin=Math.min(yMin,y);
+        yMax=Math.max(yMax,y);
+      }
+    }
+
+    const interpolate=arr=>{
+      const nextIndex=new Int32Array(h);
+      let next=-1;
+      for(let y=h-1;y>=0;y--){
+        if(arr[y]>=0)next=y;
+        nextIndex[y]=next;
+      }
+      let prev=-1;
+      for(let y=0;y<h;y++){
+        if(arr[y]>=0){prev=y;continue;}
+        const n=nextIndex[y];
+        if(prev>=0&&n>=0){
+          const t=(y-prev)/(n-prev);
+          arr[y]=Math.round(arr[prev]+(arr[n]-arr[prev])*t);
+        }else if(prev>=0)arr[y]=arr[prev];
+        else if(n>=0)arr[y]=arr[n];
+      }
+    };
+    interpolate(left);interpolate(right);
+
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d');
+    mx.fillStyle='#fff';
+
+    let minX=w,maxX=-1;
+    if(yMax<yMin){yMin=0;yMax=h-1;}
+    for(let y=yMin;y<=yMax;y++){
+      const lx=left[y],rx=right[y];
+      if(lx<0||rx<0||rx<=lx)continue;
+      mx.fillRect(lx,y,rx-lx+1,1);
+      minX=Math.min(minX,lx);maxX=Math.max(maxX,rx);
+    }
+
+    if(maxX<minX){
+      minX=Math.round(w*.095);maxX=Math.round(w*.905);
+      yMin=Math.round(h*.12);yMax=Math.round(h*.925);
+      mx.beginPath();
+      mx.moveTo(w*.095,h*.925);
+      mx.lineTo(w*.105,h*.455);
+      mx.bezierCurveTo(w*.110,h*.355,w*.170,h*.290,w*.395,h*.120);
+      mx.lineTo(w*.605,h*.120);
+      mx.bezierCurveTo(w*.830,h*.290,w*.890,h*.355,w*.895,h*.455);
+      mx.lineTo(w*.905,h*.925);
+      mx.closePath();
+      mx.fill();
+    }
+
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{
+      x:minX,y:yMin,w:maxX-minX+1,h:yMax-yMin+1
     }};
   }
 
