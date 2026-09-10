@@ -110,7 +110,7 @@ function buildTemplateMask(img){
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
   const pixels=sx.getImageData(0,0,w,h).data;
-  const blocked=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
+  const blocked=new Uint8Array(w*h),cutBarrier=new Uint8Array(w*h),outside=new Uint8Array(w*h),queue=new Int32Array(w*h);
   const cut=document.createElement('canvas');cut.width=w;cut.height=h;
   const cx=cut.getContext('2d'),cutData=cx.createImageData(w,h);
 
@@ -118,6 +118,7 @@ function buildTemplateMask(img){
     const r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3],lum=(r+g+b)/3;
     const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
     blocked[p]=(a>15&&(lum<232||redInk))?1:0;
+    cutBarrier[p]=redInk?1:0;
     if(redInk){
       cutData.data[i]=235;
       cutData.data[i+1]=35;
@@ -127,8 +128,9 @@ function buildTemplateMask(img){
   }
   cx.putImageData(cutData,0,0);
 
-  let barrier=blocked;
-  for(let pass=0;pass<2;pass++){
+  let barrier=cutBarrier;
+  const closePasses=Math.max(6,Math.min(14,Math.round(Math.min(w,h)*0.026)));
+  for(let pass=0;pass<closePasses;pass++){
     const next=barrier.slice();
     for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
       const idx=y*w+x;
