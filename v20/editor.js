@@ -127,8 +127,18 @@ function buildTemplateMask(img){
   }
   cx.putImageData(cutData,0,0);
 
+  let barrier=blocked;
+  for(let pass=0;pass<2;pass++){
+    const next=barrier.slice();
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+      const idx=y*w+x;
+      if(barrier[idx])continue;
+      if(barrier[idx-1]||barrier[idx+1]||barrier[idx-w]||barrier[idx+w]||barrier[idx-w-1]||barrier[idx-w+1]||barrier[idx+w-1]||barrier[idx+w+1])next[idx]=1;
+    }
+    barrier=next;
+  }
   let head=0,tail=0;
-  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||blocked[idx])return;outside[idx]=1;queue[tail++]=idx;};
+  const push=idx=>{if(idx<0||idx>=outside.length||outside[idx]||barrier[idx])return;outside[idx]=1;queue[tail++]=idx;};
   for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
   for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
   while(head<tail){
@@ -289,7 +299,8 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
 
     // Show the helper artwork only before the customer starts designing.
     // Once a zone has content, customer artwork/text gets visual priority.
-    if(!zoneHasContent(activeZone)){
+    const solidBackground=(zoneState(activeZone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF';
+    if(!solidBackground&&!zoneHasContent(activeZone)){
       targetCtx.save();
       targetCtx.globalAlpha=.34;
       targetCtx.globalCompositeOperation='multiply';
