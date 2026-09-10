@@ -48,7 +48,7 @@ const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-b
 // Long Sleeve Polo Phase 1: inherit the frozen long-sleeve isolation logic.
 const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-v2-exclusive-zones';
 // Fleece Hoodie only: frozen garments above do not enter this renderer.
-const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v3-wide-raised-front-solid-sleeves';
+const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v4-raised-wide-front-solid-cutline-sleeves';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -139,94 +139,34 @@ function buildTemplateMask(img,zone=null){
   }
   cx.putImageData(cutData,0,0);
 
-  // Fleece Hoodie sleeves: fill the complete printable silhouette INSIDE the
-  // actual red production cutline. The source sleeve template has a large break
-  // in one side of the dashed outline, so flood-fill can leak out and leave only
-  // the red outline visible. Reconstruct the two cut edges by scanline and bridge
-  // missing dash/gap rows, then fill between those edges.
+  // Fleece Hoodie sleeves: solid-fill the complete printable sleeve interior.
+  // The production template has a long opening in its dashed red cutline, which
+  // makes flood-fill/connected-component approaches collapse into outline-only
+  // regions. Use the calibrated sleeve silhouette for the fill, then draw the
+  // original red production cutline on top as the guide.
   if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
-    const mw=360,mh=Math.max(120,Math.round(h/w*mw));
-    const reduced=document.createElement('canvas');reduced.width=mw;reduced.height=mh;
-    const rx=reduced.getContext('2d',{willReadFrequently:true});
-    rx.imageSmoothingEnabled=true;
-    rx.drawImage(cut,0,0,mw,mh);
-    const rp=rx.getImageData(0,0,mw,mh).data;
-
-    const left=Array(mh).fill(-1),right=Array(mh).fill(-1);
-    for(let y=0;y<mh;y++){
-      let lo=mw,hi=-1;
-      for(let x=0;x<mw;x++){
-        const i=(y*mw+x)*4;
-        if(rp[i+3]>30){lo=Math.min(lo,x);hi=Math.max(hi,x);}
-      }
-      // Require meaningful separation so a single dashed side is not mistaken
-      // for the complete sleeve width on that row.
-      if(hi>=0&&hi-lo>mw*.055){left[y]=lo;right[y]=hi;}
-    }
-
-    let first=left.findIndex(v=>v>=0),last=-1;
-    for(let y=mh-1;y>=0;y--){if(left[y]>=0){last=y;break;}}
-
-    const small=document.createElement('canvas');small.width=mw;small.height=mh;
-    const sm=small.getContext('2d');
-
-    if(first<0||last<=first){
-      // Conservative Hoodie-only fallback if the production guide is replaced.
-      sm.fillStyle='#fff';traceZonePath(sm,zone,mw,mh);sm.fill();
-      first=Math.round(mh*.08);last=Math.round(mh*.92);
-      for(let y=first;y<=last;y++){left[y]=Math.round(mw*.14);right[y]=Math.round(mw*.90);}
-    }else{
-      // Bridge the large open section and normal dashed-line gaps by
-      // interpolating between the nearest valid cutline rows.
-      for(let y=first;y<=last;y++){
-        if(left[y]>=0)continue;
-        let up=y-1,down=y+1;
-        while(up>=first&&left[up]<0)up--;
-        while(down<=last&&left[down]<0)down++;
-        if(up>=first&&down<=last){
-          const q=(y-up)/(down-up);
-          left[y]=left[up]+(left[down]-left[up])*q;
-          right[y]=right[up]+(right[down]-right[up])*q;
-        }else if(up>=first){
-          left[y]=left[up];right[y]=right[up];
-        }else if(down<=last){
-          left[y]=left[down];right[y]=right[down];
-        }
-      }
-
-      // Light smoothing follows the real cutline while removing dashed-edge
-      // stair stepping. It does not expand the artwork outside the red edge.
-      const sl=left.slice(),sr=right.slice();
-      for(let y=first;y<=last;y++){
-        let a=0,b=0,n=0;
-        for(let yy=Math.max(first,y-2);yy<=Math.min(last,y+2);yy++){
-          if(left[yy]>=0){a+=left[yy];b+=right[yy];n++;}
-        }
-        if(n){sl[y]=a/n;sr[y]=b/n;}
-      }
-
-      sm.fillStyle='#fff';
-      sm.beginPath();
-      sm.moveTo(sl[first],first);
-      for(let y=first+1;y<=last;y++)sm.lineTo(sl[y],y);
-      for(let y=last;y>=first;y--)sm.lineTo(sr[y],y);
-      sm.closePath();
-      sm.fill();
-      for(let y=first;y<=last;y++){left[y]=sl[y];right[y]=sr[y];}
-    }
-
-    let minX=mw,maxX=0;
-    for(let y=first;y<=last;y++){
-      if(left[y]>=0){minX=Math.min(minX,left[y]);maxX=Math.max(maxX,right[y]);}
-    }
-
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
     const mx=mask.getContext('2d');
-    mx.imageSmoothingEnabled=true;mx.imageSmoothingQuality='high';
-    mx.drawImage(small,0,0,w,h);
+    mx.fillStyle='#fff';
+    mx.beginPath();
+    // Calibrated directly to /assets/templates/hoodie/sleeve.png.
+    mx.moveTo(w*.315,h*.905);
+    mx.lineTo(w*.205,h*.305);
+    mx.bezierCurveTo(w*.31,h*.292,w*.415,h*.235,w*.455,h*.135);
+    mx.lineTo(w*.485,h*.052);
+    mx.lineTo(w*.605,h*.083);
+    mx.bezierCurveTo(w*.615,h*.175,w*.665,h*.235,w*.845,h*.292);
+    mx.lineTo(w*.758,h*.775);
+    mx.lineTo(w*.758,h*.920);
+    mx.lineTo(w*.330,h*.920);
+    mx.closePath();
+    mx.fill();
 
     return{maskCanvas:mask,cutlineCanvas:cut,bounds:{
-      x:minX/mw*w,y:first/mh*h,w:(maxX-minX)/mw*w,h:(last-first+1)/mh*h
+      x:w*.205,
+      y:h*.052,
+      w:w*(.845-.205),
+      h:h*(.920-.052)
     }};
   }
 
