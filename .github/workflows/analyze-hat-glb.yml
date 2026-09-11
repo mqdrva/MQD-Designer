@@ -1,0 +1,53 @@
+name: Analyze Hat GLB
+on:
+  push:
+    paths:
+      - '.github/workflows/analyze-hat-glb.yml'
+permissions:
+  contents: write
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Analyze hat geometry
+        run: |
+          python3 - <<'PY'
+          import json, struct, urllib.request
+          from pathlib import Path
+          raw=urllib.request.urlopen('https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb',timeout=60).read()
+          off=12; doc=None; binchunk=None
+          while off < len(raw):
+              length,kind=struct.unpack_from('<II',raw,off); off+=8
+              chunk=raw[off:off+length]; off+=length
+              if kind==0x4E4F534A: doc=json.loads(chunk.decode('utf-8').rstrip('\x00 \t\r\n'))
+              elif kind==0x004E4942: binchunk=chunk
+          accessors=doc['accessors']; views=doc['bufferViews']
+          def read_accessor(ai):
+              a=accessors[ai]; v=views[a['bufferView']]
+              fmt={5120:'b',5121:'B',5122:'h',5123:'H',5125:'I',5126:'f'}[a['componentType']]
+              comps={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4}[a['type']]
+              size=struct.calcsize('<'+fmt); stride=v.get('byteStride',size*comps)
+              start=v.get('byteOffset',0)+a.get('byteOffset',0)
+              return [struct.unpack_from('<'+fmt*comps,binchunk,start+i*stride) for i in range(a['count'])]
+          meshes=[]
+          for mi,m in enumerate(doc.get('meshes',[])):
+              for pi,p in enumerate(m.get('primitives',[])):
+                  pos=read_accessor(p['attributes']['POSITION'])
+                  inds=[x[0] for x in read_accessor(p['indices'])] if 'indices' in p else list(range(len(pos)))
+                  mn=[min(v[j] for v in pos) for j in range(3)]
+                  mx=[max(v[j] for v in pos) for j in range(3)]
+                  meshes.append({'mesh':mi,'primitive':pi,'name':m.get('name'),'vertices':len(pos),'triangles':len(inds)//3,'min':mn,'max':mx,'material':p.get('material')})
+          out={'nodeCount':len(doc.get('nodes',[])),'meshCount':len(doc.get('meshes',[])),'materialCount':len(doc.get('materials',[])),'materials':[m.get('name') for m in doc.get('materials',[])],'primitives':meshes}
+          Path('assets/calibration/hat-structure.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Commit analysis
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/calibration/hat-structure.json
+          git commit -m 'Analyze Hat GLB geometry'
+          git push origin main
