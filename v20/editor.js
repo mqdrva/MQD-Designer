@@ -90,14 +90,16 @@ function repairImageObjects(){Object.values(designs).forEach(ps=>Object.values(p
 function ensureTemplateImage(zone=activeZone){
   const t=product.templates?.[zone];
   if(!t?.path)return null;
-  if(templateCache.has(t.path))return templateCache.get(t.path);
+  const jacketSleeve=product.id==='lightweight-jacket'&&zone.includes('Sleeve');
+  const cacheKey=jacketSleeve?'jacket-sleeve:'+t.path:t.path;
+  if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
-  templateCache.set(t.path,rec);
+  templateCache.set(cacheKey,rec);
   const img=new Image();
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img,zone);
+      const built=buildTemplateMask(img,zone,jacketSleeve);
       rec.maskCanvas=built.maskCanvas;
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
@@ -115,7 +117,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img,zone=null){
+function buildTemplateMask(img,zone=null,jacketSleeve=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -140,6 +142,19 @@ function buildTemplateMask(img,zone=null){
     }
   }
   cx.putImageData(cutData,0,0);
+
+  // Jacket sleeves: trace the supplied red perimeter, including the cuff.
+  // The central instruction graphic hides the dashed outline in this PNG.
+  if(jacketSleeve){
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d');mx.scale(w/512,h/828);mx.beginPath();
+    mx.moveTo(243,54);mx.bezierCurveTo(256,77,273,78,307,81);
+    mx.bezierCurveTo(324,194,318,204,463,249);
+    mx.lineTo(374,667);mx.lineTo(374,787);mx.lineTo(155,787);
+    mx.lineTo(155,667);mx.lineTo(78,246);
+    mx.bezierCurveTo(194,217,193,215,243,54);mx.closePath();mx.fillStyle='#fff';mx.fill();
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:78*w/512,y:54*h/828,w:385*w/512,h:733*h/828}};
+  }
 
   // Fleece Hoodie sleeves: solid-fill the complete printable sleeve interior.
   if(product.id==='fleece-hoodie'&&(zone==='Left Sleeve'||zone==='Right Sleeve')){
