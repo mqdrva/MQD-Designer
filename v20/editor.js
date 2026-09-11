@@ -57,7 +57,7 @@ const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';
 const MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved';
 // T-shirt text/artwork uses one normalized coordinate frame in 2D and 3D.
 // Front/Back are linear panel UVs; sleeve/collar orientation stays in panelUv().
-const MQD_TSHIRT_TEXT_MAPPING_LOCK='normalized-five-zone-v1';
+const MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2';
 // Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
 const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';
@@ -1010,7 +1010,26 @@ function rebuildFleeceHoodiePreview(){
 }
 
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
-function updateTshirtZoneTextures(){if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;product.zones.forEach(zone=>{const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;disposeZoneTexture(mesh);const artwork=makeCleanZoneArtworkCanvas(zone,1600),canvas=document.createElement('canvas');canvas.width=artwork.width;canvas.height=artwork.height;const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;paint.drawImage(artwork,0,artworkY);const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;});return true;}
+function updateTshirtZoneTextures(){
+ if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
+ product.zones.forEach(zone=>{
+  const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;
+  disposeZoneTexture(mesh);
+  // All-Over Print T-Shirt only: the supplied Front/Back 3D UV frame sits
+  // visually lower than the production-template frame. Raise TEXT by 9% in
+  // those two zones so its 3D placement matches the 2D editor. Images, fill,
+  // sleeves, collar and every other garment keep their approved behavior.
+  const tshirtBodyText=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  const artwork=makeCleanZoneArtworkCanvas(zone,1600,tshirtBodyText?{offsetY:-.09}:{}),canvas=document.createElement('canvas');
+  canvas.width=artwork.width;canvas.height=artwork.height;
+  const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
+  const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
+  paint.drawImage(artwork,0,artworkY);
+  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
+  mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;
+ });
+ return true;
+}
 function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),v=s.x*s.y*s.z;if(v>score){score=v;best=o;}});return best;}
 function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
 function rebuildJacketPreview(){
