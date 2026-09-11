@@ -52,6 +52,12 @@ const MQD_TSHIRT_RENDERER_LOCK='stable-v1';
 // LOCKED: 3D T-shirt zone textures must stay in the stable rectangular UV frame.
 // 2D template clipping/cropping is editor-only and must not redefine the 3D UV texture frame.
 const MQD_TSHIRT_TEXTURE_FRAME_LOCK='stable-a8bc447';
+// LOCKED/APPROVED: the All-Over Print T-Shirt Front/Back 2D fill follows the
+// production cutline. Do not change this mask while calibrating text/artwork.
+const MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved';
+// T-shirt text/artwork uses one normalized coordinate frame in 2D and 3D.
+// Front/Back are linear panel UVs; sleeve/collar orientation stays in panelUv().
+const MQD_TSHIRT_TEXT_MAPPING_LOCK='normalized-five-zone-v1';
 // Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
 const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';
