@@ -3,6 +3,12 @@ import {jacketFaceZone,matchesJacketGeometry} from './lightweight-jacket-zones.j
 import {jacketHoodValue,splitJacketHood} from './lightweight-jacket-hood.js';
 
 export const jacketZones=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
+// Pull the rear transition onto the hood, removing the hood-colored skirt
+// on the upper Back. Keep a continuous scalar for crack-free triangle clipping.
+function rearHoodValue(i,z){
+ const t=THREE.MathUtils.clamp(-z/.12,0,1);
+ return jacketHoodValue(i)-64*t*t*(3-2*t);
+}
 export function createJacketZones(source){
  const geometry=source.geometry,pos=geometry.getAttribute('position'),index=geometry.index;
  if(!matchesJacketGeometry(pos,index)){console.error('Lightweight Jacket model changed; calibrated zone map cannot be used');return null;}
@@ -10,7 +16,7 @@ export function createJacketZones(source){
  const normal=geometry.getAttribute('normal'),buffers=jacketZones.map(()=>({p:[],n:[]}));
  for(let face=0;face<index.count/3;face++){
   const zone=jacketFaceZone(face);
-  const triangle=[0,1,2].map(k=>{const i=index.getX(face*3+k);return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i),jacketHoodValue(i)];});
+  const triangle=[0,1,2].map(k=>{const i=index.getX(face*3+k);return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i),rearHoodValue(i,pos.getZ(i))];});
   const bodyZone=zone===4?(triangle.reduce((sum,v)=>sum+v[2],0)/3>.015?0:1):zone;
   const parts=zone===2||zone===3?[[zone,triangle]]:splitJacketHood(triangle,bodyZone);
   for(const [target,poly] of parts){const b=buffers[target];for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){b.p.push(...v.slice(0,3));const length=triangle.includes(v)?1:(Math.hypot(...v.slice(3,6))||1);b.n.push(v[3]/length,v[4]/length,v[5]/length);}}
