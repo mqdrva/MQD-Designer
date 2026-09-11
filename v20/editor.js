@@ -96,7 +96,8 @@ function ensureTemplateImage(zone=activeZone){
   if(!t?.path)return null;
   const jacketSleeve=product.id==='lightweight-jacket'&&zone.includes('Sleeve');
   const jacketBack=product.id==='lightweight-jacket'&&zone==='Back';
-  const cacheKey=jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const hoodMaskBody=product.id==='hood-mask-shirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
+  const cacheKey=hoodMaskBody?'hood-mask-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -104,7 +105,12 @@ function ensureTemplateImage(zone=activeZone){
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img,zone,jacketSleeve,jacketBack);
+      const built=buildTemplateMask(img,zone,jacketSleeve,jacketBack,hoodMaskBody);
+      if(hoodMaskBody){
+        // Keep the approved 3D artwork proportions independent of the 2D fill.
+        const previous=buildTemplateMask(img,zone,false,false,false).bounds;
+        rec.artworkAspect=previous.w/Math.max(1,previous.h);
+      }
       rec.maskCanvas=built.maskCanvas;
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
@@ -122,7 +128,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false){
+function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,hoodMaskBody=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -147,6 +153,23 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false){
     }
   }
   cx.putImageData(cutData,0,0);
+
+  // Approved hood-mask 3D mapping is frozen. This mask is only the 2D
+  // Front/Back/sleeve silhouette, enclosed by the supplied solid perimeter.
+  if(hoodMaskBody){
+    const wall=new Uint8Array(w*h),exterior=new Uint8Array(w*h),pending=new Int32Array(w*h);
+    for(let p=0;p<w*h;p++){const i=p*4;wall[p]=pixels[i+3]>15&&Math.min(pixels[i],pixels[i+1],pixels[i+2])<180?1:0;}
+    let head=0,tail=0;
+    const visit=p=>{if(!wall[p]&&!exterior[p]){exterior[p]=1;pending[tail++]=p;}};
+    for(let x=0;x<w;x++){visit(x);visit((h-1)*w+x);}
+    for(let y=0;y<h;y++){visit(y*w);visit(y*w+w-1);}
+    while(head<tail){const p=pending[head++],x=p%w,y=Math.floor(p/w);if(x>0)visit(p-1);if(x<w-1)visit(p+1);if(y>0)visit(p-w);if(y<h-1)visit(p+w);}
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d'),data=mx.createImageData(w,h);let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const p=y*w+x;if(exterior[p])continue;data.data.set([255,255,255,255],p*4);minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+    mx.putImageData(data,0,0);
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+  }
 
   // Trace the Back perimeter rather than flood-filling its instruction graphic.
   if(jacketBack){
@@ -522,7 +545,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   if(t?.shape==='rectangle'||!t?.path){drawLayerStack(ox,zone,{x:0,y:0,w,h});return out;}
   ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
 }
-function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
+function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false)return;x.save();const cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200;x.translate(cx,cy);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
