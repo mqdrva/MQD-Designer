@@ -11,11 +11,15 @@ const primitive=json.meshes[0].primitives[0],geometry=new THREE.BufferGeometry()
 geometry.setAttribute('position',attribute(primitive.attributes.POSITION));geometry.setAttribute('normal',attribute(primitive.attributes.NORMAL));geometry.setAttribute('uv',attribute(primitive.attributes.TEXCOORD_0));geometry.setIndex(attribute(primitive.indices));geometry.computeBoundingBox();
 let code=fs.readFileSync(new URL('../v20/shorts-panels.js',import.meta.url),'utf8').replace("'three'",JSON.stringify(pathToFileURL(threePath).href));
 const module=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
-const root=new THREE.Group(),source=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial());root.add(source);
+const root=new THREE.Group(),trimTexture=new THREE.Texture(),source=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:trimTexture}));root.add(source);
 const panels=module.createShortsPanels(source),group=root.getObjectByName('MQD_Shorts_Panels');
 assert.equal(panels.size,2);assert.deepEqual([...panels.keys()],['Front','Back']);assert.equal(source.visible,false);assert.ok(group);
 assert.deepEqual(group.children.map(mesh=>mesh.name),['Shorts_Front','Shorts_Back','Shorts_Trim']);
 assert.notEqual(panels.get('Front').material,panels.get('Back').material,'zones need independent materials');
+const trimMesh=group.getObjectByName('Shorts_Trim');
+assert.equal(trimMesh.geometry.getAttribute('position').count/3,16331,'only drawstrings and tips may stay on the fixed trim layer');
+assert.equal(trimMesh.material.map,trimTexture,'drawstrings must keep their original white/gray texture');
+assert.equal(panels.get('Front').material.map,null,'the center fabric strip must receive Front artwork');
 
 const seamZ=(geometry.boundingBox.min.z+geometry.boundingBox.max.z)/2,epsilon=2e-6;
 for(const [zone,mesh] of panels){

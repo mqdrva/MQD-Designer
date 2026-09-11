@@ -79,7 +79,10 @@ function findTrimComponents(position,index,bounds){
   const extent=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3()),trim=new Set();
   for(const [root,s] of stats){
     const componentCenterX=(s.minX+s.maxX)/2;
-    if(s.triangles>=500&&s.maxX-s.minX<extent.x*.12&&Math.abs(componentCenterX-center.x)<extent.x*.09&&
+    // Actual cords and tips are very narrow disconnected components. The
+    // center fly/fabric strip is also forward-facing, but is wider and must
+    // remain part of the printable Front surface.
+    if(s.triangles>=500&&s.maxX-s.minX<extent.x*.08&&Math.abs(componentCenterX-center.x)<extent.x*.09&&
        s.minZ>bounds.min.z+extent.z*.90&&s.minY>bounds.min.y+extent.y*.55&&s.maxY<bounds.min.y+extent.y*.985)trim.add(root);
   }
   return{find,trim};
