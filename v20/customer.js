@@ -553,6 +553,19 @@ async function signIn(event){
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   message.textContent='Signed in.';message.className='account-message success';await completeAuth(data.session);
 }
+async function signInWithGoogle(){
+  const message=$('authMessage'),button=$('googleSignInButton');
+  if(message){message.textContent='Opening Google sign-in…';message.className='account-message';}
+  if(button)button.disabled=true;
+  const {error}=await supabase.auth.signInWithOAuth({
+    provider:'google',
+    options:{redirectTo:AUTH_REDIRECT_URL}
+  });
+  if(error){
+    if(message){message.textContent=error.message;message.className='account-message error';}
+    if(button)button.disabled=false;
+  }
+}
 async function signUp(){
   const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
   if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
@@ -598,6 +611,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('closeAuth')?.addEventListener('click',closeAuth);
   $('authOverlay')?.addEventListener('click',e=>{if(e.target===$('authOverlay'))closeAuth();});
   $('authForm')?.addEventListener('submit',signIn);
+  $('googleSignInButton')?.addEventListener('click',signInWithGoogle);
   $('signUpButton')?.addEventListener('click',signUp);
   $('resendConfirmationButton')?.addEventListener('click',resendConfirmation);
   $('closeCustomer')?.addEventListener('click',()=>$('customerOverlay').classList.add('hidden'));
