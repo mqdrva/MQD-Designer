@@ -19,8 +19,10 @@ const leftCordX=-.121;
 const rightCordX=.119;
 const cordRadius=.016;
 
+// The printable torso follows the hood seam closely. The added front-depth
+// term keeps the front panel high without shrinking the rear hood shell.
 const hoodLowerEdge=v=>
-  .44+1.40*v[0]*v[0]+.55*Math.max(0,v[2]+.13);
+  .44+1.65*v[0]*v[0]+.85*Math.max(0,v[2]+.13);
 
 const openingWidth=y=>{
   if(y<=.62)return 0;
@@ -33,10 +35,15 @@ const openingWidth=y=>{
 const sleeveEdge=v=>{
   const y=v[1];
   const edge=y>.50
-    ?.455-.14*Math.min(1,(y-.50)/.35)**2
-    :.465+.03*Math.max(0,-y);
+    ?.430-.14*Math.min(1,(y-.50)/.35)**2
+    :.440+.03*Math.max(0,-y);
   return edge+.04*Math.min(.5,Math.abs(v[2]));
 };
+
+// The source garment hangs slightly forward toward the hem. Following that
+// center plane keeps the Front/Back seam straight while preventing one side's
+// color from appearing on the opposite face at the lower folds.
+const bodyCenter=v=>.028-.045*v[1];
 
 const rules=[
   // The cords are modeled into the single source mesh. Remove only their
@@ -69,10 +76,10 @@ const rules=[
   ]},
 
   // Both sleeve/body joins share the same clipped curve. Below the armhole,
-  // the Front/Back separator is the straight z=0 side seam.
+  // the Front/Back separator follows one straight, gently sloped side seam.
   {zone:2,tests:[v=>v[0]-sleeveEdge(v)]},
   {zone:3,tests:[v=>-v[0]-sleeveEdge(v)]},
-  {zone:0,tests:[v=>v[2]]}
+  {zone:0,tests:[v=>v[2]-bodyCenter(v)]}
 ];
 
 export function partitionHoodedLongSleeveTriangle(triangle){
@@ -180,6 +187,7 @@ export function createHoodedLongSleevePanels(source){
       if(material.color)material.color.set('#ffffff');
       material.roughness=.86;
       material.metalness=0;
+      material.side=THREE.FrontSide;
     }else if(material.color)material.color.set('#ffffff');
     material.needsUpdate=true;
 

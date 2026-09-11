@@ -42,6 +42,7 @@ assert.equal(sourceMesh.visible,false);
 assert.equal(new Set(group.children.map(mesh=>mesh.material)).size,7,'every surface must own an independent material');
 for(const [name,mesh] of panels){
   assert.equal(mesh.material.map,null,`${name} must not inherit another zone or the source atlas`);
+  assert.equal(mesh.material.side,THREE.FrontSide,`${name} must not render its reverse face into another zone`);
   assert.ok(mesh.geometry.getAttribute('position').count>0);
   assert.ok([...mesh.geometry.getAttribute('uv').array].every(Number.isFinite));
 }
@@ -61,17 +62,20 @@ assert.equal(zoneAt(0,0,-.10),1,'rear torso must be Back');
 assert.equal(zoneAt(.62,-.30,0),2,'positive-X arm must be Left Sleeve');
 assert.equal(zoneAt(-.62,-.30,0),3,'negative-X arm must be Right Sleeve');
 assert.equal(zoneAt(0,.55,-.10),4,'lower rear hood point must be Hood');
+assert.equal(zoneAt(0,.58,.10),0,'front panel must rise above the old hood overlap');
 assert.equal(zoneAt(0,.80,-.145),4,'rear hood shell must be Hood');
 assert.equal(zoneAt(0,.80,-.05),6,'recessed hood opening must remain neutral lining');
 assert.equal(zoneAt(-.121,.20,.08),5,'left drawstring must remain neutral');
 assert.equal(zoneAt(.119,.20,.08),5,'right drawstring must remain neutral');
 assert.equal(zoneAt(0,.20,.08),0,'center chest fabric must remain printable Front');
 
-// The body separator is the same z=0 plane from shoulder to hem.
+// The body separator is one continuous straight plane from shoulder to hem.
 for(const y of[-.75,-.35,.05,.42]){
-  assert.equal(zoneAt(.20,y,.001),0,`front side of seam must remain Front at y=${y}`);
-  assert.equal(zoneAt(.20,y,-.001),1,`rear side of seam must remain Back at y=${y}`);
+  const seam=.028-.045*y;
+  assert.equal(zoneAt(.20,y,seam+.001),0,`front side of seam must remain Front at y=${y}`);
+  assert.equal(zoneAt(.20,y,seam-.001),1,`rear side of seam must remain Back at y=${y}`);
 }
+assert.equal(zoneAt(.45,0,.08),2,'the sleeve must own its complete join without a body-color strip');
 
 // Generated UVs preserve the 2D reading direction and vertical placement.
 const front=panels.get('Front'),back=panels.get('Back');
