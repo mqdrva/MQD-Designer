@@ -91,7 +91,8 @@ function ensureTemplateImage(zone=activeZone){
   const t=product.templates?.[zone];
   if(!t?.path)return null;
   const jacketSleeve=product.id==='lightweight-jacket'&&zone.includes('Sleeve');
-  const cacheKey=jacketSleeve?'jacket-sleeve:'+t.path:t.path;
+  const jacketBack=product.id==='lightweight-jacket'&&zone==='Back';
+  const cacheKey=jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -99,7 +100,7 @@ function ensureTemplateImage(zone=activeZone){
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img,zone,jacketSleeve);
+      const built=buildTemplateMask(img,zone,jacketSleeve,jacketBack);
       rec.maskCanvas=built.maskCanvas;
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
@@ -117,7 +118,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img,zone=null,jacketSleeve=false){
+function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -142,6 +143,20 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false){
     }
   }
   cx.putImageData(cutData,0,0);
+
+  // Trace the Back perimeter rather than flood-filling its instruction graphic.
+  if(jacketBack){
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d');mx.scale(w/660,h/708);mx.beginPath();
+    mx.moveTo(276,57);mx.lineTo(398,57);mx.lineTo(513,144);
+    mx.bezierCurveTo(559,177,552,209,571,256);
+    mx.bezierCurveTo(582,281,597,292,621,299);
+    mx.bezierCurveTo(602,432,601,486,616,650);mx.lineTo(58,650);
+    mx.bezierCurveTo(72,485,73,421,53,301);
+    mx.bezierCurveTo(98,286,104,265,115,218);
+    mx.bezierCurveTo(129,162,126,170,276,57);mx.closePath();mx.fillStyle='#fff';mx.fill();
+    return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:53*w/660,y:57*h/708,w:568*w/660,h:593*h/708}};
+  }
 
   // Jacket sleeves: trace the supplied red perimeter, including the cuff.
   // The central instruction graphic hides the dashed outline in this PNG.
