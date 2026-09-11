@@ -1,0 +1,67 @@
+name: Analyze Hat Components
+on:
+  push:
+    paths:
+      - '.github/workflows/analyze-hat-components.yml'
+permissions:
+  contents: write
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Analyze hat topology components
+        run: |
+          python3 - <<'PY'
+          import json, struct, urllib.request
+          from pathlib import Path
+          raw=urllib.request.urlopen('https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb',timeout=60).read()
+          off=12; doc=None; binchunk=None
+          while off<len(raw):
+              length,kind=struct.unpack_from('<II',raw,off);off+=8
+              chunk=raw[off:off+length];off+=length
+              if kind==0x4E4F534A: doc=json.loads(chunk.decode('utf-8').rstrip('\x00 \t\r\n'))
+              elif kind==0x004E4942: binchunk=chunk
+          a=doc['accessors'];v=doc['bufferViews'];p=doc['meshes'][0]['primitives'][0]
+          def rd(i):
+              q=a[i];b=v[q['bufferView']];fmt={5123:'H',5125:'I',5126:'f'}[q['componentType']]
+              comps={'SCALAR':1,'VEC3':3}[q['type']];size=struct.calcsize('<'+fmt);stride=b.get('byteStride',size*comps);start=b.get('byteOffset',0)+q.get('byteOffset',0)
+              return [struct.unpack_from('<'+fmt*comps,binchunk,start+j*stride) for j in range(q['count'])]
+          pos=rd(p['attributes']['POSITION']);inds=[x[0] for x in rd(p['indices'])]
+          n=len(pos);parent=list(range(n));rank=[0]*n
+          def find(x):
+              while parent[x]!=x:
+                  parent[x]=parent[parent[x]];x=parent[x]
+              return x
+          def union(x,y):
+              x,y=find(x),find(y)
+              if x==y:return
+              if rank[x]<rank[y]:x,y=y,x
+              parent[y]=x
+              if rank[x]==rank[y]:rank[x]+=1
+          for i in range(0,len(inds),3):
+              x,y,z=inds[i:i+3];union(x,y);union(y,z)
+          tc={};vs={}
+          for i in range(0,len(inds),3):
+              r=find(inds[i]);tc[r]=tc.get(r,0)+1
+          for vi in set(inds):vs.setdefault(find(vi),[]).append(vi)
+          comps=[]
+          for r,verts in vs.items():
+              mn=[min(pos[i][j] for i in verts) for j in range(3)]
+              mx=[max(pos[i][j] for i in verts) for j in range(3)]
+              c=[sum(pos[i][j] for i in verts)/len(verts) for j in range(3)]
+              comps.append({'root':r,'triangles':tc.get(r,0),'vertices':len(verts),'min':mn,'max':mx,'center':c})
+          comps.sort(key=lambda x:x['triangles'],reverse=True)
+          out={'componentCount':len(comps),'topComponents':comps[:30]}
+          Path('assets/calibration/hat-components.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Commit analysis
+        run: |
+          git config user.name 'MQD Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/calibration/hat-components.json
+          git commit -m 'Analyze Hat topology components'
+          git push origin main
