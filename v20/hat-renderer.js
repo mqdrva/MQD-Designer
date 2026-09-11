@@ -6,7 +6,8 @@ export const hatZones=['Front Panel','Top of Bill'];
 // x ±0.613, y -0.485..0.485, z -0.922..0.922.
 // The bill occupies the low-y band; the printable crown panel is the forward,
 // outward-facing portion of the crown. Everything else stays on an untouched
-// neutral material so only the two customer print zones change color.
+// fixed black material. The top trim/button shares the Front Panel material,
+// so the crown top and front panel always change color as one zone.
 export function createHatZones(source){
   const geometry=source.geometry;
   const pos=geometry?.getAttribute('position');
@@ -59,7 +60,7 @@ export function createHatZones(source){
     const topBill=cy<=billTopY&&cz>billFrontZ&&ny>.12;
 
     // Front printable crown panel. Keep only the forward-facing crown surface;
-    // side/back crown and the button/top structure remain neutral.
+    // side/back crown stays fixed while the crown top is linked below.
     const xRatio=Math.abs((cx-center.x)/Math.max(.001,size.x*.5));
     const frontPanel=!topBill&&cy>billTopY&&cz>=crownFrontZ&&nz>-.05&&xRatio<.94;
     const fixedTrim=!topBill&&!frontPanel&&cy>trimY;
@@ -86,6 +87,7 @@ export function createHatZones(source){
 
   const base=Array.isArray(source.material)?source.material[0]:source.material;
   const zones=new Map();
+  let frontPanelMaterial=null;
   for(const key of['Front Panel','Top of Bill','Trim','Rest']){
     const b=buffers[key];
     if(!b.p.length)continue;
@@ -93,10 +95,13 @@ export function createHatZones(source){
     g.setAttribute('position',new THREE.Float32BufferAttribute(b.p,3));
     g.setAttribute('normal',new THREE.Float32BufferAttribute(b.n,3));
     g.computeBoundingBox();g.computeBoundingSphere();
-    const m=base?.clone?base.clone():new THREE.MeshStandardMaterial();
-    for(const mapKey of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(mapKey in m)m[mapKey]=null;
-    if(m.color)m.color.set(key==='Rest'?'#111111':key==='Trim'?'#b9b9b9':'#f5f5f5');
-    m.roughness=.84;m.metalness=0;m.transparent=false;m.opacity=1;m.needsUpdate=true;
+    const m=key==='Trim'?frontPanelMaterial:(base?.clone?base.clone():new THREE.MeshStandardMaterial());
+    if(key!=='Trim'){
+      for(const mapKey of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(mapKey in m)m[mapKey]=null;
+      if(m.color)m.color.set(key==='Rest'?'#111111':'#f5f5f5');
+      m.roughness=.84;m.metalness=0;m.transparent=false;m.opacity=1;m.needsUpdate=true;
+    }
+    if(key==='Front Panel')frontPanelMaterial=m;
     const mesh=new THREE.Mesh(g,m);
     mesh.name='Hat_'+key.replaceAll(' ','_');
     group.add(mesh);
