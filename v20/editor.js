@@ -107,7 +107,7 @@ function ensureTemplateImage(zone=activeZone){
   const hoodedLongBody=product.id==='hooded-long-sleeve'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const tshirtBody2d=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
-  const cacheKey=tshirtBody2d?'tshirt-body-v3:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const cacheKey=tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -255,34 +255,54 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
   }
 
   // All-Over Print T-Shirt Front/Back 2D calibration only.
-  // Use a deterministic production silhouette so helper circles/instructions
-  // can never become the fill mask. The true red cutline bitmap is still drawn
-  // on top, while customer color/art fills the complete panel beneath it.
+  // Match the supplied red production cutline from shoulder to hem. This is
+  // deliberately isolated from the locked T-shirt 3D renderer and from sleeves/collar.
   if(product.id==='tshirt'&&(zone==='Front'||zone==='Back')){
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
     const mx=mask.getContext('2d');mx.fillStyle='#fff';mx.beginPath();
     const back=zone==='Back';
-    mx.moveTo(w*.20,h*.90);
-    mx.lineTo(w*.14,h*.31);
-    mx.bezierCurveTo(w*.18,h*.285,w*.20,h*.245,w*.18,h*.18);
-    mx.lineTo(w*.20,h*.08);
-    mx.lineTo(w*.35,h*.04);
-    mx.bezierCurveTo(w*.38,h*.10,w*.41,h*(back?.11:.17),w*.50,h*(back?.12:.20));
-    mx.bezierCurveTo(w*.59,h*(back?.11:.17),w*.62,h*.10,w*.65,h*.04);
-    mx.lineTo(w*.80,h*.08);
-    mx.lineTo(w*.82,h*.18);
-    mx.bezierCurveTo(w*.80,h*.245,w*.82,h*.285,w*.86,h*.31);
-    mx.lineTo(w*.80,h*.90);
-    mx.closePath();mx.fill();
 
-    // Expand a few pixels into the bleed/cut edge so there can be no white halo
-    // immediately inside the red dashed production line.
-    mx.save();mx.lineWidth=Math.max(4,Math.min(w,h)*.006);mx.strokeStyle='#fff';mx.stroke();mx.restore();
+    // Left hem -> side seam -> armhole -> shoulder.
+    mx.moveTo(w*.115,h*.905);
+    mx.bezierCurveTo(w*.118,h*.74,w*.122,h*.54,w*.135,h*.385);
+    mx.bezierCurveTo(w*.142,h*.345,w*.175,h*.335,w*.195,h*.300);
+    mx.bezierCurveTo(w*.215,h*.265,w*.200,h*.225,w*.190,h*.180);
+    mx.lineTo(w*.185,h*.085);
+    mx.lineTo(w*.350,h*.040);
+
+    // Neck opening follows the red front/back neckline.
+    if(back){
+      mx.bezierCurveTo(w*.372,h*.080,w*.390,h*.105,w*.420,h*.116);
+      mx.bezierCurveTo(w*.455,h*.129,w*.545,h*.129,w*.580,h*.116);
+      mx.bezierCurveTo(w*.610,h*.105,w*.628,h*.080,w*.650,h*.040);
+    }else{
+      mx.bezierCurveTo(w*.370,h*.085,w*.382,h*.145,w*.420,h*.176);
+      mx.bezierCurveTo(w*.456,h*.205,w*.544,h*.205,w*.580,h*.176);
+      mx.bezierCurveTo(w*.618,h*.145,w*.630,h*.085,w*.650,h*.040);
+    }
+
+    // Right shoulder -> armhole -> side seam -> hem.
+    mx.lineTo(w*.815,h*.085);
+    mx.lineTo(w*.810,h*.180);
+    mx.bezierCurveTo(w*.800,h*.225,w*.785,h*.265,w*.805,h*.300);
+    mx.bezierCurveTo(w*.825,h*.335,w*.858,h*.345,w*.865,h*.385);
+    mx.bezierCurveTo(w*.878,h*.54,w*.882,h*.74,w*.885,h*.905);
+    mx.lineTo(w*.115,h*.905);
+    mx.closePath();
+    mx.fill();
+
+    // Extend the solid customer fill to the center of the dashed red bleed edge
+    // so there is no white strip between the color and production cutline.
+    mx.save();
+    mx.lineJoin='round';mx.lineCap='round';
+    mx.lineWidth=Math.max(8,Math.min(w,h)*.010);
+    mx.strokeStyle='#fff';mx.stroke();
+    mx.restore();
 
     return{
       maskCanvas:mask,
       cutlineCanvas:cut,
-      bounds:{x:w*.14,y:h*.04,w:w*.72,h:h*.86}
+      bounds:{x:w*.11,y:h*.035,w:w*.78,h:h*.875}
     };
   }
 
