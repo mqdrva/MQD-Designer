@@ -42,7 +42,7 @@ assert.equal(sourceMesh.visible,false);
 assert.equal(new Set(group.children.map(mesh=>mesh.material)).size,7,'every surface must own an independent material');
 for(const [name,mesh] of panels){
   assert.equal(mesh.material.map,null,`${name} must not inherit another zone or the source atlas`);
-  assert.equal(mesh.material.side,THREE.FrontSide,`${name} must not render its reverse face into another zone`);
+  assert.equal(mesh.material.side,name==='Hood'?THREE.DoubleSide:THREE.FrontSide,`${name} must use its calibrated surface visibility`);
   assert.ok(mesh.geometry.getAttribute('position').count>0);
   assert.ok([...mesh.geometry.getAttribute('uv').array].every(Number.isFinite));
 }
@@ -63,6 +63,8 @@ assert.equal(zoneAt(.62,-.30,0),2,'positive-X arm must be Left Sleeve');
 assert.equal(zoneAt(-.62,-.30,0),3,'negative-X arm must be Right Sleeve');
 assert.equal(zoneAt(0,.55,-.10),4,'lower rear hood point must be Hood');
 assert.equal(zoneAt(0,.58,.10),0,'front panel must rise above the old hood overlap');
+assert.equal(zoneAt(0,.61,.02),0,'front hood color must stop close to the neckline');
+assert.equal(zoneAt(0,.80,-.10),4,'rear-facing hood folds must receive the solid Hood color, not neutral lining');
 assert.equal(zoneAt(0,.80,-.145),4,'rear hood shell must be Hood');
 assert.equal(zoneAt(0,.80,-.05),6,'recessed hood opening must remain neutral lining');
 assert.equal(zoneAt(-.121,.20,.08),5,'left drawstring must remain neutral');

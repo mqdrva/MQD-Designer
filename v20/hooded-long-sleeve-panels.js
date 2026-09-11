@@ -22,7 +22,7 @@ const cordRadius=.016;
 // The printable torso follows the hood seam closely. The added front-depth
 // term keeps the front panel high without shrinking the rear hood shell.
 const hoodLowerEdge=v=>
-  .44+1.65*v[0]*v[0]+.85*Math.max(0,v[2]+.13);
+  .44+1.65*v[0]*v[0]+1.45*Math.max(0,v[2]+.13);
 
 const openingWidth=y=>{
   if(y<=.62)return 0;
@@ -68,7 +68,7 @@ const rules=[
     v=>.46-Math.abs(v[0]),
     v=>v[1]-.62,
     v=>openingWidth(v[1])-Math.abs(v[0]),
-    v=>v[2]+.13
+    v=>v[2]+.075
   ]},
   {zone:4,tests:[
     v=>v[1]-hoodLowerEdge(v),
@@ -187,7 +187,9 @@ export function createHoodedLongSleevePanels(source){
       if(material.color)material.color.set('#ffffff');
       material.roughness=.86;
       material.metalness=0;
-      material.side=THREE.FrontSide;
+      // The folded hood exposes both sides from the rear. Both belong to the
+      // same print zone; only the recessed opening retains neutral lining.
+      material.side=zoneIndex===4?THREE.DoubleSide:THREE.FrontSide;
     }else if(material.color)material.color.set('#ffffff');
     material.needsUpdate=true;
 
