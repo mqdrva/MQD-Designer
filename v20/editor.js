@@ -253,6 +253,71 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
     }};
   }
 
+  // All-Over Print T-Shirt 2D only: build the printable body/sleeve fill
+  // from the supplied TRUE RED production cutline instead of helper artwork.
+  // This prevents the instruction circle/text from becoming the customer fill mask.
+  // The locked T-shirt 3D split/UV renderer is intentionally untouched.
+  if(product.id==='tshirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone)){
+    let redBarrier=new Uint8Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
+      if(a>15&&r>170&&g<145&&b<145&&r>g*1.35)redBarrier[y*w+x]=1;
+    }
+    // Close the dashed cutline just enough to make one sealed production silhouette.
+    const passes=Math.max(7,Math.min(20,Math.round(Math.min(w,h)*.0065)));
+    for(let pass=0;pass<passes;pass++){
+      const next=redBarrier.slice();
+      for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+        const idx=y*w+x;if(redBarrier[idx])continue;
+        if(redBarrier[idx-1]||redBarrier[idx+1]||redBarrier[idx-w]||redBarrier[idx+w]||
+           redBarrier[idx-w-1]||redBarrier[idx-w+1]||redBarrier[idx+w-1]||redBarrier[idx+w+1])next[idx]=1;
+      }
+      redBarrier=next;
+    }
+
+    // Flood from the canvas edge. Anything sealed by the red cutline is a candidate.
+    const ext=new Uint8Array(w*h),q=new Int32Array(w*h);let qh=0,qt=0;
+    const pushOutside=idx=>{if(idx<0||idx>=ext.length||ext[idx]||redBarrier[idx])return;ext[idx]=1;q[qt++]=idx;};
+    for(let x=0;x<w;x++){pushOutside(x);pushOutside((h-1)*w+x);}
+    for(let y=0;y<h;y++){pushOutside(y*w);pushOutside(y*w+w-1);}
+    while(qh<qt){
+      const idx=q[qh++],x=idx%w,y=(idx/w)|0;
+      if(x>0)pushOutside(idx-1);if(x<w-1)pushOutside(idx+1);
+      if(y>0)pushOutside(idx-w);if(y<h-1)pushOutside(idx+w);
+    }
+
+    // Keep only the largest enclosed region so small closed helper letters/icons
+    // can never become printable areas.
+    const seenInside=new Uint8Array(w*h),cq=new Int32Array(w*h);let best=[];
+    for(let start=0;start<ext.length;start++){
+      if(ext[start]||redBarrier[start]||seenInside[start])continue;
+      let hq=0,tq=0;const pts=[];seenInside[start]=1;cq[tq++]=start;
+      while(hq<tq){
+        const idx=cq[hq++];pts.push(idx);const x=idx%w,y=(idx/w)|0;
+        const add=n=>{if(n<0||n>=ext.length||ext[n]||redBarrier[n]||seenInside[n])return;seenInside[n]=1;cq[tq++]=n;};
+        if(x>0)add(idx-1);if(x<w-1)add(idx+1);if(y>0)add(idx-w);if(y<h-1)add(idx+w);
+      }
+      if(pts.length>best.length)best=pts;
+    }
+
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d'),out=mx.createImageData(w,h);
+    let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(const idx of best){
+      const x=idx%w,y=(idx/w)|0,o=idx*4;
+      out.data[o]=255;out.data[o+1]=255;out.data[o+2]=255;out.data[o+3]=255;
+      minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+    }
+    if(best.length){
+      mx.putImageData(out,0,0);
+      // Include the cutline itself in the printable fill so the customer color
+      // reaches cleanly all the way to the bleed/cut boundary.
+      mx.save();mx.globalCompositeOperation='source-over';mx.drawImage(cut,0,0);mx.restore();
+      return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}};
+    }
+    console.warn('T-shirt 2D cutline mask fallback used for',zone);
+  }
+
   // Fleece Hoodie Back: use the actual red production cutline as the authority.
   // For each template row, find the left/right red cutline edges, interpolate
   // across dashed gaps, then fill the full interior between them. This avoids
@@ -540,7 +605,11 @@ function drawEditorTextOverlay(c,zone,r,rec){
   (z.layers||[]).forEach(l=>{if(l.visible===false||l.type!=='text')return;c.save();const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);drawTextLayer(c,l,b);c.restore();});
 }
 function drawSafeAreaGuide(c,zone,r,rec){
-  const b=editorDesignBounds(zone,r,rec),ix=Math.max(9,b.w*.075),iy=Math.max(9,b.h*.075),x=b.x+ix,y=b.y+iy,w=Math.max(10,b.w-ix*2),h=Math.max(10,b.h-iy*2);
+  const b=editorDesignBounds(zone,r,rec);
+  // All-Over Print T-Shirt sleeve editor only: use a much larger safe-area frame.
+  // This changes the 2D guide only; production cutlines and the locked 3D mapping stay untouched.
+  const tshirtSleeve=product.id==='tshirt'&&(zone==='Left Sleeve'||zone==='Right Sleeve');
+  const inset=tshirtSleeve?.025:.075,ix=Math.max(tshirtSleeve?4:9,b.w*inset),iy=Math.max(tshirtSleeve?4:9,b.h*inset),x=b.x+ix,y=b.y+iy,w=Math.max(10,b.w-ix*2),h=Math.max(10,b.h-iy*2);
   c.save();c.strokeStyle='#FF8A00';c.lineWidth=2;c.setLineDash([9,7]);c.strokeRect(x,y,w,h);c.setLineDash([]);c.fillStyle='#B85F00';c.font='700 10px Inter, sans-serif';c.textAlign='left';c.textBaseline='top';c.fillText('SAFE AREA',x+5,y+5);c.restore();
 }
 function imageLayerEstimatedDpi(l,zone=activeZone){
@@ -657,7 +726,11 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // already contains the customer text, so the generic helper overlay would
     // draw a second copy on top. Other products keep their approved behavior.
     const hoodMaskSleeve=product.id==='hood-mask-shirt'&&activeZone.includes('Sleeve');
-    if(product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    // T-shirt text is already rendered inside the exact masked design frame above.
+    // Do not paint a second editor-only copy; keeping one rendering path makes
+    // Front/Back/Sleeves/Collar placement correspond to the same normalized
+    // coordinates consumed by the locked 3D UV textures.
+    if(product.id!=='tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
