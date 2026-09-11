@@ -3,6 +3,7 @@ let hoodMaskPanels=null;
 import {createHoodedLongSleevePanels,hoodedLongSleeveArtworkTransform} from './hooded-long-sleeve-panels.js';
 let hoodedLongSleevePanels=null;
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
+import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 let lightweightJacketZones=null;
 import {createHatZones,hatProjection} from './hat-renderer.js';
@@ -852,6 +853,17 @@ function traceZonePath(c,zone,w,h){
   }
 }
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
+function drawLongSleeveWhiteGrid(c,zone,r,rec){
+  if(product.id!=='long-sleeve-tshirt'||!showGrid||(zoneState(zone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF')return;
+  const grid=document.createElement('canvas');grid.width=r.w;grid.height=r.h;
+  const g=grid.getContext('2d');drawGridLines(g,{x:0,y:0,w:r.w,h:r.h});
+  g.globalCompositeOperation='destination-in';g.drawImage(rec.maskCanvas,0,0,r.w,r.h);
+  // Keep the grid over white fill only, not across customer text or pictures.
+  const b=scaleBounds(rec.bounds,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,r.w,r.h);
+  g.globalCompositeOperation='destination-out';
+  g.drawImage(makeLongSleeveTshirtArtworkCanvas(zone),b.x,b.y,b.w,b.h);
+  c.drawImage(grid,r.x,r.y);
+}
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
   targetCtx.save();
@@ -888,6 +900,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // Front/Back/Sleeves/Collar placement correspond to the same normalized
     // coordinates consumed by the locked 3D UV textures.
     if(product.id!=='tshirt'&&product.id!=='long-sleeve-tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    if(includeGuides)drawLongSleeveWhiteGrid(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
@@ -1111,6 +1124,16 @@ function updateTshirtZoneTextures(){
  if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
  product.zones.forEach(zone=>{
   const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;
+  if(product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back')){
+    const rec=ensureTemplateImage(zone);
+    if(rec?.maskCanvas&&rec.bounds&&mesh.userData.patternMask!==rec.maskCanvas){
+      const mask=rec.maskCanvas.getContext('2d').getImageData(0,0,rec.maskCanvas.width,rec.maskCanvas.height);
+      const mapped=bodyPatternUv(mesh.geometry.getAttribute('position').array,zone,mask,rec.bounds);
+      mesh.geometry.getAttribute('uv').array.set(mapped);
+      mesh.geometry.getAttribute('uv').needsUpdate=true;
+      mesh.userData.patternMask=rec.maskCanvas;
+    }
+  }
   disposeZoneTexture(mesh);
   // All-Over Print T-Shirt only: the supplied Front/Back 3D UV frame sits
   // visually lower than the production-template frame. Raise TEXT by 9% in
