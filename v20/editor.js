@@ -61,7 +61,7 @@ const MQD_LONG_SLEEVE_POLO_CALIBRATION='isolated-long-sleeve-polo-v2-exclusive-z
 const MQD_FLEECE_HOODIE_CALIBRATION='isolated-fleece-hoodie-v7-reference-mockups-solid-back';
 // Long Sleeve Shirt With Hood only: five exclusive printable surfaces plus
 // untouched drawstrings/lining. Every previously approved renderer stays frozen.
-const MQD_HOODED_LONG_SLEEVE_CALIBRATION='isolated-five-zone-v1-neutral-drawstrings';
+const MQD_HOODED_LONG_SLEEVE_CALIBRATION='isolated-five-zone-v2-cutline-fill-text-stack';
 let colorRaf=0;
 let previewUpdateTimer=0;
 function scheduleGarmentPreview(delay=110){
@@ -104,7 +104,9 @@ function ensureTemplateImage(zone=activeZone){
   const jacketSleeve=product.id==='lightweight-jacket'&&zone.includes('Sleeve');
   const jacketBack=product.id==='lightweight-jacket'&&zone==='Back';
   const hoodMaskBody=product.id==='hood-mask-shirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
-  const cacheKey=hoodMaskBody?'hood-mask-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const hoodedLongBody=product.id==='hooded-long-sleeve'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
+  const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
+  const cacheKey=hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -112,7 +114,7 @@ function ensureTemplateImage(zone=activeZone){
   img.onload=()=>{
     rec.img=img;
     try{
-      const built=buildTemplateMask(img,zone,jacketSleeve,jacketBack,hoodMaskBody);
+      const built=buildTemplateMask(img,zone,jacketSleeve,jacketBack,solidBodyTemplate);
       if(hoodMaskBody){
         // Keep the approved 3D artwork proportions independent of the 2D fill.
         const previous=buildTemplateMask(img,zone,false,false,false).bounds;
@@ -142,7 +144,7 @@ function ensureTemplateImage(zone=activeZone){
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
 function preloadTemplates(){product.zones.forEach(z=>ensureTemplateImage(z));}
 
-function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,hoodMaskBody=false){
+function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,solidBodyTemplate=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -180,9 +182,10 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,hoo
     return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:minY,w:maxX-minX,h:maxY-minY}};
   }
 
-  // Approved hood-mask 3D mapping is frozen. This mask is only the 2D
-  // Front/Back/sleeve silhouette, enclosed by the supplied solid perimeter.
-  if(hoodMaskBody){
+  // Fill the complete production piece enclosed by its supplied perimeter.
+  // This affects the 2D print canvas only; each garment's 3D split stays in
+  // its product-specific renderer.
+  if(solidBodyTemplate){
     const wall=new Uint8Array(w*h),exterior=new Uint8Array(w*h),pending=new Int32Array(w*h);
     for(let p=0;p<w*h;p++){const i=p*4;wall[p]=pixels[i+3]>15&&Math.min(pixels[i],pixels[i+1],pixels[i+2])<180?1:0;}
     let head=0,tail=0;
@@ -573,7 +576,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false)return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
@@ -654,7 +657,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // already contains the customer text, so the generic helper overlay would
     // draw a second copy on top. Other products keep their approved behavior.
     const hoodMaskSleeve=product.id==='hood-mask-shirt'&&activeZone.includes('Sleeve');
-    if(product.id!=='lightweight-jacket'&&product.id!=='shorts'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    if(product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
@@ -910,13 +913,29 @@ function rebuildHoodedLongSleevePreview(){
   disposeZoneTexture(mesh);
   // The supplied sleeve geometry reverses its outside-facing U direction;
   // mirror text only so the 2D reading direction is preserved on the garment.
-  const artwork=makeCleanZoneArtworkCanvas(zone,1600,hoodedLongSleeveArtworkTransform(zone)),canvas=document.createElement('canvas');
+  const transform=hoodedLongSleeveArtworkTransform(zone);
+  const artwork=makeCleanZoneArtworkCanvas(zone,1600,{...transform,layerFilter:layer=>zone!=='Front'||layer.type!=='text'}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);paint.drawImage(artwork,0,0);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=true;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=true;
   if(zone.includes('Sleeve')||zone==='Hood')texture.wrapS=THREE.RepeatWrapping;
   texture.needsUpdate=true;mesh.material.map=texture;mesh.material.color.set('#ffffff');mesh.material.transparent=false;mesh.material.opacity=1;mesh.material.needsUpdate=true;
  }
+
+ // Front text is its own conforming pass: it remains above the hood edge but
+ // below the garment's untouched physical drawstrings.
+ const front=hoodedLongSleevePanels.get('Front');
+ const frontText=zoneState('Front').layers.some(layer=>layer.visible!==false&&layer.type==='text');
+ if(front&&frontText){
+  garment.updateMatrixWorld(true);front.updateMatrixWorld(true);
+  const canvas=makeCleanZoneArtworkCanvas('Front',1600,{...hoodedLongSleeveArtworkTransform('Front'),layerFilter:layer=>layer.type==='text'});
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=true;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=true;texture.needsUpdate=true;
+  const geometry=front.geometry.clone();
+  const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.01,depthTest:false,depthWrite:false,side:THREE.FrontSide,toneMapped:false});
+  const overlay=new THREE.Mesh(geometry,material);overlay.name='MQD_Hooded_Long_Front_Text';overlay.matrix.copy(front.matrixWorld);overlay.matrixAutoUpdate=false;overlay.renderOrder=20;decalGroup.add(overlay);
+ }
+ const strings=garment.getObjectByName('MQD_Hooded_Long_Drawstrings');
+ if(strings){strings.material.transparent=true;strings.material.opacity=1;strings.material.depthTest=true;strings.material.depthWrite=false;strings.material.needsUpdate=true;strings.renderOrder=30;}
  return true;
 }
 function rebuildHatPreview(){
