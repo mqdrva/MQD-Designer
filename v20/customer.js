@@ -44,6 +44,7 @@ const MQD_PRICES={
 const STANDARD_SIZES=['S','M','L','XL','2XL','3XL','4XL','5XL'];
 const SHORTS_SIZES=['S','M','L','XL','2XL','3XL'];
 const NO_SIZE_PRODUCTS=new Set(['hat','mask']);
+const FITTED_LONG_SLEEVE_PRODUCTS=new Set(['long-sleeve-tshirt','long-sleeve-polo','hood-mask-shirt','hooded-long-sleeve']);
 
 function currentProductId(){return $('productSelect')?.value||'';}
 function sizesForProduct(id=currentProductId()){
@@ -105,7 +106,14 @@ function renderOrderOptions(){
   }
   let note=section.querySelector('.order-options-note');
   if(!note){note=document.createElement('div');note.className='order-options-note';section.appendChild(note);}
-  note.textContent=sizes.length?(currentProductId()==='shorts'?'Shorts are available in S–3XL.':'Available in S–5XL.'):'This item uses quantity only.';
+  note.classList.remove('fit-warning');
+  const pid=currentProductId();
+  if(FITTED_LONG_SLEEVE_PRODUCTS.has(pid)){
+    note.textContent='Sizes run fitted, so we recommend a size up for a loose fit — especially the long sleeve.';
+    note.classList.add('fit-warning');
+  }else{
+    note.textContent=sizes.length?(pid==='shorts'?'Shorts are available in S–3XL.':'Available in S–5XL.'):'This item uses quantity only.';
+  }
 }
 
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
