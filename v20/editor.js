@@ -627,7 +627,8 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // Lightweight Jacket 2D editor only: render text once. The masked source
     // already contains the customer text, so the generic helper overlay would
     // draw a second copy on top. Other products keep their approved behavior.
-    if(product.id!=='lightweight-jacket')drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    const hoodMaskSleeve=product.id==='hood-mask-shirt'&&activeZone.includes('Sleeve');
+    if(product.id!=='lightweight-jacket'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay

@@ -14,6 +14,19 @@ assert.equal(panels.size,6);assert.equal(all.length,7);assert.equal(source.visib
 assert.equal(new Set(all.map(m=>m.material)).size,7);
 const zones=new Map(all.map(m=>[m.name,m]));
 for(const mesh of all){assert.ok(mesh.geometry.attributes.position.count>0);assert.ok([...mesh.geometry.attributes.uv.array].every(Number.isFinite));}
+for(const [name,side] of [['Left Sleeve',1],['Right Sleeve',-1]]){
+ const mesh=panels.get(name),p=mesh.geometry.attributes.position,uv=mesh.geometry.attributes.uv;
+ const box=mesh.geometry.boundingBox,center=box.getCenter(new THREE.Vector3());
+ let outer=-Infinity,inner=-Infinity,outerU=0,innerU=0;
+ for(let i=0;i<p.count;i++){
+  const radial=side*(p.getX(i)-center.x),zPenalty=Math.abs(p.getZ(i)-center.z)*10;
+  if(radial-zPenalty>outer){outer=radial-zPenalty;outerU=uv.getX(i);}
+  if(-radial-zPenalty>inner){inner=-radial-zPenalty;innerU=uv.getX(i);}
+ }
+ const wrapped=u=>((u%1)+1)%1;
+ assert.ok(Math.abs(wrapped(outerU)-.5)<.08,`${name} artwork center must face outside`);
+ assert.ok(wrapped(innerU)<.08||wrapped(innerU)>.92,`${name} inner seam must stay at texture edge`);
+}
 function area(geometry){let sum=0;const p=geometry.attributes.position,i=geometry.index,n=i?i.count:p.count;const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();for(let k=0;k<n;k+=3){a.fromBufferAttribute(p,i?i.getX(k):k);b.fromBufferAttribute(p,i?i.getX(k+1):k+1);c.fromBufferAttribute(p,i?i.getX(k+2):k+2);sum+=b.sub(a).cross(c.sub(a)).length()/2;}return sum;}
 assert.ok(Math.abs([...zones.values()].reduce((sum,m)=>sum+area(m.geometry),0)-area(g))<1e-6,'Clipped hood must conserve surface area');
 

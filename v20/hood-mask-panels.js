@@ -50,7 +50,12 @@ export function createHoodMaskPanels(source){
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(data.p,3));geometry.setAttribute('normal',new THREE.Float32BufferAttribute(data.n,3));geometry.computeBoundingBox();
   const b=geometry.boundingBox,s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3()),uv=[];
   for(let k=0;k<data.p.length;k+=3){const [x,y,z]=data.p.slice(k,k+3);let u;
-   if(id===2||id===3)u=(Math.atan2(z-c.z,x-c.x)/(2*Math.PI)+1)%1;
+   if(id===2||id===3){
+    // Center sleeve artwork on the outside arm. The inner seam remains at
+    // the texture edge, preventing centered text from appearing by the torso.
+    const outward=id===2?x-c.x:c.x-x;
+    u=(.5+Math.atan2(z-c.z,outward)/(2*Math.PI)+1)%1;
+   }
    else if(id===4)u=(Math.atan2(x,z)/(2*Math.PI)+1)%1;
    else u=id===1?(b.max.x-x)/s.x:(x-b.min.x)/s.x;
    uv.push(u,(y-b.min.y)/s.y);
