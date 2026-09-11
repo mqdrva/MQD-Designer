@@ -118,8 +118,10 @@ function ensureTemplateImage(zone=activeZone){
   const hoodMaskBody=product.id==='hood-mask-shirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const hoodedLongBody=product.id==='hooded-long-sleeve'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const tshirtBody2d=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  const longSleeveTshirtBody2d=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
+  const longSleeveTshirtSleeve2d=product.id==='long-sleeve-tshirt'&&zone.includes('Sleeve');
   const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
-  const cacheKey=tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const cacheKey=tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:longSleeveTshirtBody2d?'long-sleeve-tshirt-body-v1:'+zone+':'+t.path:longSleeveTshirtSleeve2d?'long-sleeve-tshirt-sleeve-v1:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -266,10 +268,11 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
     }};
   }
 
-  // All-Over Print T-Shirt Front/Back 2D calibration only.
+  // T-Shirt Front/Back 2D calibration only. Both T-Shirt products use the
+  // same supplied production templates, so they share this exact cutline fill.
   // Match the supplied red production cutline from shoulder to hem. This is
   // deliberately isolated from the locked T-shirt 3D renderer and from sleeves/collar.
-  if(product.id==='tshirt'&&(zone==='Front'||zone==='Back')){
+  if(['tshirt','long-sleeve-tshirt'].includes(product.id)&&(zone==='Front'||zone==='Back')){
     const mask=document.createElement('canvas');mask.width=w;mask.height=h;
     const mx=mask.getContext('2d');mx.fillStyle='#fff';mx.beginPath();
     const back=zone==='Back';
@@ -316,6 +319,62 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
       cutlineCanvas:cut,
       bounds:{x:w*.11,y:h*.035,w:w*.78,h:h*.875}
     };
+  }
+
+  // Long Sleeve T-Shirt sleeves 2D only: reconstruct the full printable
+  // silhouette from the left and right edges of the supplied dashed red
+  // cutline. Interpolation bridges the dash gaps without treating the large
+  // instruction circle as printable artwork. The Collar and every 3D renderer
+  // remain untouched.
+  if(product.id==='long-sleeve-tshirt'&&['Left Sleeve','Right Sleeve'].includes(zone)){
+    const left=new Int32Array(h),right=new Int32Array(h);
+    left.fill(-1);right.fill(-1);
+    const middle=w/2;
+    let yMin=h,yMax=-1;
+
+    for(let y=0;y<h;y++){
+      let lx=w,rx=-1;
+      for(let x=0;x<w;x++){
+        const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
+        const redInk=a>15&&r>170&&g<145&&b<145&&r>g*1.35;
+        if(!redInk)continue;
+        if(x<middle)lx=Math.min(lx,x);
+        if(x>middle)rx=Math.max(rx,x);
+      }
+      if(lx<w)left[y]=lx;
+      if(rx>=0)right[y]=rx;
+      if(left[y]>=0||right[y]>=0){yMin=Math.min(yMin,y);yMax=Math.max(yMax,y);}
+    }
+
+    const interpolate=arr=>{
+      const nextIndex=new Int32Array(h);let next=-1;
+      for(let y=h-1;y>=0;y--){if(arr[y]>=0)next=y;nextIndex[y]=next;}
+      let previous=-1;
+      for(let y=0;y<h;y++){
+        if(arr[y]>=0){previous=y;continue;}
+        const following=nextIndex[y];
+        if(previous>=0&&following>=0){
+          const amount=(y-previous)/(following-previous);
+          arr[y]=Math.round(arr[previous]+(arr[following]-arr[previous])*amount);
+        }else if(previous>=0)arr[y]=arr[previous];
+        else if(following>=0)arr[y]=arr[following];
+      }
+    };
+    interpolate(left);interpolate(right);
+
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d');mx.fillStyle='#fff';
+    let minX=w,maxX=-1;
+    for(let y=yMin;y<=yMax;y++){
+      const lx=left[y],rx=right[y];
+      if(lx<0||rx<0||rx<=lx)continue;
+      mx.fillRect(lx,y,rx-lx+1,1);
+      minX=Math.min(minX,lx);maxX=Math.max(maxX,rx);
+    }
+    if(maxX>=minX){
+      return{maskCanvas:mask,cutlineCanvas:cut,bounds:{x:minX,y:yMin,w:maxX-minX+1,h:yMax-yMin+1}};
+    }
+    console.warn('Long Sleeve T-Shirt sleeve cutline mask fallback used for',zone);
   }
 
   // All-Over Print T-Shirt sleeves 2D only: build the printable fill
