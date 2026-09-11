@@ -11,8 +11,14 @@ export function createHatZones(source){
   const geometry=source.geometry;
   const pos=geometry?.getAttribute('position');
   if(!pos||!source.parent)return null;
+  const index=geometry.index;
+  const hash=a=>{let h=2166136261;for(const byte of new Uint8Array(a.buffer,a.byteOffset,a.byteLength))h=Math.imul(h^byte,16777619)>>>0;return h;};
+  if(pos.count!==295786||index?.count!==1500000||hash(pos.array)!==3326373318||hash(index.array)!==1646225936){
+    console.error('Hat model changed; calibrated zone map cannot be used');
+    return null;
+  }
   if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
-  const normal=geometry.getAttribute('normal'),index=geometry.index;
+  const normal=geometry.getAttribute('normal');
   geometry.computeBoundingBox();
   const box=geometry.boundingBox.clone(),size=new THREE.Vector3();
   box.getSize(size);
@@ -20,11 +26,14 @@ export function createHatZones(source){
   box.getCenter(center);
 
   const billTopY=box.min.y+size.y*.315;
-  const crownFrontZ=center.z+size.z*.035;
+  const crownFrontZ=center.z;
+  const billFrontZ=center.z+size.z*.06;
+  const trimY=box.max.y-size.y*.034;
 
   const buffers={
     'Front Panel':{p:[],n:[]},
     'Top of Bill':{p:[],n:[]},
+    Trim:{p:[],n:[]},
     Rest:{p:[],n:[]}
   };
 
@@ -47,14 +56,15 @@ export function createHatZones(source){
 
     // Top surface of the brim/bill. Restrict by both height and upward normal
     // so the underside of the bill remains neutral.
-    const topBill=cy<=billTopY&&ny>.12;
+    const topBill=cy<=billTopY&&cz>billFrontZ&&ny>.12;
 
     // Front printable crown panel. Keep only the forward-facing crown surface;
     // side/back crown and the button/top structure remain neutral.
     const xRatio=Math.abs((cx-center.x)/Math.max(.001,size.x*.5));
-    const frontPanel=!topBill&&cy>billTopY&&cz>=crownFrontZ&&nz>.02&&xRatio<.94;
+    const frontPanel=!topBill&&cy>billTopY&&cz>=crownFrontZ&&nz>-.05&&xRatio<.94;
+    const fixedTrim=!topBill&&!frontPanel&&cy>trimY;
 
-    const key=topBill?'Top of Bill':frontPanel?'Front Panel':'Rest';
+    const key=topBill?'Top of Bill':frontPanel?'Front Panel':fixedTrim?'Trim':'Rest';
     const b=buffers[key];
     for(const v of verts){
       b.p.push(v[0],v[1],v[2]);
@@ -76,7 +86,7 @@ export function createHatZones(source){
 
   const base=Array.isArray(source.material)?source.material[0]:source.material;
   const zones=new Map();
-  for(const key of['Front Panel','Top of Bill','Rest']){
+  for(const key of['Front Panel','Top of Bill','Trim','Rest']){
     const b=buffers[key];
     if(!b.p.length)continue;
     const g=new THREE.BufferGeometry();
@@ -85,12 +95,12 @@ export function createHatZones(source){
     g.computeBoundingBox();g.computeBoundingSphere();
     const m=base?.clone?base.clone():new THREE.MeshStandardMaterial();
     for(const mapKey of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(mapKey in m)m[mapKey]=null;
-    if(m.color)m.color.set('#f5f5f5');
+    if(m.color)m.color.set(key==='Rest'?'#111111':key==='Trim'?'#b9b9b9':'#f5f5f5');
     m.roughness=.84;m.metalness=0;m.transparent=false;m.opacity=1;m.needsUpdate=true;
     const mesh=new THREE.Mesh(g,m);
     mesh.name='Hat_'+key.replaceAll(' ','_');
     group.add(mesh);
-    if(key!=='Rest')zones.set(key,mesh);
+    if(hatZones.includes(key))zones.set(key,mesh);
   }
 
   source.parent.add(group);
