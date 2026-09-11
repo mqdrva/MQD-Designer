@@ -777,7 +777,10 @@ function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspe
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
-  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide);
+  // Long Sleeve T-Shirt Front/Back only: raise text by 9% of the panel height
+  // to align its worn position with the 2D placement. Images keep their frame.
+  const bodyText=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
+  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{offsetY:-.09}:{});
   if(product.id!=='long-sleeve-tshirt'||zone==='Collar')return artwork;
   const rec=ensureTemplateImage(zone),bounds=rec?.bounds;
   if(!rec?.maskCanvas||!bounds)return artwork;
