@@ -4,6 +4,7 @@ const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
+const AUTH_REDIRECT_URL='https://mqd-designer-vercel.vercel.app/';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
@@ -548,10 +549,18 @@ async function signUp(){
   const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
   if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
   message.textContent='Creating account…';message.className='account-message';
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   if(data.session){await completeAuth(data.session);return;}
   message.textContent='Check your email to confirm your account, then return here and sign in.';message.className='account-message success';
+}
+async function resendConfirmation(){
+  const message=$('authMessage'),email=$('authEmail').value.trim();
+  if(!email){message.textContent='Enter the email address you used to create your account.';message.className='account-message error';return;}
+  message.textContent='Sending a new confirmation email…';message.className='account-message';
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
+  if(error){message.textContent=error.message;message.className='account-message error';return;}
+  message.textContent='A new confirmation email was sent. Use the newest email because older confirmation links may no longer work.';message.className='account-message success';
 }
 async function signOut(){
   await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');
@@ -582,6 +591,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('authOverlay')?.addEventListener('click',e=>{if(e.target===$('authOverlay'))closeAuth();});
   $('authForm')?.addEventListener('submit',signIn);
   $('signUpButton')?.addEventListener('click',signUp);
+  $('resendConfirmationButton')?.addEventListener('click',resendConfirmation);
   $('closeCustomer')?.addEventListener('click',()=>$('customerOverlay').classList.add('hidden'));
   $('customerOverlay')?.addEventListener('click',e=>{if(e.target===$('customerOverlay'))$('customerOverlay').classList.add('hidden');});
   $('signOutButton')?.addEventListener('click',signOut);

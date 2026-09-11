@@ -5,8 +5,9 @@ const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const customer=fs.readFileSync(new URL('../v20/customer.js',import.meta.url),'utf8');
 const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
 
-for(const id of ['accountButton','authOverlay','customerOverlay','designsList','ordersList'])assert(html.includes(`id="${id}"`),`${id} must exist`);
-for(const feature of ['signInWithPassword','auth.signUp','customer_designs','customer-artwork','Buy Again','duplicateCloudDesign','mqd_orders'])assert(customer.includes(feature),`${feature} must stay connected`);
+for(const id of ['accountButton','authOverlay','resendConfirmationButton','customerOverlay','designsList','ordersList'])assert(html.includes(`id="${id}"`),`${id} must exist`);
+for(const feature of ['signInWithPassword','auth.signUp','auth.resend','customer_designs','customer-artwork','Buy Again','duplicateCloudDesign','mqd_orders'])assert(customer.includes(feature),`${feature} must stay connected`);
+assert(customer.includes("const AUTH_REDIRECT_URL='https://mqd-designer-vercel.vercel.app/'"),'auth email links must use the permanent production URL');
 assert(customer.includes('Authorization:`Bearer ${token}`'),'checkout submission must send the signed-in customer JWT');
 assert(customer.includes("if(!requireAccount('Create or sign into your account to save"),'saving must require an account');
 assert(customer.includes("if(!requireAccount('Create or sign into your account before adding"),'cart must require an account');
