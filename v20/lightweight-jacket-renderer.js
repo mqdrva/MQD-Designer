@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {jacketFaceZone,matchesJacketGeometry} from './lightweight-jacket-zones.js';
+import {jacketHoodValue,splitJacketHood} from './lightweight-jacket-hood.js';
 
 export const jacketZones=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
 export function createJacketZones(source){
@@ -8,8 +9,11 @@ export function createJacketZones(source){
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const normal=geometry.getAttribute('normal'),buffers=jacketZones.map(()=>({p:[],n:[]}));
  for(let face=0;face<index.count/3;face++){
-  const b=buffers[jacketFaceZone(face)];
-  for(let k=0;k<3;k++){const i=index.getX(face*3+k);b.p.push(pos.getX(i),pos.getY(i),pos.getZ(i));b.n.push(normal.getX(i),normal.getY(i),normal.getZ(i));}
+  const zone=jacketFaceZone(face);
+  const triangle=[0,1,2].map(k=>{const i=index.getX(face*3+k);return[pos.getX(i),pos.getY(i),pos.getZ(i),normal.getX(i),normal.getY(i),normal.getZ(i),jacketHoodValue(i)];});
+  const bodyZone=zone===4?(triangle.reduce((sum,v)=>sum+v[2],0)/3>.015?0:1):zone;
+  const parts=zone===2||zone===3?[[zone,triangle]]:splitJacketHood(triangle,bodyZone);
+  for(const [target,poly] of parts){const b=buffers[target];for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){b.p.push(...v.slice(0,3));const length=triangle.includes(v)?1:(Math.hypot(...v.slice(3,6))||1);b.n.push(v[3]/length,v[4]/length,v[5]/length);}}
  }
  const group=new THREE.Group();group.name='MQD_Lightweight_Jacket_Zones';group.position.copy(source.position);group.quaternion.copy(source.quaternion);group.scale.copy(source.scale);
  const zones=new Map();
