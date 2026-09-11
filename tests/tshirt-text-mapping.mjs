@@ -25,17 +25,17 @@ const collarHigh=panelUv('Collar',.1,.8,0,bounds);
 assert.equal(collarLow[1],0);
 assert.equal(collarHigh[1],1);
 
-// Guard the editor path that keeps T-shirt artwork/text offset-free in 3D.
-// The only legacy vertical artwork offset allowed here belongs to the
-// Short Sleeve Polo Back, not the All-Over Print T-Shirt.
+// Guard the calibrated All-Over Print T-Shirt text mapping. Front/Back text
+// is intentionally raised 9% in the 3D texture frame to match the 2D template;
+// images and the other three T-shirt zones stay unshifted.
 const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
 assert(editor.includes("MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved'"));
-assert(editor.includes("MQD_TSHIRT_TEXT_MAPPING_LOCK='normalized-five-zone-v1'"));
+assert(editor.includes("MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2'"));
 assert(editor.includes("product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0"));
-assert(!editor.includes("product.id==='tshirt'&&zone==='Back'?-canvas.height"));
-assert(!editor.includes("product.id==='tshirt'&&zone==='Front'?-canvas.height"));
+assert(editor.includes("const tshirtBodyText=product.id==='tshirt'&&(zone==='Front'||zone==='Back')"));
+assert(editor.includes("tshirtBodyText?{offsetY:-.09}:{}"));
 
 console.log({
   zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],
-  checks:'T-shirt 2D/3D text anchors stay normalized and the approved fill remains locked.'
+  checks:'T-shirt Front/Back text is calibrated 9% higher in 3D; sleeves/collar and approved fill remain locked.'
 });
