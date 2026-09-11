@@ -30,6 +30,73 @@ const MQD_PRICES={
   'hat':35
 };
 
+const STANDARD_SIZES=['S','M','L','XL','2XL','3XL','4XL','5XL'];
+const SHORTS_SIZES=['S','M','L','XL','2XL','3XL'];
+const NO_SIZE_PRODUCTS=new Set(['hat','mask']);
+
+function currentProductId(){return $('productSelect')?.value||'';}
+function sizesForProduct(id=currentProductId()){
+  if(NO_SIZE_PRODUCTS.has(id))return[];
+  return id==='shorts'?SHORTS_SIZES:STANDARD_SIZES;
+}
+function selectedOrderOptions(){
+  const rows=[...document.querySelectorAll('#orderOptionRows .order-option-row')];
+  return rows.map(row=>({
+    size:row.querySelector('.order-size')?.value||null,
+    quantity:Math.max(1,Math.min(999,Number(row.querySelector('.order-qty')?.value)||1))
+  }));
+}
+function validateOrderOptions(){
+  const options=selectedOrderOptions();
+  if(!options.length)return{ok:false,message:'Add at least one quantity.'};
+  const sized=sizesForProduct().length>0;
+  if(sized){
+    const seen=new Set();
+    for(const item of options){
+      if(!item.size)return{ok:false,message:'Choose a size for each row.'};
+      if(seen.has(item.size))return{ok:false,message:'Each size only needs one row. Increase its quantity instead.'};
+      seen.add(item.size);
+    }
+  }
+  return{ok:true,options};
+}
+function makeOrderOptionRow(defaultSize=null,quantity=1){
+  const sizes=sizesForProduct();
+  const row=document.createElement('div');
+  row.className='order-option-row'+(sizes.length?'':' quantity-only');
+  if(sizes.length){
+    const sizeWrap=document.createElement('label');sizeWrap.className='order-option-field';
+    sizeWrap.innerHTML='<span class="order-option-label">Size</span>';
+    const select=document.createElement('select');select.className='order-size';
+    select.innerHTML=sizes.map(x=>`<option value="${x}">${x}</option>`).join('');
+    select.value=defaultSize&&sizes.includes(defaultSize)?defaultSize:sizes[0];
+    sizeWrap.appendChild(select);row.appendChild(sizeWrap);
+  }
+  const qtyWrap=document.createElement('label');qtyWrap.className='order-option-field';
+  qtyWrap.innerHTML='<span class="order-option-label">Quantity</span>';
+  const qty=document.createElement('input');qty.className='order-qty';qty.type='number';qty.min='1';qty.max='999';qty.step='1';qty.value=String(Math.max(1,quantity||1));
+  qty.addEventListener('change',()=>{qty.value=String(Math.max(1,Math.min(999,Number(qty.value)||1)));});
+  qtyWrap.appendChild(qty);row.appendChild(qtyWrap);
+  const remove=document.createElement('button');remove.type='button';remove.className='remove-order-row';remove.setAttribute('aria-label','Remove size');remove.textContent='×';
+  remove.onclick=()=>{const host=$('orderOptionRows');if(host?.children.length>1)row.remove();};
+  row.appendChild(remove);
+  return row;
+}
+function renderOrderOptions(){
+  const host=$('orderOptionRows'),add=$('addOrderOptionRow'),section=$('orderOptionsSection');
+  if(!host||!section)return;
+  host.innerHTML='';
+  const sizes=sizesForProduct();
+  host.appendChild(makeOrderOptionRow(sizes[0]||null,1));
+  if(add){
+    add.hidden=!sizes.length;
+    add.innerHTML='<span>＋</span> Add another size';
+  }
+  let note=section.querySelector('.order-options-note');
+  if(!note){note=document.createElement('div');note.className='order-options-note';section.appendChild(note);}
+  note.textContent=sizes.length?(currentProductId()==='shorts'?'Shorts are available in S–3XL.':'Available in S–5XL.'):'This item uses quantity only.';
+}
+
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
 function priceFor(id,fallback=0){return Object.prototype.hasOwnProperty.call(MQD_PRICES,id)?MQD_PRICES[id]:Number(fallback)||0;}
 
@@ -176,7 +243,7 @@ function cartItems(){
   }catch{return[]}
 }
 function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));}
-function updateCartButton(){const b=$('cartButton');if(b)b.textContent='Cart ('+cartItems().length+')';}
+function updateCartButton(){const b=$('cartButton');if(!b)return;const count=cartItems().reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);b.textContent='Cart ('+count+')';}
 
 async function submitDesignToBackend(payload){
   const clean=structuredClone(payload);
@@ -208,8 +275,12 @@ async function addToCart(){
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Adding…';
   try{
+    const selection=validateOrderOptions();
+    if(!selection.ok)throw new Error(selection.message);
     const payload=await captureDesignJSON();
     if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
+    payload.orderOptions=selection.options;
+    payload.totalQuantity=selection.options.reduce((n,x)=>n+x.quantity,0);
     let result=null;
     let pendingSync=false;
     let backendError='';
@@ -232,6 +303,8 @@ async function addToCart(){
       productId:payload.product?.id,
       productName:payload.product?.name,
       price:priceFor(payload.product?.id,payload.product?.price),
+      orderOptions:payload.orderOptions,
+      totalQuantity:payload.totalQuantity,
       addedAt:new Date().toISOString(),
       pendingSync,
       draftKey,
@@ -257,8 +330,12 @@ function stripeCheckoutUrl(item){
 function showCart(){
   const items=cartItems();
   if(!items.length){alert('Your cart is empty.');return;}
-  const total=items.reduce((n,x)=>n+(Number(x.price)||0),0);
-  const summary=items.map((x,i)=>`${i+1}. ${x.productName} — $${Number(x.price).toFixed(2)}\nRef: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}`;
+  const total=items.reduce((n,x)=>n+(Number(x.price)||0)*(Number(x.totalQuantity)||1),0);
+  const summary=items.map((x,i)=>{
+    const options=(x.orderOptions||[]).map(o=>`${o.size?o.size+' × ':''}${o.quantity}`).join(', ');
+    const qty=Number(x.totalQuantity)||1;
+    return `${i+1}. ${x.productName} — ${Number(x.price).toFixed(2)} × ${qty}\n${options?'Size / Qty: '+options+'\n':''}Ref: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`;
+  }).join('\n\n')+`\n\nSubtotal: ${total.toFixed(2)}`;
 
   if(items.some(x=>x.pendingSync)){
     alert(summary+'\n\nCheckout is temporarily blocked because at least one design has not synced to production storage yet.');
@@ -268,7 +345,12 @@ function showCart(){
     alert(summary+'\n\nSandbox checkout currently supports one customized product per checkout. Complete this order, then create the next design.');
     return;
   }
-  const item=items[0],checkoutUrl=stripeCheckoutUrl(item);
+  const item=items[0];
+  if((Number(item.totalQuantity)||1)!==1){
+    alert(summary+'\n\nYour size and quantity selections are saved. The current Stripe test link is priced for one unit, so multi-quantity checkout is blocked until quantity-aware checkout is connected.');
+    return;
+  }
+  const checkoutUrl=stripeCheckoutUrl(item);
   if(!checkoutUrl){
     alert(summary+'\n\nStripe sandbox checkout is not configured for this product yet.');
     return;
@@ -285,8 +367,16 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(select){
     const observer=new MutationObserver(()=>applyPriceOverridesToUI());
     observer.observe(select,{childList:true,subtree:true,characterData:true});
-    select.addEventListener('change',()=>setTimeout(applyPriceOverridesToUI,0));
+    select.addEventListener('change',()=>setTimeout(()=>{applyPriceOverridesToUI();renderOrderOptions();},0));
   }
+  renderOrderOptions();
+  $('addOrderOptionRow')?.addEventListener('click',()=>{
+    const sizes=sizesForProduct();if(!sizes.length)return;
+    const used=new Set(selectedOrderOptions().map(x=>x.size));
+    const next=sizes.find(x=>!used.has(x));
+    if(!next){alert('All available sizes are already listed.');return;}
+    $('orderOptionRows')?.appendChild(makeOrderOptionRow(next,1));
+  });
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);
   $('cartButton')?.addEventListener('click',showCart);
