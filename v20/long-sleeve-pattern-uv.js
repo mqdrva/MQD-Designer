@@ -1,5 +1,5 @@
 // Long Sleeve T-Shirt only. Match the vertical boundaries of the flat pattern
-// to the actual isolated body's neckline/shoulder and hem at each horizontal U.
+// to the actual isolated body's center neckline and hem using one planar frame.
 // Text and images share this geometry mapping; no layer offsets are applied.
 export function bodyPatternUv(positions,zone,mask,bounds,samples=257){
   const clamp=x=>Math.max(0,Math.min(1,x));
@@ -46,11 +46,14 @@ export function bodyPatternUv(positions,zone,mask,bounds,samples=257){
   [low,high,top,bottom].forEach(repair);
   const at=(a,u)=>{const p=clamp(u)*(samples-1),i=Math.min(samples-2,Math.floor(p));return a[i]+(a[i+1]-a[i])*(p-i);};
   const result=new Float32Array(positions.length/3*2);
+  // One affine vertical mapping for the entire panel. Per-column scaling
+  // bends horizontal artwork edges around the neckline and stretches faces.
+  // Retain the approved center neckline/hem anchors without that lateral warp.
+  const lo=at(low,.5),hi=at(high,.5),patternTop=at(top,.5),patternBottom=at(bottom,.5);
   for(let i=0,j=0;i<positions.length;i+=3,j+=2){
     const physicalU=clamp((positions[i]-minX)/width),u=zone==='Back'?1-physicalU:physicalU;
-    const lo=at(low,physicalU),hi=at(high,physicalU);
-    const fraction=clamp((hi-positions[i+1])/Math.max(1e-8,hi-lo));
-    const t=at(top,u)+fraction*(at(bottom,u)-at(top,u));
+    const fraction=(hi-positions[i+1])/Math.max(1e-8,hi-lo);
+    const t=patternTop+fraction*(patternBottom-patternTop);
     result[j]=u;result[j+1]=1-t;
   }
   return result;
