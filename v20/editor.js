@@ -1216,14 +1216,19 @@ function downloadJsonFile(name,data){
 }
 $('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
 $('loadDesign').onclick=()=>$('designUpload').click();
+async function loadDesignPayload(payload,{notify=true}={}){
+ const pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
+ if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
+ if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design.');
+ snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
+ recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();
+ if(notify)alert('Design loaded.');
+}
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
-  const payload=JSON.parse(await f.text()),pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
-  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
-  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design file.');
-  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
-  recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();alert('Design loaded.');
+  await loadDesignPayload(JSON.parse(await f.text()));
  }catch(err){console.error(err);alert('Design could not be loaded: '+err.message);}finally{e.target.value='';}
 };
 function dataUrlBlob(dataUrl){const [h,b]=dataUrl.split(','),bin=atob(b),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:h.match(/data:(.*?);/)[1]});}

@@ -1,5 +1,15 @@
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+
 const $=id=>document.getElementById(id);
-const SUBMIT_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/submit-mqd-design';
+const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
+const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let currentSession=null;
+let activeCloudDesign=null;
+let pendingAfterAuth=null;
+let currentDesignFilter='all';
+let accountDesigns=[];
 const STRIPE_TEST_LINKS={
   'tshirt':'https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01',
   'long-sleeve-tshirt':'https://buy.stripe.com/test_9B67sFg7x1pS96689iaVa02',
@@ -136,6 +146,11 @@ function migratePriceVersion(){
 }
 
 async function captureDesignJSON(){
+  if(window.MQDDesigner?.exportDesign){
+    const payload=window.MQDDesigner.exportDesign();
+    if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
+    return payload;
+  }
   const exportBtn=$('saveDesign');
   if(!exportBtn) throw new Error('Design exporter is not available.');
   let capturedHref='';
@@ -176,19 +191,94 @@ async function savePayloadToDrafts(key,payload){
   });
 }
 
+function accountUser(){return currentSession?.user||null;}
+function openAuth(reason='Sign in to save and reopen designs from any device.',after=null){
+  pendingAfterAuth=after;
+  $('authReason').textContent=reason;
+  $('authMessage').textContent='';$('authMessage').className='account-message';
+  $('authOverlay').classList.remove('hidden');
+  setTimeout(()=>$('authEmail')?.focus(),0);
+}
+function closeAuth(){
+  $('authOverlay').classList.add('hidden');
+  if(!accountUser())pendingAfterAuth=null;
+}
+function updateAccountButton(){
+  const button=$('accountButton');if(!button)return;
+  button.textContent=accountUser()?'My Account':'Sign In';
+}
+function requireAccount(reason,after){
+  if(accountUser())return true;
+  openAuth(reason,after);return false;
+}
+function fileExtension(blob,filename=''){
+  const fromName=filename.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1]?.toLowerCase();
+  if(fromName)return fromName==='jpeg'?'jpg':fromName;
+  return({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[blob.type]||'bin';
+}
+function safePathPart(value){return String(value||'artwork').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,100);}
+function designColors(payload){
+  return Object.fromEntries(Object.entries(payload.design?.zones||{}).map(([zone,state])=>[zone,String(state?.background||'#FFFFFF').toUpperCase()]));
+}
+async function prepareCloudPayload(payload,designId,userId){
+  const cloud=structuredClone(payload);
+  for(const [zone,state] of Object.entries(cloud.design?.zones||{})){
+    for(const layer of state.layers||[]){
+      delete layer.image;
+      if(layer.type!=='image')continue;
+      if(layer.storagePath){delete layer.src;continue;}
+      if(!layer.src)continue;
+      const blob=await dataUrlToBlob(layer.src);
+      const ext=fileExtension(blob,layer.filename);
+      const baseName=safePathPart(layer.filename||'artwork').replace(/\.[^.]+$/,'')||'artwork';
+      const path=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}.${ext}`;
+      const {error}=await supabase.storage.from('customer-artwork').upload(path,blob,{contentType:blob.type||'application/octet-stream',upsert:true});
+      if(error)throw new Error('Artwork upload failed: '+error.message);
+      layer.storagePath=path;delete layer.src;
+    }
+  }
+  return cloud;
+}
+async function saveCloudDesign(payload,{forceNew=false,name=null}={}){
+  const user=accountUser();if(!user)throw new Error('Please sign in first.');
+  const mayUpdate=activeCloudDesign&&activeCloudDesign.status==='draft'&&!forceNew;
+  const id=mayUpdate?activeCloudDesign.id:crypto.randomUUID();
+  const cloudPayload=await prepareCloudPayload(payload,id,user.id);
+  let previewPath=mayUpdate?activeCloudDesign.preview_path:null;
+  const preview=await mockupBlob();
+  if(preview){
+    previewPath=`${user.id}/designs/${id}/preview.png`;
+    const {error}=await supabase.storage.from('customer-artwork').upload(previewPath,preview,{contentType:'image/png',upsert:true});
+    if(error)throw new Error('Preview upload failed: '+error.message);
+  }
+  const record={
+    id,user_id:user.id,product_id:String(payload.product?.id||''),product_name:String(payload.product?.name||'Custom design'),
+    name:name||activeCloudDesign?.name||`${payload.product?.name||'Custom design'} — ${new Date().toLocaleDateString()}`,
+    status:'draft',design_json:cloudPayload,preview_path:previewPath,zone_colors:designColors(payload),
+    parent_design_id:mayUpdate?(activeCloudDesign.parent_design_id||null):(activeCloudDesign?.id||null),
+    version:mayUpdate?(activeCloudDesign.version||1):((activeCloudDesign?.version||0)+1),updated_at:new Date().toISOString()
+  };
+  const {data,error}=await supabase.from('customer_designs').upsert(record,{onConflict:'id'}).select('*').single();
+  if(error)throw new Error(error.message);
+  activeCloudDesign=data;
+  return data;
+}
+
 async function saveDraft(){
+  if(!requireAccount('Create or sign into your account to save this design on every device.',saveDraft))return;
   const btn=$('saveDraft');
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Saving…';
   try{
     const payload=await captureDesignJSON();
     await savePayloadToDrafts(payload.product?.id||'current',payload);
+    await saveCloudDesign(payload);
     btn.textContent='Saved ✓';
     setTimeout(()=>btn.textContent=old,1200);
   }catch(err){
     console.error(err);
     btn.textContent=old;
-    alert('Design could not be saved on this device: '+err.message);
+    alert('The design was saved on this device, but could not be saved to your account: '+err.message);
   }finally{btn.disabled=false;}
 }
 
@@ -246,6 +336,8 @@ function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));
 function updateCartButton(){const b=$('cartButton');if(!b)return;const count=cartItems().reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);b.textContent='Cart ('+count+')';}
 
 async function submitDesignToBackend(payload){
+  const token=currentSession?.access_token;
+  if(!token)throw new Error('Your sign-in session has expired. Please sign in again.');
   const clean=structuredClone(payload);
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
@@ -261,7 +353,7 @@ async function submitDesignToBackend(payload){
   const mockup=await mockupBlob();
   if(mockup) form.append('mockup',mockup,(payload.product?.id||'product')+'-mockup.png');
   form.append('payload',JSON.stringify(clean,(k,v)=>k==='src'||k==='image'?undefined:v));
-  const response=await fetch(SUBMIT_URL,{method:'POST',body:form});
+  const response=await fetch(SUBMIT_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){
     const detail=[result.error,result.stage&&`stage: ${result.stage}`,result.code&&`code: ${result.code}`].filter(Boolean).join(' · ');
@@ -271,6 +363,7 @@ async function submitDesignToBackend(payload){
 }
 
 async function addToCart(){
+  if(!requireAccount('Create or sign into your account before adding this custom design to the cart.',addToCart))return;
   const btn=$('addToCart');
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Adding…';
@@ -279,6 +372,8 @@ async function addToCart(){
     if(!selection.ok)throw new Error(selection.message);
     const payload=await captureDesignJSON();
     if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
+    const cloudDesign=await saveCloudDesign(payload);
+    payload.designId=cloudDesign.id;
     payload.orderOptions=selection.options;
     payload.totalQuantity=selection.options.reduce((n,x)=>n+x.quantity,0);
     let result=null;
@@ -360,6 +455,108 @@ function showCart(){
   if(proceed) window.location.assign(checkoutUrl);
 }
 
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function formatDate(value){try{return new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}catch{return'—';}}
+async function previewUrl(path){
+  if(!path)return'';
+  const {data,error}=await supabase.storage.from('customer-artwork').createSignedUrl(path,3600);
+  return error?'':(data?.signedUrl||'');
+}
+async function hydrateCloudPayload(payload){
+  const copy=structuredClone(payload);
+  for(const state of Object.values(copy.design?.zones||{})){
+    for(const layer of state.layers||[]){
+      if(layer.type!=='image'||!layer.storagePath)continue;
+      const {data,error}=await supabase.storage.from('customer-artwork').download(layer.storagePath);
+      if(error)throw new Error('Could not reopen artwork: '+error.message);
+      layer.src=URL.createObjectURL(data);
+    }
+  }
+  return copy;
+}
+async function openCloudDesign(row,{notify=true}={}){
+  if(!window.MQDDesigner?.loadDesign)throw new Error('The designer is still loading. Please try again.');
+  const payload=await hydrateCloudPayload(row.design_json);
+  await window.MQDDesigner.loadDesign(payload,{notify:false});
+  activeCloudDesign=row;
+  $('customerOverlay').classList.add('hidden');
+  if(notify)alert(row.status==='purchased'?'Purchased design opened. Saving changes will create a new draft version.':'Design opened.');
+}
+async function duplicateCloudDesign(row){
+  activeCloudDesign=row;
+  const payload=await hydrateCloudPayload(row.design_json);
+  const duplicate=await saveCloudDesign(payload,{forceNew:true,name:`Copy of ${row.name}`});
+  await openCloudDesign(duplicate,{notify:false});
+  alert('A new editable copy was created.');
+}
+async function buyAgain(row){
+  await openCloudDesign(row,{notify:false});
+  await addToCart();
+}
+async function loadDesigns(){
+  $('accountLoading').classList.remove('hidden');$('designsList').innerHTML='';
+  const {data,error}=await supabase.from('customer_designs').select('*').neq('status','archived').order('updated_at',{ascending:false});
+  $('accountLoading').classList.add('hidden');
+  if(error)throw new Error(error.message);
+  accountDesigns=data||[];
+  await renderDesigns();
+}
+async function renderDesigns(){
+  const list=$('designsList');list.innerHTML='';
+  const rows=currentDesignFilter==='all'?accountDesigns:accountDesigns.filter(x=>x.status===currentDesignFilter);
+  if(!rows.length){list.innerHTML='<div class="account-empty">No designs in this section yet.</div>';return;}
+  for(const row of rows){
+    const url=await previewUrl(row.preview_path);
+    const item=document.createElement('article');item.className='account-item';item.dataset.id=row.id;
+    item.innerHTML=`${url?`<img class="account-preview" src="${escapeHtml(url)}" alt="${escapeHtml(row.name)} preview">`:'<div class="account-preview placeholder">✦</div>'}<div><h3>${escapeHtml(row.name)}</h3><div class="account-meta">${escapeHtml(row.product_name)} · Version ${Number(row.version)||1}<br>${row.status==='purchased'?'Purchased':'Draft'} · Updated ${escapeHtml(formatDate(row.updated_at))}</div></div><div class="account-actions"><button class="btn" data-action="open" type="button">${row.status==='purchased'?'View / Edit':'Open'}</button><button class="btn" data-action="duplicate" type="button">Duplicate</button>${row.status==='purchased'?'<button class="btn orange" data-action="buy" type="button">Buy Again</button>':''}</div>`;
+    list.appendChild(item);
+  }
+}
+async function loadOrders(){
+  const list=$('ordersList');list.innerHTML='<div class="account-empty">Loading orders…</div>';
+  const {data,error}=await supabase.from('mqd_orders').select('id,order_number,status,product_name,product_price,amount_paid,currency,created_at,paid_at,design_id').order('created_at',{ascending:false});
+  if(error)throw new Error(error.message);
+  list.innerHTML='';
+  if(!data?.length){list.innerHTML='<div class="account-empty">No orders yet.</div>';return;}
+  for(const row of data){
+    const item=document.createElement('article');item.className='account-item';item.dataset.designId=row.design_id||'';
+    const amount=row.amount_paid??row.product_price??0;
+    item.innerHTML=`<div class="account-preview placeholder">#</div><div><h3>${escapeHtml(row.product_name)}</h3><div class="account-meta">${escapeHtml(row.order_number)} · ${escapeHtml(formatDate(row.paid_at||row.created_at))}<br>${new Intl.NumberFormat(undefined,{style:'currency',currency:row.currency||'USD'}).format(Number(amount)||0)} · <span class="order-badge ${escapeHtml(row.status)}">${escapeHtml(row.status)}</span></div></div><div class="account-actions">${row.design_id?'<button class="btn orange" data-order-action="buy" type="button">Buy Again</button>':''}</div>`;
+    list.appendChild(item);
+  }
+}
+async function openCustomerAccount(){
+  if(!requireAccount('Sign in to view your saved designs and orders.',openCustomerAccount))return;
+  $('customerEmail').textContent=accountUser().email||'';$('customerOverlay').classList.remove('hidden');
+  try{await loadDesigns();}catch(err){console.error(err);$('designsList').innerHTML=`<div class="account-empty">Could not load designs: ${escapeHtml(err.message)}</div>`;}
+}
+async function completeAuth(session){
+  currentSession=session;updateAccountButton();
+  if(!session)return;
+  $('authOverlay').classList.add('hidden');
+  const action=pendingAfterAuth;pendingAfterAuth=null;
+  if(action)setTimeout(()=>action(),0);
+}
+async function signIn(event){
+  event.preventDefault();
+  const message=$('authMessage');message.textContent='Signing in…';message.className='account-message';
+  const {data,error}=await supabase.auth.signInWithPassword({email:$('authEmail').value.trim(),password:$('authPassword').value});
+  if(error){message.textContent=error.message;message.className='account-message error';return;}
+  message.textContent='Signed in.';message.className='account-message success';await completeAuth(data.session);
+}
+async function signUp(){
+  const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
+  if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
+  message.textContent='Creating account…';message.className='account-message';
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
+  if(error){message.textContent=error.message;message.className='account-message error';return;}
+  if(data.session){await completeAuth(data.session);return;}
+  message.textContent='Check your email to confirm your account, then return here and sign in.';message.className='account-message success';
+}
+async function signOut(){
+  await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   migratePriceVersion();
   applyPriceOverridesToUI();
@@ -367,7 +564,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(select){
     const observer=new MutationObserver(()=>applyPriceOverridesToUI());
     observer.observe(select,{childList:true,subtree:true,characterData:true});
-    select.addEventListener('change',()=>setTimeout(()=>{applyPriceOverridesToUI();renderOrderOptions();},0));
+    select.addEventListener('change',()=>{activeCloudDesign=null;setTimeout(()=>{applyPriceOverridesToUI();renderOrderOptions();},0);});
   }
   renderOrderOptions();
   $('addOrderOptionRow')?.addEventListener('click',()=>{
@@ -380,5 +577,29 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);
   $('cartButton')?.addEventListener('click',showCart);
+  $('accountButton')?.addEventListener('click',()=>accountUser()?openCustomerAccount():openAuth());
+  $('closeAuth')?.addEventListener('click',closeAuth);
+  $('authOverlay')?.addEventListener('click',e=>{if(e.target===$('authOverlay'))closeAuth();});
+  $('authForm')?.addEventListener('submit',signIn);
+  $('signUpButton')?.addEventListener('click',signUp);
+  $('closeCustomer')?.addEventListener('click',()=>$('customerOverlay').classList.add('hidden'));
+  $('customerOverlay')?.addEventListener('click',e=>{if(e.target===$('customerOverlay'))$('customerOverlay').classList.add('hidden');});
+  $('signOutButton')?.addEventListener('click',signOut);
+  $('designsTab')?.addEventListener('click',async()=>{$('designsTab').classList.add('active');$('ordersTab').classList.remove('active');$('designsPanel').classList.remove('hidden');$('ordersPanel').classList.add('hidden');await loadDesigns();});
+  $('ordersTab')?.addEventListener('click',async()=>{$('ordersTab').classList.add('active');$('designsTab').classList.remove('active');$('ordersPanel').classList.remove('hidden');$('designsPanel').classList.add('hidden');await loadOrders();});
+  document.querySelectorAll('[data-design-filter]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('[data-design-filter]').forEach(x=>x.classList.remove('active'));button.classList.add('active');currentDesignFilter=button.dataset.designFilter;await renderDesigns();}));
+  $('designsList')?.addEventListener('click',async e=>{
+    const button=e.target.closest('[data-action]'),item=e.target.closest('.account-item');if(!button||!item)return;
+    const row=accountDesigns.find(x=>x.id===item.dataset.id);if(!row)return;
+    button.disabled=true;
+    try{if(button.dataset.action==='open')await openCloudDesign(row);else if(button.dataset.action==='duplicate')await duplicateCloudDesign(row);else if(button.dataset.action==='buy')await buyAgain(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
+  });
+  $('ordersList')?.addEventListener('click',async e=>{
+    const button=e.target.closest('[data-order-action="buy"]'),item=e.target.closest('.account-item');if(!button||!item?.dataset.designId)return;
+    button.disabled=true;
+    try{let row=accountDesigns.find(x=>x.id===item.dataset.designId);if(!row){const {data,error}=await supabase.from('customer_designs').select('*').eq('id',item.dataset.designId).single();if(error)throw error;row=data;}await buyAgain(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
+  });
   updateCartButton();
+  supabase.auth.getSession().then(({data})=>completeAuth(data.session));
+  supabase.auth.onAuthStateChange((_event,session)=>{currentSession=session;updateAccountButton();});
 });
