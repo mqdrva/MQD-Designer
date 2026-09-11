@@ -3,6 +3,8 @@ let hoodMaskPanels=null;
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 let lightweightJacketZones=null;
+import {createHatZones,hatProjection} from './hat-renderer.js';
+let hatZoneMeshes=null;
 import {partitionLongSleevePoloTriangle} from './long-sleeve-polo-panels.js';
 import {partitionFleeceHoodieTriangle,hoodiePanelNames} from './fleece-hoodie-panels.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
@@ -851,9 +853,28 @@ function rebuildHoodMaskPreview(){
   mesh.material.map?.dispose();mesh.material.map=texture;mesh.material.color.set('#FFFFFF');mesh.material.needsUpdate=true;
  }
 }
-function rebuildGarmentPreview(){if(product.id==='hood-mask-shirt'&&hoodMaskPanels){rebuildHoodMaskPreview();return;}if(product.id==='lightweight-jacket'&&lightweightJacketZones){rebuildJacketPreview();return;}if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}if(product.id==='fleece-hoodie'&&fleeceHoodieZoneMeshes.size){rebuildFleeceHoodiePreview();return;}rebuildDecals();}
+function rebuildHatPreview(){
+ if(product.id!=='hat'||!hatZoneMeshes)return false;
+ clearDecals();garment.updateMatrixWorld(true);
+ for(const [zone,target] of hatZoneMeshes){
+  const state=zoneState(zone);
+  if(target.material?.color)target.material.color.set(state.background||'#FFFFFF');
+  target.material.needsUpdate=true;
+  if(!state.layers.some(l=>l.visible!==false))continue;
+  const canvas=makeCleanZoneArtworkCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);
+  tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
+  const q=hatProjection(target,zone);
+  try{
+   const geometry=new DecalGeometry(target,q.p,q.r,q.d);
+   const material=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});
+   const artwork=new THREE.Mesh(geometry,material);artwork.renderOrder=10;decalGroup.add(artwork);
+  }catch(e){tex.dispose();console.error('Hat artwork projection failed',zone,e);}
+ }
+ return true;
+}
+function rebuildGarmentPreview(){if(product.id==='hood-mask-shirt'&&hoodMaskPanels){rebuildHoodMaskPreview();return;}if(product.id==='lightweight-jacket'&&lightweightJacketZones){rebuildJacketPreview();return;}if(product.id==='hat'&&hatZoneMeshes){rebuildHatPreview();return;}if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}if(product.id==='fleece-hoodie'&&fleeceHoodieZoneMeshes.size){rebuildFleeceHoodiePreview();return;}rebuildDecals();}
 
-function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}lightweightJacketZones=null;hoodMaskPanels=null;tshirtZoneMeshes.clear();tshirtZoneGroup=null;fleeceHoodieZoneMeshes.clear();fleeceHoodieZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}if(product.id==='fleece-hoodie'){const source=findPrimaryMesh(garment);if(source)splitFleeceHoodieGeometry(source);}if(product.id==='hood-mask-shirt'){const source=findPrimaryMesh(garment);if(source)hoodMaskPanels=createHoodMaskPanels(source);}if(product.id==='lightweight-jacket'){const source=findPrimaryMesh(garment);if(source)lightweightJacketZones=createJacketZones(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
+function loadGarment(){if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}lightweightJacketZones=null;hoodMaskPanels=null;hatZoneMeshes=null;tshirtZoneMeshes.clear();tshirtZoneGroup=null;fleeceHoodieZoneMeshes.clear();fleeceHoodieZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}if(product.id==='fleece-hoodie'){const source=findPrimaryMesh(garment);if(source)splitFleeceHoodieGeometry(source);}if(product.id==='hood-mask-shirt'){const source=findPrimaryMesh(garment);if(source)hoodMaskPanels=createHoodMaskPanels(source);}if(product.id==='lightweight-jacket'){const source=findPrimaryMesh(garment);if(source)lightweightJacketZones=createJacketZones(source);}if(product.id==='hat'){const source=findPrimaryMesh(garment);if(source)hatZoneMeshes=createHatZones(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
 
 function selectProduct(id){cropMode=false;product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
 function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
