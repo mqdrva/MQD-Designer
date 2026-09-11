@@ -105,8 +105,9 @@ function ensureTemplateImage(zone=activeZone){
   const jacketBack=product.id==='lightweight-jacket'&&zone==='Back';
   const hoodMaskBody=product.id==='hood-mask-shirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const hoodedLongBody=product.id==='hooded-long-sleeve'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
+  const tshirtBody2d=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
-  const cacheKey=hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const cacheKey=tshirtBody2d?'tshirt-body-v3:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -253,11 +254,43 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
     }};
   }
 
-  // All-Over Print T-Shirt 2D only: build the printable body/sleeve fill
+  // All-Over Print T-Shirt Front/Back 2D calibration only.
+  // Use a deterministic production silhouette so helper circles/instructions
+  // can never become the fill mask. The true red cutline bitmap is still drawn
+  // on top, while customer color/art fills the complete panel beneath it.
+  if(product.id==='tshirt'&&(zone==='Front'||zone==='Back')){
+    const mask=document.createElement('canvas');mask.width=w;mask.height=h;
+    const mx=mask.getContext('2d');mx.fillStyle='#fff';mx.beginPath();
+    const back=zone==='Back';
+    mx.moveTo(w*.20,h*.90);
+    mx.lineTo(w*.14,h*.31);
+    mx.bezierCurveTo(w*.18,h*.285,w*.20,h*.245,w*.18,h*.18);
+    mx.lineTo(w*.20,h*.08);
+    mx.lineTo(w*.35,h*.04);
+    mx.bezierCurveTo(w*.38,h*.10,w*.41,h*(back?.11:.17),w*.50,h*(back?.12:.20));
+    mx.bezierCurveTo(w*.59,h*(back?.11:.17),w*.62,h*.10,w*.65,h*.04);
+    mx.lineTo(w*.80,h*.08);
+    mx.lineTo(w*.82,h*.18);
+    mx.bezierCurveTo(w*.80,h*.245,w*.82,h*.285,w*.86,h*.31);
+    mx.lineTo(w*.80,h*.90);
+    mx.closePath();mx.fill();
+
+    // Expand a few pixels into the bleed/cut edge so there can be no white halo
+    // immediately inside the red dashed production line.
+    mx.save();mx.lineWidth=Math.max(4,Math.min(w,h)*.006);mx.strokeStyle='#fff';mx.stroke();mx.restore();
+
+    return{
+      maskCanvas:mask,
+      cutlineCanvas:cut,
+      bounds:{x:w*.14,y:h*.04,w:w*.72,h:h*.86}
+    };
+  }
+
+  // All-Over Print T-Shirt sleeves 2D only: build the printable fill
   // from the supplied TRUE RED production cutline instead of helper artwork.
   // This prevents the instruction circle/text from becoming the customer fill mask.
   // The locked T-shirt 3D split/UV renderer is intentionally untouched.
-  if(product.id==='tshirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone)){
+  if(product.id==='tshirt'&&['Left Sleeve','Right Sleeve'].includes(zone)){
     let redBarrier=new Uint8Array(w*h);
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       const i=(y*w+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2],a=pixels[i+3];
@@ -609,7 +642,8 @@ function drawSafeAreaGuide(c,zone,r,rec){
   // All-Over Print T-Shirt sleeve editor only: use a much larger safe-area frame.
   // This changes the 2D guide only; production cutlines and the locked 3D mapping stay untouched.
   const tshirtSleeve=product.id==='tshirt'&&(zone==='Left Sleeve'||zone==='Right Sleeve');
-  const inset=tshirtSleeve?.025:.075,ix=Math.max(tshirtSleeve?4:9,b.w*inset),iy=Math.max(tshirtSleeve?4:9,b.h*inset),x=b.x+ix,y=b.y+iy,w=Math.max(10,b.w-ix*2),h=Math.max(10,b.h-iy*2);
+  const tshirtBody=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  const inset=tshirtSleeve?.025:tshirtBody?.045:.075,ix=Math.max((tshirtSleeve||tshirtBody)?4:9,b.w*inset),iy=Math.max((tshirtSleeve||tshirtBody)?4:9,b.h*inset),x=b.x+ix,y=b.y+iy,w=Math.max(10,b.w-ix*2),h=Math.max(10,b.h-iy*2);
   c.save();c.strokeStyle='#FF8A00';c.lineWidth=2;c.setLineDash([9,7]);c.strokeRect(x,y,w,h);c.setLineDash([]);c.fillStyle='#B85F00';c.font='700 10px Inter, sans-serif';c.textAlign='left';c.textBaseline='top';c.fillText('SAFE AREA',x+5,y+5);c.restore();
 }
 function imageLayerEstimatedDpi(l,zone=activeZone){
