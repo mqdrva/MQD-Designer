@@ -1,0 +1,28 @@
+{
+  "nodeCount": 1,
+  "meshCount": 1,
+  "materialCount": 1,
+  "materials": [
+    "model"
+  ],
+  "primitives": [
+    {
+      "mesh": 0,
+      "primitive": 0,
+      "name": "model",
+      "vertices": 295786,
+      "triangles": 500000,
+      "min": [
+        -0.6128078103065491,
+        -0.48545926809310913,
+        -0.9222249388694763
+      ],
+      "max": [
+        0.6126105189323425,
+        0.48519015312194824,
+        0.9223833680152893
+      ],
+      "material": 0
+    }
+  ]
+}
