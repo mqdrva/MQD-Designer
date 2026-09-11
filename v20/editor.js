@@ -64,6 +64,10 @@ const MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved';
 // T-shirt text/artwork uses one normalized coordinate frame in 2D and 3D.
 // Front/Back are linear panel UVs; sleeve/collar orientation stays in panelUv().
 const MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2';
+// Long Sleeve T-Shirt only: 2D and 3D consume the same cutline-clipped artwork
+// frame. This prevents texture-edge pixels from smearing around seams/necklines.
+// The already-approved Collar renderer deliberately keeps its existing path.
+const MQD_LONG_SLEEVE_TSHIRT_TEXT_MAPPING_LOCK='cutline-clipped-four-zones-v1-collar-frozen';
 // Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
 const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';
@@ -145,7 +149,7 @@ function ensureTemplateImage(zone=activeZone){
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
       rec.status='ready';
-      if(product.id==='shorts')scheduleGarmentPreview(0);
+      if(product.id==='shorts'||product.id==='long-sleeve-tshirt')scheduleGarmentPreview(0);
     }catch(err){
       console.warn('Template mask build failed',t.path,err);
       rec.status='guide-only';
@@ -772,6 +776,25 @@ function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.te
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
+function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
+  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide);
+  if(product.id!=='long-sleeve-tshirt'||zone==='Collar')return artwork;
+  const rec=ensureTemplateImage(zone),bounds=rec?.bounds;
+  if(!rec?.maskCanvas||!bounds)return artwork;
+
+  // Layer coordinates are stored relative to rec.bounds in the 2D editor.
+  // Crop that same physical mask to the normalized artwork frame before the
+  // texture reaches Three.js. Pixels outside the production cutline become
+  // transparent instead of being clamped/repeated over nearby 3D triangles.
+  const clipped=document.createElement('canvas');clipped.width=artwork.width;clipped.height=artwork.height;
+  const c=clipped.getContext('2d');c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
+  c.drawImage(artwork,0,0);
+  c.globalCompositeOperation='destination-in';
+  c.drawImage(rec.maskCanvas,bounds.x,bounds.y,bounds.w,bounds.h,0,0,clipped.width,clipped.height);
+  c.globalCompositeOperation='source-over';
+  return clipped;
+}
+
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
   const tw=t?.width||1000,th=t?.height||1000,scale=Math.min(maxW/tw,maxH/th),dw=Math.round(tw*scale),dh=Math.round(th*scale);
@@ -857,7 +880,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // Do not paint a second editor-only copy; keeping one rendering path makes
     // Front/Back/Sleeves/Collar placement correspond to the same normalized
     // coordinates consumed by the locked 3D UV textures.
-    if(product.id!=='tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    if(product.id!=='tshirt'&&product.id!=='long-sleeve-tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
@@ -1087,7 +1110,9 @@ function updateTshirtZoneTextures(){
   // those two zones so its 3D placement matches the 2D editor. Images, fill,
   // sleeves, collar and every other garment keep their approved behavior.
   const tshirtBodyText=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
-  const artwork=makeCleanZoneArtworkCanvas(zone,1600,tshirtBodyText?{offsetY:-.09}:{}),canvas=document.createElement('canvas');
+  const artwork=product.id==='long-sleeve-tshirt'
+    ?makeLongSleeveTshirtArtworkCanvas(zone,1600)
+    :makeCleanZoneArtworkCanvas(zone,1600,tshirtBodyText?{offsetY:-.09}:{}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
