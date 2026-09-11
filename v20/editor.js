@@ -64,10 +64,9 @@ const MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved';
 // T-shirt text/artwork uses one normalized coordinate frame in 2D and 3D.
 // Front/Back are linear panel UVs; sleeve/collar orientation stays in panelUv().
 const MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2';
-// Long Sleeve T-Shirt only: 2D and 3D consume the same cutline-clipped artwork
-// frame. This prevents texture-edge pixels from smearing around seams/necklines.
-// The already-approved Collar renderer deliberately keeps its existing path.
-const MQD_LONG_SLEEVE_TSHIRT_TEXT_MAPPING_LOCK='cutline-clipped-four-zones-v1-collar-frozen';
+// Long Sleeve T-Shirt: all five zones use the same ordered artwork in 2D/3D.
+// Production silhouettes are 2D guides, not additional 3D neckline masks.
+const MQD_LONG_SLEEVE_TSHIRT_TEXT_MAPPING_LOCK='unified-five-zone-artwork-v2';
 // Short Sleeve Polo Phase 1: use the proven short-sleeve isolated five-panel renderer.
 // T-shirt and Long Sleeve T-shirt branches above remain unchanged/frozen.
 const MQD_SHORT_SLEEVE_POLO_CALIBRATION='isolated-short-sleeve-exact-collar-v3-back-artwork-alignment';
@@ -125,7 +124,7 @@ function ensureTemplateImage(zone=activeZone){
   const longSleeveTshirtBody2d=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
   const longSleeveTshirtSleeve2d=product.id==='long-sleeve-tshirt'&&zone.includes('Sleeve');
   const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
-  const cacheKey=tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:longSleeveTshirtBody2d?'long-sleeve-tshirt-body-v1:'+zone+':'+t.path:longSleeveTshirtSleeve2d?'long-sleeve-tshirt-sleeve-v1:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const cacheKey=product.id==='long-sleeve-tshirt'&&zone==='Collar'?'long-sleeve-tshirt-collar-v2:'+t.path:tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:longSleeveTshirtBody2d?'long-sleeve-tshirt-body-v1:'+zone+':'+t.path:longSleeveTshirtSleeve2d?'long-sleeve-tshirt-sleeve-v1:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -139,7 +138,7 @@ function ensureTemplateImage(zone=activeZone){
         const previous=buildTemplateMask(img,zone,false,false,false).bounds;
         rec.artworkAspect=previous.w/Math.max(1,previous.h);
       }
-      if(product.id==='shorts'){
+      if(product.id==='shorts'||product.id==='long-sleeve-tshirt'){
         const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height;
         // The PNG is a screen reference while the configured dimensions are
         // the production frame. This is the exact aspect shown in the 2D editor.
@@ -768,6 +767,18 @@ function drawLayerStack(c,zone,b){
 }
 function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   const out=document.createElement('canvas');out.width=w;out.height=h;const ox=out.getContext('2d'),rec=ensureTemplateImage(zone),t=product.templates?.[zone];
+  if(product.id==='long-sleeve-tshirt'&&rec?.img&&rec?.maskCanvas&&rec?.bounds){
+    const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height;
+    const b=scaleBounds(rec.bounds,sw,sh,w,h);
+    ox.fillStyle=zoneState(zone).background||'#FFFFFF';ox.fillRect(b.x,b.y,b.w,b.h);
+    // Use exactly the same artwork frame as the 3D texture, then apply the
+    // production silhouette only to this flat panel preview/export.
+    ox.drawImage(makeLongSleeveTshirtArtworkCanvas(zone,Math.max(w,h,1600)),b.x,b.y,b.w,b.h);
+    ox.globalCompositeOperation='destination-in';ox.drawImage(rec.maskCanvas,0,0,w,h);
+    ox.globalCompositeOperation='source-over';
+    if(includeGuide){ox.save();ox.globalAlpha=.72;ox.globalCompositeOperation='multiply';ox.drawImage(rec.img,0,0,w,h);ox.restore();}
+    return out;
+  }
   if(rec?.img&&rec?.maskCanvas&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,b=scaleBounds(rec.bounds,sw,sh,w,h);drawLayerStack(ox,zone,b);ox.globalCompositeOperation='destination-in';ox.drawImage(rec.maskCanvas,0,0,w,h);ox.globalCompositeOperation='source-over';if(includeGuide){ox.save();ox.globalAlpha=.72;ox.globalCompositeOperation='multiply';ox.drawImage(rec.img,0,0,w,h);ox.restore();}return out;}
   if(t?.shape==='rectangle'||!t?.path){drawLayerStack(ox,zone,{x:0,y:0,w,h});return out;}
   ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
@@ -777,38 +788,18 @@ function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspe
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?Number(textMap.imageOffsetY):0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
-  // Front/Back text uses the rectangular 3D panel frame. The production
-  // neckline shape is not a UV mask: applying it here cuts into the chest.
-  const bodyText=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
-  // Images retain the normalized panel coordinates, including the hem at v=0.
-  // The approved text-only offset must not move bottom-aligned images upward.
-  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{layerFilter:l=>l.type!=='text'}:{});
-  if(product.id!=='long-sleeve-tshirt'||zone==='Collar')return artwork;
-  const rec=ensureTemplateImage(zone),bounds=rec?.bounds;
-  if(!rec?.maskCanvas||!bounds)return bodyText?makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14}):artwork;
-
-  // Layer coordinates are stored relative to rec.bounds in the 2D editor.
-  // Crop that same physical mask to the normalized artwork frame before the
-  // texture reaches Three.js. Pixels outside the production cutline become
-  // transparent instead of being clamped/repeated over nearby 3D triangles.
-  const clipped=document.createElement('canvas');clipped.width=artwork.width;clipped.height=artwork.height;
-  const c=clipped.getContext('2d');c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
-  c.drawImage(artwork,0,0);
-  c.globalCompositeOperation='destination-in';
-  c.drawImage(rec.maskCanvas,bounds.x,bounds.y,bounds.w,bounds.h,0,0,clipped.width,clipped.height);
-  c.globalCompositeOperation='source-over';
-  if(bodyText){
-    // Raise text 14% (5% higher than the previous calibration). The exclusive
-    // body mesh supplies the real collar boundary; do not cut a second, deeper
-    // template neckline into its text. Images retain their unshifted frame.
-    const text=makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14,layerFilter:l=>l.type==='text'});
-    // Transparent edge texels prevent ClampToEdge from stretching letters.
-    const tx=text.getContext('2d');
-    tx.clearRect(0,0,text.width,1);tx.clearRect(0,text.height-1,text.width,1);
-    tx.clearRect(0,0,1,text.height);tx.clearRect(text.width-1,0,1,text.height);
-    c.drawImage(text,0,0);
-  }
-  return clipped;
+  // No per-type shifts or second text pass: preserve layer order, spacing,
+  // rotation and scale identically in every zone, including the Collar.
+  // Avoid the generic 256px minimum stretching narrow collar textures.
+  const ratio=zoneDesignAspect(zone);
+  const size=Math.max(maxSide,Math.ceil(256*Math.max(ratio,1/ratio)));
+  const artwork=makeCleanZoneArtworkCanvas(zone,size);
+  const c=artwork.getContext('2d');
+  // A transparent one-pixel border prevents texture-edge smearing. The same
+  // border is present in the 2D artwork; geometry provides the 3D boundaries.
+  c.clearRect(0,0,artwork.width,1);c.clearRect(0,artwork.height-1,artwork.width,1);
+  c.clearRect(0,0,1,artwork.height);c.clearRect(artwork.width-1,0,1,artwork.height);
+  return artwork;
 }
 
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
