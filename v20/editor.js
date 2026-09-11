@@ -547,7 +547,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false)return;x.save();const cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200;x.translate(cx,cy);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false)return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text'){if(textMap.flipX)x.scale(-1,1);drawTextLayer(x,l,b);}x.restore();});return c;}
 
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
@@ -869,7 +869,8 @@ function rebuildJacketPreview(){
 function rebuildHoodMaskPreview(){
  clearDecals();
  for(const [zone,mesh] of hoodMaskPanels){
-  const artwork=makeCleanZoneArtworkCanvas(zone,1600),canvas=document.createElement('canvas');
+  const textMap={flipX:zone.includes('Sleeve'),offsetY:zone==='Front'||zone==='Back'?-.13:0};
+  const artwork=makeCleanZoneArtworkCanvas(zone,1600,textMap),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;const ctx=canvas.getContext('2d');
   ctx.fillStyle=zoneState(zone).background||'#FFFFFF';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(artwork,0,0);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
