@@ -78,3 +78,8 @@ All 12 product GLB model URLs are configured to load from the public Supabase `g
 Vercel remains responsible for the web application; Supabase Storage serves the larger 3D assets.
 The Supabase project URL and publishable key are stored as Vercel environment variables for later application/backend use.
 No service-role/secret key is embedded in the browser code.
+
+## Customer accounts and repeat ordering
+Customers can design before signing in, then create or sign into a Supabase Auth account when they save or add a design to the cart. Saved designs, preview images, editable versions, purchased-design status, and order history are account-backed and available across devices. The customer area supports reopening drafts, duplicating versions, editing purchased designs as new drafts, and buying a purchased design again.
+
+Customer records are protected with Supabase Row Level Security. Artwork and previews use the private `customer-artwork` bucket under a user-owned path. Checkout submissions are authenticated and link the saved design, customer, order, order item, and production assets without changing the approved garment mapping modules.
