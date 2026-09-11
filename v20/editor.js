@@ -777,13 +777,13 @@ function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspe
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const textY=l.type==='text'?(Number(textMap.offsetY)||0)*b.h:0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+textY;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
-  // Long Sleeve T-Shirt Front/Back only: raise text by 9% of the panel height
-  // to align its worn position with the 2D placement. Images keep their frame.
+  // Front/Back text uses the rectangular 3D panel frame. The production
+  // neckline shape is not a UV mask: applying it here cuts into the chest.
   const bodyText=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
-  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{offsetY:-.09}:{});
+  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{layerFilter:l=>l.type!=='text'}:{});
   if(product.id!=='long-sleeve-tshirt'||zone==='Collar')return artwork;
   const rec=ensureTemplateImage(zone),bounds=rec?.bounds;
-  if(!rec?.maskCanvas||!bounds)return artwork;
+  if(!rec?.maskCanvas||!bounds)return bodyText?makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14}):artwork;
 
   // Layer coordinates are stored relative to rec.bounds in the 2D editor.
   // Crop that same physical mask to the normalized artwork frame before the
@@ -795,6 +795,17 @@ function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
   c.globalCompositeOperation='destination-in';
   c.drawImage(rec.maskCanvas,bounds.x,bounds.y,bounds.w,bounds.h,0,0,clipped.width,clipped.height);
   c.globalCompositeOperation='source-over';
+  if(bodyText){
+    // Raise text 14% (5% higher than the previous calibration). The exclusive
+    // body mesh supplies the real collar boundary; do not cut a second, deeper
+    // template neckline into its text. Keep image clipping unchanged.
+    const text=makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14,layerFilter:l=>l.type==='text'});
+    // Transparent edge texels prevent ClampToEdge from stretching letters.
+    const tx=text.getContext('2d');
+    tx.clearRect(0,0,text.width,1);tx.clearRect(0,text.height-1,text.width,1);
+    tx.clearRect(0,0,1,text.height);tx.clearRect(text.width-1,0,1,text.height);
+    c.drawImage(text,0,0);
+  }
   return clipped;
 }
 
