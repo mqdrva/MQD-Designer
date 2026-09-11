@@ -780,10 +780,12 @@ function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
   // Front/Back text uses the rectangular 3D panel frame. The production
   // neckline shape is not a UV mask: applying it here cuts into the chest.
   const bodyText=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
-  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{imageOffsetY:-.14,layerFilter:l=>l.type!=='text'}:{});
+  // Images retain the normalized panel coordinates, including the hem at v=0.
+  // The approved text-only offset must not move bottom-aligned images upward.
+  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,bodyText?{layerFilter:l=>l.type!=='text'}:{});
   if(product.id!=='long-sleeve-tshirt'||zone==='Collar')return artwork;
   const rec=ensureTemplateImage(zone),bounds=rec?.bounds;
-  if(!rec?.maskCanvas||!bounds)return bodyText?makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14,imageOffsetY:-.14}):artwork;
+  if(!rec?.maskCanvas||!bounds)return bodyText?makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14}):artwork;
 
   // Layer coordinates are stored relative to rec.bounds in the 2D editor.
   // Crop that same physical mask to the normalized artwork frame before the
@@ -798,7 +800,7 @@ function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
   if(bodyText){
     // Raise text 14% (5% higher than the previous calibration). The exclusive
     // body mesh supplies the real collar boundary; do not cut a second, deeper
-    // template neckline into its text. Images use this same vertical frame.
+    // template neckline into its text. Images retain their unshifted frame.
     const text=makeCleanZoneArtworkCanvas(zone,maxSide,{offsetY:-.14,layerFilter:l=>l.type==='text'});
     // Transparent edge texels prevent ClampToEdge from stretching letters.
     const tx=text.getContext('2d');
