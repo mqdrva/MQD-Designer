@@ -25,12 +25,13 @@ assert.equal(zones.size,2);assert.deepEqual([...zones.keys()],['Front Panel','To
 assert.deepEqual(group.children.map(m=>m.name),['Hat_Front_Panel','Hat_Top_of_Bill','Hat_Trim','Hat_Rest']);
 assert.equal(group.children.reduce((sum,m)=>sum+m.geometry.attributes.position.count,0),geometry.index.count,'Every source triangle must have one owner');
 assert.equal(group.getObjectByName('Hat_Rest').material.color.getHexString(),'111111');
-assert.equal(group.getObjectByName('Hat_Trim').material.color.getHexString(),'b9b9b9');
-for(const [zone,mesh] of zones){
- assert.ok(mesh.geometry.attributes.position.count>0);const q=hatProjection(mesh,zone);assert.ok(q.d.toArray().every(v=>Number.isFinite(v)&&v>0));
- for(const other of group.children)other.material.color.set('#ffffff');mesh.material.color.set('#ff0000');
- for(const other of group.children)assert.equal(other.material.color.getHexString(),other===mesh?'ff0000':'ffffff','Zone color must remain isolated');
-}
+const front=zones.get('Front Panel'),billMesh=zones.get('Top of Bill'),trim=group.getObjectByName('Hat_Trim'),rest=group.getObjectByName('Hat_Rest');
+assert.equal(trim.material,front.material,'Crown top must share the Front Panel material');
+for(const [zone,mesh] of zones){assert.ok(mesh.geometry.attributes.position.count>0);const q=hatProjection(mesh,zone);assert.ok(q.d.toArray().every(v=>Number.isFinite(v)&&v>0));}
+front.material.color.set('#ff0000');billMesh.material.color.set('#00ff00');
+assert.equal(trim.material.color.getHexString(),'ff0000','Crown top must follow Front Panel color');
+assert.equal(billMesh.material.color.getHexString(),'00ff00','Bill must remain independent from Front Panel');
+assert.equal(rest.material.color.getHexString(),'111111','Fixed side/back crown must remain black');
 const bill=zones.get('Top of Bill').geometry.attributes.position;
 for(let i=0;i<bill.count;i+=3){
  const z=(bill.getZ(i)+bill.getZ(i+1)+bill.getZ(i+2))/3;
@@ -39,4 +40,4 @@ for(let i=0;i<bill.count;i+=3){
 const changed=geometry.clone();changed.attributes.position=geometry.attributes.position.clone();changed.attributes.position.array[0]+=.001;
 const changedSource=new THREE.Mesh(changed,new THREE.MeshStandardMaterial());new THREE.Group().add(changedSource);
 assert.equal(createHatZones(changedSource),null,'Changed GLB must reject this frozen calibration');
-console.log('PASS: two isolated Hat zones, black fixed crown, gray trim, front-only bill, full 500,000-triangle ownership.');
+console.log('PASS: two isolated Hat zones, Front-linked crown top, black fixed crown, front-only bill, full 500,000-triangle ownership.');
