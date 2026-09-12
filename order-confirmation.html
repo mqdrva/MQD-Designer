@@ -11,7 +11,7 @@
 <body>
 <main class="card">
   <div class="mark">✓</div>
-  <div class="sandbox">SANDBOX TEST ORDER</div>
+  <div class="sandbox" id="sandboxBadge" hidden>TEST ORDER</div>
   <h1>Thank you — your custom order has been received.</h1>
   <p class="lead" id="message">We’re confirming your payment and matching it to your MQD design.</p>
   <section class="order">
@@ -27,6 +27,7 @@
 const STATUS_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-order-status';
 const $=id=>document.getElementById(id);
 const sessionId=new URLSearchParams(location.search).get('session_id')||'';
+if(sessionId.startsWith('cs_test_'))$('sandboxBadge').hidden=false;
 const money=(n,c='USD')=>new Intl.NumberFormat(undefined,{style:'currency',currency:c||'USD'}).format(Number(n)||0);
 async function loadStatus(attempt=0){
   if(!sessionId){$('message').textContent='Payment completed, but this confirmation page did not receive a Stripe session reference.';return;}
@@ -46,7 +47,7 @@ async function loadStatus(attempt=0){
     $('paymentStatus').textContent=paid?'Paid ✓':(data.paymentStatus||data.status||'Processing');
     $('paymentStatus').className=paid?'status':'pending';
     $('message').textContent=paid?'Payment confirmed. Your custom design and production assets are attached to this MQD order.':'Your payment is still being finalized. Your design is safely attached to the order.';
-    if(paid){try{localStorage.removeItem('mqd-cart');}catch{}}
+    if(paid){try{localStorage.removeItem('mqd-cart');localStorage.removeItem('mqd-checkout-request');}catch{}}
   }catch(err){
     console.error(err);
     if(attempt<6){setTimeout(()=>loadStatus(attempt+1),1200);return;}
