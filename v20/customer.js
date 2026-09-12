@@ -11,20 +11,7 @@ let activeCloudDesign=null;
 let pendingAfterAuth=null;
 let currentDesignFilter='all';
 let accountDesigns=[];
-const STRIPE_TEST_LINKS={
-  'tshirt':'https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01',
-  'long-sleeve-tshirt':'https://buy.stripe.com/test_9B67sFg7x1pS96689iaVa02',
-  'short-sleeve-polo':'https://buy.stripe.com/test_eVq28l8F56Kc1DEfBKaVa03',
-  'long-sleeve-polo':'https://buy.stripe.com/test_5kQ8wJ4oP3y00zA75eaVa04',
-  'fleece-hoodie':'https://buy.stripe.com/test_cNi14h3kL4C46XY61aaVa05',
-  'lightweight-jacket':'https://buy.stripe.com/test_4gMbIV08z9WofuuexGaVa06',
-  'mask':'https://buy.stripe.com/test_14A00d3kLgkM4PQ3T2aVa07',
-  'hood-mask-shirt':'https://buy.stripe.com/test_3cI6oBaNd3y00zA61aaVa08',
-  'shorts':'https://buy.stripe.com/test_3cI28l9J95G80zA1KUaVa09',
-  'sweat-pants':'https://buy.stripe.com/test_fZu14hbRh7Og966cpyaVa0a',
-  'hooded-long-sleeve':'https://buy.stripe.com/test_bJe3cp2gH4C46XY2OYaVa0b',
-  'hat':'https://buy.stripe.com/test_6oUaER3kL1pS0zA89iaVa0c'
-};
+const CHECKOUT_URL=SUPABASE_URL+'/functions/v1/create-mqd-checkout';
 const MQD_PRICE_VERSION='2026-09-09-v2';
 const MQD_PRICES={
   'tshirt':50,
@@ -426,13 +413,6 @@ async function addToCart(){
   }finally{btn.disabled=false;}
 }
 
-function stripeCheckoutUrl(item){
-  const base=STRIPE_TEST_LINKS[item?.productId];
-  if(!base)return'';
-  const join=base.includes('?')?'&':'?';
-  return base+join+'client_reference_id='+encodeURIComponent(item.orderNumber||item.designId||'MQD');
-}
-
 let cartSyncInProgress=false;
 async function loadCartDraft(key){
   const db=await openDraftDB();
@@ -512,23 +492,38 @@ async function showCart(){
     alert(summary+'\n\nCould not finish syncing:\n'+errors+'\n\nYour saved designs are retained. Click Cart to retry. Checkout will unlock after every upload succeeds.');
     return;
   }
-  if(items.length!==1){
-    alert(summary+'\n\nSandbox checkout currently supports one customized product per checkout. Complete this order, then create the next design.');
-    return;
-  }
-  const item=items[0];
-  if((Number(item.totalQuantity)||1)!==1){
-    alert(summary+'\n\nYour size and quantity selections are saved. The current Stripe test link is priced for one unit, so multi-quantity checkout is blocked until quantity-aware checkout is connected.');
-    return;
-  }
-  const checkoutUrl=stripeCheckoutUrl(item);
-  if(!checkoutUrl){
-    alert(summary+'\n\nStripe sandbox checkout is not configured for this product yet.');
-    return;
+  if(!requireAccount('Sign in before continuing to secure checkout.',showCart))return;
+  const proceed=confirm(summary+'\n\nContinue to secure checkout?');
+  if(!proceed)return;
+
+  const signature=items.map(x=>x.orderNumber).sort().join('|');
+  let checkoutState={};
+  try{checkoutState=JSON.parse(localStorage.getItem('mqd-checkout-request')||'{}');}catch{}
+  if(checkoutState.signature!==signature||!checkoutState.token){
+    checkoutState={signature,token:crypto.randomUUID()};
+    localStorage.setItem('mqd-checkout-request',JSON.stringify(checkoutState));
   }
 
-  const proceed=confirm(summary+'\n\nContinue to secure Stripe TEST checkout?\n\nNo real money will be charged in sandbox mode.');
-  if(proceed) window.location.assign(checkoutUrl);
+  const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
+  if(sessionError)throw sessionError;
+  const token=sessionData.session?.access_token;
+  if(!token){openAuth('Sign in before continuing to secure checkout.',showCart);return;}
+  const button=$('cartButton');button.disabled=true;button.textContent='Opening checkout…';
+  try{
+    const response=await fetch(CHECKOUT_URL,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({orderNumbers:items.map(x=>x.orderNumber),checkoutToken:checkoutState.token})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.url)throw new Error(result.error||`Checkout could not be created (${response.status})`);
+    window.location.assign(result.url);
+  }catch(error){
+    console.error(error);
+    alert('Checkout is not available yet: '+(error.message||String(error)));
+  }finally{
+    button.disabled=false;updateCartButton();
+  }
 }
 
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
