@@ -344,8 +344,10 @@ function cartItems(){
 function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));}
 function updateCartButton(){const b=$('cartButton');if(!b)return;const count=cartItems().reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);b.textContent='Cart ('+count+')';}
 
-async function submitDesignToBackend(payload){
-  const token=currentSession?.access_token;
+async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
+  const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
+  if(sessionError)throw sessionError;
+  const token=sessionData.session?.access_token;
   if(!token)throw new Error('Your sign-in session has expired. Please sign in again.');
   const clean=structuredClone(payload);
   const form=new FormData();
@@ -353,19 +355,19 @@ async function submitDesignToBackend(payload){
     for(const layer of state.layers||[]){
       if(layer.type!=='image'||!layer.src) continue;
       const filename=layer.filename||'artwork.png';
-      const original=await originalArtworkBlob(filename);
+      const original=retry?null:await originalArtworkBlob(filename);
       const blob=original||await dataUrlToBlob(layer.src);
       form.append('asset',blob,filename);
       form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
     }
   }
-  const mockup=await mockupBlob();
+  if(!retry)mockup=await mockupBlob();
   if(mockup) form.append('mockup',mockup,(payload.product?.id||'product')+'-mockup.png');
   form.append('payload',JSON.stringify(clean,(k,v)=>k==='src'||k==='image'?undefined:v));
-  const response=await fetch(SUBMIT_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
+  const response=await fetch(SUBMIT_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY},body:form});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){
-    const detail=[result.error,result.stage&&`stage: ${result.stage}`,result.code&&`code: ${result.code}`].filter(Boolean).join(' · ');
+    const detail=[result.error||result.message,result.stage&&`stage: ${result.stage}`,result.code&&`code: ${result.code}`].filter(Boolean).join(' · ');
     throw new Error(detail||`Design submission failed (${response.status})`);
   }
   return result;
@@ -431,7 +433,71 @@ function stripeCheckoutUrl(item){
   return base+join+'client_reference_id='+encodeURIComponent(item.orderNumber||item.designId||'MQD');
 }
 
-function showCart(){
+let cartSyncInProgress=false;
+async function loadCartDraft(key){
+  const db=await openDraftDB();
+  try{return await new Promise((resolve,reject)=>{
+    const request=db.transaction('drafts','readonly').objectStore('drafts').get(key);
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error);
+  });}finally{db.close();}
+}
+
+async function retryPendingCart(){
+  const user=accountUser();
+  if(!user)throw new Error('Please sign in to sync your saved cart.');
+  for(const item of cartItems().filter(x=>x.pendingSync)){
+    let update;
+    try{
+      const payload=await loadCartDraft(item.draftKey);
+      if(!payload?.designId||!payload.design?.zones)throw new Error('The saved cart design could not be found on this device.');
+      const {data:design,error}=await supabase.from('customer_designs').select('id,design_json,preview_path').eq('id',payload.designId).eq('user_id',user.id).single();
+      if(error||!design)throw new Error('Sign in with the account that saved this cart design.');
+      const snapshotJSON=value=>JSON.stringify(value,(key,value)=>['src','image','storagePath'].includes(key)?undefined:value);
+      const sameSnapshot=snapshotJSON(payload.design)===snapshotJSON(design.design_json?.design);
+      // Keep the cart snapshot, including its sizes and placement, not the current editor.
+      for(const [zone,state] of Object.entries(payload.design.zones)){
+        for(const layer of state.layers||[]){
+          if(layer.type!=='image')continue;
+          if(layer.src?.startsWith('data:'))continue;
+          const savedLayer=design.design_json?.design?.zones?.[zone]?.layers?.find(x=>x.id===layer.id);
+          const path=layer.storagePath||(sameSnapshot?savedLayer?.storagePath:null);
+          if(!path)throw new Error('Saved artwork is unavailable. Reopen the saved design before trying again.');
+          const {data:blob,error:downloadError}=await supabase.storage.from('customer-artwork').download(path);
+          if(downloadError)throw new Error('Could not retrieve saved artwork: '+downloadError.message);
+          layer.src=await new Promise((resolve,reject)=>{
+            const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
+          });
+        }
+      }
+      // Never attach a mockup of a different garment currently open in the editor.
+      let mockup=null;
+      if(sameSnapshot&&design.preview_path){
+        const {data,error}=await supabase.storage.from('customer-artwork').download(design.preview_path);
+        if(error)throw new Error('Could not retrieve the saved preview: '+error.message);
+        mockup=data;
+      }
+      const result=await submitDesignToBackend(payload,{retry:true,mockup});
+      if(!result.orderNumber||!result.designId)throw new Error('The upload did not return an order reference.');
+      update={designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,backendError:''};
+    }catch(error){
+      update={pendingSync:true,backendError:error.message||String(error)};
+    }
+    // Merge with current storage so additions made during upload are preserved.
+    saveCart(cartItems().map(x=>x.draftKey===item.draftKey?{...x,...update}:x));
+  }
+}
+
+async function showCart(){
+  if(cartSyncInProgress)return;
+  if(cartItems().some(x=>x.pendingSync)){
+    if(!requireAccount('Sign in to sync your saved cart.',showCart))return;
+    cartSyncInProgress=true;
+    const button=$('cartButton');button.disabled=true;button.textContent='Syncing…';
+    try{await retryPendingCart();}
+    catch(error){alert('Could not sync your cart: '+error.message);return;}
+    finally{cartSyncInProgress=false;button.disabled=false;updateCartButton();}
+  }
   const items=cartItems();
   if(!items.length){alert('Your cart is empty.');return;}
   const total=items.reduce((n,x)=>n+(Number(x.price)||0)*(Number(x.totalQuantity)||1),0);
@@ -442,7 +508,8 @@ function showCart(){
   }).join('\n\n')+`\n\nSubtotal: ${total.toFixed(2)}`;
 
   if(items.some(x=>x.pendingSync)){
-    alert(summary+'\n\nCheckout is temporarily blocked because at least one design has not synced to production storage yet.');
+    const errors=items.filter(x=>x.pendingSync).map(x=>`${x.productName}: ${x.backendError||'Upload incomplete'}`).join('\n');
+    alert(summary+'\n\nCould not finish syncing:\n'+errors+'\n\nYour saved designs are retained. Click Cart to retry. Checkout will unlock after every upload succeeds.');
     return;
   }
   if(items.length!==1){
