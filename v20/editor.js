@@ -1010,7 +1010,54 @@ function renderLayerPanel(){
 }
 
 function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZone;$('zoneSize').textContent=t?.width&&t?.height?`${t.width.toLocaleString()} × ${t.height.toLocaleString()} px`:'Custom zone';$('statusProduct').textContent=product.name;$('statusZone').textContent=activeZone;$('statusLayers').textContent=zoneState().layers.length;const c=zoneState().background||'#FFFFFF';$('zoneColor').value=c.toLowerCase();$('zoneHex').value=c;}
-function renderAll(){ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();drawEditor();rebuildGarmentPreview();}
+function renderAll(){ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();}
+
+// Copy design data only. Approved garment geometry and texture mapping stay intact.
+function garmentCopyFamily(id){
+  if(['shorts','sweat-pants'].includes(id))return 'bottoms';
+  if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo','fleece-hoodie','lightweight-jacket','hood-mask-shirt','hooded-long-sleeve'].includes(id))return 'tops';
+  return null;
+}
+function garmentCopyTargets(){const family=garmentCopyFamily(product.id);return family?catalog.filter(p=>p.id!==product.id&&garmentCopyFamily(p.id)===family):[];}
+function renderGarmentCopyControl(){
+  let button=$('copyGarmentDesign');
+  if(!button){
+    button=document.createElement('button');button.id='copyGarmentDesign';button.type='button';button.textContent='Copy to Garment';
+    button.title='Copy Design to Another Garment';button.onclick=openGarmentCopy;
+    $('cloneAllTool')?.parentElement?.appendChild(button);
+  }
+  button.hidden=!garmentCopyTargets().length;
+}
+function openGarmentCopy(){
+  const targets=garmentCopyTargets();if(!targets.length)return;
+  const source=product,dialog=document.createElement('dialog');
+  dialog.setAttribute('aria-label','Copy Design to Another Garment');
+  Object.assign(dialog.style,{width:'min(440px, calc(100vw - 40px))',boxSizing:'border-box',padding:'24px',border:'1px solid #ddd',borderRadius:'14px',fontFamily:'inherit'});
+  const heading=document.createElement('h2');heading.textContent='Copy Design to Another Garment';heading.style.fontSize='20px';
+  const label=document.createElement('label');label.textContent='Destination garment';label.htmlFor='copyGarmentTarget';
+  const select=document.createElement('select');select.id='copyGarmentTarget';Object.assign(select.style,{display:'block',width:'100%',margin:'10px 0',padding:'10px',font:'inherit'});
+  for(const p of targets){const o=document.createElement('option');o.value=p.id;o.textContent=p.name;select.appendChild(o);}
+  const details=document.createElement('p'),note=document.createElement('p');
+  note.textContent='Your original design stays intact. Placement is copied proportionally; review the preview because garment shapes differ.';
+  const update=()=>{const target=targets.find(p=>p.id===select.value),matched=source.zones.filter(z=>target.zones.includes(z)),skipped=source.zones.filter(z=>!target.zones.includes(z)),empty=target.zones.filter(z=>!source.zones.includes(z));details.textContent='Copy: '+matched.join(', ')+'.'+(skipped.length?' Not transferred: '+skipped.join(', ')+'.':'')+(empty.length?' Starts blank: '+empty.join(', ')+'.':'');};select.onchange=update;update();
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'12px',justifyContent:'flex-end'});
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.onclick=()=>dialog.close();
+  const copy=document.createElement('button');copy.type='button';copy.className='primary';copy.textContent='Copy & Preview';
+  copy.onclick=()=>{
+    const target=targets.find(p=>p.id===select.value);
+    if(product.id!==source.id||!target)return;
+    const existing=designs[target.id];
+    const hasDesign=Object.values(existing?.zones||{}).some(z=>(z.layers||[]).length||(z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF');
+    if(hasDesign&&!confirm('Replace the existing '+target.name+' design? Your '+source.name+' design will stay intact.'))return;
+    const sourceState=stateFor(source.id),zones={};
+    for(const zone of target.zones){
+      const original=source.zones.includes(zone)?sourceState.zones[zone]:null;
+      zones[zone]={background:original?.background||'#FFFFFF',layers:(original?.layers||[]).map(layer=>({...layer,id:'layer-'+layerSeq++,crop:layer.crop?{...layer.crop}:undefined}))};
+    }
+    snapshot();designs[target.id]={zones};dialog.close();selectProduct(target.id);
+  };
+  actions.append(cancel,copy);dialog.append(heading,label,select,details,note,actions);dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.appendChild(dialog);dialog.showModal();
+}
 
 
 function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
