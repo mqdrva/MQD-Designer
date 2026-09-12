@@ -1,0 +1,38 @@
+name: Frozen product regressions
+
+on:
+  pull_request:
+    paths:
+      - 'v20/**'
+      - 'assets/templates/**'
+      - 'tests/**'
+      - '.github/workflows/frozen-product-regressions.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'v20/**'
+      - 'assets/templates/**'
+      - 'tests/**'
+      - '.github/workflows/frozen-product-regressions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-products:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify frozen catalog and renderers
+        run: node tests/frozen-product-baseline.mjs
+      - name: Run mapping regressions
+        run: |
+          node --check v20/editor.js
+          node tests/fleece-hoodie-zones.mjs
+          node tests/long-sleeve-pattern-uv.mjs
+          node tests/mask-renderer.mjs
+          node tests/tshirt-text-mapping.mjs
