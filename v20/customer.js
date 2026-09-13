@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
-const AUTH_REDIRECT_URL='https://mqd-designer-vercel.vercel.app/';
+const AUTH_REDIRECT_URL='https://mymerchnow.app/';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
