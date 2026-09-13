@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
 
-const SITE_URL = "https://mqd-designer-vercel.vercel.app/";
+const SITE_URL = "https://mymerchnow.app/";
+const LEGACY_SITE_ORIGIN = "https://mqd-designer-vercel.vercel.app";
 const CATALOG = {
   "tshirt": { name: "All-Over Print T-Shirt", cents: 5000 },
   "long-sleeve-tshirt": { name: "Long Sleeve T-Shirt", cents: 6000 },
@@ -20,7 +21,7 @@ const CATALOG = {
 
 const allowedOrigin = (req) => {
   const origin = req.headers.get("origin") || "";
-  return origin === SITE_URL.slice(0, -1) || /^https:\/\/mqd-designer-vercel(?:-[a-z0-9-]+)?\.vercel\.app$/.test(origin)
+  return origin === SITE_URL.slice(0, -1) || origin === LEGACY_SITE_ORIGIN || /^https:\/\/mqd-designer-vercel(?:-[a-z0-9-]+)?\.vercel\.app$/.test(origin)
     ? origin
     : SITE_URL.slice(0, -1);
 };
