@@ -997,13 +997,14 @@ function renderLayerPanel(){
   wrap.innerHTML='';const arr=zoneState().layers;empty.classList.toggle('hidden',arr.length>0);
   // The layer at the TOP of this list is also the layer visually rendered on top.
   const panelOrder=[...arr].reverse();
-  panelOrder.forEach(l=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=!locked;d.dataset.layerId=l.id;d.title=locked?'MQD artwork placement is locked':'Drag to change layer order';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
+  const orderLocked=arr.some(isLockedLibraryLayer);
+  panelOrder.forEach(l=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=!orderLocked;d.dataset.layerId=l.id;d.title=locked?'MQD artwork placement is locked':orderLocked?'Layer order is fixed while locked MQD artwork is present':'Drag to change layer order';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':orderLocked?'•':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
     d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();drawEditor();};
-    d.ondragstart=e=>{if(locked){e.preventDefault();return;}e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
+    d.ondragstart=e=>{if(orderLocked){e.preventDefault();return;}e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
     d.ondragend=()=>d.classList.remove('dragging-layer');
-    d.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('layer-drop-target');};
+    d.ondragover=e=>{if(orderLocked)return;e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('layer-drop-target');};
     d.ondragleave=()=>d.classList.remove('layer-drop-target');
-    d.ondrop=e=>{e.preventDefault();d.classList.remove('layer-drop-target');const moved=e.dataTransfer.getData('text/plain');if(!moved||moved===l.id)return;snapshot();const order=[...arr].reverse().map(x=>x.id),from=order.indexOf(moved),to=order.indexOf(l.id);if(from<0||to<0)return;const [id]=order.splice(from,1);order.splice(to,0,id);const byId=new Map(arr.map(x=>[x.id,x]));arr.splice(0,arr.length,...order.reverse().map(id=>byId.get(id)).filter(Boolean));activeLayerId=moved;renderAll();};
+    d.ondrop=e=>{if(orderLocked)return;e.preventDefault();d.classList.remove('layer-drop-target');const moved=e.dataTransfer.getData('text/plain');if(!moved||moved===l.id)return;snapshot();const order=[...arr].reverse().map(x=>x.id),from=order.indexOf(moved),to=order.indexOf(l.id);if(from<0||to<0)return;const [id]=order.splice(from,1);order.splice(to,0,id);const byId=new Map(arr.map(x=>[x.id,x]));arr.splice(0,arr.length,...order.reverse().map(id=>byId.get(id)).filter(Boolean));activeLayerId=moved;renderAll();};
     wrap.appendChild(d);});
   const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}
   // Lightweight Jacket 2D editor gets a little more sizing range without
