@@ -14,6 +14,7 @@ let currentDesignFilter='all';
 let accountDesigns=[];
 let libraryAssets=[];
 let libraryContext=null;
+const libraryZoneCache=new Map();
 const STRIPE_TEST_LINKS={
   'tshirt':'https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01',
   'long-sleeve-tshirt':'https://buy.stripe.com/test_9B67sFg7x1pS96689iaVa02',
@@ -227,6 +228,17 @@ async function libraryRequest(body){
   const response=await fetch(LIBRARY_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`Artwork library request failed (${response.status})`);return result;
 }
+async function libraryAssetsForZone(productId,zone){
+  const key=productId+'::'+zone;
+  if(libraryZoneCache.has(key))return libraryZoneCache.get(key);
+  const pending=libraryRequest({action:'catalog',productId,zone}).then(result=>result.assets||[]).catch(error=>{libraryZoneCache.delete(key);throw error;});
+  libraryZoneCache.set(key,pending);return pending;
+}
+async function lockedAssetForZone(assetId,productId,zone){
+  const assets=await libraryAssetsForZone(productId,zone),asset=assets.find(row=>row.id===assetId);
+  return asset?.placementMode==='locked'?asset:null;
+}
+window.MQDArtworkLibrary={...(window.MQDArtworkLibrary||{}),lockedAssetForZone};
 function filteredLibraryAssets(){
   const query=($('artworkLibrarySearch')?.value||'').trim().toLowerCase(),category=$('artworkLibraryCategory')?.value||'all';
   return libraryAssets.filter(asset=>(category==='all'||asset.category===category)&&(!query||`${asset.name} ${asset.category}`.toLowerCase().includes(query)));
@@ -238,7 +250,7 @@ function renderArtworkLibrary(){
 async function openArtworkLibrary(){
   const context=window.MQDDesigner?.getContext?.();if(!context)throw new Error('The designer is still loading. Please try again.');libraryContext=context;
   $('artworkLibraryContext').textContent=`Choose artwork for ${context.productName} · ${context.zone}`;$('artworkLibraryOverlay').classList.remove('hidden');$('artworkLibraryLoading').classList.remove('hidden');$('artworkLibraryGrid').innerHTML='';$('artworkLibraryEmpty').classList.add('hidden');
-  try{const result=await libraryRequest({action:'catalog',productId:context.productId,zone:context.zone});libraryAssets=result.assets||[];renderArtworkLibrary();}
+  try{libraryAssets=await libraryAssetsForZone(context.productId,context.zone);renderArtworkLibrary();}
   catch(error){console.error(error);$('artworkLibraryEmpty').textContent='Could not load the artwork library: '+error.message;$('artworkLibraryEmpty').classList.remove('hidden');}
   finally{$('artworkLibraryLoading').classList.add('hidden');}
 }
@@ -247,7 +259,7 @@ async function hydrateLibraryArtwork(payload){
   const copy=payload;
   for(const [zone,state] of Object.entries(copy.design?.zones||{})){
     const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId);if(!layers.length)continue;
-    const result=await libraryRequest({action:'catalog',productId:copy.product?.id,zone});const byId=new Map((result.assets||[]).map(asset=>[asset.id,asset]));
+    const assets=await libraryAssetsForZone(copy.product?.id,zone);const byId=new Map(assets.map(asset=>[asset.id,asset]));
     for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;}
   }
   return copy;
