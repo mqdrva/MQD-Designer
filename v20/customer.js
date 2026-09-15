@@ -5,7 +5,7 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
 const LIBRARY_URL=SUPABASE_URL+'/functions/v1/mqd-artwork-library';
-const AUTH_REDIRECT_URL='https://mymerchnow.app/';
+function authRedirectUrl(){return window.location.origin+window.location.pathname;}
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
@@ -224,9 +224,7 @@ function requireAccount(reason,after){
   openAuth(reason,after);return false;
 }
 async function libraryRequest(body){
-  const {data,error}=await supabase.auth.getSession();if(error)throw error;
-  const token=data.session?.access_token;if(!token)throw new Error('Sign in is required to use the MQD artwork library.');
-  const response=await fetch(LIBRARY_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const response=await fetch(LIBRARY_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`Artwork library request failed (${response.status})`);return result;
 }
 function filteredLibraryAssets(){
@@ -238,7 +236,6 @@ function renderArtworkLibrary(){
   for(const asset of rows){const button=document.createElement('button');button.type='button';button.className='library-item';button.dataset.assetId=asset.id;button.innerHTML=`<img src="${escapeHtml(asset.renderUrl)}" alt="${escapeHtml(asset.name)}"><strong>${escapeHtml(asset.name)}</strong><span class="${asset.placementMode==='locked'?'locked':''}">${asset.placementMode==='locked'?'Locked placement':'Move and resize'}</span>`;grid.appendChild(button);}
 }
 async function openArtworkLibrary(){
-  if(!requireAccount('Sign in to use the protected MQD artwork library.',openArtworkLibrary))return;
   const context=window.MQDDesigner?.getContext?.();if(!context)throw new Error('The designer is still loading. Please try again.');libraryContext=context;
   $('artworkLibraryContext').textContent=`Choose artwork for ${context.productName} · ${context.zone}`;$('artworkLibraryOverlay').classList.remove('hidden');$('artworkLibraryLoading').classList.remove('hidden');$('artworkLibraryGrid').innerHTML='';$('artworkLibraryEmpty').classList.add('hidden');
   try{const result=await libraryRequest({action:'catalog',productId:context.productId,zone:context.zone});libraryAssets=result.assets||[];renderArtworkLibrary();}
@@ -563,6 +560,7 @@ async function showCart(){
     alert(summary+'\n\nStripe sandbox checkout is not configured for this product yet.');
     return;
   }
+  if(!requireAccount('Create or sign into your account before purchasing this custom design.',showCart))return;
 
   const proceed=confirm(summary+'\n\nContinue to secure Stripe TEST checkout?\n\nNo real money will be charged in sandbox mode.');
   if(proceed) window.location.assign(checkoutUrl);
@@ -663,7 +661,7 @@ async function signInWithGoogle(){
   if(button)button.disabled=true;
   const {error}=await supabase.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo:AUTH_REDIRECT_URL}
+    options:{redirectTo:authRedirectUrl()}
   });
   if(error){
     if(message){message.textContent=error.message;message.className='account-message error';}
@@ -674,7 +672,7 @@ async function signUp(){
   const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
   if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
   message.textContent='Creating account…';message.className='account-message';
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:authRedirectUrl()}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   if(data.session){await completeAuth(data.session);return;}
   message.textContent='Check your email to confirm your account, then return here and sign in.';message.className='account-message success';
@@ -683,7 +681,7 @@ async function resendConfirmation(){
   const message=$('authMessage'),email=$('authEmail').value.trim();
   if(!email){message.textContent='Enter the email address you used to create your account.';message.className='account-message error';return;}
   message.textContent='Sending a new confirmation email…';message.className='account-message';
-  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:authRedirectUrl()}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   message.textContent='A new confirmation email was sent. Use the newest email because older confirmation links may no longer work.';message.className='account-message success';
 }
