@@ -260,7 +260,7 @@ async function hydrateLibraryArtwork(payload){
   for(const [zone,state] of Object.entries(copy.design?.zones||{})){
     const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId);if(!layers.length)continue;
     const assets=await libraryAssetsForZone(copy.product?.id,zone);const byId=new Map(assets.map(asset=>[asset.id,asset]));
-    for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;}
+    for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;layer.libraryPlacements=asset.placements||layer.libraryPlacements||{};}
   }
   return copy;
 }
