@@ -12,9 +12,7 @@ Deno.serve(async(req:Request)=>{
   if(req.method!=='POST')return json(req,{error:'Method not allowed'},405);
   try{
     const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();if(!url||!key)return json(req,{error:'Backend service credentials are not configured'},500);
-    const token=(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');if(!token)return json(req,{error:'Sign in is required'},401);
     const supabase=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
-    const {data:{user},error:userError}=await supabase.auth.getUser(token);if(userError||!user)return json(req,{error:'Your sign-in session is invalid or expired'},401);
     const body=await req.json().catch(()=>({})),action=String(body?.action||'');if(action!=='catalog')return json(req,{error:'Unsupported action'},400);
     const productId=String(body?.productId||'').slice(0,100),zone=String(body?.zone||'').slice(0,100);if(!productId||!zone)return json(req,{error:'Product and print zone are required'},400);
     const {data:placements,error:placementError}=await supabase.from('mqd_library_asset_placements').select('asset_id,x,y,scale,rotation,flip_x,flip_y,crop').eq('product_id',productId).eq('zone_name',zone);
