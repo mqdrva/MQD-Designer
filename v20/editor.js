@@ -1370,7 +1370,7 @@ function addLibraryAsset(asset){
     img.onload=()=>{
       if(!canAddLayer())return reject(new Error('This print zone already has the maximum number of layers.'));
       snapshot();const placement=asset.placement||{},locked=asset.placementMode==='locked',stackOrder=Number(asset.stackOrder)||(locked?0:20);
-      const l={id:'layer-'+layerSeq++,type:'image',label:asset.name||nextLabel(),filename:(asset.slug||'mqd-library-artwork')+'.png',src:asset.renderUrl,image:img,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop||{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:locked,libraryCategory:asset.category||'artwork',libraryPreset:asset.placementPreset||'full',libraryStackOrder:stackOrder};
+      const l={id:'layer-'+layerSeq++,type:'image',label:asset.name||nextLabel(),filename:(asset.slug||'mqd-library-artwork')+'.png',src:asset.renderUrl,image:img,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop||{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:locked,libraryCategory:asset.category||'artwork',libraryPreset:asset.placementPreset||'full',libraryStackOrder:stackOrder,libraryPlacements:asset.placements||{}};
       if(isFullLockedLibraryBackground(l))l.libraryContentBounds=measureVisibleImageBounds(img);
       const layers=zoneState().layers;if(locked){const index=layers.findIndex(row=>!row.libraryLocked||Number(row.libraryStackOrder)>stackOrder);if(index<0)layers.push(l);else layers.splice(index,0,l);}else layers.push(l);
       activeLayerId=l.id;cropMode=false;renderAll();resolve(l);
@@ -1415,14 +1415,18 @@ async function cloneLockedLibraryToAllZones(source){
   const targets=product.zones.filter(zone=>zone!==activeZone&&!zoneState(zone).layers.some(layer=>layer.libraryAssetId===source.libraryAssetId));
   if(!targets.length){alert('This locked artwork is already on every available print zone.');return;}
   let resolved;
-  try{resolved=await Promise.all(targets.map(async zone=>({zone,asset:await resolver(source.libraryAssetId,product.id,zone)})));}
+  try{resolved=await Promise.all(targets.map(async zone=>{
+    const placement=source.libraryPlacements?.[zone];
+    if(placement)return{zone,asset:{id:source.libraryAssetId,name:source.label,slug:source.filename,category:source.libraryCategory,placementMode:'locked',placementPreset:source.libraryPreset,stackOrder:source.libraryStackOrder,renderUrl:source.src,placement,placements:source.libraryPlacements}};
+    return{zone,asset:await resolver(source.libraryAssetId,product.id,zone)};
+  }));}
   catch(error){console.error(error);alert('The approved placements could not be loaded. Please try again.');return;}
   const available=resolved.filter(({zone,asset})=>asset&&zoneState(zone).layers.length<MAX_ZONE_LAYERS),skipped=resolved.filter(({zone,asset})=>!asset||zoneState(zone).layers.length>=MAX_ZONE_LAYERS).map(({zone})=>zone);
   if(!available.length){alert('No additional print zones are available for this locked artwork.');return;}
   snapshot();
   for(const {zone,asset} of available){
     const placement=asset.placement||{},target=zoneState(zone),stackOrder=Number(asset.stackOrder)||0,preset=asset.placementPreset||source.libraryPreset||'full';
-    const copy={...source,id:'layer-'+layerSeq++,label:asset.name||source.label,filename:(asset.slug||source.filename||'mqd-library-artwork').replace(/\.png$/i,'')+'.png',src:asset.renderUrl||source.src,image:source.image,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop?{...placement.crop}:{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:true,libraryCategory:asset.category||source.libraryCategory||'artwork',libraryPreset:preset,libraryStackOrder:stackOrder};
+    const copy={...source,id:'layer-'+layerSeq++,label:asset.name||source.label,filename:(asset.slug||source.filename||'mqd-library-artwork').replace(/\.png$/i,'')+'.png',src:asset.renderUrl||source.src,image:source.image,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop?{...placement.crop}:{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:true,libraryCategory:asset.category||source.libraryCategory||'artwork',libraryPreset:preset,libraryStackOrder:stackOrder,libraryPlacements:asset.placements||source.libraryPlacements||{}};
     if(preset==='full'&&source.libraryContentBounds)copy.libraryContentBounds={...source.libraryContentBounds};else delete copy.libraryContentBounds;
     insertLockedLibraryLayer(target,copy);
   }
