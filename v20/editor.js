@@ -117,7 +117,14 @@ function restoreDesignState(state){
 function snapshot(){history.push(cloneDesignState());if(history.length>30)history.shift();future.length=0;}
 function undo(){if(!history.length)return;future.push(cloneDesignState());restoreDesignState(history.pop());renderAll();}
 function redo(){if(!future.length)return;history.push(cloneDesignState());restoreDesignState(future.pop());renderAll();}
-function repairImageObjects(){Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>z.layers?.forEach(l=>{if(l.type==='image'&&l.src&&!l.image){const img=new Image();img.onload=renderAll;img.src=l.src;l.image=img;}})));}
+function repairImageObjects(){
+  Object.values(designs).forEach(ps=>Object.values(ps.zones||{}).forEach(z=>z.layers?.forEach(l=>{
+    if(l.type!=='image'||!l.src||l.image)return;
+    const img=new Image();if(l.libraryAssetId)img.crossOrigin='anonymous';
+    img.onload=()=>{if(isFullLockedLibraryBackground(l))l.libraryContentBounds=measureVisibleImageBounds(img);renderAll();};
+    img.src=l.src;l.image=img;
+  })));
+}
 
 function ensureTemplateImage(zone=activeZone){
   if(product.id==='sweat-pants'&&sweatTemplates.has(zone))return sweatTemplates.get(zone);
@@ -705,16 +712,38 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
   };
 }
 function scaleBounds(b,sw,sh,dw,dh){return{x:b.x/sw*dw,y:b.y/sh*dh,w:b.w/sw*dw,h:b.h/sh*dh};}
+function isFullLockedLibraryBackground(l){return !!(l?.type==='image'&&l.libraryAssetId&&l.libraryLocked&&l.libraryPreset==='full');}
+function measureVisibleImageBounds(img){
+  if(!img)return{left:0,top:0,right:1,bottom:1};
+  const fullW=Math.max(1,img.naturalWidth||img.width),fullH=Math.max(1,img.naturalHeight||img.height),maxSide=512,ratio=Math.min(1,maxSide/Math.max(fullW,fullH));
+  const w=Math.max(1,Math.round(fullW*ratio)),h=Math.max(1,Math.round(fullH*ratio)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  try{
+    const x=canvas.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,w,h);x.drawImage(img,0,0,w,h);
+    const data=x.getImageData(0,0,w,h).data;let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let py=0;py<h;py++)for(let px=0;px<w;px++){if(data[(py*w+px)*4+3]<=12)continue;minX=Math.min(minX,px);minY=Math.min(minY,py);maxX=Math.max(maxX,px);maxY=Math.max(maxY,py);}
+    if(maxX<minX||maxY<minY)return{left:0,top:0,right:1,bottom:1};
+    const pad=1;return{left:Math.max(0,(minX-pad)/w),top:Math.max(0,(minY-pad)/h),right:Math.min(1,(maxX+pad+1)/w),bottom:Math.min(1,(maxY+pad+1)/h)};
+  }catch(error){console.warn('Library background padding could not be measured',error);return{left:0,top:0,right:1,bottom:1};}
+}
+function normalizedLibraryContentBounds(l){
+  if(!isFullLockedLibraryBackground(l))return null;
+  const measured=l.libraryContentBounds||measureVisibleImageBounds(l.image),left=Math.max(0,Math.min(.98,Number(measured?.left)||0)),top=Math.max(0,Math.min(.98,Number(measured?.top)||0)),right=Math.max(.02,Math.min(1,Number(measured?.right)||1)),bottom=Math.max(.02,Math.min(1,Number(measured?.bottom)||1));
+  const bounds=right>left&&bottom>top?{left,top,right,bottom}:{left:0,top:0,right:1,bottom:1};l.libraryContentBounds=bounds;return bounds;
+}
 function drawImageLayer(c,l,b){
   if(!l.image)return;
+  const fullW=Math.max(1,l.image.naturalWidth||l.image.width),fullH=Math.max(1,l.image.naturalHeight||l.image.height),content=normalizedLibraryContentBounds(l);
+  if(content){
+    const sx=fullW*content.left,sy=fullH*content.top,sw=Math.max(1,fullW*(content.right-content.left)),sh=Math.max(1,fullH*(content.bottom-content.top));
+    const base=Math.max(b.w/sw,b.h/sh),scale=base*(l.scale||1),dw=sw*scale,dh=sh*scale;
+    c.scale(l.flipX?-1:1,l.flipY?-1:1);c.drawImage(l.image,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);return;
+  }
   const crop=l.crop||{left:0,top:0,right:0,bottom:0};
   const left=Math.max(0,Math.min(.45,Number(crop.left)||0)),top=Math.max(0,Math.min(.45,Number(crop.top)||0)),right=Math.max(0,Math.min(.45,Number(crop.right)||0)),bottom=Math.max(0,Math.min(.45,Number(crop.bottom)||0));
-  const fullW=Math.max(1,l.image.width),fullH=Math.max(1,l.image.height);
   const sx=fullW*left,sy=fullH*top,sw=Math.max(1,fullW*(1-left-right)),sh=Math.max(1,fullH*(1-top-bottom));
   const base=Math.max(b.w/fullW,b.h/fullH),scale=base*(l.scale||1),iw=fullW*scale,ih=fullH*scale;
   const dx=-iw/2+iw*left,dy=-ih/2+ih*top,dw=iw*(1-left-right),dh=ih*(1-top-bottom);
-  c.scale(l.flipX?-1:1,l.flipY?-1:1);
-  c.drawImage(l.image,sx,sy,sw,sh,dx,dy,dw,dh);
+  c.scale(l.flipX?-1:1,l.flipY?-1:1);c.drawImage(l.image,sx,sy,sw,sh,dx,dy,dw,dh);
 }
 function drawTextLayer(c,l,b){
   const fs=Math.max(18,b.w*.10*(l.scale||1));
@@ -750,7 +779,7 @@ function drawSafeAreaGuide(c,zone,r,rec){
 function imageLayerEstimatedDpi(l,zone=activeZone){
   if(!l||l.type!=='image'||!l.image)return null;const t=product.templates?.[zone],rec=ensureTemplateImage(zone);let tw=t?.width||0,th=t?.height||0;
   if(rec?.bounds){tw=rec.bounds.w;th=rec.bounds.h;}if(!tw||!th)return null;
-  const iw=Math.max(1,l.image.naturalWidth||l.image.width),ih=Math.max(1,l.image.naturalHeight||l.image.height),base=Math.max(tw/iw,th/ih)*Math.max(.01,Number(l.scale)||1);
+  const bounds=normalizedLibraryContentBounds(l),fullW=Math.max(1,l.image.naturalWidth||l.image.width),fullH=Math.max(1,l.image.naturalHeight||l.image.height),iw=bounds?fullW*(bounds.right-bounds.left):fullW,ih=bounds?fullH*(bounds.bottom-bounds.top):fullH,base=Math.max(tw/iw,th/ih)*Math.max(.01,Number(l.scale)||1);
   return 300/Math.max(.0001,base);
 }
 function zoneQuality(zone=activeZone){
@@ -949,6 +978,7 @@ function activeLayerScreenRect(){
   if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
   const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
   if(l.type==='image'&&l.image){
+    if(isFullLockedLibraryBackground(l))return{x:b.x,y:b.y,w:b.w,h:b.h,cx:b.x+b.w/2,cy:b.y+b.h/2,b,fullW:b.w,fullH:b.h,crop:{left:0,top:0,right:0,bottom:0}};
     const crop=l.crop||{left:0,top:0,right:0,bottom:0},left=Math.max(0,Math.min(.45,Number(crop.left)||0)),top=Math.max(0,Math.min(.45,Number(crop.top)||0)),right=Math.max(0,Math.min(.45,Number(crop.right)||0)),bottom=Math.max(0,Math.min(.45,Number(crop.bottom)||0));
     const fullW=Math.max(1,l.image.width),fullH=Math.max(1,l.image.height),base=Math.max(b.w/fullW,b.h/fullH),scale=base*(l.scale||1),iw=fullW*scale,ih=fullH*scale;
     const x=cx-iw/2+iw*left,y=cy-ih/2+ih*top,w=iw*(1-left-right),h=ih*(1-top-bottom);
@@ -1333,7 +1363,18 @@ function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
 function addImage(src,filename){if(!canAddLayer())return;const img=new Image();img.onload=()=>{if(!canAddLayer())return;snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
 function addLibraryAsset(asset){
   if(!asset?.id||!asset.renderUrl||!canAddLayer())return Promise.reject(new Error('This library artwork is unavailable.'));
-  return new Promise((resolve,reject)=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>{if(!canAddLayer())return reject(new Error('This print zone already has the maximum number of layers.'));snapshot();const placement=asset.placement||{},locked=asset.placementMode==='locked',stackOrder=Number(asset.stackOrder)||(locked?0:20),l={id:'layer-'+layerSeq++,type:'image',label:asset.name||nextLabel(),filename:(asset.slug||'mqd-library-artwork')+'.png',src:asset.renderUrl,image:img,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop||{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:locked,libraryCategory:asset.category||'artwork',libraryPreset:asset.placementPreset||'full',libraryStackOrder:stackOrder};const layers=zoneState().layers;if(locked){const index=layers.findIndex(row=>!row.libraryLocked||Number(row.libraryStackOrder)>stackOrder);if(index<0)layers.push(l);else layers.splice(index,0,l);}else layers.push(l);activeLayerId=l.id;cropMode=false;renderAll();resolve(l);};img.onerror=()=>reject(new Error('The library artwork could not be loaded.'));img.src=asset.renderUrl;});
+  return new Promise((resolve,reject)=>{
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{
+      if(!canAddLayer())return reject(new Error('This print zone already has the maximum number of layers.'));
+      snapshot();const placement=asset.placement||{},locked=asset.placementMode==='locked',stackOrder=Number(asset.stackOrder)||(locked?0:20);
+      const l={id:'layer-'+layerSeq++,type:'image',label:asset.name||nextLabel(),filename:(asset.slug||'mqd-library-artwork')+'.png',src:asset.renderUrl,image:img,x:Number(placement.x)||0,y:Number(placement.y)||0,scale:Number(placement.scale)||1,rotation:Number(placement.rotation)||0,flipX:!!placement.flipX,flipY:!!placement.flipY,crop:placement.crop||{left:0,top:0,right:0,bottom:0},visible:true,libraryAssetId:asset.id,libraryLocked:locked,libraryCategory:asset.category||'artwork',libraryPreset:asset.placementPreset||'full',libraryStackOrder:stackOrder};
+      if(isFullLockedLibraryBackground(l))l.libraryContentBounds=measureVisibleImageBounds(img);
+      const layers=zoneState().layers;if(locked){const index=layers.findIndex(row=>!row.libraryLocked||Number(row.libraryStackOrder)>stackOrder);if(index<0)layers.push(l);else layers.splice(index,0,l);}else layers.push(l);
+      activeLayerId=l.id;cropMode=false;renderAll();resolve(l);
+    };
+    img.onerror=()=>reject(new Error('The library artwork could not be loaded.'));img.src=asset.renderUrl;
+  });
 }
 function addText(){if(!canAddLayer())return;const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
 function updateLayer(prop,val){const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;l[prop]=val;renderLayerPanel();renderPrintQuality();drawEditor();scheduleGarmentPreview();}
