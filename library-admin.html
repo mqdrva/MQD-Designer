@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MQD Artwork Library Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/v20/library-admin.css">
+</head>
+<body>
+  <header><a href="/?owner=1" class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><span>Artwork Library Admin</span></a><button id="signOut" class="btn hidden" type="button">Sign Out</button></header>
+  <main>
+    <section id="authCard" class="card auth-card">
+      <h1>Owner sign-in</h1>
+      <p>Only an approved MQD owner account can upload or publish library artwork.</p>
+      <button id="googleSignIn" class="btn primary" type="button">Continue with Google</button>
+      <div id="authStatus" class="status" role="status"></div>
+    </section>
+
+    <div id="adminApp" class="hidden">
+      <section class="hero">
+        <div><p class="eyebrow">PRIVATE ASSET MANAGER</p><h1>Customer artwork library</h1><p>Upload a master once, choose its placement rule, and publish it to approved garment zones.</p></div>
+        <a class="btn" href="/?owner=1">Open Designer</a>
+      </section>
+
+      <section class="card">
+        <div class="section-head"><div><h2>Add artwork</h2><p>PNG, JPEG, or WebP. Masters stay private; customers receive temporary display images only.</p></div></div>
+        <form id="uploadForm">
+          <label class="drop-zone" for="assetFiles"><strong>Choose artwork files</strong><span>Select one or several files with the same placement behavior.</span><input id="assetFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple required></label>
+          <div id="fileSummary" class="file-summary">No files selected.</div>
+          <div class="form-grid">
+            <label>Category<select id="category"><option value="background">Background</option><option value="icon">Icon / badge</option></select></label>
+            <label>Customer controls<select id="placementMode"><option value="locked">Locked position</option><option value="editable">Move and resize</option></select></label>
+            <label>Placement preset<select id="preset"><option value="full">Fill entire zone</option><option value="top">Lock to top edge</option><option value="bottom">Lock to bottom edge</option></select></label>
+            <label id="scaleField" class="hidden">Starting size<input id="defaultScale" type="number" min="0.05" max="4" step="0.05" value="0.35"></label>
+          </div>
+          <label class="check"><input id="reverseBack" type="checkbox" checked><span><strong>Reverse artwork on Back zones</strong><small>Keeps the front/back side seams aligned.</small></span></label>
+          <fieldset><legend>Garments</legend><div class="fieldset-tools"><button id="selectAllProducts" class="text-button" type="button">Select all</button><button id="clearProducts" class="text-button" type="button">Clear</button></div><div id="productGrid" class="product-grid"></div></fieldset>
+          <button id="publishButton" class="btn primary" type="submit">Upload and Publish</button>
+        </form>
+        <div id="uploadQueue" class="queue" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head"><div><h2>Published artwork</h2><p>Turn an item off to remove it from the customer picker without deleting its private master.</p></div><button id="refreshAssets" class="btn" type="button">Refresh</button></div>
+        <div id="assetGrid" class="asset-grid"><div class="empty">Loading artwork…</div></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/v20/library-admin.js"></script>
+</body>
+</html>
+

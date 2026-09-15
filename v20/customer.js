@@ -251,7 +251,7 @@ async function hydrateLibraryArtwork(payload){
   for(const [zone,state] of Object.entries(copy.design?.zones||{})){
     const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId);if(!layers.length)continue;
     const result=await libraryRequest({action:'catalog',productId:copy.product?.id,zone});const byId=new Map((result.assets||[]).map(asset=>[asset.id,asset]));
-    for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';}
+    for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;}
   }
   return copy;
 }

@@ -70,7 +70,7 @@ Deno.serve(async(req:Request)=>{
   for(let i=0;i<libraryJobs.length;i++){
    const job=libraryJobs[i],{data:master,error:downloadError}=await supabase.storage.from('mqd-library-assets').download(job.asset.master_path);
    if(downloadError||!master)return json({error:downloadError?.message||'MQD library master is unavailable',stage:'library_master_download'},500);
-   if(master.size>20*1024*1024)return json({error:'MQD library master is too large',stage:'library_master_validation'},500);
+   if(master.size>50*1024*1024)return json({error:'MQD library master is too large',stage:'library_master_validation'},500);
    const filename=safe(job.asset.master_path.split('/').pop()||`${job.asset.slug}.png`),path=`${order.id}/${safe(job.zone)}/library-${String(i+1).padStart(2,'0')}-${filename}`,contentType=mimeFor(master,job.asset.master_path);
    const {error:uploadError}=await supabase.storage.from('mqd-production').upload(path,master,{contentType,upsert:true});
    if(uploadError)return json({error:uploadError.message,stage:'library_master_upload'},500);
