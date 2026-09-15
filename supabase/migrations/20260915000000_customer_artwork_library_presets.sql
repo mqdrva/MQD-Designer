@@ -43,3 +43,9 @@ alter table public.mqd_library_asset_placements
 create index if not exists mqd_library_assets_stack_idx
   on public.mqd_library_assets(active,category,stack_order,sort_order,name);
 
+-- Edge Functions use the service_role to manage this otherwise private catalog.
+-- RLS remains forced and anon/authenticated keep their explicit deny policies.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table public.mqd_library_assets to service_role;
+grant select, insert, update, delete on table public.mqd_library_asset_placements to service_role;
+grant usage, select on sequence public.mqd_library_asset_placements_id_seq to service_role;
