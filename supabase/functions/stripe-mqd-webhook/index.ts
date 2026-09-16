@@ -55,19 +55,24 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 6 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 7 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "";
     const key = serviceKey();
     if (!url || !key) return json({ error: "Backend service credentials are not configured" }, 500);
     const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: secret, error: secretError } = await supabase.rpc("mqd_get_vault_secret", { secret_name: "mqd_stripe_webhook_signing_secret" });
-    if (secretError || !secret) return json({ error: "Stripe webhook is not configured" }, 500);
+    let secret = Deno.env.get("MQD_STRIPE_WEBHOOK_SIGNING_SECRET") || "";
+    if (!secret) {
+      const { data: vaultSecret, error: secretError } = await supabase.rpc("mqd_get_vault_secret", { secret_name: "mqd_stripe_webhook_signing_secret" });
+      if (secretError) return json({ error: "Stripe webhook is not configured" }, 500);
+      secret = String(vaultSecret || "");
+    }
+    if (!secret) return json({ error: "Stripe webhook is not configured" }, 500);
 
     const payload = await req.text();
     const signature = req.headers.get("stripe-signature") || "";
-    if (!await verifyStripeSignature(payload, signature, String(secret))) return json({ error: "Invalid Stripe signature" }, 400);
+    if (!await verifyStripeSignature(payload, signature, secret)) return json({ error: "Invalid Stripe signature" }, 400);
 
     const event = JSON.parse(payload);
     const session = event?.data?.object || {};
