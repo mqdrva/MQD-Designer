@@ -87,6 +87,8 @@ function configuredSiteUrl() {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors(req) });
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
+  let stage = "authentication";
+  const diagnosticId = crypto.randomUUID();
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const key = serviceKey();
@@ -107,6 +109,7 @@ Deno.serve(async (req) => {
     }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(checkoutToken)) return json(req, { error: "Invalid checkout request" }, 400);
 
+    stage = "read-orders";
     const { data: orders, error: orderError } = await supabase
       .from("mqd_orders")
       .select("id,order_number,status,product_id,design_id,customer_email")
@@ -119,6 +122,7 @@ Deno.serve(async (req) => {
     }
 
     const orderIds = orders.map((order) => order.id);
+    stage = "read-items";
     const { data: itemRows, error: itemError } = await supabase
       .from("mqd_order_items")
       .select("id,order_id,product_id,quantity,order_options")
@@ -149,10 +153,12 @@ Deno.serve(async (req) => {
           quantity: option.quantity
         });
       }
+      stage = "update-order-price";
       const { error: canonicalError } = await supabase.from("mqd_orders")
         .update({ product_name: catalog.name, product_price: catalog.cents / 100, stripe_payment_status: "unpaid" })
         .eq("id", order.id).eq("user_id", user.id);
       if (canonicalError) throw canonicalError;
+      stage = "update-item-price";
       const { error: itemPriceError } = await supabase.from("mqd_order_items")
         .update({ product_name: catalog.name, unit_price: catalog.cents / 100 })
         .eq("id", item.id).eq("order_id", order.id);
@@ -161,6 +167,7 @@ Deno.serve(async (req) => {
     if (lineItems.length > 100) return json(req, { error: "The cart has too many separate size rows for one checkout" }, 409);
     const shippingCents = shippingCentsForQuantity(totalQuantity);
 
+    stage = "stripe-configuration";
     const secret = await stripeSecret(supabase);
     if (!secret) return json(req, { error: "Stripe checkout is not configured yet" }, 503);
     const stripe = new Stripe(secret, {
@@ -170,6 +177,7 @@ Deno.serve(async (req) => {
     const configuredSite = configuredSiteUrl();
     const countryList = (Deno.env.get("MQD_ALLOWED_COUNTRIES") || "US").split(",").map((x) => x.trim().toUpperCase()).filter((x) => /^[A-Z]{2}$/.test(x));
     if (!countryList.length) return json(req, { error: "Checkout shipping countries are not configured" }, 503);
+    stage = "stripe-session";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
@@ -206,13 +214,17 @@ Deno.serve(async (req) => {
     }, { idempotencyKey: `mqd-checkout-${user.id}-${checkoutToken}` });
     if (!session.url) throw new Error("Stripe did not return a checkout URL");
 
+    stage = "save-session";
     const { error: sessionError } = await supabase.from("mqd_orders")
       .update({ stripe_checkout_session_id: session.id, stripe_payment_status: session.payment_status || "unpaid" })
       .eq("user_id", user.id).in("order_number", orderNumbers);
     if (sessionError) throw sessionError;
     return json(req, { ok: true, sessionId: session.id, url: session.url });
   } catch (error) {
-    console.error("create-mqd-checkout failed", error instanceof Error ? error.message : String(error));
-    return json(req, { error: error instanceof Error ? error.message : "Checkout could not be created" }, 500);
+    // PostgREST errors are plain objects, not Error instances. Never log the
+    // entire object: it can contain request headers or customer data.
+    const code = typeof error?.code === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(error.code) ? error.code : "unknown";
+    console.error(JSON.stringify({ event: "checkout-failed", diagnosticId, stage, code }));
+    return json(req, { error: `Checkout failed at ${stage} (${code}). Reference: ${diagnosticId}` }, 500);
   }
 });
