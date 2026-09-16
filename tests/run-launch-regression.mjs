@@ -69,6 +69,7 @@ console.log(`PASS: all ${products.length} frozen product GLBs downloaded and str
 
 const tests=[
   ['checkout-security.mjs'],
+  ['checkout-customer-experience.mjs'],
   ['shipping-tiers.mjs'],
   ['customer-accounts.mjs'],
   ['fleece-hoodie-zones.mjs'],
