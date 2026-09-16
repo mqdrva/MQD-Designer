@@ -44,6 +44,7 @@ assert(!customer.includes("status:'paid'"), 'browser must never mark an order pa
 
 assert(status.includes(".eq('stripe_checkout_session_id',sessionId)"), 'confirmation status must resolve by the unguessable Checkout Session ID');
 assert(config.includes('[functions.stripe-mqd-webhook]\nverify_jwt = false'), 'Stripe webhook must bypass Supabase JWT checks and verify Stripe signatures itself');
+assert(webhook.includes('Deno.env.get("MQD_STRIPE_WEBHOOK_SIGNING_SECRET")'), 'Stripe webhook must support the encrypted Edge Function signing secret');
 assert(config.includes('[functions.mqd-order-status]\nverify_jwt = false'), 'order confirmation status must be reachable after Stripe redirects the customer');
 
 console.log('PASS: authenticated, server-priced, multi-item Stripe Checkout and verified webhook fulfillment are protected.');
