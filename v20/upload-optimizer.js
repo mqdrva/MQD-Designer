@@ -26,15 +26,27 @@
     });
   }
 
-  async function makePreviewBlob(file){
-    if(typeof createImageBitmap!=='function') return file;
-    const bitmap=await createImageBitmap(file);
+  async function decodePreviewImage(file){
+    if(typeof createImageBitmap==='function'){
+      try{return{source:await createImageBitmap(file,{imageOrientation:'from-image'}),close(source){source.close?.();}};}
+      catch(error){console.warn('Image bitmap decoding unavailable; using browser image decoding',error);}
+    }
+    const url=URL.createObjectURL(file),image=new Image();
     try{
-      const maxEdge=Math.max(bitmap.width,bitmap.height);
+      await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('The selected image could not be decoded.'));image.src=url;});
+      return{source:image,close(){URL.revokeObjectURL(url);}};
+    }catch(error){URL.revokeObjectURL(url);throw error;}
+  }
+
+  async function makePreviewBlob(file){
+    const decoded=await decodePreviewImage(file),bitmap=decoded.source;
+    try{
+      const sourceWidth=bitmap.naturalWidth||bitmap.width,sourceHeight=bitmap.naturalHeight||bitmap.height;
+      const maxEdge=Math.max(sourceWidth,sourceHeight);
       const scale=Math.min(1,MAX_PREVIEW_EDGE/Math.max(1,maxEdge));
       if(scale===1 && file.size<=6*1024*1024) return file;
-      const width=Math.max(1,Math.round(bitmap.width*scale));
-      const height=Math.max(1,Math.round(bitmap.height*scale));
+      const width=Math.max(1,Math.round(sourceWidth*scale));
+      const height=Math.max(1,Math.round(sourceHeight*scale));
       const canvas=document.createElement('canvas');
       canvas.width=width;canvas.height=height;
       const ctx=canvas.getContext('2d',{alpha:true});
@@ -45,7 +57,7 @@
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,outputType,0.92));
       return blob||file;
     } finally {
-      bitmap.close?.();
+      decoded.close(bitmap);
     }
   }
 
