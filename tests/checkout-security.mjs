@@ -20,6 +20,9 @@ assert(checkout.includes('stripe.checkout.sessions.create'), 'checkout must use 
 assert(checkout.includes('idempotencyKey:'), 'checkout creation must be idempotent');
 assert(checkout.includes('integration_identifier: integrationIdentifier(checkoutToken)'), 'Checkout Sessions must include a stable integration identifier');
 assert(checkout.includes('shipping_address_collection:'), 'physical-goods checkout must collect a shipping address');
+assert(checkout.includes('shipping_options:'), 'checkout must include the server-calculated shipping charge');
+assert(checkout.includes('shippingCentsForQuantity(totalQuantity)'), 'shipping must be calculated from verified item quantities');
+assert(checkout.includes('shipping_cents: String(shippingCents)'), 'the shipping tier must be recorded in Stripe metadata');
 assert(checkout.includes('payment_intent_data:'), 'payment metadata must follow the PaymentIntent');
 assert(checkout.includes('mqd_user_id: user.id'), 'checkout metadata must bind the Stripe Session to the customer');
 assert(checkout.includes('quantity < 1 || quantity > 99'), 'server must enforce checkout quantity limits');
@@ -33,6 +36,8 @@ assert(webhook.includes('verifyStripeSignature(payload, signature'), 'webhook mu
 assert(webhook.includes('checkout.session.async_payment_succeeded'), 'webhook must support delayed payment success');
 assert(webhook.includes('checkout.session.async_payment_failed'), 'webhook must support delayed payment failure');
 assert(webhook.includes('Number(session.amount_subtotal) !== expectedSubtotalCents'), 'webhook must verify the server-calculated merchandise subtotal before fulfillment');
+assert(webhook.includes('Number(session.total_details?.amount_shipping) !== expectedShippingCents'), 'webhook must verify the server-calculated shipping tier before fulfillment');
+assert(webhook.includes('Number(session.amount_total) !== expectedSubtotalCents + expectedShippingCents'), 'webhook must verify the final merchandise-plus-shipping total');
 assert(webhook.includes('const alreadyPaid ='), 'late events must not downgrade paid orders');
 assert(webhook.includes('update.status = "paid"'), 'only the verified webhook may mark orders paid');
 assert(!customer.includes("status:'paid'"), 'browser must never mark an order paid');
