@@ -17,7 +17,10 @@ assert(index.includes('Help &amp; Policies'),'designer must expose customer help
 for(const page of pages)assert(index.includes(`/${page}`),`designer must link ${page}`);
 assert(confirmation.includes('/returns.html')&&confirmation.includes('/privacy.html'),'order confirmation must expose returns and privacy');
 assert(index.includes('data-mobile-pane="preview"')&&index.includes('data-mobile-pane="control"'),'mobile designer must expose preview and option tabs');
+assert(index.includes('data-mobile-pane="control">Add / Edit</button>'),'mobile controls tab must clearly describe adding and editing artwork');
+assert(index.indexOf('/v20/upload-optimizer.js')<index.indexOf('/v20/editor.js'),'image optimizer must load before the editor handles phone uploads');
 assert(css.includes('.preview-pane.mobile-active')&&css.includes('.control-pane.mobile-active'),'mobile preview and controls must be reachable');
+assert(css.includes('html{color-scheme:light}')&&css.includes('cursor:grab;background:#fff'),'mobile browsers must keep the 2D canvas readable in dark mode');
 assert(mobile.includes("window.dispatchEvent(new Event('resize'))"),'3D renderer must resize when its mobile tab opens');
 
 console.log('PASS: launch policy pages are linked and all mobile designer panes remain reachable.');
