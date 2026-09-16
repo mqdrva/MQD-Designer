@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const read=file=>fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
+const index=read('index.html');
+const css=read('v20/editor.css');
+const mobile=read('v20/mobile-workspace.js');
+const confirmation=read('order-confirmation.html');
+const pages=['contact.html','shipping.html','returns.html','privacy.html','terms.html'];
+
+for(const page of pages){
+  const html=read(page);
+  assert(html.includes('Back to designer'),`${page} must return customers to the designer`);
+  assert(html.includes('/privacy.html')&&html.includes('/terms.html'),`${page} must link the policy set`);
+}
+assert(index.includes('Help &amp; Policies'),'designer must expose customer help and policies');
+for(const page of pages)assert(index.includes(`/${page}`),`designer must link ${page}`);
+assert(confirmation.includes('/returns.html')&&confirmation.includes('/privacy.html'),'order confirmation must expose returns and privacy');
+assert(index.includes('data-mobile-pane="preview"')&&index.includes('data-mobile-pane="control"'),'mobile designer must expose preview and option tabs');
+assert(css.includes('.preview-pane.mobile-active')&&css.includes('.control-pane.mobile-active'),'mobile preview and controls must be reachable');
+assert(mobile.includes("window.dispatchEvent(new Event('resize'))"),'3D renderer must resize when its mobile tab opens');
+
+console.log('PASS: launch policy pages are linked and all mobile designer panes remain reachable.');
