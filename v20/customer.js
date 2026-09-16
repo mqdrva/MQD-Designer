@@ -1,4 +1,5 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+import {shippingCentsForQuantity} from './checkout-pricing.js';
 
 const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
@@ -46,7 +47,7 @@ function selectedOrderOptions(){
   const rows=[...document.querySelectorAll('#orderOptionRows .order-option-row')];
   return rows.map(row=>({
     size:row.querySelector('.order-size')?.value||null,
-    quantity:Math.max(1,Math.min(999,Number(row.querySelector('.order-qty')?.value)||1))
+    quantity:Math.max(1,Math.min(99,Number(row.querySelector('.order-qty')?.value)||1))
   }));
 }
 function validateOrderOptions(){
@@ -77,8 +78,8 @@ function makeOrderOptionRow(defaultSize=null,quantity=1){
   }
   const qtyWrap=document.createElement('label');qtyWrap.className='order-option-field';
   qtyWrap.innerHTML='<span class="order-option-label">Quantity</span>';
-  const qty=document.createElement('input');qty.className='order-qty';qty.type='number';qty.min='1';qty.max='999';qty.step='1';qty.value=String(Math.max(1,quantity||1));
-  qty.addEventListener('change',()=>{qty.value=String(Math.max(1,Math.min(999,Number(qty.value)||1)));});
+  const qty=document.createElement('input');qty.className='order-qty';qty.type='number';qty.min='1';qty.max='99';qty.step='1';qty.value=String(Math.max(1,Math.min(99,quantity||1)));
+  qty.addEventListener('change',()=>{qty.value=String(Math.max(1,Math.min(99,Number(qty.value)||1)));});
   qtyWrap.appendChild(qty);row.appendChild(qtyWrap);
   const remove=document.createElement('button');remove.type='button';remove.className='remove-order-row';remove.setAttribute('aria-label','Remove size');remove.textContent='×';
   remove.onclick=()=>{const host=$('orderOptionRows');if(host?.children.length>1)row.remove();};
@@ -514,6 +515,16 @@ async function retryPendingCart(){
   }
 }
 
+function checkoutFailureMessage(result,status){
+  const detail=String(result?.error||'');
+  const reference=detail.match(/\bReference:\s*([0-9a-f-]{36})/i)?.[1]||'';
+  const pendingApproval=status===503||/Checkout failed at stripe-session/i.test(detail);
+  const message=pendingApproval
+    ?'Payments are temporarily unavailable while Stripe completes account approval. Your cart and saved designs are safe. Please try again later.'
+    :'Secure checkout could not open. Your cart and saved designs are safe. Please try again later.';
+  return reference?`${message}\n\nSupport reference: ${reference}`:message;
+}
+
 async function showCart(){
   if(cartSyncInProgress)return;
   if(cartItems().some(x=>x.pendingSync)){
@@ -526,12 +537,15 @@ async function showCart(){
   }
   const items=cartItems();
   if(!items.length){alert('Your cart is empty.');return;}
+  const totalQuantity=items.reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);
   const total=items.reduce((n,x)=>n+(Number(x.price)||0)*(Number(x.totalQuantity)||1),0);
+  const shipping=shippingCentsForQuantity(totalQuantity)/100;
+  const shippingTier=totalQuantity<=9?'1–9 items':totalQuantity<=19?'10–19 items':'20+ items';
   const summary=items.map((x,i)=>{
     const options=(x.orderOptions||[]).map(o=>`${o.size?o.size+' × ':''}${o.quantity}`).join(', ');
     const qty=Number(x.totalQuantity)||1;
     return `${i+1}. ${x.productName} — ${Number(x.price).toFixed(2)} × ${qty}\n${options?'Size / Qty: '+options+'\n':''}Ref: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`;
-  }).join('\n\n')+`\n\nSubtotal: ${total.toFixed(2)}`;
+  }).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}\nShipping (${shippingTier}): $${shipping.toFixed(2)}\nTotal before tax: $${(total+shipping).toFixed(2)}`;
 
   if(items.some(x=>x.pendingSync)){
     const errors=items.filter(x=>x.pendingSync).map(x=>`${x.productName}: ${x.backendError||'Upload incomplete'}`).join('\n');
@@ -563,11 +577,11 @@ async function showCart(){
       body:JSON.stringify({orderNumbers:items.map(x=>x.orderNumber),checkoutToken:checkoutState.token})
     });
     const result=await response.json().catch(()=>({}));
-    if(!response.ok||!result.url)throw new Error(result.error||`Checkout could not be created (${response.status})`);
+    if(!response.ok||!result.url){alert(checkoutFailureMessage(result,response.status));return;}
     window.location.assign(result.url);
   }catch(error){
     console.error(error);
-    alert('Checkout is not available yet: '+(error.message||String(error)));
+    alert('Secure checkout could not connect. Your cart and saved designs are safe. Check your internet connection and try again.');
   }finally{
     button.disabled=false;updateCartButton();
   }
