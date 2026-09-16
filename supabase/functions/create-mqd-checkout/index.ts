@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
+import { shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
 
 const SITE_URL = "https://mymerchnow.app/";
 const LEGACY_SITE_ORIGIN = "https://mqd-designer-vercel.vercel.app";
@@ -127,12 +128,15 @@ Deno.serve(async (req) => {
     if (orders.some((order) => !itemsByOrder.has(order.id))) return json(req, { error: "A cart item is missing its production details" }, 409);
 
     const lineItems = [];
+    let totalQuantity = 0;
     for (const order of orders) {
       const catalog = CATALOG[order.product_id];
       if (!catalog) return json(req, { error: `Checkout is not configured for ${order.product_id}` }, 409);
       const item = itemsByOrder.get(order.id);
       if (item.product_id !== order.product_id) return json(req, { error: "A cart item failed product verification" }, 409);
-      for (const option of normalizedOptions(item, catalog)) {
+      const options = normalizedOptions(item, catalog);
+      totalQuantity += options.reduce((sum, option) => sum + option.quantity, 0);
+      for (const option of options) {
         lineItems.push({
           price_data: {
             currency: "usd",
@@ -155,6 +159,7 @@ Deno.serve(async (req) => {
       if (itemPriceError) throw itemPriceError;
     }
     if (lineItems.length > 100) return json(req, { error: "The cart has too many separate size rows for one checkout" }, 409);
+    const shippingCents = shippingCentsForQuantity(totalQuantity);
 
     const secret = await stripeSecret(supabase);
     if (!secret) return json(req, { error: "Stripe checkout is not configured yet" }, 503);
@@ -173,9 +178,30 @@ Deno.serve(async (req) => {
       success_url: `${configuredSite}order-confirmation.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: configuredSite,
       shipping_address_collection: { allowed_countries: countryList },
+      shipping_options: [{
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: shippingCents, currency: "usd" },
+          display_name: "MQD standard shipping"
+        }
+      }],
       phone_number_collection: { enabled: true },
-      metadata: { order_numbers: orderNumbers.join(","), checkout_token: checkoutToken, mqd_user_id: user.id },
-      payment_intent_data: { metadata: { order_numbers: orderNumbers.join(","), checkout_token: checkoutToken, mqd_user_id: user.id } },
+      metadata: {
+        order_numbers: orderNumbers.join(","),
+        checkout_token: checkoutToken,
+        mqd_user_id: user.id,
+        item_quantity: String(totalQuantity),
+        shipping_cents: String(shippingCents)
+      },
+      payment_intent_data: {
+        metadata: {
+          order_numbers: orderNumbers.join(","),
+          checkout_token: checkoutToken,
+          mqd_user_id: user.id,
+          item_quantity: String(totalQuantity),
+          shipping_cents: String(shippingCents)
+        }
+      },
       integration_identifier: integrationIdentifier(checkoutToken)
     }, { idempotencyKey: `mqd-checkout-${user.id}-${checkoutToken}` });
     if (!session.url) throw new Error("Stripe did not return a checkout URL");
