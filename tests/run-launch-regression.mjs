@@ -68,6 +68,7 @@ await Promise.all(workers);
 console.log(`PASS: all ${products.length} frozen product GLBs downloaded and structurally validated.`);
 
 const tests=[
+  ['checkout-security.mjs'],
   ['customer-accounts.mjs'],
   ['fleece-hoodie-zones.mjs'],
   ['frozen-product-baseline.mjs'],

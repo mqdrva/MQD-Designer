@@ -1,2 +1,8 @@
 [functions.mqd-artwork-library]
 verify_jwt = false
+
+[functions.mqd-order-status]
+verify_jwt = false
+
+[functions.stripe-mqd-webhook]
+verify_jwt = false
