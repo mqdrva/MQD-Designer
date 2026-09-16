@@ -20,6 +20,7 @@ import {partitionFleeceHoodieTriangle,hoodiePanelNames} from './fleece-hoodie-pa
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
+import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from './tshirt-artwork-calibration.js';
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -68,6 +69,9 @@ const MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved';
 // T-shirt text/artwork uses one normalized coordinate frame in 2D and 3D.
 // Front/Back are linear panel UVs; sleeve/collar orientation stays in panelUv().
 const MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2';
+// Keep movable customer artwork aligned with the same approved 2D frame while
+// preserving separately calibrated locked MQD library backgrounds.
+const MQD_TSHIRT_EDITABLE_ARTWORK_MAPPING_LOCK='front-back-editable-artwork-up-9pct-v3';
 // Long Sleeve T-Shirt: all five zones use the same ordered artwork in 2D/3D.
 // Production silhouettes are 2D guides, not additional 3D neckline masks.
 const MQD_LONG_SLEEVE_TSHIRT_TEXT_MAPPING_LOCK='unified-five-zone-artwork-v2';
@@ -821,7 +825,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?Number(textMap.imageOffsetY):0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
   // No per-type shifts or second text pass: preserve layer order, spacing,
@@ -1239,13 +1243,13 @@ function updateTshirtZoneTextures(){
   }
   disposeZoneTexture(mesh);
   // All-Over Print T-Shirt only: the supplied Front/Back 3D UV frame sits
-  // visually lower than the production-template frame. Raise TEXT by 9% in
-  // those two zones so its 3D placement matches the 2D editor. Images, fill,
-  // sleeves, collar and every other garment keep their approved behavior.
-  const tshirtBodyText=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  // visually lower than the production-template frame. Raise movable customer
+  // artwork by 9% so logos and text match the 2D editor. Locked MQD library
+  // backgrounds, fill, sleeves, collar and every other garment stay unchanged.
+  const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const artwork=product.id==='long-sleeve-tshirt'
     ?makeLongSleeveTshirtArtworkCanvas(zone,1600)
-    :makeCleanZoneArtworkCanvas(zone,1600,tshirtBodyText?{offsetY:-.09}:{}),canvas=document.createElement('canvas');
+    :makeCleanZoneArtworkCanvas(zone,1600,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY:tshirtBodyImageOffsetY}:{}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
