@@ -4,12 +4,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"GET, POST, OPTIONS"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
 const safe=(v:string)=>v.replace(/[^a-zA-Z0-9._-]+/g,"_").slice(0,120);
+const mimeFor=(blob:Blob,path:string)=>blob.type&&blob.type!=='application/octet-stream'?blob.type:path.toLowerCase().endsWith('.jpg')||path.toLowerCase().endsWith('.jpeg')?'image/jpeg':path.toLowerCase().endsWith('.webp')?'image/webp':'image/png';
 function serviceKey(){return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||Deno.env.get('SUPABASE_SECRET_KEY')||'';}
 
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();
- if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:4});
+ if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:5});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try{
   if(!url||!key)return json({error:'Backend service credentials are not configured'},500);
@@ -22,6 +23,19 @@ Deno.serve(async(req:Request)=>{
   if(!raw||raw.length>2_000_000)return json({error:'Invalid design payload'},400);
   const payload=JSON.parse(raw),p=payload?.product,designId=String(payload?.designId||'');
   if(!p?.id||!p?.name||!payload?.design?.zones||!designId)return json({error:'Incomplete design'},400);
+  const libraryJobs:Array<{zone:string;layer:any;asset:any;placement:any}>=[];
+  for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))for(const layer of state?.layers||[]){
+   if(layer?.type!=='image'||!layer?.libraryAssetId)continue;
+   const {data:asset,error:assetLookupError}=await supabase.from('mqd_library_assets').select('id,name,slug,category,master_path,placement_mode,active').eq('id',String(layer.libraryAssetId)).eq('active',true).maybeSingle();
+   if(assetLookupError)return json({error:assetLookupError.message,stage:'library_asset_lookup'},500);
+   if(!asset)return json({error:`MQD library artwork is unavailable for ${zone}`,stage:'library_asset_lookup'},400);
+   const {data:placement,error:placementError}=await supabase.from('mqd_library_asset_placements').select('x,y,scale,rotation,flip_x,flip_y,crop').eq('asset_id',asset.id).eq('product_id',String(p.id)).eq('zone_name',zone).maybeSingle();
+   if(placementError)return json({error:placementError.message,stage:'library_placement_lookup'},500);
+   if(!placement)return json({error:`MQD library artwork is not approved for ${p.name} · ${zone}`,stage:'library_placement_lookup'},400);
+   if(asset.placement_mode==='locked')Object.assign(layer,{x:Number(placement.x),y:Number(placement.y),scale:Number(placement.scale),rotation:Number(placement.rotation),flipX:!!placement.flip_x,flipY:!!placement.flip_y,crop:placement.crop,libraryLocked:true});
+   else layer.libraryLocked=false;
+   delete layer.src;delete layer.storagePath;libraryJobs.push({zone,layer,asset,placement});
+  }
   const {data:design,error:designError}=await supabase.from('customer_designs').select('id').eq('id',designId).eq('user_id',user.id).maybeSingle();
   if(designError)return json({error:designError.message,stage:'design_lookup'},500);
   if(!design)return json({error:'The saved design does not belong to this account'},403);
@@ -52,6 +66,17 @@ Deno.serve(async(req:Request)=>{
    if(upErr)return json({error:upErr.message,stage:'asset_upload'},500);
    const {error:assetErr}=await supabase.from('mqd_order_assets').insert({order_id:order.id,zone_name:String(meta.zone||''),layer_id:String(meta.layerId||''),layer_type:'image',original_filename:file.name,storage_path:path,mime_type:file.type,background_hex:backgrounds[String(meta.zone||'')]||null,metadata:meta});
    if(assetErr)return json({error:assetErr.message,stage:'asset_insert'},500);
+  }
+  for(let i=0;i<libraryJobs.length;i++){
+   const job=libraryJobs[i],{data:master,error:downloadError}=await supabase.storage.from('mqd-library-assets').download(job.asset.master_path);
+   if(downloadError||!master)return json({error:downloadError?.message||'MQD library master is unavailable',stage:'library_master_download'},500);
+   if(master.size>50*1024*1024)return json({error:'MQD library master is too large',stage:'library_master_validation'},500);
+   const filename=safe(job.asset.master_path.split('/').pop()||`${job.asset.slug}.png`),path=`${order.id}/${safe(job.zone)}/library-${String(i+1).padStart(2,'0')}-${filename}`,contentType=mimeFor(master,job.asset.master_path);
+   const {error:uploadError}=await supabase.storage.from('mqd-production').upload(path,master,{contentType,upsert:true});
+   if(uploadError)return json({error:uploadError.message,stage:'library_master_upload'},500);
+   const metadata={...job.layer,libraryAssetId:job.asset.id,libraryAssetName:job.asset.name,libraryCategory:job.asset.category,source:'mqd-library'};delete metadata.src;delete metadata.image;
+   const {error:recordError}=await supabase.from('mqd_order_assets').insert({order_id:order.id,zone_name:job.zone,layer_id:String(job.layer.id||''),layer_type:'image',original_filename:filename,storage_path:path,mime_type:contentType,background_hex:backgrounds[job.zone]||null,metadata});
+   if(recordError)return json({error:recordError.message,stage:'library_asset_insert'},500);
   }
   for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))for(const layer of state?.layers||[]){
    if(layer?.type!=='text')continue;

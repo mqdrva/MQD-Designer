@@ -4,13 +4,17 @@ const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
-const AUTH_REDIRECT_URL='https://mymerchnow.app/';
+const LIBRARY_URL=SUPABASE_URL+'/functions/v1/mqd-artwork-library';
+function authRedirectUrl(){return window.location.origin+window.location.pathname;}
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
 let pendingAfterAuth=null;
 let currentDesignFilter='all';
 let accountDesigns=[];
+let libraryAssets=[];
+let libraryContext=null;
+const libraryZoneCache=new Map();
 const STRIPE_TEST_LINKS={
   'tshirt':'https://buy.stripe.com/test_bJe00ddZpb0s0zA75eaVa01',
   'long-sleeve-tshirt':'https://buy.stripe.com/test_9B67sFg7x1pS96689iaVa02',
@@ -220,6 +224,46 @@ function requireAccount(reason,after){
   if(accountUser())return true;
   openAuth(reason,after);return false;
 }
+async function libraryRequest(body){
+  const response=await fetch(LIBRARY_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`Artwork library request failed (${response.status})`);return result;
+}
+async function libraryAssetsForZone(productId,zone){
+  const key=productId+'::'+zone;
+  if(libraryZoneCache.has(key))return libraryZoneCache.get(key);
+  const pending=libraryRequest({action:'catalog',productId,zone}).then(result=>result.assets||[]).catch(error=>{libraryZoneCache.delete(key);throw error;});
+  libraryZoneCache.set(key,pending);return pending;
+}
+async function lockedAssetForZone(assetId,productId,zone){
+  const assets=await libraryAssetsForZone(productId,zone),asset=assets.find(row=>row.id===assetId);
+  return asset?.placementMode==='locked'?asset:null;
+}
+window.MQDArtworkLibrary={...(window.MQDArtworkLibrary||{}),lockedAssetForZone};
+function filteredLibraryAssets(){
+  const query=($('artworkLibrarySearch')?.value||'').trim().toLowerCase(),category=$('artworkLibraryCategory')?.value||'all';
+  return libraryAssets.filter(asset=>(category==='all'||asset.category===category)&&(!query||`${asset.name} ${asset.category}`.toLowerCase().includes(query)));
+}
+function renderArtworkLibrary(){
+  const grid=$('artworkLibraryGrid'),rows=filteredLibraryAssets();if(!grid)return;grid.innerHTML='';$('artworkLibraryEmpty')?.classList.toggle('hidden',rows.length>0);
+  for(const asset of rows){const button=document.createElement('button');button.type='button';button.className='library-item';button.dataset.assetId=asset.id;button.innerHTML=`<img src="${escapeHtml(asset.renderUrl)}" alt="${escapeHtml(asset.name)}"><strong>${escapeHtml(asset.name)}</strong><span class="${asset.placementMode==='locked'?'locked':''}">${asset.placementMode==='locked'?'Locked placement':'Move and resize'}</span>`;grid.appendChild(button);}
+}
+async function openArtworkLibrary(){
+  const context=window.MQDDesigner?.getContext?.();if(!context)throw new Error('The designer is still loading. Please try again.');libraryContext=context;
+  $('artworkLibraryContext').textContent=`Choose artwork for ${context.productName} · ${context.zone}`;$('artworkLibraryOverlay').classList.remove('hidden');$('artworkLibraryLoading').classList.remove('hidden');$('artworkLibraryGrid').innerHTML='';$('artworkLibraryEmpty').classList.add('hidden');
+  try{libraryAssets=await libraryAssetsForZone(context.productId,context.zone);renderArtworkLibrary();}
+  catch(error){console.error(error);$('artworkLibraryEmpty').textContent='Could not load the artwork library: '+error.message;$('artworkLibraryEmpty').classList.remove('hidden');}
+  finally{$('artworkLibraryLoading').classList.add('hidden');}
+}
+function closeArtworkLibrary(){$('artworkLibraryOverlay')?.classList.add('hidden');}
+async function hydrateLibraryArtwork(payload){
+  const copy=payload;
+  for(const [zone,state] of Object.entries(copy.design?.zones||{})){
+    const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId);if(!layers.length)continue;
+    const assets=await libraryAssetsForZone(copy.product?.id,zone);const byId=new Map(assets.map(asset=>[asset.id,asset]));
+    for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;layer.libraryPlacements=asset.placements||layer.libraryPlacements||{};}
+  }
+  return copy;
+}
 function fileExtension(blob,filename=''){
   const fromName=filename.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1]?.toLowerCase();
   if(fromName)return fromName==='jpeg'?'jpg':fromName;
@@ -235,6 +279,7 @@ async function prepareCloudPayload(payload,designId,userId){
     for(const layer of state.layers||[]){
       delete layer.image;
       if(layer.type!=='image')continue;
+      if(layer.libraryAssetId){delete layer.src;delete layer.storagePath;continue;}
       if(layer.storagePath){delete layer.src;continue;}
       if(!layer.src)continue;
       const blob=await dataUrlToBlob(layer.src);
@@ -353,7 +398,7 @@ async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
     for(const layer of state.layers||[]){
-      if(layer.type!=='image'||!layer.src) continue;
+      if(layer.type!=='image'||layer.libraryAssetId||!layer.src) continue;
       const filename=layer.filename||'artwork.png';
       const original=retry?null:await originalArtworkBlob(filename);
       const blob=original||await dataUrlToBlob(layer.src);
@@ -449,7 +494,7 @@ async function retryPendingCart(){
   for(const item of cartItems().filter(x=>x.pendingSync)){
     let update;
     try{
-      const payload=await loadCartDraft(item.draftKey);
+      const payload=await hydrateLibraryArtwork(structuredClone(await loadCartDraft(item.draftKey)));
       if(!payload?.designId||!payload.design?.zones)throw new Error('The saved cart design could not be found on this device.');
       const {data:design,error}=await supabase.from('customer_designs').select('id,design_json,preview_path').eq('id',payload.designId).eq('user_id',user.id).single();
       if(error||!design)throw new Error('Sign in with the account that saved this cart design.');
@@ -459,6 +504,7 @@ async function retryPendingCart(){
       for(const [zone,state] of Object.entries(payload.design.zones)){
         for(const layer of state.layers||[]){
           if(layer.type!=='image')continue;
+          if(layer.libraryAssetId)continue;
           if(layer.src?.startsWith('data:'))continue;
           const savedLayer=design.design_json?.design?.zones?.[zone]?.layers?.find(x=>x.id===layer.id);
           const path=layer.storagePath||(sameSnapshot?savedLayer?.storagePath:null);
@@ -526,6 +572,7 @@ async function showCart(){
     alert(summary+'\n\nStripe sandbox checkout is not configured for this product yet.');
     return;
   }
+  if(!requireAccount('Create or sign into your account before purchasing this custom design.',showCart))return;
 
   const proceed=confirm(summary+'\n\nContinue to secure Stripe TEST checkout?\n\nNo real money will be charged in sandbox mode.');
   if(proceed) window.location.assign(checkoutUrl);
@@ -542,13 +589,13 @@ async function hydrateCloudPayload(payload){
   const copy=structuredClone(payload);
   for(const state of Object.values(copy.design?.zones||{})){
     for(const layer of state.layers||[]){
-      if(layer.type!=='image'||!layer.storagePath)continue;
+      if(layer.type!=='image'||layer.libraryAssetId||!layer.storagePath)continue;
       const {data,error}=await supabase.storage.from('customer-artwork').download(layer.storagePath);
       if(error)throw new Error('Could not reopen artwork: '+error.message);
       layer.src=URL.createObjectURL(data);
     }
   }
-  return copy;
+  return await hydrateLibraryArtwork(copy);
 }
 async function openCloudDesign(row,{notify=true}={}){
   if(!window.MQDDesigner?.loadDesign)throw new Error('The designer is still loading. Please try again.');
@@ -626,7 +673,7 @@ async function signInWithGoogle(){
   if(button)button.disabled=true;
   const {error}=await supabase.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo:AUTH_REDIRECT_URL}
+    options:{redirectTo:authRedirectUrl()}
   });
   if(error){
     if(message){message.textContent=error.message;message.className='account-message error';}
@@ -637,7 +684,7 @@ async function signUp(){
   const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
   if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
   message.textContent='Creating account…';message.className='account-message';
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:authRedirectUrl()}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   if(data.session){await completeAuth(data.session);return;}
   message.textContent='Check your email to confirm your account, then return here and sign in.';message.className='account-message success';
@@ -646,7 +693,7 @@ async function resendConfirmation(){
   const message=$('authMessage'),email=$('authEmail').value.trim();
   if(!email){message.textContent='Enter the email address you used to create your account.';message.className='account-message error';return;}
   message.textContent='Sending a new confirmation email…';message.className='account-message';
-  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:authRedirectUrl()}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   message.textContent='A new confirmation email was sent. Use the newest email because older confirmation links may no longer work.';message.className='account-message success';
 }
@@ -654,6 +701,7 @@ async function signOut(){
   await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');
 }
 
+window.MQDArtworkLibrary={open:openArtworkLibrary};
 window.addEventListener('DOMContentLoaded',()=>{
   migratePriceVersion();
   applyPriceOverridesToUI();
@@ -670,6 +718,16 @@ window.addEventListener('DOMContentLoaded',()=>{
     const next=sizes.find(x=>!used.has(x));
     if(!next){alert('All available sizes are already listed.');return;}
     $('orderOptionRows')?.appendChild(makeOrderOptionRow(next,1));
+  });
+  $('openArtworkLibrary')?.addEventListener('click',()=>openArtworkLibrary().catch(error=>{console.error(error);alert(error.message);}));
+  $('closeArtworkLibrary')?.addEventListener('click',closeArtworkLibrary);
+  $('artworkLibraryOverlay')?.addEventListener('click',event=>{if(event.target===$('artworkLibraryOverlay'))closeArtworkLibrary();});
+  $('artworkLibrarySearch')?.addEventListener('input',renderArtworkLibrary);
+  $('artworkLibraryCategory')?.addEventListener('change',renderArtworkLibrary);
+  $('artworkLibraryGrid')?.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-asset-id]');if(!button)return;const asset=libraryAssets.find(row=>row.id===button.dataset.assetId);if(!asset)return;
+    const current=window.MQDDesigner?.getContext?.();if(!current||current.productId!==libraryContext?.productId||current.zone!==libraryContext?.zone){alert('The garment area changed. Reopen the library for the currently selected area.');return;}
+    button.disabled=true;try{await window.MQDDesigner.addLibraryAsset(asset);closeArtworkLibrary();}catch(error){console.error(error);alert(error.message);}finally{button.disabled=false;}
   });
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);

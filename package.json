@@ -1,0 +1,12 @@
+{
+  "name": "mqd-designer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:launch": "node tests/run-launch-regression.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "0.1.100",
+    "three": "0.180.0"
+  }
+}

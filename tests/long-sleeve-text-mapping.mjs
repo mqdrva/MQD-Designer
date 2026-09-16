@@ -14,7 +14,8 @@ const context={document:{createElement:()=>createCanvas(1,1)},
 context.product={id:'long-sleeve-tshirt'};
 context.scaleBounds=(b)=>b;
 vm.createContext(context);
-vm.runInContext(extract('drawImageLayer','drawTextLayer')+
+vm.runInContext(extract('isFullLockedLibraryBackground','drawImageLayer')+
+  extract('drawImageLayer','drawTextLayer')+
   extract('drawTextLayer','editorDesignBounds')+
   extract('makeCleanZoneArtworkCanvas','editorRect'),context);
 vm.runInContext(extract('renderMaskedZoneCanvas','zoneDesignAspect'),context);
