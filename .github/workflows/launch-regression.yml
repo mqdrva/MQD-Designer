@@ -1,0 +1,34 @@
+name: Frozen product regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frozen-product-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  launch-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: .cache/mqd-glbs
+          key: ${{ runner.os }}-mqd-glbs-${{ hashFiles('tests/frozen-products.json') }}
+      - run: npm ci
+      - name: Verify all 12 frozen garments
+        run: npm run test:launch
+        env:
+          MQD_GLB_CACHE_DIR: .cache/mqd-glbs
