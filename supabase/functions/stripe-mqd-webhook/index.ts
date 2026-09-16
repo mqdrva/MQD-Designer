@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { quantityFromOrderItem, shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -54,7 +55,7 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 5 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 6 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "";
@@ -84,15 +85,17 @@ Deno.serve(async (req: Request) => {
     if (metadataUserId && orders.some((order: any) => order.user_id !== metadataUserId)) return json({ error: "Checkout ownership verification failed" }, 400);
 
     const { data: items, error: itemsError } = await supabase.from("mqd_order_items")
-      .select("order_id,unit_price,quantity")
+      .select("order_id,unit_price,quantity,order_options")
       .in("order_id", orders.map((order: any) => order.id));
     if (itemsError) throw itemsError;
     if (!items || items.length !== orders.length) return json({ error: "Checkout item verification failed" }, 409);
     const itemByOrder = new Map(items.map((item: any) => [item.order_id, item]));
+    const totalQuantity = orders.reduce((sum: number, order: any) => sum + quantityFromOrderItem(itemByOrder.get(order.id)), 0);
     const expectedSubtotalCents = orders.reduce((sum: number, order: any) => {
       const item: any = itemByOrder.get(order.id);
-      return sum + Math.round(Number(item.unit_price || 0) * 100) * Math.max(1, Number(item.quantity) || 1);
+      return sum + Math.round(Number(item.unit_price || 0) * 100) * quantityFromOrderItem(item);
     }, 0);
+    const expectedShippingCents = shippingCentsForQuantity(totalQuantity);
 
     const paid = event.type === "checkout.session.async_payment_succeeded" || (event.type === "checkout.session.completed" && session.payment_status === "paid");
     const failed = event.type === "checkout.session.async_payment_failed";
@@ -100,13 +103,21 @@ Deno.serve(async (req: Request) => {
       console.error("Stripe subtotal mismatch", { eventId: event.id, sessionId: session.id, expectedSubtotalCents, amountSubtotal: session.amount_subtotal });
       return json({ error: "Checkout amount verification failed" }, 409);
     }
+    if (paid && Number(session.total_details?.amount_shipping) !== expectedShippingCents) {
+      console.error("Stripe shipping mismatch", { eventId: event.id, sessionId: session.id, expectedShippingCents, amountShipping: session.total_details?.amount_shipping });
+      return json({ error: "Checkout shipping verification failed" }, 409);
+    }
+    if (paid && Number(session.amount_total) !== expectedSubtotalCents + expectedShippingCents) {
+      console.error("Stripe total mismatch", { eventId: event.id, sessionId: session.id, expectedTotalCents: expectedSubtotalCents + expectedShippingCents, amountTotal: session.amount_total });
+      return json({ error: "Checkout total verification failed" }, 409);
+    }
 
     const shipping = session.shipping_details || session.collected_information?.shipping_details || null;
     const eventTime = Number.isFinite(Number(event.created)) ? new Date(Number(event.created) * 1000).toISOString() : new Date().toISOString();
     for (const order of orders) {
       const item: any = itemByOrder.get(order.id);
       const alreadyPaid = order.status === "paid" || order.stripe_payment_status === "paid";
-      const orderSubtotal = Math.round(Number(item.unit_price || 0) * 100) * Math.max(1, Number(item.quantity) || 1) / 100;
+      const orderSubtotal = Math.round(Number(item.unit_price || 0) * 100) * quantityFromOrderItem(item) / 100;
       const update: Record<string, unknown> = {
         stripe_checkout_session_id: String(session.id || ""),
         stripe_payment_intent_id: stripeId(session.payment_intent),
