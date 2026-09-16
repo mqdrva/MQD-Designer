@@ -11,15 +11,20 @@
 <body>
 <header>
   <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><select id="productSelect" class="product-select"></select></div>
-  <div class="top-actions"><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="accountButton" class="btn">Sign In</button><a class="btn owner-only" href="/library-admin.html">Artwork Library Admin</a><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
+  <div class="top-actions"><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="accountButton" class="btn">Sign In</button><details class="help-menu"><summary class="btn">Help &amp; Policies</summary><nav aria-label="Customer help"><a href="/contact.html">Contact</a><a href="/shipping.html">Shipping</a><a href="/returns.html">Returns &amp; refunds</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></nav></details><a class="btn owner-only" href="/library-admin.html">Artwork Library Admin</a><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
 </header>
+<nav class="mobile-workspace-tabs" aria-label="Designer workspace" role="tablist">
+  <button type="button" role="tab" aria-controls="previewPane" aria-selected="false" data-mobile-pane="preview">3D Preview</button>
+  <button type="button" role="tab" aria-controls="canvasPane" aria-selected="true" data-mobile-pane="canvas" class="active">Design</button>
+  <button type="button" role="tab" aria-controls="controlPane" aria-selected="false" data-mobile-pane="control">Options</button>
+</nav>
 <div class="app">
-  <section class="preview-pane">
+  <section id="previewPane" class="preview-pane">
     <div class="pane-head"><div class="seg"><button class="active">3D</button><button disabled>Mockup</button></div></div>
     <canvas id="webgl" class="webgl"></canvas>
     <div class="viewer-hint">Drag to rotate · Scroll to zoom</div>
   </section>
-  <section class="canvas-pane">
+  <section id="canvasPane" class="canvas-pane">
     <div class="editor-toolbar">
       <button id="flipXTool" class="tool">Flip X</button><button id="flipYTool" class="tool">Flip Y</button><button id="alignTool" class="tool">Align</button><button id="cloneAllTool" class="tool">Clone All</button><button id="cropTool" class="tool">Crop</button><button id="duplicateTool" class="tool">Duplicate</button><button id="resetTool" class="tool">Reset</button>
     </div>
@@ -33,7 +38,7 @@
       <div class="bottom-controls"><div class="toolbox"><button id="undo" class="small-square">↶</button><span>Undo</span></div><div class="toolbox"><button id="redo" class="small-square">↷</button><span>Redo</span></div><div class="toolbox"><button id="gridToggle" class="small-square">#</button><span>Gridlines</span></div></div>
     </div>
   </section>
-  <aside class="control-pane">
+  <aside id="controlPane" class="control-pane">
     <div class="add-grid">
       <button id="addImageBtn" class="add-card"><span class="ico">▧</span><span>Add Image</span></button>
       <button id="addTextBtn" class="add-card"><span class="ico">T</span><span>Add Text</span></button>
@@ -58,6 +63,7 @@
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/editor-canvas-guard.js"></script>
+<script type="module" src="/v20/mobile-workspace.js"></script>
 <script type="module" src="/v20/editor.js"></script>
 <script type="module" src="/v20/customer.js?v=20260916a"></script>
 </body>

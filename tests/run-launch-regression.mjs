@@ -71,6 +71,7 @@ const tests=[
   ['checkout-security.mjs'],
   ['checkout-customer-experience.mjs'],
   ['shipping-tiers.mjs'],
+  ['launch-pages.mjs'],
   ['customer-accounts.mjs'],
   ['fleece-hoodie-zones.mjs'],
   ['frozen-product-baseline.mjs'],
