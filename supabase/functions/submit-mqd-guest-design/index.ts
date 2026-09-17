@@ -36,7 +36,7 @@ async function sha256Hex(value: string) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors(req) });
-  if (req.method === "GET") return json(req, { ok: true, service: "submit-mqd-guest-design", version: 1 });
+  if (req.method === "GET") return json(req, { ok: true, service: "submit-mqd-guest-design", version: 2 });
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "", key = serviceKey();
@@ -79,6 +79,7 @@ Deno.serve(async (req: Request) => {
       user_id: null,
       design_id: null,
       guest_checkout_token_hash: guestHash,
+      is_test: payload?.mqdSandboxTest === true,
       status: "submitted",
       customer_email: null,
       product_id: String(p.id),
