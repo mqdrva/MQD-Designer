@@ -102,7 +102,7 @@
       canvas.dispatchEvent(new win.PointerEvent('pointerdown',{...base,buttons:1,clientX:x,clientY:y}));
       canvas.dispatchEvent(new win.PointerEvent('pointermove',{...base,buttons:1,clientX:x+dx,clientY:y}));
       canvas.dispatchEvent(new win.PointerEvent('pointerup',{...base,buttons:0,clientX:x+dx,clientY:y}));
-      await nextFrames(win,3);
+      await nextFrames(win,120);
     }finally{
       if(restoreSet)delete canvas.setPointerCapture;
       if(restoreRelease)delete canvas.releasePointerCapture;
@@ -129,8 +129,14 @@
       await nextFrames(win,3);
       const views=[];
       for(let i=0;i<VIEW_ORDER.length;i++){
-        if(i>0)await quarterOrbit(frame,canvas);
-        views.push({view:VIEW_ORDER[i],blob:await canvasPng(canvas)});
+        const view=VIEW_ORDER[i];
+        if(typeof win.MQDDesigner?.setProductionProofView==='function'){
+          if(!win.MQDDesigner.setProductionProofView(view))throw new Error(`Could not set exact ${view} production view.`);
+          await nextFrames(win,2);
+        }else if(i>0){
+          await quarterOrbit(frame,canvas);
+        }
+        views.push({view,blob:await canvasPng(canvas)});
       }
       return views;
     }finally{frame.remove();}
