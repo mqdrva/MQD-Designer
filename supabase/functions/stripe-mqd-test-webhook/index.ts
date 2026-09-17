@@ -61,7 +61,7 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-test-webhook", version: 2 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-test-webhook", version: 3 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "", key = serviceKey();
@@ -145,7 +145,7 @@ Deno.serve(async (req: Request) => {
       const { error: updateError } = await supabase.from("mqd_orders").update(update).eq("id", order.id);
       if (updateError) throw updateError;
 
-      if (paid && !alreadyPaid && ownerRecipients.length) {
+      if (paid && ownerRecipients.length) {
         const subject = `[TEST] MQD sandbox paid order — ${order.order_number}`;
         const text = `SANDBOX TEST — NO REAL PAYMENT.\n\nOrder: ${order.order_number}\nGarment: ${order.product_name || "Custom garment"}\nCustomer: ${customerName || "Customer"}\nEmail: ${customerEmail || "Not provided"}\nQuantity: ${quantity}\nOrder subtotal: $${orderSubtotal.toFixed(2)}\n\nOpen Owner Orders: https://mymerchnow.app/owner`;
         const html = `<h2>MQD sandbox paid order</h2><p><strong>This is a Stripe sandbox test. No real payment was processed.</strong></p><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner">Open Owner Orders</a></p>`;
@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
           try {
             await queueMqdEmail(supabase, {
               orderId: order.id,
-              kind: "owner_paid_order_test",
+              kind: "owner_paid_order",
               recipient,
               subject,
               html,
