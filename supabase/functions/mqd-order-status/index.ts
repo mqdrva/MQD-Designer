@@ -14,19 +14,20 @@ Deno.serve(async(req)=>{
     const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();if(!url||!key)return json({error:'Backend not configured'},500);
     const supabase=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
     const {data,error}=await supabase.from('mqd_orders')
-      .select('order_number,status,product_name,product_price,amount_paid,currency,paid_at,stripe_payment_status')
+      .select('order_number,status,product_name,product_price,amount_paid,currency,paid_at,stripe_payment_status,is_test')
       .eq('stripe_checkout_session_id',sessionId).order('created_at',{ascending:true});
     if(error)return json({error:error.message},500);
     if(!data?.length)return json({ok:true,pending:true});
     const orders=data.map(row=>({
       orderNumber:row.order_number,status:row.status,productName:row.product_name,
       productPrice:Number(row.product_price||0),amountPaid:row.amount_paid==null?null:Number(row.amount_paid),
-      currency:row.currency||'USD',paidAt:row.paid_at,paymentStatus:row.stripe_payment_status
+      currency:row.currency||'USD',paidAt:row.paid_at,paymentStatus:row.stripe_payment_status,isTest:row.is_test===true
     }));
     const allPaid=orders.every(row=>row.status==='paid'||row.paymentStatus==='paid');
     const amountPaid=orders.reduce((sum,row)=>sum+(row.amountPaid??row.productPrice),0);
+    const isTestSession=sessionId.startsWith('cs_test_');
     return json({
-      ok:true,pending:false,orders,
+      ok:true,pending:false,isTest:isTestSession,orders,
       orderNumber:orders.map(row=>row.orderNumber).join(', '),
       productName:orders.length===1?orders[0].productName:`${orders.length} customized products`,
       amountPaid,currency:orders[0].currency||'USD',
