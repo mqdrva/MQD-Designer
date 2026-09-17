@@ -28,7 +28,7 @@
 const STATUS_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-order-status';
 const $=id=>document.getElementById(id);
 const sessionId=new URLSearchParams(location.search).get('session_id')||'';
-if(sessionId.startsWith('cs_test_'))$('sandboxBadge').hidden=false;
+$('sandboxBadge').hidden=true;
 const money=(n,c='USD')=>new Intl.NumberFormat(undefined,{style:'currency',currency:c||'USD'}).format(Number(n)||0);
 async function loadStatus(attempt=0){
   if(!sessionId){$('message').textContent='Payment completed, but this confirmation page did not receive a Stripe session reference.';return;}
@@ -41,6 +41,7 @@ async function loadStatus(attempt=0){
       return;
     }
     if(!r.ok||!data.ok)throw new Error(data.error||'Could not load order status');
+    $('sandboxBadge').hidden=data.isTest!==true;
     $('orderNumber').textContent=data.orderNumber||'—';
     $('productName').textContent=data.productName||'—';
     $('amount').textContent=money(data.amountPaid ?? data.productPrice,data.currency||'USD');
