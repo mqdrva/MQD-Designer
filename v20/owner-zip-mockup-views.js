@@ -105,7 +105,7 @@
       await win.MQDDesigner.loadDesign(payload,{notify:false});
       try{await doc.fonts?.ready;}catch{}
       const canvas=doc.getElementById('webgl');if(!canvas)throw new Error('3D preview canvas is unavailable.');
-      await waitForGarment(canvas);await nextFrames(win,3);
+      await waitForGarment(canvas);await sleep(900);await nextFrames(win,3);
       const output=[];
       for(let i=0;i<views.length;i++){
         if(i>0)await quarterOrbit(frame,canvas);
