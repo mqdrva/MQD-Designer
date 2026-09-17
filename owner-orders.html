@@ -7,7 +7,7 @@
   <title>MQD Owner Orders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260916a">
+  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260916b">
 </head>
 <body>
 <header>
@@ -78,12 +78,13 @@
       </section>
 
       <section class="detail-section"><div class="section-head"><div><h3>Garments</h3><p>Product, size, quantity, and price captured with this order.</p></div></div><div id="itemList" class="item-list"></div></section>
+      <section id="savedDesignSection" class="detail-section hidden"><div class="section-head"><div><h3>Customer saved design</h3><p>The account design linked to this purchase.</p></div></div><div class="saved-design-card"><div class="saved-design-preview"><img id="savedDesignPreview" alt="Saved customer design preview"><div id="savedDesignPreviewMissing" class="preview-missing hidden">No saved preview</div></div><div class="saved-design-meta"><strong id="savedDesignName">Saved design</strong><div id="savedDesignStatus" class="muted"></div><div id="savedDesignUpdated" class="muted"></div></div></div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Background HEX colors</h3><p>Production colors saved for each print zone.</p></div><button id="downloadColors" class="btn small" type="button">Download HEX JSON</button></div><div id="colorGrid" class="color-grid"></div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Saved design &amp; production files</h3><p>Mockup, design snapshot, original artwork, captured zone files, and production metadata.</p></div><button id="downloadProductionZip" class="btn primary small" type="button">Download Production ZIP</button></div><div class="file-actions"><button id="downloadDesign" class="file-button" type="button">Saved Design JSON</button><button id="downloadOrderSummary" class="file-button" type="button">Order Summary JSON</button></div><div id="assetGroups" class="asset-groups"></div><div id="zoneFallback" class="note hidden">This older order was created before automatic zone PNG capture. Its design JSON, original artwork, mockup, HEX colors, and per-zone metadata are still available in the Production ZIP.</div></section>
     </div>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script type="module" src="/v20/owner-orders.js?v=20260916a"></script>
+<script type="module" src="/v20/owner-orders.js?v=20260916b"></script>
 </body>
 </html>
