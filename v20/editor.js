@@ -1113,6 +1113,26 @@ function openGarmentCopy(){
 
 function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
 function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}
+function setProductionProofView(view){
+ if(!camera||!controls||!renderer||!garment)return false;
+ const target=controls.target.clone(),offset=camera.position.clone().sub(target),horizontal=Math.hypot(offset.x,offset.z);
+ if(!horizontal)return false;
+ const y=offset.y,positions={
+  front:new THREE.Vector3(0,y,horizontal),
+  'left-side':new THREE.Vector3(-horizontal,y,0),
+  back:new THREE.Vector3(0,y,-horizontal),
+  'right-side':new THREE.Vector3(horizontal,y,0)
+ },next=positions[String(view||'').toLowerCase()];
+ if(!next)return false;
+ const damping=controls.enableDamping;
+ controls.enableDamping=false;
+ camera.position.copy(target).add(next);
+ camera.lookAt(target);
+ controls.update();
+ renderer.render(scene,camera);
+ controls.enableDamping=damping;
+ return true;
+}
 function downloadMockupPNG(){
  if(!renderer||!garment)return;
  renderer.render(scene,camera);
@@ -1552,7 +1572,7 @@ async function loadDesignPayload(payload,{notify=true}={}){
  recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();
  if(notify)alert('Design loaded.');
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
