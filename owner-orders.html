@@ -7,7 +7,7 @@
   <title>MQD Owner Orders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260916b">
+  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260917c">
 </head>
 <body>
 <header>
@@ -36,12 +36,13 @@
       <button class="stat-card" data-status="in-production"><span>In Production</span><strong id="countProduction">0</strong></button>
       <button class="stat-card" data-status="shipped"><span>Shipped</span><strong id="countShipped">0</strong></button>
       <button class="stat-card" data-status="completed"><span>Completed</span><strong id="countCompleted">0</strong></button>
+      <button class="stat-card test-stat" data-status="test"><span>Test Orders</span><strong id="countTest">0</strong></button>
     </section>
 
     <section class="card orders-card">
       <div class="toolbar">
         <label class="search-wrap"><span class="sr-only">Search orders</span><input id="orderSearch" type="search" placeholder="Search customer, email, phone, product, or order number"></label>
-        <select id="statusFilter" aria-label="Filter by order status"><option value="all">All statuses</option><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option></select>
+        <select id="statusFilter" aria-label="Filter by order status"><option value="all">All statuses</option><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option><option value="test">Test Orders</option></select>
       </div>
       <div id="ordersMessage" class="message" role="status"></div>
       <div class="table-wrap">
@@ -63,6 +64,7 @@
       <section class="detail-top">
         <div class="mockup-card"><img id="mockupImage" alt="Customer garment mockup"><div id="mockupMissing" class="preview-missing hidden">No mockup saved</div></div>
         <div class="status-panel">
+          <div id="testOrderNotice" class="test-order-notice hidden">SANDBOX TEST ORDER — locked out of production and shipping.</div>
           <label>Order status<select id="detailStatus"><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option></select></label>
           <label>Shipping carrier<input id="detailCarrier" type="text" maxlength="80" placeholder="UPS, USPS, FedEx…"></label>
           <label>Tracking number<input id="detailTracking" type="text" maxlength="120" placeholder="Enter tracking number"></label>
@@ -86,6 +88,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/owner-zip-mockup-views.js?v=20260917b"></script>
-<script type="module" src="/v20/owner-orders.js?v=20260916b"></script>
+<script type="module" src="/v20/owner-orders.js?v=20260917c"></script>
 </body>
 </html>
