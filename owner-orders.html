@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>MQD Owner Orders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260916a">
+</head>
+<body>
+<header>
+  <a href="/?owner=1" class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><span>Owner Orders</span></a>
+  <nav class="header-actions"><a class="btn" href="/?owner=1">Designer</a><a class="btn" href="/library-admin.html">Artwork Library</a><button id="signOut" class="btn hidden" type="button">Sign Out</button></nav>
+</header>
+<main>
+  <section id="authCard" class="card auth-card">
+    <p class="eyebrow">PRIVATE OWNER AREA</p>
+    <h1>Orders dashboard</h1>
+    <p>Sign in with an approved MQD owner account to view customer orders and production files.</p>
+    <button id="googleSignIn" class="btn primary" type="button">Continue with Google</button>
+    <div id="authStatus" class="message" role="status"></div>
+  </section>
+
+  <div id="ordersApp" class="hidden">
+    <section class="hero">
+      <div><p class="eyebrow">ORDER OPERATIONS</p><h1>Owner Orders Dashboard</h1><p>Paid orders, production status, shipping details, tracking, mockups, saved designs, and production downloads.</p></div>
+      <button id="refreshOrders" class="btn" type="button">Refresh Orders</button>
+    </section>
+
+    <section class="stats" aria-label="Order status summary">
+      <button class="stat-card active" data-status="all"><span>All</span><strong id="countAll">0</strong></button>
+      <button class="stat-card" data-status="new"><span>New</span><strong id="countNew">0</strong></button>
+      <button class="stat-card" data-status="paid"><span>Paid</span><strong id="countPaid">0</strong></button>
+      <button class="stat-card" data-status="in-production"><span>In Production</span><strong id="countProduction">0</strong></button>
+      <button class="stat-card" data-status="shipped"><span>Shipped</span><strong id="countShipped">0</strong></button>
+      <button class="stat-card" data-status="completed"><span>Completed</span><strong id="countCompleted">0</strong></button>
+    </section>
+
+    <section class="card orders-card">
+      <div class="toolbar">
+        <label class="search-wrap"><span class="sr-only">Search orders</span><input id="orderSearch" type="search" placeholder="Search customer, email, phone, product, or order number"></label>
+        <select id="statusFilter" aria-label="Filter by order status"><option value="all">All statuses</option><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option></select>
+      </div>
+      <div id="ordersMessage" class="message" role="status"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Garment / Size</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </div>
+      <div id="ordersEmpty" class="empty hidden">No orders match this filter.</div>
+    </section>
+  </div>
+</main>
+
+<div id="orderOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div class="drawer">
+    <div class="drawer-head"><div><p class="eyebrow">ORDER DETAIL</p><h2 id="detailTitle">Order</h2><div id="detailSubtitle" class="muted"></div></div><button id="closeDetail" class="icon-btn" type="button" aria-label="Close order detail">×</button></div>
+    <div id="detailLoading" class="empty">Loading order…</div>
+    <div id="detailContent" class="hidden">
+      <section class="detail-top">
+        <div class="mockup-card"><img id="mockupImage" alt="Customer garment mockup"><div id="mockupMissing" class="preview-missing hidden">No mockup saved</div></div>
+        <div class="status-panel">
+          <label>Order status<select id="detailStatus"><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option></select></label>
+          <label>Shipping carrier<input id="detailCarrier" type="text" maxlength="80" placeholder="UPS, USPS, FedEx…"></label>
+          <label>Tracking number<input id="detailTracking" type="text" maxlength="120" placeholder="Enter tracking number"></label>
+          <button id="saveOrderUpdate" class="btn primary" type="button">Save Status &amp; Tracking</button>
+          <div id="updateMessage" class="message" role="status"></div>
+        </div>
+      </section>
+
+      <section class="detail-grid">
+        <article class="info-card"><h3>Customer</h3><dl><div><dt>Name</dt><dd id="customerName">—</dd></div><div><dt>Email</dt><dd id="customerEmail">—</dd></div><div><dt>Phone</dt><dd id="customerPhone">—</dd></div></dl></article>
+        <article class="info-card"><h3>Shipping</h3><div id="shippingName" class="strong">—</div><address id="shippingAddress">—</address></article>
+        <article class="info-card"><h3>Order</h3><dl><div><dt>Reference</dt><dd id="orderReference">—</dd></div><div><dt>Paid</dt><dd id="orderPaid">—</dd></div><div><dt>Created</dt><dd id="orderCreated">—</dd></div></dl></article>
+      </section>
+
+      <section class="detail-section"><div class="section-head"><div><h3>Garments</h3><p>Product, size, quantity, and price captured with this order.</p></div></div><div id="itemList" class="item-list"></div></section>
+      <section class="detail-section"><div class="section-head"><div><h3>Background HEX colors</h3><p>Production colors saved for each print zone.</p></div><button id="downloadColors" class="btn small" type="button">Download HEX JSON</button></div><div id="colorGrid" class="color-grid"></div></section>
+      <section class="detail-section"><div class="section-head"><div><h3>Saved design &amp; production files</h3><p>Mockup, design snapshot, original artwork, captured zone files, and production metadata.</p></div><button id="downloadProductionZip" class="btn primary small" type="button">Download Production ZIP</button></div><div class="file-actions"><button id="downloadDesign" class="file-button" type="button">Saved Design JSON</button><button id="downloadOrderSummary" class="file-button" type="button">Order Summary JSON</button></div><div id="assetGroups" class="asset-groups"></div><div id="zoneFallback" class="note hidden">This older order was created before automatic zone PNG capture. Its design JSON, original artwork, mockup, HEX colors, and per-zone metadata are still available in the Production ZIP.</div></section>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module" src="/v20/owner-orders.js?v=20260916a"></script>
+</body>
+</html>
