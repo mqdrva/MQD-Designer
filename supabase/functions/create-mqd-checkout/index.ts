@@ -118,11 +118,12 @@ Deno.serve(async (req) => {
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase
       .from("mqd_orders")
-      .select("id,order_number,status,product_id,design_id,customer_email")
+      .select("id,order_number,status,product_id,design_id,customer_email,is_test")
       .eq("user_id", user.id)
       .in("order_number", orderNumbers);
     if (orderError) throw orderError;
     if (!orders || orders.length !== orderNumbers.length) return json(req, { error: "One or more cart items could not be verified" }, 403);
+    if (orders.some((order) => order.is_test === true)) return json(req, { error: "Stripe sandbox test orders cannot be used in live checkout" }, 409);
     if (orders.some((order) => !["submitted", "draft"].includes(order.status))) {
       return json(req, { error: "One or more cart items can no longer be checked out" }, 409);
     }
