@@ -115,7 +115,7 @@ Deno.serve(async (req: Request) => {
     if (!orderNumbers.length || orderNumbers.length > 20 || orderNumbers.some((x: string) => !/^MQD-[A-Z0-9]{6,20}$/.test(x))) {
       return json(req, { error: "The cart contains an invalid order reference" }, 400);
     }
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(checkoutToken)) return json(req, { error: "Invalid checkout request" }, 400);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(checkoutToken)) return json(req, { error: "Invalid checkout request" }, 400);
 
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase.from("mqd_orders")
