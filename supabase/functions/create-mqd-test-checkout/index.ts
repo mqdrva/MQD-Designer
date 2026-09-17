@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
 
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase.from("mqd_orders")
-      .select("id,order_number,status,product_id,design_id,user_id,guest_checkout_token_hash")
+      .select("id,order_number,status,product_id,design_id,user_id,guest_checkout_token_hash,is_test")
       .in("order_number", orderNumbers);
     if (orderError) throw orderError;
     if (!orders || orders.length !== orderNumbers.length) return json(req, { error: "One or more cart items could not be verified" }, 403);
@@ -111,6 +111,7 @@ Deno.serve(async (req: Request) => {
       return json(req, { error: "Sandbox checkout only accepts the guest orders created in this browser" }, 403);
     }
     if (orders.some((order: any) => !["submitted", "draft"].includes(order.status))) return json(req, { error: "One or more cart items can no longer be checked out" }, 409);
+    if (orders.some((order: any) => order.is_test !== true)) return json(req, { error: "Sandbox checkout only accepts orders explicitly marked as test orders" }, 409);
 
     const orderIds = orders.map((order: any) => order.id);
     stage = "read-items";
@@ -144,7 +145,7 @@ Deno.serve(async (req: Request) => {
         });
       }
       const { error: canonicalError } = await supabase.from("mqd_orders")
-        .update({ product_name: catalog.name, product_price: catalog.cents / 100, stripe_payment_status: "unpaid" })
+        .update({ product_name: catalog.name, product_price: catalog.cents / 100, stripe_payment_status: "unpaid", is_test: true })
         .eq("id", order.id);
       if (canonicalError) throw canonicalError;
       const { error: itemPriceError } = await supabase.from("mqd_order_items")
@@ -196,7 +197,7 @@ Deno.serve(async (req: Request) => {
 
     stage = "save-test-session";
     const { error: sessionError } = await supabase.from("mqd_orders")
-      .update({ stripe_checkout_session_id: session.id, stripe_payment_status: session.payment_status || "unpaid" })
+      .update({ stripe_checkout_session_id: session.id, stripe_payment_status: session.payment_status || "unpaid", is_test: true })
       .in("id", orderIds);
     if (sessionError) throw sessionError;
     return json(req, { ok: true, test: true, sessionId: session.id, url: session.url });
