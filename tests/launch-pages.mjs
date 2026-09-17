@@ -20,7 +20,7 @@ assert(confirmation.includes('/returns.html')&&confirmation.includes('/privacy.h
 assert(index.includes('data-mobile-pane="preview"')&&index.includes('data-mobile-pane="control"'),'mobile designer must expose preview and option tabs');
 assert(index.includes('data-mobile-pane="control">Add / Edit</button>'),'mobile controls tab must clearly describe adding and editing artwork');
 assert(index.indexOf('/v20/upload-optimizer.js')<index.indexOf('/v20/editor.js'),'image optimizer must load before the editor handles phone uploads');
-assert(index.includes('/v20/editor.css?v=20260916c')&&index.includes('/v20/editor.js?v=20260916c')&&index.includes('/v20/upload-optimizer.js?v=20260916c'),'designer assets must use the current cache-busting version');
+assert(index.includes('/v20/editor.css?v=20260917a')&&index.includes('/v20/editor.js?v=20260917a')&&index.includes('/v20/upload-optimizer.js?v=20260917a'),'designer assets must use the current cache-busting version');
 assert(index.includes('no-cache, no-store, must-revalidate'),'designer HTML must tell mobile browsers not to reuse a stale page');
 assert(vercel.headers.some(rule=>rule.source==='/'&&rule.headers.some(header=>header.key==='Cache-Control'&&header.value.includes('no-store'))),'production designer route must not be cached');
 assert(css.includes('.preview-pane.mobile-active')&&css.includes('.control-pane.mobile-active'),'mobile preview and controls must be reachable');
