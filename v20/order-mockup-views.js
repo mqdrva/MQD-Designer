@@ -112,6 +112,7 @@
       try{await doc.fonts?.ready;}catch{}
       const canvas=doc.getElementById('webgl');if(!canvas)throw new Error('3D preview canvas is unavailable.');
       await waitForGarment(canvas);
+      await sleep(900);
       await nextFrames(win,3);
       const views=[];
       for(let i=0;i<VIEW_ORDER.length;i++){
