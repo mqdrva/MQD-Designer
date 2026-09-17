@@ -5,7 +5,7 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const ORDERS_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const STATUS_LABELS={new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled'};
+const STATUS_LABELS={new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled',test:'Test'};
 let activeStatus='all',activeSearch='',currentDetail=null,searchTimer=0;
 
 async function request(body){
@@ -18,7 +18,7 @@ function text(el,value='—'){if(el)el.textContent=value==null||value===''?'—'
 function money(value,currency='USD'){const n=Number(value);if(!Number.isFinite(n))return '—';try{return new Intl.NumberFormat('en-US',{style:'currency',currency:currency||'USD'}).format(n);}catch{return '$'+n.toFixed(2);}}
 function dateTime(value){if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleString();}
 function safePart(value){return String(value||'file').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,100)||'file';}
-function statusBadge(status){const span=document.createElement('span');span.className='status-badge '+String(status||'new');span.textContent=STATUS_LABELS[status]||status||'New';return span;}
+function statusBadge(status){const span=document.createElement('span');span.className='status-badge '+String(status||'new');span.textContent=STATUS_LABELS[status]||status||'New';return span;}function testBadge(){const span=document.createElement('span');span.className='test-badge';span.textContent='TEST';return span;}
 function optionsText(item){const options=Array.isArray(item?.order_options)?item.order_options:[];if(!options.length)return `Qty ${Number(item?.quantity)||1}`;return options.map(o=>`${o?.size?o.size+' × ':''}${Number(o?.quantity)||1}`).join(', ');}
 function itemQuantity(item){const options=Array.isArray(item?.order_options)?item.order_options:[];return options.length?options.reduce((n,o)=>n+(Number(o?.quantity)||0),0):(Number(item?.quantity)||1);}
 function orderTotal(order){if(order.amount_paid!=null)return Number(order.amount_paid)||0;return (order.items||[]).reduce((sum,item)=>sum+(Number(item.unit_price)||0)*itemQuantity(item),0);}
@@ -27,18 +27,18 @@ function showAuth(message='',error=false){$('authCard').classList.remove('hidden
 function setOrdersMessage(message='',error=false){text($('ordersMessage'),message||'');$('ordersMessage').classList.toggle('error',error);}
 
 function renderCounts(counts={}){
-  text($('countAll'),counts.all??0);text($('countNew'),counts.new??0);text($('countPaid'),counts.paid??0);text($('countProduction'),counts['in-production']??0);text($('countShipped'),counts.shipped??0);text($('countCompleted'),counts.completed??0);
+  text($('countAll'),counts.all??0);text($('countNew'),counts.new??0);text($('countPaid'),counts.paid??0);text($('countProduction'),counts['in-production']??0);text($('countShipped'),counts.shipped??0);text($('countCompleted'),counts.completed??0);text($('countTest'),counts.test??0);
 }
 function renderOrders(rows=[]){
   const body=$('ordersBody');body.innerHTML='';$('ordersEmpty').classList.toggle('hidden',rows.length>0);
   for(const order of rows){
     const tr=document.createElement('tr');
-    const orderCell=document.createElement('td');const ref=document.createElement('div');ref.className='order-link';ref.textContent=order.order_number;const product=document.createElement('div');product.className='muted';product.textContent=order.product_name||'Custom garment';orderCell.append(ref,product);
+    const orderCell=document.createElement('td');const ref=document.createElement('div');ref.className='order-link';ref.textContent=order.order_number;const product=document.createElement('div');product.className='muted';product.textContent=order.product_name||'Custom garment';orderCell.append(ref,product);if(order.is_test===true)orderCell.appendChild(testBadge());
     const customerCell=document.createElement('td');const customer=document.createElement('div');customer.textContent=order.customer_name||order.shipping_name||'Customer';const email=document.createElement('div');email.className='muted';email.textContent=order.customer_email||'';customerCell.append(customer,email);
     const garmentCell=document.createElement('td');const item=order.items?.[0];const garment=document.createElement('div');garment.textContent=item?.product_name||order.product_name||'Custom garment';const sizes=document.createElement('div');sizes.className='qty-list';for(const option of item?.order_options||[]){const chip=document.createElement('span');chip.className='size-chip';chip.textContent=`${option.size||'Qty'} × ${Number(option.quantity)||1}`;sizes.appendChild(chip);}if(!sizes.childElementCount){const chip=document.createElement('span');chip.className='size-chip';chip.textContent=optionsText(item);sizes.appendChild(chip);}garmentCell.append(garment,sizes);
     const qtyCell=document.createElement('td');qtyCell.textContent=String((order.items||[]).reduce((n,x)=>n+itemQuantity(x),0)||1);
     const amountCell=document.createElement('td');amountCell.textContent=money(orderTotal(order),order.currency||'USD');
-    const statusCell=document.createElement('td');statusCell.appendChild(statusBadge(order.ui_status));
+    const statusCell=document.createElement('td');if(order.is_test===true)statusCell.appendChild(testBadge());statusCell.appendChild(statusBadge(order.ui_status));
     const dateCell=document.createElement('td');dateCell.textContent=new Date(order.created_at).toLocaleDateString();
     const actionCell=document.createElement('td');const button=document.createElement('button');button.className='view-btn';button.type='button';button.textContent='View';button.onclick=()=>openOrder(order.id);actionCell.appendChild(button);
     tr.append(orderCell,customerCell,garmentCell,qtyCell,amountCell,statusCell,dateCell,actionCell);body.appendChild(tr);
@@ -72,9 +72,9 @@ function renderAssets(detail){
   if(detail.order?.mockup_url){const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent='Mockup';const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent='Customer 3D mockup PNG';const a=document.createElement('a');a.href=detail.order.mockup_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.append(label,a);group.append(h,row);host.prepend(group);}
 }
 function renderDetail(detail){
-  currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
+  currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${order.is_test===true?'TEST ORDER · ':''}${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
   const img=$('mockupImage'),missing=$('mockupMissing');if(order.mockup_url){img.src=order.mockup_url;img.classList.remove('hidden');missing.classList.add('hidden');}else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
-  $('detailStatus').value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';$('detailCarrier').value=order.shipping_carrier||'';$('detailTracking').value=order.tracking_number||'';
+  $('detailStatus').value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';$('detailCarrier').value=order.shipping_carrier||'';$('detailTracking').value=order.tracking_number||'';const locked=order.is_test===true;$('detailStatus').disabled=locked;$('detailCarrier').disabled=locked;$('detailTracking').disabled=locked;$('saveOrderUpdate').disabled=locked;$('testOrderNotice').classList.toggle('hidden',!locked);
   text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderAssets(detail);
 }
 async function openOrder(id){
@@ -84,7 +84,7 @@ async function openOrder(id){
 function closeDetail(){$('orderOverlay').classList.add('hidden');currentDetail=null;$('updateMessage').textContent='';}
 
 async function saveOrderUpdate(){
-  if(!currentDetail)return;const button=$('saveOrderUpdate'),old=button.textContent;button.disabled=true;button.textContent='Saving…';$('updateMessage').textContent='';
+  if(!currentDetail)return;if(currentDetail.order?.is_test===true){$('updateMessage').textContent='Sandbox test orders are locked and cannot be sent to production or shipping.';$('updateMessage').className='message error';return;}const button=$('saveOrderUpdate'),old=button.textContent;button.disabled=true;button.textContent='Saving…';$('updateMessage').textContent='';
   try{await request({action:'update',id:currentDetail.order.id,status:$('detailStatus').value,carrier:$('detailCarrier').value,trackingNumber:$('detailTracking').value});$('updateMessage').textContent='Saved ✓';$('updateMessage').className='message success';const refreshed=await request({action:'detail',id:currentDetail.order.id});renderDetail(refreshed);await loadOrders();}
   catch(error){$('updateMessage').textContent=error.message;$('updateMessage').className='message error';}
   finally{button.disabled=false;button.textContent=old;}
