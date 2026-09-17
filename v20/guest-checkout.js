@@ -4,8 +4,10 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const GUEST_SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-guest-design';
 const GUEST_CHECKOUT_URL=SUPABASE_URL+'/functions/v1/create-mqd-guest-checkout';
+const TEST_CHECKOUT_URL=SUPABASE_URL+'/functions/v1/create-mqd-test-checkout';
 const GUEST_TOKEN_KEY='mqd-guest-order-token';
 const CHECKOUT_STATE_KEY='mqd-checkout-request';
+const TEST_MODE=new URLSearchParams(location.search).get('mqdStripeTest')==='1';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 
 const PRICES={
@@ -43,6 +45,7 @@ function hasGoogleIdentity(user){
   if(user?.app_metadata?.provider)providers.push(String(user.app_metadata.provider));
   return providers.includes('google');
 }
+function isOwnerAdmin(user){return user?.app_metadata?.role==='admin';}
 function guestToken(){
   let token=localStorage.getItem(GUEST_TOKEN_KEY)||'';
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)){
@@ -109,6 +112,7 @@ async function buildGuestSubmission(payload){
   if(mockup)form.append('mockup',mockup,(payload.product?.id||'product')+'-mockup.png');
   const clean=structuredClone(payload);
   delete clean.designId;
+  if(TEST_MODE)clean.mqdSandboxTest=true;
   form.append('payload',JSON.stringify(clean,(key,value)=>key==='src'||key==='image'?undefined:value));
   form.append('guestToken',guestToken());
   return form;
@@ -145,6 +149,7 @@ async function addGuestToCart(button){
       addedAt:new Date().toISOString(),
       pendingSync:false,
       guest:true,
+      sandboxTest:TEST_MODE,
       draftKey:null,
       backendError:''
     });
@@ -164,9 +169,11 @@ function checkoutFailureMessage(result,status){
   const detail=String(result?.error||'');
   const reference=detail.match(/\bReference:\s*([0-9a-f-]{36})/i)?.[1]||'';
   const pendingApproval=status===503||/Checkout failed at stripe-session/i.test(detail);
-  const base=pendingApproval
-    ?'Payments are temporarily unavailable while Stripe completes account approval. Your cart is safe on this device. Please try again later.'
-    :'Secure checkout could not open. Your cart is safe on this device. Please try again later.';
+  const base=TEST_MODE
+    ?'Stripe sandbox checkout could not open. Your test cart is safe on this device. Please try again.'
+    :pendingApproval
+      ?'Payments are temporarily unavailable while Stripe completes account approval. Your cart is safe on this device. Please try again later.'
+      :'Secure checkout could not open. Your cart is safe on this device. Please try again later.';
   return reference?`${base}\n\nSupport reference: ${reference}`:base;
 }
 async function runGuestCheckout(button){
@@ -174,13 +181,15 @@ async function runGuestCheckout(button){
   checkoutBusy=true;
   const cartButton=document.getElementById('cartButton');
   const original=button.textContent;
-  button.disabled=true;button.textContent='Opening checkout…';
+  button.disabled=true;button.textContent=TEST_MODE?'Opening sandbox…':'Opening checkout…';
   if(cartButton)cartButton.disabled=true;
   try{
     const items=cartItems();
     if(!items.length)throw new Error('Your cart is empty.');
     if(items.some(item=>item.pendingSync))throw new Error('One or more older cart items still need to sync. Remove and re-add those items, then try checkout again.');
     if(items.some(item=>!/^MQD-[A-Z0-9]{6,20}$/.test(String(item.orderNumber||''))))throw new Error('One or more cart items need to be re-added before checkout.');
+    if(TEST_MODE&&items.some(item=>item.sandboxTest!==true))throw new Error('Your cart contains regular checkout items. Clear the cart and add a fresh test item while the SANDBOX TEST banner is visible.');
+    if(!TEST_MODE&&items.some(item=>item.sandboxTest===true))throw new Error('Your cart contains a Stripe sandbox test item. Remove it before using live checkout.');
     const signature=items.map(item=>item.orderNumber).sort().join('|');
     let state={};
     try{state=JSON.parse(localStorage.getItem(CHECKOUT_STATE_KEY)||'{}');}catch{}
@@ -189,18 +198,21 @@ async function runGuestCheckout(button){
       localStorage.setItem(CHECKOUT_STATE_KEY,JSON.stringify(state));
     }
     const session=(await supabase.auth.getSession()).data.session||currentSession;
+    if(TEST_MODE&&(!session?.access_token||!isOwnerAdmin(session.user))){
+      throw new Error('Owner admin sign-in is required for the Stripe sandbox test. Sign in at /owner in this browser, then return to this test page.');
+    }
     const headers={apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'};
     if(session?.access_token)headers.Authorization=`Bearer ${session.access_token}`;
-    const response=await fetch(GUEST_CHECKOUT_URL,{
+    const response=await fetch(TEST_MODE?TEST_CHECKOUT_URL:GUEST_CHECKOUT_URL,{
       method:'POST',headers,
       body:JSON.stringify({orderNumbers:items.map(item=>item.orderNumber),checkoutToken:state.token,guestToken:guestToken()})
     });
     const result=await response.json().catch(()=>({}));
-    if(!response.ok||!result.url){alert(checkoutFailureMessage(result,response.status));return;}
+    if(!response.ok||!result.url||(TEST_MODE&&result.test!==true)){alert(checkoutFailureMessage(result,response.status));return;}
     window.location.assign(result.url);
   }catch(error){
-    console.error('MQD guest checkout failed',error);
-    alert(error?.message||'Secure checkout could not connect. Your cart is safe on this device.');
+    console.error(TEST_MODE?'MQD sandbox checkout failed':'MQD guest checkout failed',error);
+    alert(error?.message||(TEST_MODE?'Stripe sandbox checkout could not connect.':'Secure checkout could not connect. Your cart is safe on this device.'));
   }finally{
     button.disabled=false;button.textContent=original;
     if(cartButton)cartButton.disabled=false;
@@ -208,12 +220,30 @@ async function runGuestCheckout(button){
     checkoutBusy=false;
   }
 }
+function showTestModeUI(){
+  if(!TEST_MODE||document.getElementById('mqdStripeTestBanner'))return;
+  const banner=document.createElement('div');
+  banner.id='mqdStripeTestBanner';
+  banner.setAttribute('role','status');
+  banner.textContent='STRIPE SANDBOX TEST — no real payment will be charged. Test orders are temporary.';
+  Object.assign(banner.style,{position:'sticky',top:'0',zIndex:'99999',padding:'10px 16px',textAlign:'center',fontWeight:'800',fontFamily:'Inter,system-ui,sans-serif',background:'#fff3cd',color:'#5f4300',borderBottom:'1px solid #e6c76a'});
+  document.body.prepend(banner);
+  const checkout=document.getElementById('checkoutCart');
+  if(checkout)checkout.textContent='Sandbox Checkout';
+}
 
 // Capture before the legacy account-only customer handlers. Signed-in Google
 // customers keep the existing account flow; guests use the secure token flow.
+// The owner-only mqdStripeTest=1 route deliberately forces the guest path so
+// the production guest checkout can be tested against Stripe sandbox safely.
 document.addEventListener('click',event=>{
   const addButton=event.target.closest?.('#addToCart');
   if(addButton){
+    if(TEST_MODE){
+      event.preventDefault();event.stopImmediatePropagation();
+      void addGuestToCart(addButton);
+      return;
+    }
     if(passThroughAddOnce){passThroughAddOnce=false;return;}
     if(!sessionResolved){
       event.preventDefault();event.stopImmediatePropagation();
@@ -232,10 +262,19 @@ document.addEventListener('click',event=>{
   const checkoutButton=event.target.closest?.('#checkoutCart');
   if(checkoutButton){
     const items=cartItems();
+    if(TEST_MODE){
+      event.preventDefault();event.stopImmediatePropagation();
+      void runGuestCheckout(checkoutButton);
+      return;
+    }
     if(!items.some(item=>item.guest===true))return;
     event.preventDefault();event.stopImmediatePropagation();
     void runGuestCheckout(checkoutButton);
   }
 },true);
 
-window.MQDGuestCheckout={enabled:true};
+if(TEST_MODE){
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',showTestModeUI,{once:true});
+  else showTestModeUI();
+}
+window.MQDGuestCheckout={enabled:true,testMode:TEST_MODE};
