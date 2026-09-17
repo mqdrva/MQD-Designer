@@ -1,4 +1,5 @@
 const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_FROM='Morales Quality Designs <notifications@mymerchnow.app>';
 
 async function vaultSecret(supabase,name){
   try{
@@ -10,7 +11,7 @@ async function vaultSecret(supabase,name){
 
 async function emailConfig(supabase){
   const apiKey=(Deno.env.get('MQD_RESEND_API_KEY')||await vaultSecret(supabase,'mqd_resend_api_key')).trim();
-  const from=(Deno.env.get('MQD_EMAIL_FROM')||await vaultSecret(supabase,'mqd_email_from')).trim();
+  const from=(Deno.env.get('MQD_EMAIL_FROM')||await vaultSecret(supabase,'mqd_email_from')||DEFAULT_FROM).trim();
   return{apiKey,from};
 }
 
