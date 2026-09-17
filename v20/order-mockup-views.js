@@ -16,6 +16,7 @@
 
   const nativeFetch=window.fetch.bind(window);
   const SUBMIT_PATH='/functions/v1/submit-mqd-design';
+  const GUEST_SUBMIT_PATH='/functions/v1/submit-mqd-guest-design';
   const LIBRARY_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-artwork-library';
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
   const VIEW_ORDER=['front','left-side','back','right-side'];
@@ -147,9 +148,10 @@
 
   window.fetch=async function(input,init){
     const url=requestUrl(input);
-    if(url.includes(SUBMIT_PATH)&&init?.body instanceof FormData){
+    if((url.includes(SUBMIT_PATH)||url.includes(GUEST_SUBMIT_PATH))&&init?.body instanceof FormData){
       try{await appendProofViews(init.body);}catch(error){console.warn('MQD multi-angle order proof capture skipped:',error);}
     }
     return nativeFetch(input,init);
   };
+  import('/v20/guest-checkout.js?v=20260917a').catch(error=>console.error('MQD guest checkout module failed to load',error));
 })();
