@@ -39,6 +39,11 @@ const json = (req, body, status = 200) => new Response(JSON.stringify(body), {
   headers: { ...cors(req), "Content-Type": "application/json", "Cache-Control": "no-store" }
 });
 const serviceKey = () => Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
+function hasGoogleIdentity(user) {
+  const providers = Array.isArray(user?.app_metadata?.providers) ? user.app_metadata.providers.map(String) : [];
+  if (user?.app_metadata?.provider) providers.push(String(user.app_metadata.provider));
+  return providers.includes("google");
+}
 
 async function stripeSecret(supabase) {
   const direct = Deno.env.get("MQD_STRIPE_SECRET_KEY") || Deno.env.get("STRIPE_SECRET_KEY") || "";
@@ -100,6 +105,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) return json(req, { error: "Your sign-in session is invalid or expired" }, 401);
+    if (!hasGoogleIdentity(user)) return json(req, { error: "Continue with Google is required for checkout." }, 403);
 
     const body = await req.json().catch(() => ({}));
     const orderNumbers = [...new Set((Array.isArray(body?.orderNumbers) ? body.orderNumbers : []).map((x) => String(x).trim()))];
@@ -221,8 +227,6 @@ Deno.serve(async (req) => {
     if (sessionError) throw sessionError;
     return json(req, { ok: true, sessionId: session.id, url: session.url });
   } catch (error) {
-    // PostgREST errors are plain objects, not Error instances. Never log the
-    // entire object: it can contain request headers or customer data.
     const code = typeof error?.code === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(error.code) ? error.code : "unknown";
     console.error(JSON.stringify({ event: "checkout-failed", diagnosticId, stage, code }));
     return json(req, { error: `Checkout failed at ${stage} (${code}). Reference: ${diagnosticId}` }, 500);
