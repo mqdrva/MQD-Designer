@@ -6,11 +6,12 @@ const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,
 const safe=(v:string)=>v.replace(/[^a-zA-Z0-9._-]+/g,"_").slice(0,120);
 const mimeFor=(blob:Blob,path:string)=>blob.type&&blob.type!=='application/octet-stream'?blob.type:path.toLowerCase().endsWith('.jpg')||path.toLowerCase().endsWith('.jpeg')?'image/jpeg':path.toLowerCase().endsWith('.webp')?'image/webp':'image/png';
 function serviceKey(){return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||Deno.env.get('SUPABASE_SECRET_KEY')||'';}
+function hasGoogleIdentity(user:any){const providers=Array.isArray(user?.app_metadata?.providers)?user.app_metadata.providers.map(String):[];if(user?.app_metadata?.provider)providers.push(String(user.app_metadata.provider));return providers.includes('google');}
 
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();
- if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:5});
+ if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:6});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try{
   if(!url||!key)return json({error:'Backend service credentials are not configured'},500);
@@ -19,6 +20,7 @@ Deno.serve(async(req:Request)=>{
   const supabase=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:{user},error:userError}=await supabase.auth.getUser(token);
   if(userError||!user)return json({error:'Your sign-in session is invalid or expired'},401);
+  if(!hasGoogleIdentity(user))return json({error:'Continue with Google is required for customer orders.'},403);
   const form=await req.formData(),raw=String(form.get('payload')||'');
   if(!raw||raw.length>2_000_000)return json({error:'Invalid design payload'},400);
   const payload=JSON.parse(raw),p=payload?.product,designId=String(payload?.designId||'');
