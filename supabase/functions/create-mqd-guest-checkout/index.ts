@@ -212,7 +212,7 @@ Deno.serve(async (req: Request) => {
     }, {
       idempotencyKey: `mqd-guest-checkout-${allOwnedByUser ? user.id : guestHash.slice(0, 20)}-${checkoutToken}`
     });
-    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    if (!session.url || !session.id.startsWith("cs_live_")) throw new Error("Stripe did not return a live checkout session");
 
     stage = "save-session";
     const { error: sessionError } = await supabase.from("mqd_orders")
