@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>MQD Owner Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#171717;--muted:#717171;--line:#e7e7e7;--accent:#ff6b00;--danger:#b42318;--green:#147a4b}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:#f6f6f6}.hidden{display:none!important}
+    header{height:66px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px}header img{height:40px;width:auto}.brand{display:flex;align-items:center;gap:12px;font-weight:800}.customer-link{color:#555;text-decoration:none;font-size:13px;font-weight:700}
+    main{min-height:calc(100vh - 66px);display:grid;place-items:center;padding:28px}.card{width:min(620px,94vw);background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 55px rgba(0,0,0,.07);padding:30px}.eyebrow{font-size:10px;letter-spacing:.15em;font-weight:800;color:var(--accent);margin:0 0 6px}.card h1{margin:0 0 10px;font-size:30px}.lead{color:var(--muted);line-height:1.55;margin:0 0 22px}.btn{border:1px solid #d8d8d8;background:#fff;color:#222;border-radius:10px;padding:11px 14px;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.btn.primary{background:#111;color:#fff;border-color:#111}.btn.orange{background:var(--accent);color:#fff;border-color:var(--accent)}.btn.full{width:100%}.message{font-size:12px;line-height:1.45;margin-top:12px;color:var(--muted);min-height:18px}.message.error{color:var(--danger)}.message.success{color:var(--green)}
+    .portal-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}.account{font-size:11px;color:var(--muted);text-align:right;overflow-wrap:anywhere}.tools{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tool{display:block;border:1px solid var(--line);border-radius:14px;padding:16px;text-decoration:none;color:var(--ink);background:#fff}.tool:hover{border-color:#cfcfcf;background:#fffaf6}.tool strong{display:block;font-size:14px;margin-bottom:5px}.tool span{display:block;color:var(--muted);font-size:11px;line-height:1.45}.tool.orders{border-color:#ffd0ae;background:#fff9f4}.portal-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);margin-top:20px;padding-top:18px}.security-note{font-size:10px;color:#8a8a8a;line-height:1.45;max-width:360px}
+    @media(max-width:620px){header{padding:0 14px}.card{padding:22px}.card h1{font-size:25px}.tools{grid-template-columns:1fr}.portal-head{display:block}.account{text-align:left;margin-top:8px}.portal-actions{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><span>Owner Portal</span></div>
+  <a class="customer-link" href="/">Customer Site</a>
+</header>
+<main>
+  <section id="signInCard" class="card">
+    <p class="eyebrow">PRIVATE OWNER ACCESS</p>
+    <h1>MQD Owner Portal</h1>
+    <p class="lead">Sign in with an approved Morales Quality Designs owner account. The URL alone does not grant access.</p>
+    <button id="googleSignIn" class="btn primary full" type="button">Continue with Google</button>
+    <div id="signInMessage" class="message" role="status"></div>
+  </section>
+
+  <section id="ownerCard" class="card hidden">
+    <div class="portal-head">
+      <div><p class="eyebrow">AUTHORIZED OWNER</p><h1>Owner Portal</h1><p class="lead" style="margin-bottom:0">Choose the management area you want to open.</p></div>
+      <div id="ownerEmail" class="account"></div>
+    </div>
+    <div class="tools">
+      <a class="tool orders" href="/owner-orders.html"><strong>Owner Orders</strong><span>Orders, customer details, production files, status, shipping and tracking.</span></a>
+      <a class="tool" href="/?owner=1"><strong>Designer &amp; Product Admin</strong><span>Open the 3D designer with your private owner controls enabled.</span></a>
+      <a class="tool" href="/library-admin.html"><strong>Artwork Library Admin</strong><span>Manage MQD backgrounds, icons and customer artwork options.</span></a>
+      <a class="tool" href="/"><strong>Customer Site</strong><span>View the same public experience your customers see.</span></a>
+    </div>
+    <div class="portal-actions">
+      <div class="security-note">Owner access is verified against the backend admin role. Non-admin accounts cannot open private order data.</div>
+      <button id="signOut" class="btn" type="button">Sign Out</button>
+    </div>
+  </section>
+
+  <section id="deniedCard" class="card hidden">
+    <p class="eyebrow">ACCESS DENIED</p>
+    <h1>Owner access required</h1>
+    <p class="lead">This account is signed in, but it is not approved for the MQD owner portal.</p>
+    <button id="deniedSignOut" class="btn primary" type="button">Sign Out</button>
+    <div id="deniedMessage" class="message error" role="status"></div>
+  </section>
+</main>
+<script type="module">
+  import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+  const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+  const OWNER_CHECK_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
+  const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const $=id=>document.getElementById(id);
+  let checking=false;
+
+  function show(id){for(const name of ['signInCard','ownerCard','deniedCard'])$(name).classList.toggle('hidden',name!==id);}
+  function message(value='',error=false){$('signInMessage').textContent=value;$('signInMessage').classList.toggle('error',error);}
+
+  async function verifyOwner(){
+    if(checking)return;checking=true;
+    try{
+      const {data,error}=await supabase.auth.getSession();
+      if(error)throw error;
+      const session=data.session;
+      if(!session){show('signInCard');message('');return;}
+      message('Checking owner access…');
+      const response=await fetch(OWNER_CHECK_URL,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'list',status:'all',search:''})});
+      if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');return;}
+      const body=await response.json().catch(()=>({}));
+      if(response.status===401){await supabase.auth.signOut();show('signInCard');message('Your session expired. Please sign in again.',true);return;}
+      show('deniedCard');$('deniedMessage').textContent=body.error||'This account does not have owner access.';
+    }catch(error){show('signInCard');message(error instanceof Error?error.message:String(error),true);}
+    finally{checking=false;}
+  }
+
+  $('googleSignIn').onclick=async()=>{
+    message('Opening secure sign in…');
+    const redirectTo=new URL('/owner/',location.origin).href;
+    const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
+    if(error)message(error.message,true);
+  };
+  const signOut=async()=>{await supabase.auth.signOut();show('signInCard');message('Signed out.');};
+  $('signOut').onclick=signOut;$('deniedSignOut').onclick=signOut;
+  supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session)setTimeout(verifyOwner,0);if(event==='SIGNED_OUT')show('signInCard');});
+  verifyOwner();
+</script>
+</body>
+</html>
