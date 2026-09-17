@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
 
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase.from("mqd_orders")
-      .select("id,order_number,status,product_id,design_id,user_id,customer_email,guest_checkout_token_hash")
+      .select("id,order_number,status,product_id,design_id,user_id,customer_email,guest_checkout_token_hash,is_test")
       .in("order_number", orderNumbers);
     if (orderError) throw orderError;
     if (!orders || orders.length !== orderNumbers.length) return json(req, { error: "One or more cart items could not be verified" }, 403);
