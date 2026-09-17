@@ -132,6 +132,7 @@ Deno.serve(async (req: Request) => {
         shipping_name: shipping?.name || null,
         shipping_address: shipping?.address || null,
         currency: String(session.currency || "usd").toUpperCase(),
+        is_test: true,
         updated_at: eventTime
       };
       if (paid) {
