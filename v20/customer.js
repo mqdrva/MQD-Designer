@@ -374,7 +374,10 @@ function cartItems(){
     return Array.isArray(items)?items.map(x=>({...x,price:priceFor(x.productId,x.price)})):[];
   }catch{return[]}
 }
-function saveCart(items){localStorage.setItem('mqd-cart',JSON.stringify(items));}
+function saveCart(items){
+  localStorage.setItem('mqd-cart',JSON.stringify(items));
+  localStorage.removeItem('mqd-checkout-request');
+}
 function updateCartButton(){const b=$('cartButton');if(!b)return;const count=cartItems().reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);b.textContent='Cart ('+count+')';}
 
 async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
@@ -526,35 +529,80 @@ function checkoutFailureMessage(result,status){
 }
 
 async function showCart(){
+  renderCart();
+  $('cartOverlay')?.classList.remove('hidden');
+}
+
+function closeCart(){
+  $('cartOverlay')?.classList.add('hidden');
+}
+
+function cartTotals(items=cartItems()){
+  const quantity=items.reduce((sum,item)=>sum+(Number(item.totalQuantity)||1),0);
+  const subtotal=items.reduce((sum,item)=>sum+(Number(item.price)||0)*(Number(item.totalQuantity)||1),0);
+  const shipping=items.length?shippingCentsForQuantity(quantity)/100:0;
+  const shippingTier=quantity<=9?'1–9 items':quantity<=19?'10–19 items':'20+ items';
+  return {quantity,subtotal,shipping,shippingTier,total:subtotal+shipping};
+}
+
+function renderCart(){
+  const items=cartItems();
+  const totals=cartTotals(items);
+  const list=$('cartList'),empty=$('cartEmpty'),footer=$('cartFooter'),checkout=$('checkoutCart'),clear=$('clearCart');
+  if(!list)return;
+  list.innerHTML=items.map((item,index)=>{
+    const quantity=Number(item.totalQuantity)||1;
+    const options=(item.orderOptions||[]).map(option=>`<span>${escapeHtml(option.size||'Item')} × ${Number(option.quantity)||1}</span>`).join('');
+    const syncState=item.pendingSync?'<div class="cart-sync pending">Saved locally · sync required before checkout</div>':'<div class="cart-sync ready">Ready for checkout</div>';
+    return `<article class="cart-item"><div class="cart-item-main"><div class="cart-item-heading"><h3>${escapeHtml(item.productName||'Custom product')}</h3><strong>$${((Number(item.price)||0)*quantity).toFixed(2)}</strong></div><div class="cart-item-options">${options||`<span>Quantity × ${quantity}</span>`}</div><div class="cart-reference">Ref: ${escapeHtml(item.orderNumber||'Pending')}</div>${syncState}</div><button class="btn danger cart-remove" type="button" data-cart-remove="${index}" aria-label="Remove ${escapeHtml(item.productName||'item')} from cart">Remove</button></article>`;
+  }).join('');
+  empty?.classList.toggle('hidden',items.length>0);
+  footer?.classList.toggle('hidden',items.length===0);
+  if($('cartItemCount'))$('cartItemCount').textContent=items.length?`${totals.quantity} ${totals.quantity===1?'item':'items'}`:'No items';
+  if($('cartSubtotal'))$('cartSubtotal').textContent=`$${totals.subtotal.toFixed(2)}`;
+  if($('cartShippingLabel'))$('cartShippingLabel').textContent=`Shipping (${totals.shippingTier})`;
+  if($('cartShipping'))$('cartShipping').textContent=`$${totals.shipping.toFixed(2)}`;
+  if($('cartTotal'))$('cartTotal').textContent=`$${totals.total.toFixed(2)}`;
+  if(checkout){checkout.disabled=!items.length||cartSyncInProgress;checkout.textContent=items.some(item=>item.pendingSync)?'Sync & Checkout':'Secure Checkout';}
+  if(clear)clear.disabled=!items.length||cartSyncInProgress;
+}
+
+function removeCartItem(index){
+  const items=cartItems();
+  if(index<0||index>=items.length)return;
+  items.splice(index,1);
+  saveCart(items);
+  updateCartButton();
+  renderCart();
+}
+
+function clearCart(){
+  if(!cartItems().length)return;
+  if(!confirm('Remove all items from your cart? Your saved designs will not be deleted.'))return;
+  saveCart([]);
+  updateCartButton();
+  renderCart();
+}
+
+async function checkoutCart(){
   if(cartSyncInProgress)return;
-  if(cartItems().some(x=>x.pendingSync)){
-    if(!requireAccount('Sign in to sync your saved cart.',showCart))return;
+  let items=cartItems();
+  if(!items.length){renderCart();return;}
+  if(items.some(item=>item.pendingSync)){
+    if(!requireAccount('Sign in to sync your saved cart.',checkoutCart))return;
     cartSyncInProgress=true;
-    const button=$('cartButton');button.disabled=true;button.textContent='Syncing…';
+    renderCart();
     try{await retryPendingCart();}
     catch(error){alert('Could not sync your cart: '+error.message);return;}
-    finally{cartSyncInProgress=false;button.disabled=false;updateCartButton();}
+    finally{cartSyncInProgress=false;updateCartButton();renderCart();}
+    items=cartItems();
+    if(items.some(item=>item.pendingSync)){
+      const errors=items.filter(item=>item.pendingSync).map(item=>`${item.productName}: ${item.backendError||'Upload incomplete'}`).join('\n');
+      alert('Could not finish syncing:\n'+errors+'\n\nYour cart and saved designs are retained. Try checkout again when the connection is available.');
+      return;
+    }
   }
-  const items=cartItems();
-  if(!items.length){alert('Your cart is empty.');return;}
-  const totalQuantity=items.reduce((n,x)=>n+(Number(x.totalQuantity)||1),0);
-  const total=items.reduce((n,x)=>n+(Number(x.price)||0)*(Number(x.totalQuantity)||1),0);
-  const shipping=shippingCentsForQuantity(totalQuantity)/100;
-  const shippingTier=totalQuantity<=9?'1–9 items':totalQuantity<=19?'10–19 items':'20+ items';
-  const summary=items.map((x,i)=>{
-    const options=(x.orderOptions||[]).map(o=>`${o.size?o.size+' × ':''}${o.quantity}`).join(', ');
-    const qty=Number(x.totalQuantity)||1;
-    return `${i+1}. ${x.productName} — ${Number(x.price).toFixed(2)} × ${qty}\n${options?'Size / Qty: '+options+'\n':''}Ref: ${x.orderNumber}${x.pendingSync?'\nSaved locally · sync pending':''}`;
-  }).join('\n\n')+`\n\nSubtotal: $${total.toFixed(2)}\nShipping (${shippingTier}): $${shipping.toFixed(2)}\nTotal before tax: $${(total+shipping).toFixed(2)}`;
-
-  if(items.some(x=>x.pendingSync)){
-    const errors=items.filter(x=>x.pendingSync).map(x=>`${x.productName}: ${x.backendError||'Upload incomplete'}`).join('\n');
-    alert(summary+'\n\nCould not finish syncing:\n'+errors+'\n\nYour saved designs are retained. Click Cart to retry. Checkout will unlock after every upload succeeds.');
-    return;
-  }
-  if(!requireAccount('Sign in before continuing to secure checkout.',showCart))return;
-  const proceed=confirm(summary+'\n\nContinue to secure checkout?');
-  if(!proceed)return;
+  if(!requireAccount('Sign in before continuing to secure checkout.',checkoutCart))return;
 
   const signature=items.map(x=>x.orderNumber).sort().join('|');
   let checkoutState={};
@@ -563,14 +611,14 @@ async function showCart(){
     checkoutState={signature,token:crypto.randomUUID()};
     localStorage.setItem('mqd-checkout-request',JSON.stringify(checkoutState));
   }
-  if(!requireAccount('Create or sign into your account before purchasing this custom design.',showCart))return;
-
-  const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
-  if(sessionError)throw sessionError;
-  const token=sessionData.session?.access_token;
-  if(!token){openAuth('Sign in before continuing to secure checkout.',showCart);return;}
-  const button=$('cartButton');button.disabled=true;button.textContent='Opening checkout…';
+  const button=$('checkoutCart'),cartButton=$('cartButton');
+  button.disabled=true;button.textContent='Opening checkout…';
+  cartButton.disabled=true;
   try{
+    const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
+    if(sessionError)throw sessionError;
+    const token=sessionData.session?.access_token;
+    if(!token){openAuth('Sign in before continuing to secure checkout.',checkoutCart);return;}
     const response=await fetch(CHECKOUT_URL,{
       method:'POST',
       headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},
@@ -583,7 +631,7 @@ async function showCart(){
     console.error(error);
     alert('Secure checkout could not connect. Your cart and saved designs are safe. Check your internet connection and try again.');
   }finally{
-    button.disabled=false;updateCartButton();
+    button.disabled=false;cartButton.disabled=false;updateCartButton();renderCart();
   }
 }
 
@@ -707,7 +755,7 @@ async function resendConfirmation(){
   message.textContent='A new confirmation email was sent. Use the newest email because older confirmation links may no longer work.';message.className='account-message success';
 }
 async function signOut(){
-  await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');
+  await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');closeCart();
 }
 
 window.MQDArtworkLibrary={open:openArtworkLibrary};
@@ -741,6 +789,11 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);
   $('cartButton')?.addEventListener('click',showCart);
+  $('closeCart')?.addEventListener('click',closeCart);
+  $('cartOverlay')?.addEventListener('click',event=>{if(event.target===$('cartOverlay'))closeCart();});
+  $('cartList')?.addEventListener('click',event=>{const button=event.target.closest('[data-cart-remove]');if(button)removeCartItem(Number(button.dataset.cartRemove));});
+  $('clearCart')?.addEventListener('click',clearCart);
+  $('checkoutCart')?.addEventListener('click',checkoutCart);
   $('accountButton')?.addEventListener('click',()=>accountUser()?openCustomerAccount():openAuth());
   $('closeAuth')?.addEventListener('click',closeAuth);
   $('authOverlay')?.addEventListener('click',e=>{if(e.target===$('authOverlay'))closeAuth();});
