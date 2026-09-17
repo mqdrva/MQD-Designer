@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { quantityFromOrderItem, shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
+import { escapeMqdEmailHtml, mqdOwnerEmails, queueMqdEmail } from "../_shared/mqd-email.js";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -55,7 +56,7 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 7 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 8 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "";
@@ -82,7 +83,7 @@ Deno.serve(async (req: Request) => {
     const orderNumbers = orderNumbersFor(session);
     if (!orderNumbers.length) return json({ error: "Checkout session has no valid order references" }, 400);
     const { data: orders, error: ordersError } = await supabase.from("mqd_orders")
-      .select("id,order_number,design_id,user_id,status,stripe_payment_status")
+      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status")
       .in("order_number", orderNumbers);
     if (ordersError) throw ordersError;
     if (!orders || orders.length !== orderNumbers.length) return json({ error: "One or more checkout orders were not found" }, 404);
@@ -114,21 +115,26 @@ Deno.serve(async (req: Request) => {
     }
     if (paid && Number(session.amount_total) !== expectedSubtotalCents + expectedShippingCents) {
       console.error("Stripe total mismatch", { eventId: event.id, sessionId: session.id, expectedTotalCents: expectedSubtotalCents + expectedShippingCents, amountTotal: session.amount_total });
-      return json({ error: "Checkout total verification failed" }, 409);
+      return json({ error: "Checkout amount verification failed" }, 409);
     }
 
     const shipping = session.shipping_details || session.collected_information?.shipping_details || null;
+    const customerEmail = String(session.customer_details?.email || session.customer_email || "").trim();
+    const customerName = String(session.customer_details?.name || shipping?.name || "Customer").trim();
     const eventTime = Number.isFinite(Number(event.created)) ? new Date(Number(event.created) * 1000).toISOString() : new Date().toISOString();
+    const ownerRecipients = paid ? await mqdOwnerEmails(supabase) : [];
+
     for (const order of orders) {
       const item: any = itemByOrder.get(order.id);
       const alreadyPaid = order.status === "paid" || order.stripe_payment_status === "paid";
-      const orderSubtotal = Math.round(Number(item.unit_price || 0) * 100) * quantityFromOrderItem(item) / 100;
+      const quantity = quantityFromOrderItem(item);
+      const orderSubtotal = Math.round(Number(item.unit_price || 0) * 100) * quantity / 100;
       const update: Record<string, unknown> = {
         stripe_checkout_session_id: String(session.id || ""),
         stripe_payment_intent_id: stripeId(session.payment_intent),
         stripe_customer_id: stripeId(session.customer),
-        customer_email: session.customer_details?.email || session.customer_email || null,
-        customer_name: session.customer_details?.name || shipping?.name || null,
+        customer_email: customerEmail || null,
+        customer_name: customerName || null,
         customer_phone: session.customer_details?.phone || null,
         shipping_name: shipping?.name || null,
         shipping_address: shipping?.address || null,
@@ -148,6 +154,19 @@ Deno.serve(async (req: Request) => {
       if (paid && order.design_id) {
         const { error: designError } = await supabase.from("customer_designs").update({ status: "purchased", updated_at: eventTime }).eq("id", order.design_id).eq("user_id", order.user_id);
         if (designError) throw designError;
+      }
+
+      if (paid && !alreadyPaid && ownerRecipients.length) {
+        const subject = `New paid MQD order — ${order.order_number}`;
+        const text = `A new MQD order has been paid.\n\nOrder: ${order.order_number}\nGarment: ${order.product_name || "Custom garment"}\nCustomer: ${customerName || "Customer"}\nEmail: ${customerEmail || "Not provided"}\nQuantity: ${quantity}\nOrder subtotal: $${orderSubtotal.toFixed(2)}\n\nOpen Owner Orders: https://mymerchnow.app/owner`;
+        const html = `<h2>New paid MQD order</h2><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner">Open Owner Orders</a></p>`;
+        for (const recipient of ownerRecipients) {
+          try {
+            await queueMqdEmail(supabase,{orderId:order.id,kind:"owner_paid_order",recipient,subject,html,text,meta:{orderNumber:order.order_number,eventId:String(event.id||"")}});
+          } catch (notifyError) {
+            console.error("MQD owner notification queue failed", notifyError instanceof Error ? notifyError.message : String(notifyError));
+          }
+        }
       }
     }
     return json({ received: true, orderNumbers, status: paid ? "paid" : failed ? "failed" : String(session.payment_status || "unpaid") });
