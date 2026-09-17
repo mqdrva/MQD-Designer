@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
     const authorized = orders.every((order: any) => (user && order.user_id === user.id) || (!!guestHash && order.guest_checkout_token_hash === guestHash));
     if (!authorized) return json(req, { error: "One or more cart items could not be verified for this browser or account" }, 403);
     if (orders.some((order: any) => !["submitted", "draft"].includes(order.status))) return json(req, { error: "One or more cart items can no longer be checked out" }, 409);
+    if (orders.some((order: any) => order.is_test === true)) return json(req, { error: "Stripe sandbox test orders cannot be used in live checkout" }, 409);
 
     const orderIds = orders.map((order: any) => order.id);
     stage = "read-items";
