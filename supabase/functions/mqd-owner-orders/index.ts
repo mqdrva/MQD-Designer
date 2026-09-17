@@ -32,21 +32,21 @@ Deno.serve(async(req:Request)=>{
       try{await retryPendingMqdEmails(supabase,5);}catch(error){console.error('MQD pending email retry skipped',error instanceof Error?error.message:String(error));}
       const filter=cleanText(body?.status||'all',30).toLowerCase(),search=cleanText(body?.search||'',160).toLowerCase();
       const {data:orders,error:ordersError}=await supabase.from('mqd_orders')
-        .select('id,order_number,status,customer_name,customer_email,customer_phone,shipping_name,product_id,product_name,product_price,amount_paid,currency,paid_at,mockup_path,background_colors,tracking_number,shipping_carrier,production_started_at,shipped_at,completed_at,created_at,updated_at')
+        .select('id,order_number,status,is_test,customer_name,customer_email,customer_phone,shipping_name,product_id,product_name,product_price,amount_paid,currency,paid_at,mockup_path,background_colors,tracking_number,shipping_carrier,production_started_at,shipped_at,completed_at,created_at,updated_at')
         .order('created_at',{ascending:false}).limit(300);
       if(ordersError)return json(req,{error:ordersError.message},500);
       const ids=(orders||[]).map((row:any)=>row.id);
       const {data:items,error:itemsError}=ids.length?await supabase.from('mqd_order_items').select('id,order_id,product_id,product_name,unit_price,quantity,order_options').in('order_id',ids):{data:[],error:null};
       if(itemsError)return json(req,{error:itemsError.message},500);
       const byOrder=new Map<string,any[]>();for(const item of items||[]){const list=byOrder.get(item.order_id)||[];list.push(item);byOrder.set(item.order_id,list);}
-      const all=orders||[],filtered=all.filter((row:any)=>{
-        if(!matchesStatus(String(row.status||''),filter))return false;
+      const all=orders||[],production=all.filter((row:any)=>row.is_test!==true),tests=all.filter((row:any)=>row.is_test===true),filtered=all.filter((row:any)=>{
+        if(filter==='test'){if(row.is_test!==true)return false;}else{if(row.is_test===true)return false;if(!matchesStatus(String(row.status||''),filter))return false;}
         if(!search)return true;
         const hay=[row.order_number,row.customer_name,row.customer_email,row.customer_phone,row.shipping_name,row.product_name].map(v=>String(v||'').toLowerCase()).join(' ');
         return hay.includes(search);
       }).map((row:any)=>({...row,ui_status:UI_STATUS[row.status]||row.status,items:byOrder.get(row.id)||[]}));
-      const counts={all:all.length,new:0,paid:0,'in-production':0,shipped:0,completed:0};
-      for(const row of all){const k=UI_STATUS[String(row.status||'')]||String(row.status||'');if(k in counts)(counts as any)[k]++;}
+      const counts={all:production.length,new:0,paid:0,'in-production':0,shipped:0,completed:0,test:tests.length};
+      for(const row of production){const k=UI_STATUS[String(row.status||'')]||String(row.status||'');if(k in counts)(counts as any)[k]++;}
       return json(req,{orders:filtered,counts,limit:300});
     }
 
@@ -72,8 +72,9 @@ Deno.serve(async(req:Request)=>{
     if(action==='update'){
       const id=cleanText(body?.id,64);if(!UUID.test(id))return json(req,{error:'Invalid order'},400);
       const requested=cleanText(body?.status,30).toLowerCase(),status=STATUS_MAP[requested];if(!status)return json(req,{error:'Unsupported order status'},400);
-      const {data:existing,error:existingError}=await supabase.from('mqd_orders').select('id,order_number,status,customer_email,customer_name,shipping_name,product_name').eq('id',id).maybeSingle();
+      const {data:existing,error:existingError}=await supabase.from('mqd_orders').select('id,order_number,status,is_test,customer_email,customer_name,shipping_name,product_name').eq('id',id).maybeSingle();
       if(existingError)return json(req,{error:existingError.message},500);if(!existing)return json(req,{error:'Order not found'},404);
+      if(existing.is_test===true)return json(req,{error:'Sandbox test orders are locked and cannot be moved into production or shipping.'},409);
       const trackingNumber=cleanText(body?.trackingNumber,120),carrier=cleanText(body?.carrier,80),now=new Date().toISOString();
       const update:Record<string,unknown>={status,tracking_number:trackingNumber||null,shipping_carrier:carrier||null,updated_at:now};
       if(status==='production')update.production_started_at=now;
