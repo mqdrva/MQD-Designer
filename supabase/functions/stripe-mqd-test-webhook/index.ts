@@ -8,22 +8,35 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { "content-type": "application/json", "cache-control": "no-store" }
 });
 const encoder = new TextEncoder();
+
 function serviceKey() {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY");
   if (legacy) return legacy;
   try { return JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}").default || ""; } catch { return ""; }
 }
+
+async function webhookSecret(supabase: any) {
+  const direct = String(Deno.env.get("MQD_STRIPE_TEST_WEBHOOK_SECRET") || "").trim();
+  if (direct.startsWith("whsec_")) return direct;
+  const { data, error } = await supabase.rpc("mqd_get_vault_secret", { secret_name: "mqd_stripe_test_webhook_secret" });
+  if (error) return "";
+  const value = String(data || "").trim();
+  return value.startsWith("whsec_") ? value : "";
+}
+
 function timingSafeEqual(left: string, right: string) {
   if (left.length !== right.length) return false;
   let difference = 0;
   for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
   return difference === 0;
 }
+
 async function hmacHex(secret: string, message: string) {
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
   return Array.from(new Uint8Array(signature)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+
 async function verifyStripeSignature(payload: string, header: string, secret: string) {
   const parts = header.split(",").map((part) => part.trim());
   const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2) || "";
@@ -33,9 +46,14 @@ async function verifyStripeSignature(payload: string, header: string, secret: st
   const expected = await hmacHex(secret, `${timestamp}.${payload}`);
   return candidates.some((candidate) => timingSafeEqual(candidate, expected));
 }
+
 function orderNumbersFor(session: any) {
-  return [...new Set(String(session?.metadata?.order_numbers || "").split(",").map((value) => value.trim()).filter((value) => /^MQD-[A-Z0-9]{6,20}$/.test(value)))];
+  return [...new Set(String(session?.metadata?.order_numbers || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => /^MQD-[A-Z0-9]{6,20}$/.test(value)))];
 }
+
 function stripeId(value: any) {
   if (typeof value === "string") return value;
   return value?.id ? String(value.id) : null;
@@ -43,18 +61,19 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-test-webhook", version: 1 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-test-webhook", version: 2 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "", key = serviceKey();
     if (!url || !key) return json({ error: "Backend service credentials are not configured" }, 500);
     const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const secret = String(Deno.env.get("MQD_STRIPE_TEST_WEBHOOK_SECRET") || "").trim();
-    if (!secret || !secret.startsWith("whsec_")) return json({ error: "Stripe sandbox webhook is not configured" }, 500);
+    const secret = await webhookSecret(supabase);
+    if (!secret) return json({ error: "Stripe sandbox webhook is not configured" }, 500);
 
     const payload = await req.text();
     const signature = req.headers.get("stripe-signature") || "";
     if (!await verifyStripeSignature(payload, signature, secret)) return json({ error: "Invalid Stripe signature" }, 400);
+
     const event = JSON.parse(payload);
     if (event?.livemode !== false) return json({ error: "Live Stripe events are not accepted by the sandbox webhook" }, 400);
     const session = event?.data?.object || {};
@@ -64,6 +83,7 @@ Deno.serve(async (req: Request) => {
 
     const orderNumbers = orderNumbersFor(session);
     if (!orderNumbers.length) return json({ error: "Checkout session has no valid order references" }, 400);
+
     const { data: orders, error: ordersError } = await supabase.from("mqd_orders")
       .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status")
       .in("order_number", orderNumbers);
@@ -76,6 +96,7 @@ Deno.serve(async (req: Request) => {
       .in("order_id", orders.map((order: any) => order.id));
     if (itemsError) throw itemsError;
     if (!items || items.length !== orders.length) return json({ error: "Checkout item verification failed" }, 409);
+
     const itemByOrder = new Map(items.map((item: any) => [item.order_id, item]));
     const totalQuantity = orders.reduce((sum: number, order: any) => sum + quantityFromOrderItem(itemByOrder.get(order.id)), 0);
     const expectedSubtotalCents = orders.reduce((sum: number, order: any) => {
@@ -130,13 +151,22 @@ Deno.serve(async (req: Request) => {
         const html = `<h2>MQD sandbox paid order</h2><p><strong>This is a Stripe sandbox test. No real payment was processed.</strong></p><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner">Open Owner Orders</a></p>`;
         for (const recipient of ownerRecipients) {
           try {
-            await queueMqdEmail(supabase, { orderId: order.id, kind: "owner_paid_order_test", recipient, subject, html, text, meta: { orderNumber: order.order_number, eventId: String(event.id || ""), sandbox: true } });
+            await queueMqdEmail(supabase, {
+              orderId: order.id,
+              kind: "owner_paid_order_test",
+              recipient,
+              subject,
+              html,
+              text,
+              meta: { orderNumber: order.order_number, eventId: String(event.id || ""), sandbox: true }
+            });
           } catch (notifyError) {
             console.error("MQD sandbox owner notification queue failed", notifyError instanceof Error ? notifyError.message : String(notifyError));
           }
         }
       }
     }
+
     return json({ received: true, test: true, orderNumbers, status: paid ? "paid" : failed ? "failed" : String(session.payment_status || "unpaid") });
   } catch (error) {
     console.error("stripe-mqd-test-webhook failed", error instanceof Error ? error.message : String(error));
