@@ -76,6 +76,7 @@ Deno.serve(async (req: Request) => {
     if (!await verifyStripeSignature(payload, signature, secret)) return json({ error: "Invalid Stripe signature" }, 400);
 
     const event = JSON.parse(payload);
+    if (event?.livemode !== true) return json({ error: "Sandbox Stripe events are not accepted by the live webhook" }, 400);
     const session = event?.data?.object || {};
     const supported = ["checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed"];
     if (!supported.includes(event.type)) return json({ received: true, ignored: true });
@@ -83,10 +84,11 @@ Deno.serve(async (req: Request) => {
     const orderNumbers = orderNumbersFor(session);
     if (!orderNumbers.length) return json({ error: "Checkout session has no valid order references" }, 400);
     const { data: orders, error: ordersError } = await supabase.from("mqd_orders")
-      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status")
+      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status,is_test")
       .in("order_number", orderNumbers);
     if (ordersError) throw ordersError;
     if (!orders || orders.length !== orderNumbers.length) return json({ error: "One or more checkout orders were not found" }, 404);
+    if (orders.some((order: any) => order.is_test === true)) return json({ error: "Sandbox test orders are not accepted by the live webhook" }, 400);
     const metadataUserId = String(session?.metadata?.mqd_user_id || "");
     if (metadataUserId && orders.some((order: any) => order.user_id !== metadataUserId)) return json({ error: "Checkout ownership verification failed" }, 400);
 
