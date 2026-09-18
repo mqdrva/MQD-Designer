@@ -88,6 +88,23 @@ function selectedOrderOptions(){
   return options;
 }
 function blobFromDataUrl(src){return fetch(src).then(response=>response.blob());}
+function openGuestOriginalArtworkDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('mqd-upload-originals',1);
+    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('files'))req.result.createObjectStore('files');};
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+}
+async function guestOriginalArtworkBlob(filename){
+  if(!filename)return null;
+  try{
+    const db=await openGuestOriginalArtworkDB();
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction('files','readonly'),req=tx.objectStore('files').get(filename);
+      req.onsuccess=()=>resolve(req.result?.file||null);req.onerror=()=>reject(req.error);
+    });
+  }catch(error){console.warn('Guest original artwork lookup skipped',error);return null;}
+}
 function mockupBlob(){
   return new Promise(resolve=>{
     const src=document.getElementById('webgl');
@@ -103,9 +120,24 @@ async function buildGuestSubmission(payload){
     for(const layer of state.layers||[]){
       if(layer.type!=='image'||layer.libraryAssetId||!layer.src)continue;
       const filename=layer.filename||'artwork.png';
-      const blob=await blobFromDataUrl(layer.src);
-      form.append('asset',blob,filename);
-      form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
+      const baseMeta={zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false};
+      if(layer.backgroundRemoved===true){
+        const processed=await blobFromDataUrl(layer.src);
+        const processedName=layer.backgroundRemovedFilename||((layer.originalFilename||filename).replace(/\.[^.]+$/,'')+'-no-background.png');
+        form.append('asset',processed,processedName);
+        form.append('assetMeta',JSON.stringify({...baseMeta,kind:'background-removed',sourceFilename:layer.originalFilename||filename,provider:layer.backgroundRemovalProvider||'photoroom'}));
+        let original=await guestOriginalArtworkBlob(layer.originalFilename||filename);
+        if(!original&&layer.backgroundOriginalSrc)original=await blobFromDataUrl(layer.backgroundOriginalSrc);
+        if(original){
+          form.append('asset',original,layer.originalFilename||filename);
+          form.append('assetMeta',JSON.stringify({...baseMeta,kind:'original-source',processedFilename:processedName}));
+        }
+      }else{
+        const original=await guestOriginalArtworkBlob(filename);
+        const blob=original||await blobFromDataUrl(layer.src);
+        form.append('asset',blob,filename);
+        form.append('assetMeta',JSON.stringify({...baseMeta,kind:'artwork'}));
+      }
     }
   }
   const mockup=await mockupBlob();
@@ -113,7 +145,7 @@ async function buildGuestSubmission(payload){
   const clean=structuredClone(payload);
   delete clean.designId;
   if(TEST_MODE)clean.mqdSandboxTest=true;
-  form.append('payload',JSON.stringify(clean,(key,value)=>key==='src'||key==='image'?undefined:value));
+  form.append('payload',JSON.stringify(clean,(key,value)=>key==='src'||key==='image'||key==='backgroundOriginalSrc'?undefined:value));
   form.append('guestToken',guestToken());
   return form;
 }
