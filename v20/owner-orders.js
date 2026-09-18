@@ -63,6 +63,16 @@ function renderItems(items=[]){
   const host=$('itemList');host.innerHTML='';for(const item of items){const row=document.createElement('div');row.className='item-row';const left=document.createElement('div');const title=document.createElement('strong');title.textContent=item.product_name||'Custom garment';const meta=document.createElement('div');meta.className='item-meta';meta.textContent=`${optionsText(item)} · ${money(item.unit_price)} each`;left.append(title,meta);const right=document.createElement('strong');right.textContent=`Qty ${itemQuantity(item)}`;row.append(left,right);host.appendChild(row);}if(!items.length)host.innerHTML='<div class="empty">No item record found.</div>';
 }
 function renderColors(colors={}){const host=$('colorGrid');host.innerHTML='';for(const [zone,hex] of Object.entries(colors||{})){const chip=document.createElement('div');chip.className='color-chip';const swatch=document.createElement('span');swatch.className='swatch';swatch.style.background=String(hex||'#fff');const label=document.createElement('span');label.textContent=`${zone}: ${hex}`;chip.append(swatch,label);host.appendChild(chip);}if(!host.childElementCount)host.textContent='No HEX colors saved.';}
+function renderSavedDesign(saved){
+  const section=$('savedDesignSection');if(!section)return;
+  section.classList.toggle('hidden',!saved);if(!saved)return;
+  text($('savedDesignName'),saved.name||'Saved design');
+  text($('savedDesignStatus'),`${saved.status||'saved'} · Version ${Number(saved.version)||1}`);
+  const stamp=saved.updated_at||saved.created_at;text($('savedDesignUpdated'),stamp?`Updated ${new Date(stamp).toLocaleString()}`:'');
+  const img=$('savedDesignPreview'),missing=$('savedDesignPreviewMissing');
+  if(saved.preview_url){img.src=saved.preview_url;img.classList.remove('hidden');missing.classList.add('hidden');}
+  else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
+}
 function metadataButton(label,filename,data){const button=document.createElement('button');button.type='button';button.className='file-button';button.textContent=label;button.onclick=()=>downloadJSON(filename,data);return button;}
 function renderAssets(detail){
   const host=$('assetGroups');host.innerHTML='';const assets=detail.assets||[],zoneFiles=assets.filter(a=>a.layer_type==='zone'),artwork=assets.filter(a=>a.layer_type==='image'),textAssets=assets.filter(a=>a.layer_type==='text');
@@ -80,7 +90,7 @@ function renderDetail(detail){
   for(const control of [status,carrier,tracking,save]){control.disabled=locked;control.removeAttribute('readonly');control.setAttribute('aria-disabled',locked?'true':'false');control.style.pointerEvents=locked?'none':'auto';control.style.opacity=locked?'.55':'1';}
   if(!locked){carrier.tabIndex=0;tracking.tabIndex=0;status.tabIndex=0;save.tabIndex=0;}
   $('testOrderNotice').classList.toggle('hidden',!locked);
-  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderAssets(detail);
+  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);
 }
 async function openOrder(id){
   $('orderOverlay').classList.remove('hidden');$('detailLoading').classList.remove('hidden');$('detailContent').classList.add('hidden');text($('detailLoading'),'Loading order…');
