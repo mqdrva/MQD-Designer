@@ -271,12 +271,24 @@ async function prepareCloudPayload(payload,designId,userId){
       if(layer.storagePath){delete layer.src;continue;}
       if(!layer.src)continue;
       const blob=await dataUrlToBlob(layer.src);
-      const ext=fileExtension(blob,layer.filename);
-      const baseName=safePathPart(layer.filename||'artwork').replace(/\.[^.]+$/,'')||'artwork';
-      const path=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}.${ext}`;
+      const baseName=safePathPart((layer.originalFilename||layer.filename||'artwork').replace(/\.[^.]+$/,''))||'artwork';
+      const processed=layer.backgroundRemoved===true;
+      const ext=processed?'png':fileExtension(blob,layer.filename);
+      const path=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}${processed?'-no-background':''}.${ext}`;
       const {error}=await supabase.storage.from('customer-artwork').upload(path,blob,{contentType:blob.type||'application/octet-stream',upsert:true});
       if(error)throw new Error('Artwork upload failed: '+error.message);
-      layer.storagePath=path;delete layer.src;
+      layer.storagePath=path;
+      if(processed&&!layer.originalStoragePath){
+        const original=await originalArtworkBlob(layer.originalFilename||layer.filename);
+        if(original){
+          const originalExt=fileExtension(original,layer.originalFilename||layer.filename);
+          const originalPath=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}-original.${originalExt}`;
+          const {error:originalError}=await supabase.storage.from('customer-artwork').upload(originalPath,original,{contentType:original.type||'application/octet-stream',upsert:true});
+          if(originalError)throw new Error('Original artwork upload failed: '+originalError.message);
+          layer.originalStoragePath=originalPath;
+        }
+      }
+      delete layer.src;
     }
   }
   return cloud;
@@ -391,15 +403,29 @@ async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
     for(const layer of state.layers||[]){
       if(layer.type!=='image'||layer.libraryAssetId||!layer.src) continue;
       const filename=layer.filename||'artwork.png';
-      const original=retry?null:await originalArtworkBlob(filename);
-      const blob=original||await dataUrlToBlob(layer.src);
-      form.append('asset',blob,filename);
-      form.append('assetMeta',JSON.stringify({zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false}));
+      const baseMeta={zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false};
+      if(layer.backgroundRemoved===true){
+        const processed=await dataUrlToBlob(layer.src);
+        const processedName=layer.backgroundRemovedFilename||((layer.originalFilename||filename).replace(/\.[^.]+$/,'')+'-no-background.png');
+        form.append('asset',processed,processedName);
+        form.append('assetMeta',JSON.stringify({...baseMeta,kind:'background-removed',sourceFilename:layer.originalFilename||filename,provider:layer.backgroundRemovalProvider||'photoroom'}));
+        let original=retry?null:await originalArtworkBlob(layer.originalFilename||filename);
+        if(!original&&layer.backgroundOriginalSrc)original=await dataUrlToBlob(layer.backgroundOriginalSrc);
+        if(original){
+          form.append('asset',original,layer.originalFilename||filename);
+          form.append('assetMeta',JSON.stringify({...baseMeta,kind:'original-source',processedFilename:processedName}));
+        }
+      }else{
+        const original=retry?null:await originalArtworkBlob(filename);
+        const blob=original||await dataUrlToBlob(layer.src);
+        form.append('asset',blob,filename);
+        form.append('assetMeta',JSON.stringify({...baseMeta,kind:'artwork'}));
+      }
     }
   }
   if(!retry)mockup=await mockupBlob();
   if(mockup) form.append('mockup',mockup,(payload.product?.id||'product')+'-mockup.png');
-  form.append('payload',JSON.stringify(clean,(k,v)=>k==='src'||k==='image'?undefined:v));
+  form.append('payload',JSON.stringify(clean,(k,v)=>k==='src'||k==='image'||k==='backgroundOriginalSrc'?undefined:v));
   const response=await fetch(SUBMIT_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY},body:form});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){
@@ -650,6 +676,10 @@ async function hydrateCloudPayload(payload){
       const {data,error}=await supabase.storage.from('customer-artwork').download(layer.storagePath);
       if(error)throw new Error('Could not reopen artwork: '+error.message);
       layer.src=URL.createObjectURL(data);
+      if(layer.backgroundRemoved===true&&layer.originalStoragePath){
+        const {data:original,error:originalError}=await supabase.storage.from('customer-artwork').download(layer.originalStoragePath);
+        if(!originalError&&original)layer.backgroundOriginalSrc=URL.createObjectURL(original);
+      }
     }
   }
   return await hydrateLibraryArtwork(copy);
