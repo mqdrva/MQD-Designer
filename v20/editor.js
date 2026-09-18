@@ -146,8 +146,9 @@ function ensureTemplateImage(zone=activeZone){
   const tshirtBody2d=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const longSleeveTshirtBody2d=product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back');
   const longSleeveTshirtSleeve2d=product.id==='long-sleeve-tshirt'&&zone.includes('Sleeve');
+  const poloSleeve2d=product.id==='long-sleeve-polo'&&zone.includes('Sleeve');
   const solidBodyTemplate=hoodMaskBody||hoodedLongBody;
-  const cacheKey=product.id==='long-sleeve-tshirt'&&zone==='Collar'?'long-sleeve-tshirt-collar-v2:'+t.path:tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:longSleeveTshirtBody2d?'long-sleeve-tshirt-body-v1:'+zone+':'+t.path:longSleeveTshirtSleeve2d?'long-sleeve-tshirt-sleeve-v1:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
+  const cacheKey=poloSleeve2d?'long-sleeve-polo-sleeve-v1:'+zone+':'+t.path:product.id==='long-sleeve-tshirt'&&zone==='Collar'?'long-sleeve-tshirt-collar-v2:'+t.path:tshirtBody2d?'tshirt-body-v4:'+zone+':'+t.path:longSleeveTshirtBody2d?'long-sleeve-tshirt-body-v1:'+zone+':'+t.path:longSleeveTshirtSleeve2d?'long-sleeve-tshirt-sleeve-v1:'+zone+':'+t.path:hoodMaskBody?'hood-mask-2d:'+t.path:hoodedLongBody?'hooded-long-2d:'+t.path:jacketSleeve||jacketBack?'jacket-panel:'+t.path:t.path;
   if(templateCache.has(cacheKey))return templateCache.get(cacheKey);
   const rec={img:null,maskCanvas:null,cutlineCanvas:null,bounds:null,status:'loading'};
   templateCache.set(cacheKey,rec);
@@ -165,7 +166,12 @@ function ensureTemplateImage(zone=activeZone){
           buildSource=small;
         }
       }
-      const built=buildTemplateMask(buildSource,zone,jacketSleeve,jacketBack,solidBodyTemplate);
+      const built=buildTemplateMask(buildSource,zone,jacketSleeve,jacketBack,solidBodyTemplate,poloSleeve2d);
+      if(poloSleeve2d){
+        // Correct the flat silhouette without rescaling approved 3D artwork.
+        const previous=buildTemplateMask(buildSource,zone).bounds;
+        rec.artworkAspect=previous.w/Math.max(1,previous.h);
+      }
       // On phones, keep only the compact T-shirt template canvas. The original
       // 4K template bitmap is not needed after its mask/cutline were built and
       // retaining it caused Android browsers to run out of memory after several zones.
@@ -202,7 +208,7 @@ function preloadTemplates(){
  product.zones.forEach(z=>ensureTemplateImage(z));
 }
 
-function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,solidBodyTemplate=false){
+function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,solidBodyTemplate=false,poloSleeve2d=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
   const sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(img,0,0,w,h);
@@ -369,7 +375,7 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
   // cutline. Interpolation bridges the dash gaps without treating the large
   // instruction circle as printable artwork. The Collar and every 3D renderer
   // remain untouched.
-  if(product.id==='long-sleeve-tshirt'&&['Left Sleeve','Right Sleeve'].includes(zone)){
+  if((product.id==='long-sleeve-tshirt'||poloSleeve2d)&&['Left Sleeve','Right Sleeve'].includes(zone)){
     const left=new Int32Array(h),right=new Int32Array(h);
     left.fill(-1);right.fill(-1);
     const middle=w/2;
