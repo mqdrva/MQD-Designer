@@ -14,7 +14,11 @@ function render(){
     tab.classList.toggle('active',selected);
     tab.setAttribute('aria-selected',String(selected));
   }
-  if(mobile.matches&&active==='preview')requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
+  if(!mobile.matches)return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const refreshed=window.MQDDesigner?.refreshMobileWorkspace?.(active);
+    if(active==='preview'&&!refreshed)window.dispatchEvent(new Event('resize'));
+  }));
 }
 
 for(const tab of tabs)tab.addEventListener('click',()=>{active=tab.dataset.mobilePane;render();});
