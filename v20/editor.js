@@ -90,7 +90,7 @@ let previewUpdateTimer=0;
 let mobilePreviewDirty=false;
 const mobileDesignerMedia=window.matchMedia('(max-width: 850px)');
 function mobileDesignerMode(){return mobileDesignerMedia.matches;}
-function previewTextureMax(){return mobileDesignerMode()?1024:1600;}
+function previewTextureMax(){return mobileDesignerMode()?768:1600;}
 function previewPaneVisible(){return !mobileDesignerMode()||document.querySelector('.preview-pane')?.classList.contains('mobile-active');}
 function scheduleGarmentPreview(delay=110){
   clearTimeout(previewUpdateTimer);
@@ -155,18 +155,21 @@ function ensureTemplateImage(zone=activeZone){
   img.onload=()=>{
     rec.img=img;
     try{
-      let buildSource=img,maskScaleX=1,maskScaleY=1;
+      let buildSource=img;
       if(mobileDesignerMode()&&product.id==='tshirt'){
         const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height,maxEdge=Math.max(sw,sh);
-        if(maxEdge>2200){
-          const scale=2200/maxEdge,small=document.createElement('canvas');
+        if(maxEdge>1000){
+          const scale=1000/maxEdge,small=document.createElement('canvas');
           small.width=Math.max(1,Math.round(sw*scale));small.height=Math.max(1,Math.round(sh*scale));
           const smallCtx=small.getContext('2d');smallCtx.imageSmoothingEnabled=true;smallCtx.imageSmoothingQuality='high';smallCtx.drawImage(img,0,0,small.width,small.height);
-          buildSource=small;maskScaleX=sw/small.width;maskScaleY=sh/small.height;
+          buildSource=small;
         }
       }
       const built=buildTemplateMask(buildSource,zone,jacketSleeve,jacketBack,solidBodyTemplate);
-      if(buildSource!==img&&built?.bounds)built.bounds={x:built.bounds.x*maskScaleX,y:built.bounds.y*maskScaleY,w:built.bounds.w*maskScaleX,h:built.bounds.h*maskScaleY};
+      // On phones, keep only the compact T-shirt template canvas. The original
+      // 4K template bitmap is not needed after its mask/cutline were built and
+      // retaining it caused Android browsers to run out of memory after several zones.
+      if(buildSource!==img&&product.id==='tshirt')rec.img=buildSource;
       if(hoodMaskBody){
         // Keep the approved 3D artwork proportions independent of the 2D fill.
         const previous=buildTemplateMask(img,zone,false,false,false).bounds;
@@ -1136,7 +1139,7 @@ function resize3DViewport(){
  if(w<2||h<2)return false;
  camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);return true;
 }
-function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true,powerPreference:'default'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,mobileDesignerMode()?1.25:2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();mobilePreviewDirty=true;console.warn('MQD 3D preview context paused; waiting for browser restore.');});canvas.addEventListener('webglcontextrestored',()=>{console.info('MQD 3D preview context restored.');resize3DViewport();rebuildGarmentPreview();});addEventListener('resize',resize3DViewport);resize3DViewport();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
+function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true,powerPreference:'default'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,mobileDesignerMode()?1.25:2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();mobilePreviewDirty=true;console.warn('MQD 3D preview context paused; waiting for browser restore.');});canvas.addEventListener('webglcontextrestored',()=>{console.info('MQD 3D preview context restored.');resize3DViewport();rebuildGarmentPreview();});addEventListener('resize',resize3DViewport);resize3DViewport();(function loop(){if(previewPaneVisible()){controls.update();renderer.render(scene,camera);}requestAnimationFrame(loop)})();}
 function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}
 function setProductionProofView(view){
  if(!camera||!controls||!renderer||!garment)return false;
