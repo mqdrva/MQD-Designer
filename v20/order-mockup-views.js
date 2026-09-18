@@ -2,18 +2,6 @@
   const params=new URLSearchParams(location.search);
   if(params.get('mqdCapture')==='1')return;
 
-  // Customer accounts are Google-only. Keep the existing auth module and
-  // session handling, but remove the legacy email/password controls before
-  // the module attaches its event handlers.
-  const authForm=document.getElementById('authForm');
-  const googleButton=document.getElementById('googleSignInButton');
-  const authMessage=document.getElementById('authMessage');
-  if(authForm&&googleButton&&authMessage){
-    authForm.replaceChildren(googleButton,authMessage);
-    googleButton.querySelector('span:last-child')?.replaceChildren(document.createTextNode('Continue with Google'));
-    authForm.setAttribute('aria-label','Google account sign in');
-  }
-
   const nativeFetch=window.fetch.bind(window);
   const SUBMIT_PATH='/functions/v1/submit-mqd-design';
   const GUEST_SUBMIT_PATH='/functions/v1/submit-mqd-guest-design';
