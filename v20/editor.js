@@ -1358,7 +1358,16 @@ function rebuildFleeceHoodiePreview(){
   const z=stateFor().zones[zone];if(!z?.layers?.some(l=>l.visible!==false))return;
   const target=fleeceHoodieZoneMeshes.get(zone);if(!target)return;
   const canvas=makeCleanZoneArtworkCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
+  // Hoodie sleeve zones use opposite X signs from the generic projector.
+  // Size the projector from the actual sleeve so lower-arm artwork is included.
   const q=zonePlacement(zone);
+  if(zone==='Left Sleeve'||zone==='Right Sleeve'){
+    const sleeveBox=new THREE.Box3().setFromObject(target),sleeveSize=sleeveBox.getSize(new THREE.Vector3()),center=sleeveBox.getCenter(new THREE.Vector3());
+    const side=zone==='Left Sleeve'?1:-1;
+    q.p.copy(center);
+    q.r.set(0,side*Math.PI/2,0);
+    q.d.set(sleeveSize.z*1.02,sleeveSize.y*1.02,sleeveSize.x*1.02);
+  }
   try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
  });
  return true;
