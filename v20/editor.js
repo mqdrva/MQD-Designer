@@ -1068,7 +1068,7 @@ async function removeBackgroundActive(){
      layer.backgroundOriginalSrc=layer.src;
      layer.originalFilename=layer.originalFilename||layer.filename||'artwork.png';
    }
-   layer.src=src;layer.image=image;layer.backgroundRemoved=true;layer.backgroundRemovalProvider='photoroom';layer.backgroundRemovedFilename=noBackgroundFilename(layer.originalFilename||layer.filename);
+   layer.src=src;layer.image=image;layer.backgroundRemoved=true;layer.backgroundRemovalProvider='photoroom';layer.backgroundRemovedFilename=noBackgroundFilename(layer.originalFilename||layer.filename);delete layer.storagePath;
    cropMode=false;renderAll();
    if(status)status.textContent='Background removed ✓  Restore Original is available below.';
  }catch(error){
@@ -1084,7 +1084,7 @@ async function restoreBackgroundActive(){
  const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||!layer.backgroundOriginalSrc)return;
  try{
    const image=await loadImageElement(layer.backgroundOriginalSrc);
-   snapshot();layer.src=layer.backgroundOriginalSrc;layer.image=image;layer.backgroundRemoved=false;cropMode=false;renderAll();
+   snapshot();layer.src=layer.backgroundOriginalSrc;layer.image=image;layer.backgroundRemoved=false;delete layer.storagePath;cropMode=false;renderAll();
    const status=$('backgroundRemovalStatus');if(status)status.textContent='Original artwork restored.';
  }catch(error){console.error(error);alert('The original artwork could not be restored on this device.');}
 }
