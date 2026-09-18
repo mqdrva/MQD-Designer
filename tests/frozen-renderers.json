@@ -40,8 +40,8 @@
     "assets/templates/tshirt/sleeve.png": "0b012416466c01abe0d51cb537d21dd231e1ff6adf8a8e7dcb1dd8b7b38ef8bd"
   },
   "editorFunctions": {
-    "ensureTemplateImage": "d3482c303612d6626da497c0288cc444c771f99e926b4414a065130dbb8bd21d",
-    "buildTemplateMask": "f25d00adeb9cb06c9ed0653451ba00f01ea1fcf1d022910d8a16d0ec6b3adc1e",
+    "ensureTemplateImage": "5303a5e3d0f8a744c315c8a32ff216f6efca69e6aae52254efdcb9134e757037",
+    "buildTemplateMask": "a8f983afb47641a1d0f6111096ab76a2cc6a56c4507ec74a8d3bcf1af81d1fb5",
     "makeCleanZoneArtworkCanvas": "d64b432e2123a1eeb5096c348d82d4fc19bf01c6a0fc24d65151c212bfa709a0",
     "makeLongSleeveTshirtArtworkCanvas": "d1d558df268c453399d9ab3d68c783c5a0fa10877a2d9e626980eb3cb04fa28c",
     "renderMaskedZoneCanvas": "305f07f354f2f6ec4d58bd4b291d5f15420996db0d347eb6c55dc0b5e2dd6209",
