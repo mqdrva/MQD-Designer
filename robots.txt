@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /owner
+Disallow: /owner-orders.html
+Disallow: /library-admin.html
+Disallow: /order-confirmation.html
+
+Sitemap: https://mymerchnow.app/sitemap.xml
