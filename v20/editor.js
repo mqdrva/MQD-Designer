@@ -1039,6 +1039,7 @@ function drawSelectionOverlay(){
 function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();}
 function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
+const MQD_BACKGROUND_REMOVAL_ENABLED=false;
 const MQD_REMOVE_BACKGROUND_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-remove-background';
 const MQD_SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 function blobDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||new Error('Could not read the processed image.'));reader.readAsDataURL(blob);});}
@@ -1155,7 +1156,7 @@ function renderLayerPanel(){
     imageQuick.prepend(bgTools);
     $('removeImageBackground').onclick=removeBackgroundActive;$('restoreImageBackground').onclick=restoreBackgroundActive;
   }
-  const bgEligible=l.type==='image'&&!l.libraryAssetId;
+  const bgEligible=MQD_BACKGROUND_REMOVAL_ENABLED&&l.type==='image'&&!l.libraryAssetId;
   if(bgTools){
     bgTools.classList.toggle('hidden',!bgEligible);
     if(bgEligible){
