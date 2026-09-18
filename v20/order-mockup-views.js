@@ -77,7 +77,7 @@
   async function hydrateRenderPayload(payload,form){
     const renderPayload=structuredClone(payload),files=form.getAll('asset').filter(value=>value instanceof File),metas=form.getAll('assetMeta').map(parseMeta);
     for(let i=0;i<files.length;i++){
-      const meta=metas[i]||{};if(meta.kind==='mockup-view')continue;
+      const meta=metas[i]||{};if(meta.kind==='mockup-view'||meta.kind==='original-source')continue;
       const layer=renderPayload?.design?.zones?.[meta.zone]?.layers?.find(row=>String(row.id)===String(meta.layerId));
       if(layer?.type==='image'&&!layer.libraryAssetId)layer.src=await dataUrl(files[i]);
     }
