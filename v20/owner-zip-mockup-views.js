@@ -7,42 +7,6 @@
   const LIBRARY_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-artwork-library';
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 
-  // Owner Orders saved-design panel. The primary dashboard module keeps its
-  // state private, so capture only the already-authorized detail response and
-  // render the linked customer design without weakening backend access rules.
-  let latestSavedDesign=null;
-  function renderSavedDesign(){
-    const section=document.getElementById('savedDesignSection');
-    if(!section)return;
-    const saved=latestSavedDesign;
-    section.classList.toggle('hidden',!saved);
-    if(!saved)return;
-    const name=document.getElementById('savedDesignName'),status=document.getElementById('savedDesignStatus'),updated=document.getElementById('savedDesignUpdated');
-    if(name)name.textContent=saved.name||'Saved design';
-    if(status)status.textContent=`${saved.status||'saved'} · Version ${Number(saved.version)||1}`;
-    const stamp=saved.updated_at||saved.created_at;
-    if(updated)updated.textContent=stamp?`Updated ${new Date(stamp).toLocaleString()}`:'';
-    const img=document.getElementById('savedDesignPreview'),missing=document.getElementById('savedDesignPreviewMissing');
-    if(saved.preview_url){if(img){img.src=saved.preview_url;img.classList.remove('hidden');}missing?.classList.add('hidden');}
-    else{if(img){img.removeAttribute('src');img.classList.add('hidden');}missing?.classList.remove('hidden');}
-  }
-  const savedStyle=document.createElement('style');
-  savedStyle.textContent='.saved-design-card{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:center;border:1px solid #e5e5e5;border-radius:12px;padding:10px}.saved-design-preview{width:110px;height:90px;border:1px solid #e5e5e5;border-radius:9px;background:#f7f7f7;display:grid;place-items:center;overflow:hidden}.saved-design-preview img{width:100%;height:100%;object-fit:contain}.saved-design-meta{display:grid;gap:5px;font-size:12px}';
-  document.head.appendChild(savedStyle);
-  window.fetch=async function(input,init){
-    const response=await nativeFetch(input,init);
-    try{
-      const url=typeof input==='string'?input:input instanceof URL?input.href:input?.url||'';
-      if(url.includes('/functions/v1/mqd-owner-orders')&&typeof init?.body==='string'){
-        const body=JSON.parse(init.body);
-        if(body?.action==='detail'){
-          response.clone().json().then(detail=>{latestSavedDesign=detail?.savedDesign||null;renderSavedDesign();}).catch(()=>{});
-        }
-      }
-    }catch{}
-    return response;
-  };
-  new MutationObserver(renderSavedDesign).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
 
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const safePart=value=>String(value||'artwork').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,100);
