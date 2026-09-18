@@ -11,7 +11,7 @@ function hasGoogleIdentity(user:any){const providers=Array.isArray(user?.app_met
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();
- if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:6});
+ if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:7});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try{
   if(!url||!key)return json({error:'Backend service credentials are not configured'},500);
@@ -20,7 +20,6 @@ Deno.serve(async(req:Request)=>{
   const supabase=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:{user},error:userError}=await supabase.auth.getUser(token);
   if(userError||!user)return json({error:'Your sign-in session is invalid or expired'},401);
-  if(!hasGoogleIdentity(user))return json({error:'Continue with Google is required for customer orders.'},403);
   const form=await req.formData(),raw=String(form.get('payload')||'');
   if(!raw||raw.length>2_000_000)return json({error:'Invalid design payload'},400);
   const payload=JSON.parse(raw),p=payload?.product,designId=String(payload?.designId||'');
