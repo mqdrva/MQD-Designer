@@ -159,5 +159,5 @@
     }
     return nativeFetch(input,init);
   };
-  import('/v20/guest-checkout.js?v=20260917c').catch(error=>console.error('MQD guest checkout module failed to load',error));
+  import('/v20/guest-checkout.js?v=20260918a').catch(error=>console.error('MQD guest checkout module failed to load',error));
 })();
