@@ -193,7 +193,9 @@ async function savePayloadToDrafts(key,payload){
 }
 
 function accountUser(){return currentSession?.user||null;}
-function openAuth(reason='Sign in to save and reopen designs from any device.',after=null){
+function isGuestUser(user=accountUser()){return !!user?.is_anonymous;}
+function isPermanentUser(user=accountUser()){return !!user&&!isGuestUser(user);}
+function openAuth(reason='Sign in to save designs across devices, or continue as a guest to purchase without an account.',after=null){
   pendingAfterAuth=after;
   $('authReason').textContent=reason;
   $('authMessage').textContent='';$('authMessage').className='account-message';
@@ -206,10 +208,14 @@ function closeAuth(){
 }
 function updateAccountButton(){
   const button=$('accountButton');if(!button)return;
-  button.textContent=accountUser()?'My Account':'Sign In';
+  button.textContent=isPermanentUser()?'My Account':isGuestUser()?'Guest':'Sign In';
 }
 function requireAccount(reason,after){
   if(accountUser())return true;
+  openAuth(reason,after);return false;
+}
+function requirePermanentAccount(reason,after){
+  if(isPermanentUser())return true;
   openAuth(reason,after);return false;
 }
 async function libraryRequest(body){
@@ -319,7 +325,7 @@ async function saveCloudDesign(payload,{forceNew=false,name=null}={}){
 }
 
 async function saveDraft(){
-  if(!requireAccount('Create or sign into your account to save this design on every device.',saveDraft))return;
+  if(!requirePermanentAccount('Continue with Google or Email to save this design and reopen it from any device.',saveDraft))return;
   const btn=$('saveDraft');
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Saving…';
@@ -736,7 +742,7 @@ async function loadOrders(){
   }
 }
 async function openCustomerAccount(){
-  if(!requireAccount('Sign in to view your saved designs and orders.',openCustomerAccount))return;
+  if(!requirePermanentAccount('Continue with Google or Email to view saved designs and orders from any device.',openCustomerAccount))return;
   $('customerEmail').textContent=accountUser().email||'';$('customerOverlay').classList.remove('hidden');
   try{await loadDesigns();}catch(err){console.error(err);$('designsList').innerHTML=`<div class="account-empty">Could not load designs: ${escapeHtml(err.message)}</div>`;}
 }
@@ -747,12 +753,14 @@ async function completeAuth(session){
   const action=pendingAfterAuth;pendingAfterAuth=null;
   if(action)setTimeout(()=>action(),0);
 }
-async function signIn(event){
+async function signInWithEmail(event){
   event.preventDefault();
-  const message=$('authMessage');message.textContent='Signing in…';message.className='account-message';
-  const {data,error}=await supabase.auth.signInWithPassword({email:$('authEmail').value.trim(),password:$('authPassword').value});
+  const message=$('authMessage'),email=$('authEmail').value.trim();
+  if(!email){message.textContent='Enter your email address.';message.className='account-message error';return;}
+  message.textContent='Sending secure sign-in link…';message.className='account-message';
+  const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:authRedirectUrl(),shouldCreateUser:true}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
-  message.textContent='Signed in.';message.className='account-message success';await completeAuth(data.session);
+  message.textContent='Check your email for the secure sign-in link. You can use Yahoo, Outlook, iCloud, Gmail, or another email provider.';message.className='account-message success';
 }
 async function signInWithGoogle(){
   const message=$('authMessage'),button=$('googleSignInButton');
@@ -767,22 +775,18 @@ async function signInWithGoogle(){
     if(button)button.disabled=false;
   }
 }
-async function signUp(){
-  const message=$('authMessage'),email=$('authEmail').value.trim(),password=$('authPassword').value;
-  if(!email||password.length<8){message.textContent='Enter a valid email and a password with at least 8 characters.';message.className='account-message error';return;}
-  message.textContent='Creating account…';message.className='account-message';
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:authRedirectUrl()}});
-  if(error){message.textContent=error.message;message.className='account-message error';return;}
-  if(data.session){await completeAuth(data.session);return;}
-  message.textContent='Check your email to confirm your account, then return here and sign in.';message.className='account-message success';
-}
-async function resendConfirmation(){
-  const message=$('authMessage'),email=$('authEmail').value.trim();
-  if(!email){message.textContent='Enter the email address you used to create your account.';message.className='account-message error';return;}
-  message.textContent='Sending a new confirmation email…';message.className='account-message';
-  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:authRedirectUrl()}});
-  if(error){message.textContent=error.message;message.className='account-message error';return;}
-  message.textContent='A new confirmation email was sent. Use the newest email because older confirmation links may no longer work.';message.className='account-message success';
+async function continueAsGuest(){
+  const message=$('authMessage'),button=$('guestSignInButton');
+  if(message){message.textContent='Starting guest checkout session…';message.className='account-message';}
+  if(button)button.disabled=true;
+  const {data,error}=await supabase.auth.signInAnonymously();
+  if(error){
+    if(message){message.textContent=error.message;message.className='account-message error';}
+    if(button)button.disabled=false;
+    return;
+  }
+  if(message){message.textContent='Guest session ready.';message.className='account-message success';}
+  await completeAuth(data.session);
 }
 async function signOut(){
   await supabase.auth.signOut();currentSession=null;activeCloudDesign=null;accountDesigns=[];saveCart([]);updateCartButton();updateAccountButton();$('customerOverlay').classList.add('hidden');closeCart();
@@ -824,13 +828,12 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('cartList')?.addEventListener('click',event=>{const button=event.target.closest('[data-cart-remove]');if(button)removeCartItem(Number(button.dataset.cartRemove));});
   $('clearCart')?.addEventListener('click',clearCart);
   $('checkoutCart')?.addEventListener('click',checkoutCart);
-  $('accountButton')?.addEventListener('click',()=>accountUser()?openCustomerAccount():openAuth());
+  $('accountButton')?.addEventListener('click',()=>isPermanentUser()?openCustomerAccount():openAuth(isGuestUser()?'You are shopping as a guest. Continue with Google or Email to save designs across devices.':'Sign in to save designs across devices, or continue as a guest to purchase without an account.'));
   $('closeAuth')?.addEventListener('click',closeAuth);
   $('authOverlay')?.addEventListener('click',e=>{if(e.target===$('authOverlay'))closeAuth();});
-  $('authForm')?.addEventListener('submit',signIn);
+  $('authForm')?.addEventListener('submit',signInWithEmail);
   $('googleSignInButton')?.addEventListener('click',signInWithGoogle);
-  $('signUpButton')?.addEventListener('click',signUp);
-  $('resendConfirmationButton')?.addEventListener('click',resendConfirmation);
+  $('guestSignInButton')?.addEventListener('click',continueAsGuest);
   $('closeCustomer')?.addEventListener('click',()=>$('customerOverlay').classList.add('hidden'));
   $('customerOverlay')?.addEventListener('click',e=>{if(e.target===$('customerOverlay'))$('customerOverlay').classList.add('hidden');});
   $('signOutButton')?.addEventListener('click',signOut);
