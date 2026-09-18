@@ -1111,7 +1111,13 @@ function openGarmentCopy(){
 }
 
 
-function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);const resize=()=>{const r=canvas.getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height,false)};addEventListener('resize',resize);resize();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
+function resize3DViewport(){
+ const canvas=$('webgl');if(!renderer||!camera||!canvas)return false;
+ const r=canvas.getBoundingClientRect(),w=Math.round(r.width),h=Math.round(r.height);
+ if(w<2||h<2)return false;
+ camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);return true;
+}
+function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);addEventListener('resize',resize3DViewport);resize3DViewport();(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop)})();}
 function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}
 function setProductionProofView(view){
  if(!camera||!controls||!renderer||!garment)return false;
@@ -1572,7 +1578,18 @@ async function loadDesignPayload(payload,{notify=true}={}){
  recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();
  if(notify)alert('Design loaded.');
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+function refreshMobileWorkspace(pane){
+ if(pane==='canvas'){renderStatus();drawEditor();return true;}
+ if(pane==='control'){renderStatus();renderLayerPanel();return true;}
+ if(pane==='preview'){
+   const visible=resize3DViewport();
+   rebuildGarmentPreview();
+   if(visible&&renderer&&scene&&camera)renderer.render(scene,camera);
+   return visible;
+ }
+ return false;
+}
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
