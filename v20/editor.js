@@ -1073,7 +1073,31 @@ function renderLayerPanel(){
   $('cloneAllTool').disabled=!!(l.libraryAssetId&&!locked);
   $('cloneAllTool').title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
   $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
-  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can duplicate it to a selected zone or all zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
+  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can add it to another compatible print zone or all available zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
+  let lockedActions=$('lockedLibraryDuplicateActions');
+  if(locked&&!lockedActions){
+    lockedActions=document.createElement('div');lockedActions.id='lockedLibraryDuplicateActions';lockedActions.className='locked-duplicate-actions';
+    const title=document.createElement('div');title.className='locked-duplicate-title';title.textContent='Use this MQD background on more zones';
+    const row=document.createElement('div');row.className='locked-duplicate-row';
+    const select=document.createElement('select');select.id='lockedDuplicateZone';select.className='input';select.setAttribute('aria-label','Choose another print zone');
+    const addOne=document.createElement('button');addOne.id='lockedDuplicateOne';addOne.type='button';addOne.className='btn';addOne.textContent='Add to Zone';
+    const addAll=document.createElement('button');addAll.id='lockedDuplicateAll';addAll.type='button';addAll.className='btn orange';addAll.textContent='Add to All Zones';
+    addOne.onclick=async()=>{const layer=activeLayer(),zone=select.value;if(!layer||!isLockedLibraryLayer(layer)||!zone)return;addOne.disabled=true;try{await duplicateLockedLibraryToZone(layer,zone);}finally{addOne.disabled=false;}};
+    addAll.onclick=async()=>{const layer=activeLayer();if(!layer||!isLockedLibraryLayer(layer))return;addAll.disabled=true;try{await cloneLockedLibraryToAllZones(layer);}finally{addAll.disabled=false;}};
+    row.append(select,addOne);lockedActions.append(title,row,addAll);controlsEl.insertBefore(lockedActions,controlsEl.querySelector('.action-row'));
+  }
+  if(lockedActions){
+    lockedActions.classList.toggle('hidden',!locked||product.zones.length<2);
+    if(locked&&product.zones.length>1){
+      const select=lockedActions.querySelector('#lockedDuplicateZone'),addOne=lockedActions.querySelector('#lockedDuplicateOne'),addAll=lockedActions.querySelector('#lockedDuplicateAll');
+      const availableZones=product.zones.filter(zone=>zone!==activeZone&&!zoneState(zone).layers.some(layer=>layer.libraryAssetId===l.libraryAssetId));
+      select.innerHTML='';
+      for(const zone of availableZones){const option=document.createElement('option');option.value=zone;option.textContent=zone;select.appendChild(option);}
+      addOne.disabled=!availableZones.length;
+      addAll.disabled=!availableZones.length;
+      if(!availableZones.length){const option=document.createElement('option');option.value='';option.textContent='Already added everywhere';select.appendChild(option);}
+    }
+  }
   const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);$('imageQuickControls')?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   $('imageQuickControls')?.querySelectorAll('button').forEach(button=>button.disabled=locked);
   if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
