@@ -105,7 +105,6 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) return json(req, { error: "Your sign-in session is invalid or expired" }, 401);
-    if (!hasGoogleIdentity(user)) return json(req, { error: "Continue with Google is required for checkout." }, 403);
 
     const body = await req.json().catch(() => ({}));
     const orderNumbers = [...new Set((Array.isArray(body?.orderNumbers) ? body.orderNumbers : []).map((x) => String(x).trim()))];
