@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
         if (designError) throw designError;
       }
 
-      if (paid && !alreadyPaid && ownerRecipients.length) {
+      if (paid && ownerRecipients.length) {
         const subject = `New paid MQD order — ${order.order_number}`;
         const text = `A new MQD order has been paid.\n\nOrder: ${order.order_number}\nGarment: ${order.product_name || "Custom garment"}\nCustomer: ${customerName || "Customer"}\nEmail: ${customerEmail || "Not provided"}\nQuantity: ${quantity}\nOrder subtotal: $${orderSubtotal.toFixed(2)}\n\nOpen Owner Orders: https://mymerchnow.app/owner`;
         const html = `<h2>New paid MQD order</h2><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner">Open Owner Orders</a></p>`;
