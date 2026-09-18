@@ -29,3 +29,11 @@ $$;
 revoke all on public.mqd_background_removal_usage from anon,authenticated;
 revoke all on function public.mqd_consume_background_removal(text,integer) from public,anon,authenticated;
 grant execute on function public.mqd_consume_background_removal(text,integer) to service_role;
+
+drop policy if exists "No client access to background removal usage" on public.mqd_background_removal_usage;
+create policy "No client access to background removal usage"
+on public.mqd_background_removal_usage
+for all
+to anon, authenticated
+using (false)
+with check (false);
