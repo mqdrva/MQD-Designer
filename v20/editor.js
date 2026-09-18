@@ -1039,6 +1039,55 @@ function drawSelectionOverlay(){
 function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();}
 function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
+const MQD_REMOVE_BACKGROUND_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-remove-background';
+const MQD_SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+function blobDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||new Error('Could not read the processed image.'));reader.readAsDataURL(blob);});}
+function loadImageElement(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('The processed image could not be opened.'));image.src=src;});}
+function noBackgroundFilename(filename='artwork.png'){const base=String(filename||'artwork').replace(/\.[^.]+$/,'')||'artwork';return base+'-no-background.png';}
+async function removeBackgroundActive(){
+ const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||!layer.src)return;
+ const button=$('removeImageBackground'),restore=$('restoreImageBackground'),status=$('backgroundRemovalStatus');
+ const old=button?.textContent||'Remove Background';
+ if(button){button.disabled=true;button.textContent='Removing…';}
+ if(restore)restore.disabled=true;
+ if(status)status.textContent='AI is separating the logo from its background…';
+ try{
+   const source=await fetch(layer.src);if(!source.ok)throw new Error('The uploaded artwork could not be read.');
+   const blob=await source.blob();
+   const form=new FormData();form.append('image_file',blob,layer.filename||'artwork.png');
+   const response=await fetch(MQD_REMOVE_BACKGROUND_URL,{method:'POST',headers:{apikey:MQD_SUPABASE_PUBLISHABLE_KEY},body:form});
+   if(!response.ok){
+     const result=await response.json().catch(()=>({}));
+     throw new Error(result.error||'Background removal could not finish.');
+   }
+   const processed=await response.blob();
+   if(!processed.size)throw new Error('Background removal returned an empty image.');
+   const src=await blobDataUrl(processed),image=await loadImageElement(src);
+   snapshot();
+   if(!layer.backgroundRemoved){
+     layer.backgroundOriginalSrc=layer.src;
+     layer.originalFilename=layer.originalFilename||layer.filename||'artwork.png';
+   }
+   layer.src=src;layer.image=image;layer.backgroundRemoved=true;layer.backgroundRemovalProvider='photoroom';layer.backgroundRemovedFilename=noBackgroundFilename(layer.originalFilename||layer.filename);
+   cropMode=false;renderAll();
+   if(status)status.textContent='Background removed ✓  Restore Original is available below.';
+ }catch(error){
+   console.error('MQD background removal failed',error);
+   if(status)status.textContent=error?.message||String(error);
+   alert('Background removal could not finish: '+(error?.message||String(error)));
+ }finally{
+   if(button){button.disabled=false;button.textContent=old;}
+   if(restore)restore.disabled=false;
+ }
+}
+async function restoreBackgroundActive(){
+ const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||!layer.backgroundOriginalSrc)return;
+ try{
+   const image=await loadImageElement(layer.backgroundOriginalSrc);
+   snapshot();layer.src=layer.backgroundOriginalSrc;layer.image=image;layer.backgroundRemoved=false;cropMode=false;renderAll();
+   const status=$('backgroundRemovalStatus');if(status)status.textContent='Original artwork restored.';
+ }catch(error){console.error(error);alert('The original artwork could not be restored on this device.');}
+}
 
 function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — $${Number(p.price).toFixed(2)}`;sel.appendChild(o);});sel.value=product.id;}
 function zoneIconLabel(z){if(z==='Front')return'▰\nFront';if(z==='Back')return'▱\nBack';if(z.includes('Sleeve'))return'▭\n'+(z.startsWith('Left')?'L Sleeve':'R Sleeve');if(z==='Collar')return'⌒\nCollar';if(z==='Hood')return'◠\nHood';return z;}
@@ -1098,8 +1147,24 @@ function renderLayerPanel(){
       if(!availableZones.length){const option=document.createElement('option');option.value='';option.textContent='Already added everywhere';select.appendChild(option);}
     }
   }
-  const isText=l.type==='text';textControls?.classList.toggle('hidden',!isText);$('imageQuickControls')?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
-  $('imageQuickControls')?.querySelectorAll('button').forEach(button=>button.disabled=locked);
+  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText);imageQuick?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
+  let bgTools=$('backgroundRemovalTools');
+  if(!bgTools&&imageQuick){
+    bgTools=document.createElement('div');bgTools.id='backgroundRemovalTools';bgTools.className='background-removal-tools';
+    bgTools.innerHTML='<div class="background-removal-title">Logo background</div><div class="background-removal-actions"><button id="removeImageBackground" class="btn" type="button">Remove Background</button><button id="restoreImageBackground" class="btn" type="button">Restore Original</button></div><div id="backgroundRemovalStatus" class="subtle background-removal-status">AI removal works best on logos with a clear foreground.</div>';
+    imageQuick.prepend(bgTools);
+    $('removeImageBackground').onclick=removeBackgroundActive;$('restoreImageBackground').onclick=restoreBackgroundActive;
+  }
+  const bgEligible=l.type==='image'&&!l.libraryAssetId;
+  if(bgTools){
+    bgTools.classList.toggle('hidden',!bgEligible);
+    if(bgEligible){
+      $('removeImageBackground').classList.toggle('hidden',!!l.backgroundRemoved);
+      $('restoreImageBackground').classList.toggle('hidden',!l.backgroundRemoved);
+      $('backgroundRemovalStatus').textContent=l.backgroundRemoved?'Background removed ✓':'AI removal works best on logos with a clear foreground.';
+    }
+  }
+  imageQuick?.querySelectorAll('button').forEach(button=>button.disabled=locked);
   if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
 }
 
@@ -1612,7 +1677,7 @@ editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=act
 editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
 
 function designJSON(){
- const clean=JSON.parse(JSON.stringify(designs,function(k,v){if(k==='image')return undefined;if(k==='src'&&this?.libraryAssetId)return undefined;return v;}));
+ const clean=JSON.parse(JSON.stringify(designs,function(k,v){if(k==='image'||k==='backgroundOriginalSrc')return undefined;if(k==='src'&&this?.libraryAssetId)return undefined;return v;}));
  const templates=Object.fromEntries(product.zones.map(z=>[z,product.templates?.[z]||null]));
  return{schema:'mqd-design-v1',engine:{calibration:product.id==='tshirt'?MQD_TSHIRT_ZONE_CALIBRATION:product.id==='mask'?MASK_MAPPING_CALIBRATION:'legacy-preview'},product:{id:product.id,name:product.name,category:product.category,price:product.price,model:product.model},activeZone,templates,design:clean[product.id]||{},savedAt:new Date().toISOString()};
 }
