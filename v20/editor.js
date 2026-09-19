@@ -1170,6 +1170,73 @@ function renderLayerPanel(){
       if(!availableZones.length){const option=document.createElement('option');option.value='';option.textContent='Already added everywhere';select.appendChild(option);}
     }
   }
+
+  // Mobile customer-uploaded images: show the same zone-copy controls directly
+  // under the selected image after it has been added from the device.
+  let customerImageActions=$('customerImageDuplicateActions');
+  const customerImage=l.type==='image'&&!l.libraryAssetId;
+  if(customerImage&&!customerImageActions){
+    customerImageActions=document.createElement('div');
+    customerImageActions.id='customerImageDuplicateActions';
+    customerImageActions.className='locked-duplicate-actions';
+    const title=document.createElement('div');
+    title.className='locked-duplicate-title';
+    title.textContent='Use this picture on more zones';
+    const row=document.createElement('div');
+    row.className='locked-duplicate-row';
+    const select=document.createElement('select');
+    select.id='customerDuplicateZone';
+    select.className='input';
+    select.setAttribute('aria-label','Choose another print zone');
+    const addOne=document.createElement('button');
+    addOne.id='customerDuplicateOne';
+    addOne.type='button';
+    addOne.className='btn';
+    addOne.textContent='Add to Zone';
+    const addAll=document.createElement('button');
+    addAll.id='customerDuplicateAll';
+    addAll.type='button';
+    addAll.className='btn orange';
+    addAll.textContent='Add to All Zones';
+    addOne.onclick=()=>{
+      const layer=activeLayer(),zone=select.value;
+      if(!layer||layer.type!=='image'||layer.libraryAssetId||!zone)return;
+      duplicateActiveToZone(zone);
+    };
+    addAll.onclick=()=>{
+      const layer=activeLayer();
+      if(!layer||layer.type!=='image'||layer.libraryAssetId)return;
+      const zones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<MAX_ZONE_LAYERS);
+      if(!zones.length){alert('No additional print zones are available.');return;}
+      snapshot();
+      for(const zone of zones)duplicateLayerIntoZone(layer,zone);
+      renderAll();
+    };
+    row.append(select,addOne);
+    customerImageActions.append(title,row,addAll);
+    controlsEl.insertBefore(customerImageActions,controlsEl.querySelector('.action-row'));
+  }
+  if(customerImageActions){
+    const show=customerImage&&product.zones.length>1&&window.matchMedia('(max-width:850px)').matches;
+    customerImageActions.classList.toggle('hidden',!show);
+    if(show){
+      const select=customerImageActions.querySelector('#customerDuplicateZone');
+      const addOne=customerImageActions.querySelector('#customerDuplicateOne');
+      const addAll=customerImageActions.querySelector('#customerDuplicateAll');
+      const availableZones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<MAX_ZONE_LAYERS);
+      select.innerHTML='';
+      for(const zone of availableZones){
+        const option=document.createElement('option');
+        option.value=zone;option.textContent=zone;select.appendChild(option);
+      }
+      addOne.disabled=!availableZones.length;
+      addAll.disabled=!availableZones.length;
+      if(!availableZones.length){
+        const option=document.createElement('option');
+        option.value='';option.textContent='No available zones';select.appendChild(option);
+      }
+    }
+  }
   const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText);imageQuick?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   let bgTools=$('backgroundRemovalTools');
   if(!bgTools&&imageQuick){
