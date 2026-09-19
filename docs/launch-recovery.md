@@ -31,3 +31,4 @@ The authenticated save endpoint validates the owner path, image signature and 20
 - Select a private destination for automated backups.
 - Verify alert delivery and configure runtime/payment/email error alerts.
 - Complete an isolated restoration drill and a real purchase/refund/production-export acceptance check before unrestricted launch.
+- Resolve the frozen-renderer baseline gate against the approved September 19 artwork fixes. The security changes do not modify renderer files. Do not regenerate baseline hashes simply to hide a failing test.
