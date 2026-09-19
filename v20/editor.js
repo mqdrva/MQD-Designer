@@ -1159,7 +1159,30 @@ function renderLayerPanel(){
   // Lightweight Jacket 2D editor gets a little more sizing range without
   // changing any garment geometry or any other product's controls.
   $('layerScale').max=String(Math.round(maxLayerScale(l)*100));
-  const locked=isLockedLibraryLayer(l);$('selectedLayerLabel').textContent=l.label+(locked?' · Locked':'');$('layerX').value=l.x||0;$('layerY').value=l.y||0;$('layerScale').value=Math.round((l.scale||1)*100);$('layerRotation').value=l.rotation||0;$('layerXVal').textContent=l.x||0;$('layerYVal').textContent=l.y||0;$('layerScaleVal').textContent=Math.round((l.scale||1)*100);$('layerRotationVal').textContent=(l.rotation||0)+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';
+  const locked=isLockedLibraryLayer(l);$('selectedLayerLabel').textContent=l.label+(locked?' · Locked':'');
+  let orderControls=$('layerOrderControls');
+  if(!orderControls){
+    orderControls=document.createElement('div');
+    orderControls.id='layerOrderControls';
+    Object.assign(orderControls.style,{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',margin:'10px 0 14px'});
+    const forward=document.createElement('button'),backward=document.createElement('button');
+    forward.id='layerMoveForward';backward.id='layerMoveBackward';
+    forward.type=backward.type='button';
+    forward.className=backward.className='btn';
+    forward.textContent='↑ Bring Forward';
+    backward.textContent='↓ Send Backward';
+    forward.title='Move this layer one step higher / in front';
+    backward.title='Move this layer one step lower / behind';
+    orderControls.append(forward,backward);
+    $('selectedLayerLabel').insertAdjacentElement('afterend',orderControls);
+  }
+  const visualIndex=[...arr].reverse().findIndex(layer=>layer.id===l.id);
+  const forward=$('layerMoveForward'),backward=$('layerMoveBackward');
+  forward.disabled=visualIndex<=0;
+  backward.disabled=visualIndex<0||visualIndex>=[...arr].reverse().length-1;
+  forward.onclick=()=>moveLayerStackOrder(l.id,-1);
+  backward.onclick=()=>moveLayerStackOrder(l.id,1);
+  $('layerX').value=l.x||0;$('layerY').value=l.y||0;$('layerScale').value=Math.round((l.scale||1)*100);$('layerRotation').value=l.rotation||0;$('layerXVal').textContent=l.x||0;$('layerYVal').textContent=l.y||0;$('layerScaleVal').textContent=Math.round((l.scale||1)*100);$('layerRotationVal').textContent=(l.rotation||0)+'°';$('toggleLayer').textContent=l.visible===false?'Show':'Hide';
   for(const id of['layerX','layerY','layerScale','layerRotation','fillLayer'])$(id).disabled=locked;
   for(const id of['flipXTool','flipYTool','alignTool','cropTool','resetTool'])$(id).disabled=locked;
   $('duplicateTool').disabled=!!(l.libraryAssetId&&!locked);
