@@ -6,22 +6,26 @@ import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash} from '../v20/shir
 const {createCanvas}=createRequire(import.meta.url)('@napi-rs/canvas');
 const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
 const extract=(name,next)=>source.slice(source.indexOf('function '+name+'('),source.indexOf('function '+next+'('));
-let textTransforms=[],imageTransforms=[];
+let textTransforms=[],imageTransforms=[],textStyles=[];
 const text={type:'text',text:'LNO',x:20.5768,y:17.8047,scale:.72};
 const image={type:'image',image:{width:100,height:100},x:0,y:0,scale:1};
 const ctx={document:{createElement:()=>createCanvas(1,1)},product:{id:'long-sleeve-polo'},
  zoneDesignAspect:()=>3180/1130,zoneState:()=>({layers:[text,image]}),
  shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,
- drawTextLayer(c){textTransforms.push(c.getTransform());},drawImageLayer(c){imageTransforms.push(c.getTransform());}};
+ drawTextLayer(c,l){textTransforms.push(c.getTransform());textStyles.push(l);},drawImageLayer(c){imageTransforms.push(c.getTransform());}};
 vm.createContext(ctx);
 vm.runInContext(extract('makeCleanZoneArtworkCanvas','makeLongSleeveTshirtArtworkCanvas')+extract('makeShirtPreviewArtwork','updateTshirtZoneTextures'),ctx);
 const output=ctx.makeShirtPreviewArtwork('Collar',1000);
 assert.equal(textTransforms.length,1);
+assert.equal(textStyles[0].scale,text.scale*1.5,'collar text is 50% larger');
+assert.equal(textStyles[0].weight,900,'bold collar text uses heavy weight');
+assert.equal(textStyles[0].strokeColor,'#111111','bold reinforcement matches fill');
+assert.equal(text.scale,.72,'saved/2D text size is not mutated');
 assert.equal(textTransforms[0].a,-1,'collar text compensates the reversed 3D direction');
 assert.ok(Math.abs(textTransforms[0].e-(output.width/2+text.x*output.width/200))<.01,'text anchor is preserved');
 assert.equal(imageTransforms[0].a,1,'image orientation is unchanged');
 for(const [product,zone] of [['long-sleeve-polo','Front'],['short-sleeve-polo','Collar'],['tshirt','Collar']]){
- ctx.product.id=product;textTransforms=[];ctx.makeShirtPreviewArtwork(zone,1000);assert.equal(textTransforms[0].a,1,product+'/'+zone+' unchanged');
+ ctx.product.id=product;textTransforms=[];textStyles=[];ctx.makeShirtPreviewArtwork(zone,1000);assert.equal(textTransforms[0].a,1,product+'/'+zone+' unchanged');assert.equal(textStyles[0].scale,.72);
 }
 let basePasses=0,overlayPasses=0;
 const canvas=createCanvas(700,250);
