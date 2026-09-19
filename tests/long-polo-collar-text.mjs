@@ -22,8 +22,15 @@ assert.equal(textStyles[0].weight,900,'bold collar text uses heavy weight');
 assert.equal(textStyles[0].strokeColor,'#111111','bold reinforcement matches fill');
 assert.equal(text.scale,.72,'saved/2D text size is not mutated');
 assert.equal(textTransforms[0].a,-1,'collar text compensates the reversed 3D direction');
+assert.equal(textTransforms[0].d,4,'collar glyph height compensates the compressed vertical UV band');
 assert.ok(Math.abs(textTransforms[0].e-(output.width/2+text.x*output.width/200))<.01,'text anchor is preserved');
 assert.equal(imageTransforms[0].a,1,'image orientation is unchanged');
+text.bold=false;textStyles=[];ctx.makeShirtPreviewArtwork('Collar',1000);
+assert.equal(textStyles[0].weight,700,'Bold off retains a heavier base weight in 3D');
+assert.equal(textStyles[0].bold,true,'preview renderer uses the supplied base weight');
+assert.equal(textStyles[0].strokeWidth,.45,'base weight receives subtle matching reinforcement');
+assert.equal(text.bold,false,'saved Bold toggle is unchanged');
+delete text.bold;
 for(const [product,zone] of [['long-sleeve-polo','Front'],['short-sleeve-polo','Collar'],['tshirt','Collar']]){
  ctx.product.id=product;textTransforms=[];textStyles=[];ctx.makeShirtPreviewArtwork(zone,1000);assert.equal(textTransforms[0].a,1,product+'/'+zone+' unchanged');assert.equal(textStyles[0].scale,.72);
 }
