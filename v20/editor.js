@@ -6,6 +6,7 @@ import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panel
 import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
+import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js';
 let lightweightJacketZones=null;
 import {createHatZones,hatProjection} from './hat-renderer.js';
 let hatZoneMeshes=null;
@@ -1364,7 +1365,8 @@ function rebuildFleeceHoodiePreview(){
  product.zones.forEach(zone=>{
   const z=stateFor().zones[zone];if(!z?.layers?.some(l=>l.visible!==false))return;
   const target=fleeceHoodieZoneMeshes.get(zone);if(!target)return;
-  const canvas=makeCleanZoneArtworkCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
+  for(const [batchIndex,batch] of hoodieArtworkBatches(zone,z.layers).entries()){
+  const canvas=makeCleanZoneArtworkCanvas(zone,1600,{layerFilter:layer=>batch.layers.includes(layer),imageFrame:layer=>hoodieSplashPreviewFrame(zone,layer)}),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
   // Hoodie sleeve zones use opposite X signs from the generic projector.
   // Size the projector from the actual sleeve so lower-arm artwork is included.
   const q=zonePlacement(zone);
@@ -1375,7 +1377,15 @@ function rebuildFleeceHoodiePreview(){
     q.r.set(0,side*Math.PI/2,0);
     q.d.set(sleeveSize.z*1.02,sleeveSize.y*1.02,sleeveSize.x*1.02);
   }
-  try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
+  if(batch.splash){
+    const box=new THREE.Box3().setFromObject(target),size=box.getSize(new THREE.Vector3());
+    q.p.copy(box.getCenter(new THREE.Vector3()));
+    q.r.set(0,zone==='Left Sleeve'?Math.PI/2:zone==='Right Sleeve'?-Math.PI/2:zone==='Back'||zone==='Hood'?Math.PI:0,0);
+    q.d.set(zone.includes('Sleeve')?size.z:size.x,size.y,zone.includes('Sleeve')?size.x*2:size.z*2);
+    q.d.max(new THREE.Vector3(.001,.001,.001));
+  }
+  try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10+batchIndex;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
+  }
  });
  return true;
 }
