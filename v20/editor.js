@@ -1108,12 +1108,46 @@ function maxLayerScale(layer=activeLayer()){
   if(product.id==='sweat-pants'&&(activeZone==='Front'||activeZone==='Back')&&layer?.type==='text')return 4;
   return 2.2;
 }
+function moveLayerStackOrder(layerId,delta){
+  const arr=zoneState().layers;
+  const order=[...arr].reverse();
+  const from=order.findIndex(layer=>layer.id===layerId);
+  const to=from+delta;
+  if(from<0||to<0||to>=order.length)return;
+  snapshot();
+  const [moved]=order.splice(from,1);
+  order.splice(to,0,moved);
+  arr.splice(0,arr.length,...order.reverse());
+  activeLayerId=layerId;
+  renderAll();
+}
+
 function renderLayerPanel(){
   const wrap=$('layers'),empty=$('emptyLayers'),controlsEl=$('layerControls'),textControls=$('textControls');
   wrap.innerHTML='';const arr=zoneState().layers;empty.classList.toggle('hidden',arr.length>0);
   // The layer at the TOP of this list is also the layer visually rendered on top.
   const panelOrder=[...arr].reverse();
-  panelOrder.forEach(l=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title=locked?'MQD artwork placement is locked; drag to change layer order':'Drag to change layer order';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · locked':''}${l.visible===false?' · hidden':''}</div></div><span>↕ ${locked?'🔒 ':''}${l.type==='image'?'▧':'T'}</span></div>`;
+  panelOrder.forEach((l,index)=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title=locked?'MQD artwork placement is locked; use the arrows or drag to change layer order':'Use the arrows or drag to change layer order';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒 ':''}${l.type==='image'?'▧':'T'}</span></div>`;
+    const head=d.querySelector('.layer-head');
+    const orderTools=document.createElement('div');
+    Object.assign(orderTools.style,{display:'flex',gap:'4px',alignItems:'center',marginLeft:'8px'});
+    const up=document.createElement('button'),down=document.createElement('button');
+    for(const btn of[up,down]){
+      btn.type='button';
+      Object.assign(btn.style,{width:'28px',height:'28px',padding:'0',border:'1px solid #ddd',borderRadius:'7px',background:'#fff',cursor:'pointer',fontSize:'16px',lineHeight:'1'});
+      btn.onmousedown=e=>e.stopPropagation();
+      btn.onclick=e=>e.stopPropagation();
+      btn.draggable=false;
+    }
+    up.textContent='↑';down.textContent='↓';
+    up.title='Move this layer higher / in front';
+    down.title='Move this layer lower / behind';
+    up.disabled=index===0;down.disabled=index===panelOrder.length-1;
+    if(up.disabled)up.style.opacity='.35';if(down.disabled)down.style.opacity='.35';
+    up.onclick=e=>{e.stopPropagation();moveLayerStackOrder(l.id,-1);};
+    down.onclick=e=>{e.stopPropagation();moveLayerStackOrder(l.id,1);};
+    orderTools.append(up,down);
+    head.appendChild(orderTools);
     d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();drawEditor();};
     d.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
     d.ondragend=()=>d.classList.remove('dragging-layer');
@@ -1132,7 +1166,7 @@ function renderLayerPanel(){
   $('cloneAllTool').disabled=!!(l.libraryAssetId&&!locked);
   $('cloneAllTool').title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
   $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
-  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position, size and rotation. Drag its layer card up or down to change stacking order. You can also add it to another compatible print zone or all available zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
+  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position, size and rotation. Use the ↑ / ↓ buttons on its layer card to change stacking order. You can also drag the card, add it to another compatible print zone or all available zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
   let lockedActions=$('lockedLibraryDuplicateActions');
   if(locked&&!lockedActions){
     lockedActions=document.createElement('div');lockedActions.id='lockedLibraryDuplicateActions';lockedActions.className='locked-duplicate-actions';
