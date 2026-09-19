@@ -82,7 +82,9 @@ export default async function handler(req, res) {
     const context = body.context && typeof body.context === 'object' ? body.context : {};
     if (!message) return res.status(400).json({ error: 'Please enter a question.' });
 
-    if (!process.env.OPENAI_API_KEY) {
+    const gatewayToken = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || '';
+    const openaiKey = process.env.OPENAI_API_KEY || '';
+    if (!gatewayToken && !openaiKey) {
       return res.status(200).json({ answer: fallbackAnswer(message), fallback: true });
     }
 
@@ -98,14 +100,15 @@ export default async function handler(req, res) {
       }
     ];
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const useGateway = !!gatewayToken;
+    const response = await fetch(useGateway ? 'https://ai-gateway.vercel.sh/v1/responses' : 'https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${useGateway ? gatewayToken : openaiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: process.env.MQD_HELP_MODEL || 'gpt-5.6-luna',
+        model: process.env.MQD_HELP_MODEL || (useGateway ? 'openai/gpt-5.6-luna' : 'gpt-5.6-luna'),
         instructions: KNOWLEDGE,
         input,
         max_output_tokens: 350,
