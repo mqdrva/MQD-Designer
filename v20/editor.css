@@ -32,3 +32,8 @@ header{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:
 #textControls .text-style-controls{display:grid;grid-template-columns:minmax(58px,1fr) minmax(58px,1fr) minmax(0,1.5fr);gap:6px}
 #textControls .text-style-controls .btn{padding:9px 8px;white-space:nowrap;font-size:13px;line-height:18px;min-width:58px}
 #textControls .text-style-controls .input{min-width:0;padding:9px 6px;font-size:13px;line-height:18px}
+.layer-order-actions{display:flex;gap:6px;margin-top:7px}
+.layer-order-actions button{flex:1;min-width:0;padding:6px;border:1px solid #ddd;border-radius:5px;background:#fff;font:inherit;font-size:11px;cursor:pointer}
+.layer-order-actions button:disabled{opacity:.35;cursor:default}
+.layer-order-actions button:focus-visible{outline:2px solid #ff7900;outline-offset:2px}
+.layer-head>div{min-width:0;overflow-wrap:anywhere}

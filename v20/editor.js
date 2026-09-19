@@ -826,7 +826,7 @@ function zoneQuality(zone=activeZone){
 function ensureCustomerUx(){
   if(!document.getElementById('mqdUxStyles')){const style=document.createElement('style');style.id='mqdUxStyles';style.textContent=`.zone-icon{position:relative}.zone-icon.complete::after{content:'✓';position:absolute;right:4px;top:4px;width:14px;height:14px;border-radius:50%;background:#18a558;color:#fff;font-size:9px;font-weight:900;display:grid;place-items:center;box-shadow:0 0 0 2px #fff}.guide-legend{font-size:9px;color:#777;text-align:center;margin-top:-2px;margin-bottom:7px}.guide-legend .cut{color:#EB232D;font-weight:800}.guide-legend .safe{color:#D66F00;font-weight:800}.quality-card{border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;padding:9px;margin-top:8px}.quality-card .q-label{font-size:9px;color:#888}.quality-card .q-value{font-size:13px;font-weight:800;margin-top:3px}.quality-card .q-note{font-size:9px;color:#777;line-height:1.35;margin-top:3px}.quality-card.good .q-value{color:#157c3f}.quality-card.warn .q-value{color:#9a6100}.quality-card.bad .q-value{color:#b42318}`;document.head.appendChild(style);}
   if(!document.getElementById('guideLegend')){const title=document.querySelector('.zone-title');if(title){const d=document.createElement('div');d.id='guideLegend';d.className='guide-legend';d.innerHTML='<span class="cut">Red</span> = cut / bleed edge &nbsp;·&nbsp; <span class="safe">Orange</span> = keep important text & logos inside';title.insertAdjacentElement('afterend',d);}}
-  if(!document.getElementById('printQualityCard')){const status=$('statusProduct')?.closest('.section');if(status){const d=document.createElement('div');d.id='printQualityCard';d.className='section quality-card neutral';d.innerHTML='<div class="q-label">Estimated print quality</div><div id="printQualityValue" class="q-value">—</div><div id="printQualityNote" class="q-note">Select or add artwork to check resolution.</div>';status.insertAdjacentElement('beforebegin',d);}}
+  if(!document.getElementById('printQualityCard')){const status=$('layerControls')?.closest('.section');if(status){const d=document.createElement('div');d.id='printQualityCard';d.className='section quality-card neutral';d.innerHTML='<div class="q-label">Estimated print quality</div><div id="printQualityValue" class="q-value">—</div><div id="printQualityNote" class="q-note">Select or add artwork to check resolution.</div>';status.insertAdjacentElement('afterend',d);}}
 }
 function renderPrintQuality(){ensureCustomerUx();const q=zoneQuality(activeZone),card=$('printQualityCard'),value=$('printQualityValue'),note=$('printQualityNote');if(!card||!value||!note)return;card.classList.remove('good','warn','bad','neutral');card.classList.add(q.tone);value.textContent=q.label;note.textContent=q.note+' Estimated against a 300-DPI production target.';}
 
@@ -1108,19 +1108,31 @@ function maxLayerScale(layer=activeLayer()){
   if(product.id==='sweat-pants'&&(activeZone==='Front'||activeZone==='Back')&&layer?.type==='text')return 4;
   return 2.2;
 }
+function reorderLayer(id,targetId){
+  const arr=zoneState().layers,from=arr.findIndex(l=>l.id===id),to=arr.findIndex(l=>l.id===targetId);
+  if(from<0||to<0||from===to)return;
+  snapshot();
+  const [layer]=arr.splice(from,1);arr.splice(to,0,layer);
+  activeLayerId=id;renderAll();
+}
 function renderLayerPanel(){
   const wrap=$('layers'),empty=$('emptyLayers'),controlsEl=$('layerControls'),textControls=$('textControls');
   wrap.innerHTML='';const arr=zoneState().layers;empty.classList.toggle('hidden',arr.length>0);
   // The layer at the TOP of this list is also the layer visually rendered on top.
   const panelOrder=[...arr].reverse();
-  const orderLocked=arr.some(isLockedLibraryLayer);
-  panelOrder.forEach(l=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=!orderLocked;d.dataset.layerId=l.id;d.title=locked?'MQD artwork placement is locked':orderLocked?'Layer order is fixed while locked MQD artwork is present':'Drag to change layer order';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':orderLocked?'•':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
+  panelOrder.forEach((l,index)=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title='Drag to change layer order. Top layer appears in front.';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · position locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
+    const actions=document.createElement('div');actions.className='layer-order-actions';
+    for(const [offset,label] of [[-1,'Move up'],[1,'Move down']]){
+      const button=document.createElement('button');button.type='button';button.textContent=(offset<0?'↑ ':'↓ ')+label;button.disabled=!panelOrder[index+offset];button.setAttribute('aria-label',`${label}: ${l.label}`);
+      button.onclick=e=>{e.stopPropagation();const target=panelOrder[index+offset];if(target)reorderLayer(l.id,target.id);};actions.appendChild(button);
+    }
+    d.appendChild(actions);
     d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();drawEditor();};
-    d.ondragstart=e=>{if(orderLocked){e.preventDefault();return;}e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
+    d.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
     d.ondragend=()=>d.classList.remove('dragging-layer');
-    d.ondragover=e=>{if(orderLocked)return;e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('layer-drop-target');};
+    d.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('layer-drop-target');};
     d.ondragleave=()=>d.classList.remove('layer-drop-target');
-    d.ondrop=e=>{if(orderLocked)return;e.preventDefault();d.classList.remove('layer-drop-target');const moved=e.dataTransfer.getData('text/plain');if(!moved||moved===l.id)return;snapshot();const order=[...arr].reverse().map(x=>x.id),from=order.indexOf(moved),to=order.indexOf(l.id);if(from<0||to<0)return;const [id]=order.splice(from,1);order.splice(to,0,id);const byId=new Map(arr.map(x=>[x.id,x]));arr.splice(0,arr.length,...order.reverse().map(id=>byId.get(id)).filter(Boolean));activeLayerId=moved;renderAll();};
+    d.ondrop=e=>{e.preventDefault();d.classList.remove('layer-drop-target');reorderLayer(e.dataTransfer.getData('text/plain'),l.id);};
     wrap.appendChild(d);});
   const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}
   // Lightweight Jacket 2D editor gets a little more sizing range without
@@ -1133,7 +1145,7 @@ function renderLayerPanel(){
   $('cloneAllTool').disabled=!!(l.libraryAssetId&&!locked);
   $('cloneAllTool').title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
   $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
-  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can add it to another compatible print zone or all available zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
+  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can change its layer order, add it to other print zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
   let lockedActions=$('lockedLibraryDuplicateActions');
   if(locked&&!lockedActions){
     lockedActions=document.createElement('div');lockedActions.id='lockedLibraryDuplicateActions';lockedActions.className='locked-duplicate-actions';
@@ -1179,7 +1191,7 @@ function renderLayerPanel(){
   if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
 }
 
-function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZone;$('zoneSize').textContent=t?.width&&t?.height?`${t.width.toLocaleString()} × ${t.height.toLocaleString()} px`:'Custom zone';$('statusProduct').textContent=product.name;$('statusZone').textContent=activeZone;$('statusLayers').textContent=zoneState().layers.length;const c=zoneState().background||'#FFFFFF';$('zoneColor').value=c.toLowerCase();$('zoneHex').value=c;}
+function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZone;$('zoneSize').textContent=t?.width&&t?.height?`${t.width.toLocaleString()} × ${t.height.toLocaleString()} px`:'Custom zone';const c=zoneState().background||'#FFFFFF';$('zoneColor').value=c.toLowerCase();$('zoneHex').value=c;}
 function renderAll(){ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();}
 
 // Copy design data only. Approved garment geometry and texture mapping stay intact.
