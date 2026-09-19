@@ -58,6 +58,7 @@
 </main>
 <script type="module">
   import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+  import {requireAdminMfa} from '/v20/admin-security.js?v=1';
   const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
   const OWNER_CHECK_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
@@ -76,9 +77,19 @@
       const session=data.session;
       if(!session){show('signInCard');message('');return;}
       message('Checking owner access…');
-      const response=await fetch(OWNER_CHECK_URL,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'list',status:'all',search:''})});
+      const ownerRequest=async()=>{
+        const current=(await supabase.auth.getSession()).data.session;
+        return fetch(OWNER_CHECK_URL,{method:'POST',headers:{Authorization:`Bearer ${current?.access_token||session.access_token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'list',status:'all',search:''})});
+      };
+      let response=await ownerRequest();
       if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');return;}
-      const body=await response.json().catch(()=>({}));
+      let body=await response.json().catch(()=>({}));
+      if(response.status===403&&body.code==='MFA_REQUIRED'){
+        show('signInCard');message('Owner account approved. Complete authenticator verification to continue.');
+        await requireAdminMfa(supabase);
+        response=await ownerRequest();body=await response.json().catch(()=>({}));
+        if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');return;}
+      }
       if(response.status===401){await supabase.auth.signOut();show('signInCard');message('Your session expired. Please sign in again.',true);return;}
       show('deniedCard');$('deniedMessage').textContent=body.error||'This account does not have owner access.';
     }catch(error){show('signInCard');message(error instanceof Error?error.message:String(error),true);}
