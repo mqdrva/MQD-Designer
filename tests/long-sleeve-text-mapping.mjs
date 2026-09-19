@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {clipShirtSplash,shirtSplashPreviewFrame} from '../v20/shirt-splash-preview.js';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
@@ -9,7 +10,7 @@ const extract=(a,b)=>editor.slice(editor.indexOf('function '+a+'('),editor.index
 let layers=[];
 const image=createCanvas(100,100);image.getContext('2d').fillRect(0,0,100,100);
 const ratios={'Front':.75,'Back':.75,'Left Sleeve':.6,'Right Sleeve':.6,'Collar':8};
-const context={document:{createElement:()=>createCanvas(1,1)},
+const context={clipShirtSplash,shirtSplashPreviewFrame,document:{createElement:()=>createCanvas(1,1)},
   zoneDesignAspect:zone=>ratios[zone],zoneState:()=>({layers})};
 context.product={id:'long-sleeve-tshirt'};
 context.scaleBounds=(b)=>b;

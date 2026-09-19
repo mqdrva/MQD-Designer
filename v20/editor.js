@@ -7,6 +7,7 @@ import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js';
+import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash} from './shirt-splash-preview.js';
 let lightweightJacketZones=null;
 import {createHatZones,hatProjection} from './hat-renderer.js';
 let hatZoneMeshes=null;
@@ -831,7 +832,7 @@ function renderPrintQuality(){ensureCustomerUx();const q=zoneQuality(activeZone)
 
 function drawLayerStack(c,zone,b){
   const z=zoneState(zone);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
-  (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
+  (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();clipShirtSplash(c,product.id,zone,l,b);const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,b);}
     else if(l.type==='text'){drawTextLayer(c,l,b);}c.restore();});
 }
@@ -855,15 +856,15 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h});return c;}
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,l,b);x.restore();});return c;}
 
-function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600){
+function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600,preview=false){
   // No per-type shifts or second text pass: preserve layer order, spacing,
   // rotation and scale identically in every zone, including the Collar.
   // Avoid the generic 256px minimum stretching narrow collar textures.
   const ratio=zoneDesignAspect(zone);
   const size=Math.max(maxSide,Math.ceil(256*Math.max(ratio,1/ratio)));
-  const artwork=makeCleanZoneArtworkCanvas(zone,size);
+  const artwork=makeCleanZoneArtworkCanvas(zone,size,preview?{imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)}:{});
   const c=artwork.getContext('2d');
   // A transparent one-pixel border prevents texture-edge smearing. The same
   // border is present in the 2D artwork; geometry provides the 3D boundaries.
@@ -1391,6 +1392,27 @@ function rebuildFleeceHoodiePreview(){
 }
 
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
+function makeShirtPreviewArtwork(zone,maxSide,options={}){
+ const settings={...options,imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)};
+ const shiftedBack=product.id==='short-sleeve-polo'&&zone==='Back'&&zoneState(zone).layers.some(layer=>layer.visible!==false&&isShirtSplash(product.id,zone,layer));
+ if(!shiftedBack)return makeCleanZoneArtworkCanvas(zone,maxSide,settings);
+ // Preserve the approved back shift for every other layer. The water alone
+ // reaches the hem, and is composited in its original stacking position.
+ const layers=zoneState(zone).layers||[];
+ const out=makeCleanZoneArtworkCanvas(zone,maxSide,{layerFilter:()=>false});
+ const ctx=out.getContext('2d');
+ const batches=[];
+ for(const layer of layers){
+  if(layer.visible===false)continue;
+  const splash=isShirtSplash(product.id,zone,layer),last=batches.at(-1);
+  if(last&&last.splash===splash)last.layers.push(layer);else batches.push({splash,layers:[layer]});
+ }
+ for(const batch of batches){
+  const artwork=makeCleanZoneArtworkCanvas(zone,maxSide,{...settings,layerFilter:layer=>batch.layers.includes(layer)});
+  ctx.drawImage(artwork,0,batch.splash?0:-out.height*.08);
+ }
+ return out;
+}
 function updateTshirtZoneTextures(){
  if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
  const textureMax=previewTextureMax();
@@ -1420,12 +1442,13 @@ function updateTshirtZoneTextures(){
   // backgrounds, fill, sleeves, collar and every other garment stay unchanged.
   const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const artwork=product.id==='long-sleeve-tshirt'
-    ?makeLongSleeveTshirtArtworkCanvas(zone,textureMax)
-    :makeCleanZoneArtworkCanvas(zone,textureMax,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY:tshirtBodyImageOffsetY}:{}),canvas=document.createElement('canvas');
+    ?makeLongSleeveTshirtArtworkCanvas(zone,textureMax,true)
+    :makeShirtPreviewArtwork(zone,textureMax,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY:tshirtBodyImageOffsetY}:{}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
-  paint.drawImage(artwork,0,artworkY);
+  const splashBack=product.id==='short-sleeve-polo'&&zone==='Back'&&state.layers.some(layer=>layer.visible!==false&&isShirtSplash(product.id,zone,layer));
+  paint.drawImage(artwork,0,splashBack?0:artworkY);
   const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
   mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;
  });
@@ -1451,7 +1474,7 @@ function rebuildJacketPreview(){
 function rebuildHoodMaskPreview(){
  clearDecals();
  for(const [zone,mesh] of hoodMaskPanels){
-  const textMap={flipX:zone.includes('Sleeve'),offsetY:zone==='Front'||zone==='Back'?-.13:0};
+  const textMap={flipX:zone.includes('Sleeve'),offsetY:zone==='Front'||zone==='Back'?-.13:0,imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)};
   const artwork=makeCleanZoneArtworkCanvas(zone,1600,textMap),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;const ctx=canvas.getContext('2d');
   ctx.fillStyle=zoneState(zone).background||'#FFFFFF';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(artwork,0,0);
@@ -1467,7 +1490,7 @@ function rebuildHoodedLongSleevePreview(){
   // The supplied sleeve geometry reverses its outside-facing U direction;
   // mirror text only so the 2D reading direction is preserved on the garment.
   const transform=hoodedLongSleeveArtworkTransform(zone);
-  const artwork=makeCleanZoneArtworkCanvas(zone,1600,{...transform,layerFilter:layer=>zone!=='Front'||layer.type!=='text'}),canvas=document.createElement('canvas');
+  const artwork=makeCleanZoneArtworkCanvas(zone,1600,{...transform,imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b),layerFilter:layer=>zone!=='Front'||layer.type!=='text'}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);paint.drawImage(artwork,0,0);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=true;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=true;

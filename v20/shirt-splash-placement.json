@@ -1,0 +1,467 @@
+[
+  {
+    "product": "tshirt",
+    "zone": "Front",
+    "x": 2.43,
+    "y": 11.693,
+    "scale": 0.9785,
+    "ratio": 0.6933333333333334,
+    "normalizedCut": {
+      "left": -0.010204081632653048,
+      "right": 1.0344995140913507,
+      "top": 0.04811143505021055,
+      "bottom": 1.0056754130223517
+    },
+    "flatRatio": 0.6933333333333334
+  },
+  {
+    "product": "tshirt",
+    "zone": "Back",
+    "x": 2.964,
+    "y": 12.78,
+    "scale": 0.9867,
+    "ratio": 0.7090443349753695,
+    "normalizedCut": {
+      "left": -0.0002223210315695949,
+      "right": 1.0298651252408477,
+      "top": 0.04144499178981937,
+      "bottom": 1.0148440065681443
+    },
+    "flatRatio": 0.7090443349753695
+  },
+  {
+    "product": "tshirt",
+    "zone": "Left Sleeve",
+    "x": -0.216,
+    "y": -77.934,
+    "scale": 1.0907,
+    "ratio": 1.2222222222222223,
+    "normalizedCut": {
+      "left": 0.09523809523809523,
+      "right": 0.9025974025974026,
+      "top": 0.3835978835978836,
+      "bottom": 0.7195767195767195
+    },
+    "flatRatio": 1.2222222222222223
+  },
+  {
+    "product": "tshirt",
+    "zone": "Right Sleeve",
+    "x": -0.216,
+    "y": -77.934,
+    "scale": 1.0907,
+    "ratio": 1.2222222222222223,
+    "normalizedCut": {
+      "left": 0.09523809523809523,
+      "right": 0.9025974025974026,
+      "top": 0.3835978835978836,
+      "bottom": 0.7195767195767195
+    },
+    "flatRatio": 1.2222222222222223
+  },
+  {
+    "product": "tshirt",
+    "zone": "Collar",
+    "x": -0.187,
+    "y": -157.348,
+    "scale": 1.232,
+    "ratio": 1.383419689119171,
+    "normalizedCut": {
+      "left": 0.04307116104868914,
+      "right": 0.9550561797752809,
+      "top": 0.3911917098445596,
+      "bottom": 0.49222797927461137
+    },
+    "flatRatio": 1.383419689119171
+  },
+  {
+    "product": "long-sleeve-tshirt",
+    "zone": "Front",
+    "x": 2.43,
+    "y": 14.45,
+    "scale": 0.9484,
+    "ratio": 0.6719642857142858,
+    "normalizedCut": {
+      "left": -0.010204081632653048,
+      "right": 1.0344995140913507,
+      "top": 0.04811143505021055,
+      "bottom": 1.0056754130223517
+    },
+    "flatRatio": 0.6719642857142858
+  },
+  {
+    "product": "long-sleeve-tshirt",
+    "zone": "Back",
+    "x": 2.964,
+    "y": 18.114,
+    "scale": 0.9283,
+    "ratio": 0.6671038002109645,
+    "normalizedCut": {
+      "left": -0.0002223210315695949,
+      "right": 1.0298651252408477,
+      "top": 0.04144499178981937,
+      "bottom": 1.0148440065681443
+    },
+    "flatRatio": 0.6671038002109645
+  },
+  {
+    "product": "long-sleeve-tshirt",
+    "zone": "Left Sleeve",
+    "x": 0.602,
+    "y": 59.263,
+    "scale": 0.4429,
+    "ratio": 0.5980044719307378,
+    "normalizedCut": {
+      "left": 0.2289156626506024,
+      "right": 0.7771084337349398,
+      "top": 0,
+      "bottom": 0.9987146529562982
+    },
+    "flatRatio": 0.5980044719307378
+  },
+  {
+    "product": "long-sleeve-tshirt",
+    "zone": "Right Sleeve",
+    "x": 0.602,
+    "y": 59.263,
+    "scale": 0.4429,
+    "ratio": 0.5980044719307378,
+    "normalizedCut": {
+      "left": 0.2289156626506024,
+      "right": 0.7771084337349398,
+      "top": 0,
+      "bottom": 0.9987146529562982
+    },
+    "flatRatio": 0.5980044719307378
+  },
+  {
+    "product": "long-sleeve-tshirt",
+    "zone": "Collar",
+    "x": -0.187,
+    "y": -748.869,
+    "scale": 1.232,
+    "ratio": 6.636039097378145,
+    "normalizedCut": {
+      "left": 0.04307116104868914,
+      "right": 0.9550561797752809,
+      "top": 0.3911917098445596,
+      "bottom": 0.49222797927461137
+    },
+    "flatRatio": 6.636039097378145
+  },
+  {
+    "product": "short-sleeve-polo",
+    "zone": "Front",
+    "x": -0.139,
+    "y": -3.244,
+    "scale": 0.8651,
+    "ratio": 0.6998050682261209,
+    "normalizedCut": {
+      "left": 0.04178272980501393,
+      "right": 0.9568245125348189,
+      "top": 0.029239766081871343,
+      "bottom": 0.8791423001949318
+    },
+    "flatRatio": 0.6998050682261209
+  },
+  {
+    "product": "short-sleeve-polo",
+    "zone": "Back",
+    "x": -0.145,
+    "y": -4.532,
+    "scale": 0.8387,
+    "ratio": 0.6521327014218009,
+    "normalizedCut": {
+      "left": 0.023255813953488372,
+      "right": 0.9752906976744186,
+      "top": 0.015165876777251185,
+      "bottom": 0.8606635071090047
+    },
+    "flatRatio": 0.6521327014218009
+  },
+  {
+    "product": "short-sleeve-polo",
+    "zone": "Left Sleeve",
+    "x": -0.536,
+    "y": -83.399,
+    "scale": 1.1121,
+    "ratio": 1.435897435897436,
+    "normalizedCut": {
+      "left": 0.08571428571428572,
+      "right": 0.9089285714285714,
+      "top": 0.17692307692307693,
+      "bottom": 0.8128205128205128
+    },
+    "flatRatio": 1.435897435897436
+  },
+  {
+    "product": "short-sleeve-polo",
+    "zone": "Right Sleeve",
+    "x": -0.536,
+    "y": -83.399,
+    "scale": 1.1121,
+    "ratio": 1.435897435897436,
+    "normalizedCut": {
+      "left": 0.08571428571428572,
+      "right": 0.9089285714285714,
+      "top": 0.17692307692307693,
+      "bottom": 0.8128205128205128
+    },
+    "flatRatio": 1.435897435897436
+  },
+  {
+    "product": "short-sleeve-polo",
+    "zone": "Collar",
+    "x": -0.164,
+    "y": -146.736,
+    "scale": 1.238,
+    "ratio": 1.564102564102564,
+    "normalizedCut": {
+      "left": 0.040983606557377046,
+      "right": 0.9573770491803278,
+      "top": 0.20256410256410257,
+      "bottom": 0.6512820512820513
+    },
+    "flatRatio": 1.564102564102564
+  },
+  {
+    "product": "long-sleeve-polo",
+    "zone": "Front",
+    "x": -0.139,
+    "y": -3.244,
+    "scale": 0.8651,
+    "ratio": 0.6998050682261209,
+    "normalizedCut": {
+      "left": 0.04178272980501393,
+      "right": 0.9568245125348189,
+      "top": 0.029239766081871343,
+      "bottom": 0.8791423001949318
+    },
+    "flatRatio": 0.6998050682261209
+  },
+  {
+    "product": "long-sleeve-polo",
+    "zone": "Back",
+    "x": -0.145,
+    "y": 8.847,
+    "scale": 0.9525,
+    "ratio": 0.7405812701829925,
+    "normalizedCut": {
+      "left": 0.023255813953488372,
+      "right": 0.9752906976744186,
+      "top": 0.0193756727664155,
+      "bottom": 0.9795479009687836
+    },
+    "flatRatio": 0.7405812701829925
+  },
+  {
+    "product": "long-sleeve-polo",
+    "zone": "Left Sleeve",
+    "x": 0.602,
+    "y": 56.413,
+    "scale": 0.474,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.2289156626506024,
+      "right": 0.7771084337349398,
+      "top": 0,
+      "bottom": 0.9987146529562982
+    },
+    "flatRatio": 0.6401028277634961
+  },
+  {
+    "product": "long-sleeve-polo",
+    "zone": "Right Sleeve",
+    "x": 0.602,
+    "y": 56.413,
+    "scale": 0.474,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.2289156626506024,
+      "right": 0.7771084337349398,
+      "top": 0,
+      "bottom": 0.9987146529562982
+    },
+    "flatRatio": 0.6401028277634961
+  },
+  {
+    "product": "long-sleeve-polo",
+    "zone": "Collar",
+    "x": -0.164,
+    "y": -146.736,
+    "scale": 1.238,
+    "ratio": 1.564102564102564,
+    "normalizedCut": {
+      "left": 0.040983606557377046,
+      "right": 0.9573770491803278,
+      "top": 0.20256410256410257,
+      "bottom": 0.6512820512820513
+    },
+    "flatRatio": 1.564102564102564
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Front",
+    "x": -0.171,
+    "y": 5.378,
+    "scale": 0.9732,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.02054794520547945,
+      "right": 0.9777397260273972,
+      "top": 0.019329896907216496,
+      "bottom": 0.9716494845360825
+    },
+    "flatRatio": 0.7525773195876289
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Back",
+    "x": 0,
+    "y": 5.84,
+    "scale": 0.9654,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.022336769759450172,
+      "right": 0.9776632302405498,
+      "top": 0.017994858611825194,
+      "bottom": 0.9704370179948586
+    },
+    "flatRatio": 0.7480719794344473
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Left Sleeve",
+    "x": 0.187,
+    "y": 52.06,
+    "scale": 0.4498,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.24531835205992508,
+      "right": 0.7565543071161048,
+      "top": 0.018292682926829267,
+      "bottom": 0.9658536585365853
+    },
+    "flatRatio": 0.651219512195122
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Right Sleeve",
+    "x": 0.187,
+    "y": 52.06,
+    "scale": 0.4498,
+    "ratio": 0.8939393939393939,
+    "normalizedCut": {
+      "left": 0.24531835205992508,
+      "right": 0.7565543071161048,
+      "top": 0.018292682926829267,
+      "bottom": 0.9658536585365853
+    },
+    "flatRatio": 0.651219512195122
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Hood",
+    "x": 0.323,
+    "y": -110.356,
+    "scale": 1.0633,
+    "ratio": 1.5816326530612246,
+    "normalizedCut": {
+      "left": 0.10806451612903226,
+      "right": 0.8951612903225806,
+      "top": 0.1760204081632653,
+      "bottom": 0.7168367346938775
+    },
+    "flatRatio": 1.5816326530612246
+  },
+  {
+    "product": "hood-mask-shirt",
+    "zone": "Built-In Mask",
+    "x": 0,
+    "y": -23.073,
+    "scale": 1.3464,
+    "ratio": 0.9966777408637874,
+    "normalizedCut": {
+      "left": 0,
+      "right": 1,
+      "top": 0,
+      "bottom": 1
+    },
+    "flatRatio": 0.9966777408637874
+  },
+  {
+    "product": "hooded-long-sleeve",
+    "zone": "Front",
+    "x": -0.171,
+    "y": 5.378,
+    "scale": 0.9732,
+    "ratio": 0.7525773195876289,
+    "normalizedCut": {
+      "left": 0.02054794520547945,
+      "right": 0.9777397260273972,
+      "top": 0.019329896907216496,
+      "bottom": 0.9716494845360825
+    },
+    "flatRatio": 0.7525773195876289
+  },
+  {
+    "product": "hooded-long-sleeve",
+    "zone": "Back",
+    "x": 0,
+    "y": 5.84,
+    "scale": 0.9654,
+    "ratio": 0.7480719794344473,
+    "normalizedCut": {
+      "left": 0.022336769759450172,
+      "right": 0.9776632302405498,
+      "top": 0.017994858611825194,
+      "bottom": 0.9704370179948586
+    },
+    "flatRatio": 0.7480719794344473
+  },
+  {
+    "product": "hooded-long-sleeve",
+    "zone": "Left Sleeve",
+    "x": 0.187,
+    "y": 52.06,
+    "scale": 0.4498,
+    "ratio": 0.651219512195122,
+    "normalizedCut": {
+      "left": 0.24531835205992508,
+      "right": 0.7565543071161048,
+      "top": 0.018292682926829267,
+      "bottom": 0.9658536585365853
+    },
+    "flatRatio": 0.651219512195122
+  },
+  {
+    "product": "hooded-long-sleeve",
+    "zone": "Right Sleeve",
+    "x": 0.187,
+    "y": 52.06,
+    "scale": 0.4498,
+    "ratio": 0.651219512195122,
+    "normalizedCut": {
+      "left": 0.24531835205992508,
+      "right": 0.7565543071161048,
+      "top": 0.018292682926829267,
+      "bottom": 0.9658536585365853
+    },
+    "flatRatio": 0.651219512195122
+  },
+  {
+    "product": "hooded-long-sleeve",
+    "zone": "Hood",
+    "x": 0.323,
+    "y": -110.356,
+    "scale": 1.0633,
+    "ratio": 1.5816326530612246,
+    "normalizedCut": {
+      "left": 0.10806451612903226,
+      "right": 0.8951612903225806,
+      "top": 0.1760204081632653,
+      "bottom": 0.7168367346938775
+    },
+    "flatRatio": 1.5816326530612246
+  }
+]
