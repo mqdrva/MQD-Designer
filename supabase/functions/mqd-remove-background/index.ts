@@ -49,12 +49,14 @@ Deno.serve(async(req:Request)=>{
 
     const forwarded=(req.headers.get("x-forwarded-for")||"").split(",")[0].trim();
     const ip=forwarded||req.headers.get("cf-connecting-ip")||req.headers.get("x-real-ip")||"unknown";
-    const ipHash=await sha256(ip+"|"+(Deno.env.get("SUPABASE_URL")||"mqd"));
+    const salt=Deno.env.get("SUPABASE_URL")||"mqd";
+    const ipHash=await sha256(ip+"|"+salt);
     const {data:allowed,error:limitError}=await supabase.rpc("mqd_consume_background_removal",{p_ip_hash:ipHash,p_limit:20});
-    if(limitError)console.warn("background removal rate limit unavailable",limitError.message);
-    else if(allowed===false)return json({error:"Daily background-removal limit reached. Please try again tomorrow.",code:"rate_limited"},429,origin);
+    if(limitError || (allowed!==true && allowed!==false))return json({error:"Usage limits are temporarily unavailable. Please try again later.",code:"rate_limit_unavailable"},503,origin);
+    if(allowed===false)return json({error:"Daily background-removal limit reached. Please try again tomorrow.",code:"rate_limited"},429,origin);
 
-    const form=await req.formData(),file=form.get("image_file");
+    const form=await req.formData();
+    const file=form.get("image_file");
     if(!(file instanceof File)||!file.size)return json({error:"Choose an image first."},400,origin);
     if(file.size>15*1024*1024)return json({error:"This image is too large for background removal. Please use an image under 15 MB."},413,origin);
     if(!["image/png","image/jpeg","image/webp"].includes(file.type))return json({error:"Use a PNG, JPG, or WebP image."},400,origin);
@@ -79,13 +81,16 @@ Deno.serve(async(req:Request)=>{
 
     const result=await provider.arrayBuffer();
     if(!result.byteLength)return json({error:"Background removal returned an empty image."},502,origin);
-    return new Response(result,{status:200,headers:{
-      "content-type":"image/png",
-      "cache-control":"no-store",
-      "content-disposition":"inline; filename=background-removed.png",
-      "access-control-allow-origin":origin,
-      "vary":"Origin"
-    }});
+    return new Response(result,{
+      status:200,
+      headers:{
+        "content-type":"image/png",
+        "cache-control":"no-store",
+        "content-disposition":"inline; filename=background-removed.png",
+        "access-control-allow-origin":origin,
+        "vary":"Origin"
+      }
+    });
   }catch(error){
     console.error("mqd-remove-background failed",error);
     return json({error:"Background removal could not finish. Please try again."},500,origin);

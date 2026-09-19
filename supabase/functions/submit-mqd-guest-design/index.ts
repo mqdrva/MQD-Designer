@@ -1,3 +1,4 @@
+import { boundedFormData, validateGuestFiles, consumeBudget, UploadError } from "../_shared/mqd-upload-guard.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
@@ -42,7 +43,12 @@ Deno.serve(async (req: Request) => {
     const url = Deno.env.get("SUPABASE_URL") || "", key = serviceKey();
     if (!url || !key) return json(req, { error: "Backend service credentials are not configured" }, 500);
     const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const form = await req.formData();
+    // Global cap remains effective even if an attacker rotates guest tokens or spoofs IP headers.
+    await consumeBudget(supabase, 'guest-requests-global', 500);
+    const ip = (req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown").split(",")[0].trim();
+    await consumeBudget(supabase, 'guest-ip-' + await sha256Hex(ip), 100);
+    const form = await boundedFormData(req);
+    const uploadedBytes = validateGuestFiles(form);
     const guestToken = String(form.get("guestToken") || "").trim();
     if (!validGuestToken(guestToken)) return json(req, { error: "Guest checkout session is invalid. Refresh and try again." }, 401);
     const guestHash = await sha256Hex(guestToken);
@@ -51,6 +57,9 @@ Deno.serve(async (req: Request) => {
     const payload = JSON.parse(raw), p = payload?.product;
     if (!p?.id || !p?.name || !payload?.design?.zones) return json(req, { error: "Incomplete design" }, 400);
 
+    const zones = Object.entries<any>(payload.design.zones);
+    if (zones.length > 12 || zones.some(([,state]) => !Array.isArray(state?.layers ?? []) || (state?.layers?.length || 0) > 100)) return json(req, { error: "Design contains too many zones or layers" }, 400);
+    await consumeBudget(supabase, 'guest-token-' + guestHash, 100);
     const libraryJobs: Array<{ zone: string; layer: any; asset: any; placement: any }> = [];
     for (const [zone, state] of Object.entries<any>(payload.design.zones || {})) for (const layer of state?.layers || []) {
       if (layer?.type !== "image" || !layer?.libraryAssetId) continue;
@@ -71,8 +80,13 @@ Deno.serve(async (req: Request) => {
       else layer.libraryLocked = false;
       delete layer.src; delete layer.storagePath;
       libraryJobs.push({ zone, layer, asset, placement });
+      if (libraryJobs.length > 20) return json(req, { error: "Too many library artwork layers" }, 400);
     }
 
+    // Reserve the largest allowed master for each library copy before writing anything.
+    const reservedBytes = uploadedBytes + libraryJobs.length * 50 * 1024 * 1024;
+    await consumeBudget(supabase, 'guest-bytes-global', 500, reservedBytes);
+    await consumeBudget(supabase, 'guest-bytes-' + guestHash, 100, reservedBytes, 2 * 1024 * 1024 * 1024);
     const backgrounds: Record<string, string> = {};
     for (const [zone, state] of Object.entries<any>(payload.design.zones || {})) backgrounds[zone] = String(state?.background || "#FFFFFF").toUpperCase();
     const { data: order, error: orderErr } = await supabase.from("mqd_orders").insert({
@@ -167,6 +181,7 @@ Deno.serve(async (req: Request) => {
 
     return json(req, { ok: true, designId: null, orderId: order.id, orderNumber: order.order_number, mockupPath });
   } catch (e) {
+    if (e instanceof UploadError) return json(req, { error: e.message }, e.status);
     console.error(e);
     return json(req, { error: e instanceof Error ? e.message : String(e), stage: "unexpected" }, 500);
   }

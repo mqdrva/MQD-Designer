@@ -144,14 +144,15 @@ Deno.serve(async (req: Request) => {
         updated_at: eventTime
       };
       if (paid) {
-        update.status = "paid";
+        if (!["production", "shipped", "completed", "cancelled"].includes(order.status)) update.status = "paid";
         update.stripe_payment_status = "paid";
         update.amount_paid = orderSubtotal;
         update.paid_at = eventTime;
       } else if (!alreadyPaid) {
         update.stripe_payment_status = failed ? "failed" : String(session.payment_status || "unpaid");
       }
-      const { error: updateError } = await supabase.from("mqd_orders").update(update).eq("id", order.id);
+      const { error: updateError } = await supabase.from("mqd_orders").update(update).eq("id", order.id)
+        .or("stripe_payment_status.is.null,stripe_payment_status.neq.paid");
       if (updateError) throw updateError;
       if (paid && order.design_id) {
         const { error: designError } = await supabase.from("customer_designs").update({ status: "purchased", updated_at: eventTime }).eq("id", order.design_id).eq("user_id", order.user_id);
