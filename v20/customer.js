@@ -264,6 +264,12 @@ function fileExtension(blob,filename=''){
   return({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[blob.type]||'bin';
 }
 function safePathPart(value){return String(value||'artwork').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,100);}
+async function uploadCustomerArtwork(path,blob){
+  const {data,error}=await supabase.auth.getSession();if(error||!data.session)throw new Error('Please sign in before saving.');
+  const form=new FormData();form.append('path',path);form.append('file',blob,path.split('/').at(-1));
+  const response=await fetch(SUPABASE_URL+'/functions/v1/mqd-save-artwork',{method:'POST',headers:{Authorization:`Bearer ${data.session.access_token}`,apikey:SUPABASE_PUBLISHABLE_KEY},body:form});
+  const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'Artwork upload failed.');
+}
 function designColors(payload){
   return Object.fromEntries(Object.entries(payload.design?.zones||{}).map(([zone,state])=>[zone,String(state?.background||'#FFFFFF').toUpperCase()]));
 }
@@ -281,16 +287,14 @@ async function prepareCloudPayload(payload,designId,userId){
       const processed=layer.backgroundRemoved===true;
       const ext=processed?'png':fileExtension(blob,layer.filename);
       const path=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}${processed?'-no-background':''}.${ext}`;
-      const {error}=await supabase.storage.from('customer-artwork').upload(path,blob,{contentType:blob.type||'application/octet-stream',upsert:true});
-      if(error)throw new Error('Artwork upload failed: '+error.message);
+      await uploadCustomerArtwork(path,blob);
       layer.storagePath=path;
       if(processed&&!layer.originalStoragePath){
         const original=await originalArtworkBlob(layer.originalFilename||layer.filename);
         if(original){
           const originalExt=fileExtension(original,layer.originalFilename||layer.filename);
           const originalPath=`${userId}/designs/${designId}/${safePathPart(zone)}/${safePathPart(layer.id)}-${baseName}-original.${originalExt}`;
-          const {error:originalError}=await supabase.storage.from('customer-artwork').upload(originalPath,original,{contentType:original.type||'application/octet-stream',upsert:true});
-          if(originalError)throw new Error('Original artwork upload failed: '+originalError.message);
+          await uploadCustomerArtwork(originalPath,original);
           layer.originalStoragePath=originalPath;
         }
       }
@@ -308,8 +312,7 @@ async function saveCloudDesign(payload,{forceNew=false,name=null}={}){
   const preview=await mockupBlob();
   if(preview){
     previewPath=`${user.id}/designs/${id}/preview.png`;
-    const {error}=await supabase.storage.from('customer-artwork').upload(previewPath,preview,{contentType:'image/png',upsert:true});
-    if(error)throw new Error('Preview upload failed: '+error.message);
+    await uploadCustomerArtwork(previewPath,preview);
   }
   const record={
     id,user_id:user.id,product_id:String(payload.product?.id||''),product_name:String(payload.product?.name||'Custom design'),

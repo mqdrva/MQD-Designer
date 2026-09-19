@@ -1,0 +1,23 @@
+name: MQD live site checks
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/check-live-site.mjs
+      - .github/workflows/monitor-live-site.yml
+permissions:
+  contents: read
+concurrency:
+  group: mqd-live-site-checks
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check public pages and authentication boundaries
+        run: node scripts/check-live-site.mjs

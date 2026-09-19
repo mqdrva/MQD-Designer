@@ -1,4 +1,5 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+import {requireAdminMfa} from './admin-security.js?v=1';
 
 const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
@@ -8,6 +9,7 @@ const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persist
 let products=[];
 
 async function request(body){
+  await requireAdminMfa(supabase);
   const {data,error}=await supabase.auth.getSession();if(error)throw error;
   const token=data.session?.access_token;if(!token)throw new Error('Sign in is required.');
   const response=await fetch(ADMIN_URL,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -72,4 +74,3 @@ $('uploadForm').onsubmit=async event=>{
 };
 
 syncBehaviorFields();supabase.auth.getSession().then(({data})=>data.session?startAdmin():showAuth());supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session)startAdmin();if(event==='SIGNED_OUT')showAuth('Signed out.');});
-

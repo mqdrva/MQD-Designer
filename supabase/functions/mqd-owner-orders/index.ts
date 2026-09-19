@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { escapeMqdEmailHtml, queueMqdEmail, retryPendingMqdEmails } from "../_shared/mqd-email.js";
+import { hasAdminMfa } from "../_shared/mqd-admin-security.js";
 
 const allowedOrigins=new Set(['https://mymerchnow.app','https://www.mymerchnow.app','https://mqd-designer-vercel.vercel.app']);
 function allowedOrigin(origin:string){return allowedOrigins.has(origin)||/^https:\/\/mqd-designer-vercel(?:-[a-z0-9-]+)?\.vercel\.app$/.test(origin);}
@@ -25,8 +26,20 @@ Deno.serve(async(req:Request)=>{
     const {data:{user},error:userError}=await supabase.auth.getUser(token);
     if(userError||!user)return json(req,{error:'Your sign-in session is invalid or expired'},401);
     if(user.app_metadata?.role!=='admin')return json(req,{error:'Owner Orders access is required'},403);
+    if(!await hasAdminMfa(supabase,token))return json(req,{error:'Verify your owner account with an authenticator code.',code:'MFA_REQUIRED'},403);
 
     const body=await req.json().catch(()=>({})),action=String(body?.action||'list');
+
+    if(action==='backup-list'){
+      const bucket=String(body.bucket||''),prefix=String(body.prefix||''),offset=Number(body.offset||0);
+      if(!['garments','customer-artwork','mqd-library-assets','mqd-production'].includes(bucket)||prefix.length>1024||prefix.split('/').some(p=>p==='.'||p==='..')||!Number.isSafeInteger(offset)||offset<0)return json(req,{error:'Invalid backup request'},400);
+      const {data:rows,error}=await supabase.storage.from(bucket).list(prefix,{limit:100,offset,sortBy:{column:'name',order:'asc'}});
+      if(error)return json(req,{error:'Could not list backup files'},500);
+      const files=(rows||[]).filter((r:any)=>r.id),paths=files.map((r:any)=>[prefix,r.name].filter(Boolean).join('/'));
+      const signed=paths.length?await supabase.storage.from(bucket).createSignedUrls(paths,3600):{data:[],error:null};
+      if(signed.error||(signed.data||[]).some((r:any)=>r.error||!r.signedUrl))return json(req,{error:'Could not authorize backup downloads'},500);
+      return json(req,{folders:(rows||[]).filter((r:any)=>!r.id).map((r:any)=>[prefix,r.name].filter(Boolean).join('/')),files:files.map((r:any,i:number)=>({path:paths[i],size:Number(r.metadata?.size)||0,updatedAt:r.updated_at,url:signed.data?.[i]?.signedUrl})),nextOffset:rows?.length===100?offset+100:null});
+    }
 
     if(action==='list'){
       try{await retryPendingMqdEmails(supabase,5);}catch(error){console.error('MQD pending email retry skipped',error instanceof Error?error.message:String(error));}

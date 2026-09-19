@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { hasAdminMfa } from "../_shared/mqd-admin-security.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 type Zone={name:string;width:number;height:number};
@@ -50,6 +51,7 @@ Deno.serve(async(req:Request)=>{
     const {data:{user},error:userError}=await supabase.auth.getUser(token);
     if(userError||!user)return json(req,{error:'Your sign-in session is invalid or expired'},401);
     if(user.app_metadata?.role!=='admin')return json(req,{error:'Artwork library owner access is required'},403);
+    if(!await hasAdminMfa(supabase,token))return json(req,{error:'Verify your owner account with an authenticator code.',code:'MFA_REQUIRED'},403);
     const body=await req.json().catch(()=>({})),action=String(body?.action||'');
 
     if(action==='products')return json(req,{products:PRODUCTS});
