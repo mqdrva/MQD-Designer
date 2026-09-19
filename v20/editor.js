@@ -965,11 +965,12 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // already contains the customer text, so the generic helper overlay would
     // draw a second copy on top. Other products keep their approved behavior.
     const hoodMaskSleeve=product.id==='hood-mask-shirt'&&activeZone.includes('Sleeve');
+    const longPoloCollar=product.id==='long-sleeve-polo'&&activeZone==='Collar';
     // T-shirt text is already rendered inside the exact masked design frame above.
     // Do not paint a second editor-only copy; keeping one rendering path makes
     // Front/Back/Sleeves/Collar placement correspond to the same normalized
     // coordinates consumed by the locked 3D UV textures.
-    if(product.id!=='sweat-pants'&&product.id!=='tshirt'&&product.id!=='long-sleeve-tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
+    if(product.id!=='sweat-pants'&&product.id!=='tshirt'&&product.id!=='long-sleeve-tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve&&!longPoloCollar)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
     if(includeGuides)drawLongSleeveWhiteGrid(targetCtx,activeZone,r,rec);
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
@@ -1393,7 +1394,8 @@ function rebuildFleeceHoodiePreview(){
 
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
 function makeShirtPreviewArtwork(zone,maxSide,options={}){
- const settings={...options,imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)};
+ // Correct the folded long-polo collar reading direction for text only.
+ const settings={...options,flipX:product.id==='long-sleeve-polo'&&zone==='Collar'?true:options.flipX,imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)};
  const shiftedBack=product.id==='short-sleeve-polo'&&zone==='Back'&&zoneState(zone).layers.some(layer=>layer.visible!==false&&isShirtSplash(product.id,zone,layer));
  if(!shiftedBack)return makeCleanZoneArtworkCanvas(zone,maxSide,settings);
  // Preserve the approved back shift for every other layer. The water alone
