@@ -753,6 +753,47 @@ async function completeAuth(session){
   const action=pendingAfterAuth;pendingAfterAuth=null;
   if(action)setTimeout(()=>action(),0);
 }
+
+async function restoreAuthFromRedirect(){
+  const url=new URL(window.location.href);
+  const hash=new URLSearchParams(url.hash.replace(/^#/,''));
+  const callbackError=url.searchParams.get('error_description')||hash.get('error_description')||url.searchParams.get('error')||hash.get('error');
+  if(callbackError)console.warn('Supabase email sign-in callback error:',callbackError);
+
+  let session=null;
+  const accessToken=hash.get('access_token');
+  const refreshToken=hash.get('refresh_token');
+
+  // Explicitly persist implicit-flow magic-link tokens. This protects the
+  // customer session even if automatic URL detection races the page startup.
+  if(accessToken&&refreshToken){
+    const {data,error}=await supabase.auth.setSession({access_token:accessToken,refresh_token:refreshToken});
+    if(error)console.warn('Could not persist email sign-in session:',error.message);
+    else session=data.session;
+  }
+
+  // Also support a PKCE-style callback if Supabase returns an auth code.
+  if(!session&&url.searchParams.get('code')){
+    const {data,error}=await supabase.auth.exchangeCodeForSession(url.searchParams.get('code'));
+    if(error)console.warn('Could not exchange email sign-in code:',error.message);
+    else session=data.session;
+  }
+
+  if(!session){
+    const {data,error}=await supabase.auth.getSession();
+    if(error)throw error;
+    session=data.session;
+  }
+
+  const hasAuthParams=accessToken||refreshToken||url.searchParams.has('code')||url.searchParams.has('error')||url.searchParams.has('error_description')||hash.has('error')||hash.has('error_description');
+  if(hasAuthParams){
+    url.hash='';
+    ['code','error','error_code','error_description'].forEach(key=>url.searchParams.delete(key));
+    history.replaceState({},document.title,url.pathname+(url.searchParams.toString()?('?'+url.searchParams.toString()):''));
+  }
+
+  return {session,callbackError};
+}
 async function signInWithEmail(event){
   event.preventDefault();
   const message=$('authMessage'),email=$('authEmail').value.trim();
@@ -852,6 +893,16 @@ window.addEventListener('DOMContentLoaded',()=>{
     try{let row=accountDesigns.find(x=>x.id===item.dataset.designId);if(!row){const {data,error}=await supabase.from('customer_designs').select('*').eq('id',item.dataset.designId).single();if(error)throw error;row=data;}await buyAgain(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
   });
   updateCartButton();
-  supabase.auth.getSession().then(({data})=>completeAuth(data.session));
+  restoreAuthFromRedirect().then(({session,callbackError})=>{
+    completeAuth(session);
+    if(callbackError&&!session){
+      openAuth('That email sign-in link could not be completed. Request a new link and use the newest email.');
+      const message=$('authMessage');
+      if(message){message.textContent=callbackError;message.className='account-message error';}
+    }
+  }).catch(error=>{
+    console.error('Auth restore failed',error);
+    completeAuth(null);
+  });
   supabase.auth.onAuthStateChange((_event,session)=>{currentSession=session;updateAccountButton();});
 });
