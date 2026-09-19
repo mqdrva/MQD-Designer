@@ -1100,7 +1100,14 @@ async function restoreBackgroundActive(){
  }catch(error){console.error(error);alert('The original artwork could not be restored on this device.');}
 }
 
-function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — $${Number(p.price).toFixed(2)}`;sel.appendChild(o);});sel.value=product.id;}
+function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — ${Number(p.price).toFixed(2)}`;sel.appendChild(o);});sel.value=product.id;}
+function renderMobileImageTargets(){
+  const select=$('mobileImageZone');if(!select)return;
+  const current=select.value;
+  select.innerHTML='';
+  product.zones.forEach(zone=>{const option=document.createElement('option');option.value=zone;option.textContent=zone;select.appendChild(option);});
+  select.value=product.zones.includes(current)?current:activeZone;
+}
 function zoneIconLabel(z){if(z==='Front')return'▰\nFront';if(z==='Back')return'▱\nBack';if(z.includes('Sleeve'))return'▭\n'+(z.startsWith('Left')?'L Sleeve':'R Sleeve');if(z==='Collar')return'⌒\nCollar';if(z==='Hood')return'◠\nHood';return z;}
 function renderZones(){const rail=$('zoneRail');rail.innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone-icon'+(z===activeZone?' active':'')+(zoneHasContent(z)?' complete':'');b.innerHTML=escapeHtml(zoneIconLabel(z)).replace('\n','<br>');b.title=zoneHasContent(z)?z+' — design added':z+' — not designed yet';b.onclick=()=>selectZone(z);rail.appendChild(b);});}
 function maxLayerScale(layer=activeLayer()){
@@ -1236,7 +1243,7 @@ function renderLayerPanel(){
 }
 
 function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZone;$('zoneSize').textContent=t?.width&&t?.height?`${t.width.toLocaleString()} × ${t.height.toLocaleString()} px`:'Custom zone';$('statusProduct').textContent=product.name;$('statusZone').textContent=activeZone;$('statusLayers').textContent=zoneState().layers.length;const c=zoneState().background||'#FFFFFF';$('zoneColor').value=c.toLowerCase();$('zoneHex').value=c;}
-function renderAll(){ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();}
+function renderAll(){ensureCustomerUx();renderProducts();renderMobileImageTargets();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();}
 
 // Copy design data only. Approved garment geometry and texture mapping stay intact.
 function garmentCopyFamily(id){
@@ -1630,7 +1637,30 @@ function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().lay
 const MAX_ZONE_LAYERS=6;
 function canAddLayer(zone=activeZone){const z=zoneState(zone);if(z.layers.length>=MAX_ZONE_LAYERS){alert(`This print zone can have up to ${MAX_ZONE_LAYERS} layers.`);return false;}return true;}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
-function addImage(src,filename){if(!canAddLayer())return;const img=new Image();img.onload=()=>{if(!canAddLayer())return;snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
+function addImageToZones(src,filename,zones,{selectAfter=null}={}){
+  const requested=[...new Set(zones)].filter(zone=>product.zones.includes(zone));
+  if(!requested.length)return;
+  const available=requested.filter(zone=>zoneState(zone).layers.length<MAX_ZONE_LAYERS);
+  const skipped=requested.filter(zone=>!available.includes(zone));
+  if(!available.length){alert('The selected print zone'+(requested.length>1?'s are':' is')+' already at the 6-layer limit.');return;}
+  const img=new Image();
+  img.onload=()=>{
+    snapshot();
+    let selectedId=null;
+    for(const zone of available){
+      const target=zoneState(zone);
+      const l={id:'layer-'+layerSeq++,type:'image',label:'Layer '+(target.layers.length+1),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};
+      target.layers.push(l);
+      if(zone===(selectAfter||activeZone))selectedId=l.id;
+    }
+    if(selectAfter&&product.zones.includes(selectAfter))activeZone=selectAfter;
+    activeLayerId=selectedId||zoneState().layers.at(-1)?.id||null;
+    renderAll();
+    if(skipped.length)alert('Picture added. Skipped full zones: '+skipped.join(', ')+'.');
+  };
+  img.src=src;
+}
+function addImage(src,filename){if(!canAddLayer())return;addImageToZones(src,filename,[activeZone],{selectAfter:activeZone});}
 function addLibraryAsset(asset){
   if(!asset?.id||!asset.renderUrl||!canAddLayer())return Promise.reject(new Error('This library artwork is unavailable.'));
   return new Promise((resolve,reject)=>{
@@ -1781,7 +1811,17 @@ $('textItalic')?.addEventListener('click',()=>{const l=activeLayer();if(!l||l.ty
 $('textAlign')?.addEventListener('change',e=>updateTextProp('align',e.target.value));
 initTextFonts();
 
-$('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').onclick=()=>$('artUpload').click();$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>addImage(rd.result,f.name);rd.readAsDataURL(f);e.target.value='';};$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
+let pendingImageDestination={mode:'active',zone:null};
+$('productSelect').onchange=e=>selectProduct(e.target.value);
+$('addImageBtn').onclick=()=>{pendingImageDestination={mode:'active',zone:activeZone};$('artUpload').click();};
+$('mobileAddImageZone')?.addEventListener('click',()=>{const zone=$('mobileImageZone')?.value||activeZone;pendingImageDestination={mode:'zone',zone};$('artUpload').click();});
+$('mobileAddImageAll')?.addEventListener('click',()=>{pendingImageDestination={mode:'all',zone:null};$('artUpload').click();});
+$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const destination=pendingImageDestination;const rd=new FileReader();rd.onload=()=>{
+  if(destination.mode==='all')addImageToZones(rd.result,f.name,product.zones);
+  else if(destination.mode==='zone')addImageToZones(rd.result,f.name,[destination.zone],{selectAfter:destination.zone});
+  else addImage(rd.result,f.name);
+};rd.readAsDataURL(f);e.target.value='';pendingImageDestination={mode:'active',zone:activeZone};};
+$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
 [['layerX','x',Number],['layerY','y',Number],['layerScale','scale',v=>Number(v)/100],['layerRotation','rotation',Number]].forEach(([id,p,fn])=>$(id).oninput=e=>updateLayer(p,fn(e.target.value)));
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();const arr=zoneState().layers;arr.splice(arr.findIndex(x=>x.id===l.id),1);activeLayerId=arr.at(-1)?.id||null;renderAll();};$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
