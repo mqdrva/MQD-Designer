@@ -712,6 +712,47 @@ async function buyAgain(row){
   await openCloudDesign(row,{notify:false});
   await addToCart();
 }
+function designStoragePaths(row){
+  const user=accountUser(),prefix=user?`${user.id}/designs/${row.id}/`:'';
+  const paths=new Set();
+  const add=path=>{if(path&&prefix&&String(path).startsWith(prefix))paths.add(String(path));};
+  add(row.preview_path);
+  for(const state of Object.values(row.design_json?.design?.zones||{})){
+    for(const layer of state?.layers||[]){
+      add(layer.storagePath);
+      add(layer.originalStoragePath);
+    }
+  }
+  return [...paths];
+}
+async function deleteCloudDesign(row){
+  if(!row||row.status!=='draft')throw new Error('Only draft designs can be deleted. Purchased designs stay with your order history.');
+  const user=accountUser();if(!user)throw new Error('Please sign in first.');
+  const ok=confirm(`Delete “${row.name}”? This removes the draft from My Designs and cannot be undone.`);
+  if(!ok)return false;
+
+  const assetPaths=designStoragePaths(row);
+  const {data,error}=await supabase.from('customer_designs')
+    .delete()
+    .eq('id',row.id)
+    .eq('user_id',user.id)
+    .eq('status','draft')
+    .select('id');
+  if(error)throw new Error(error.message);
+  if(!data?.length)throw new Error('This draft could not be deleted. Refresh My Designs and try again.');
+
+  if(assetPaths.length){
+    const {error:storageError}=await supabase.storage.from('customer-artwork').remove(assetPaths);
+    if(storageError)console.warn('Draft record deleted, but some stored artwork could not be cleaned up:',storageError.message);
+  }
+
+  if(activeCloudDesign?.id===row.id)activeCloudDesign=null;
+  accountDesigns=accountDesigns.filter(x=>x.id!==row.id);
+  const cart=cartItems(),nextCart=cart.filter(item=>item.designId!==row.id);
+  if(nextCart.length!==cart.length){saveCart(nextCart);updateCartButton();}
+  await renderDesigns();
+  return true;
+}
 async function loadDesigns(){
   $('accountLoading').classList.remove('hidden');$('designsList').innerHTML='';
   const {data,error}=await supabase.from('customer_designs').select('*').neq('status','archived').order('updated_at',{ascending:false});
@@ -727,7 +768,7 @@ async function renderDesigns(){
   for(const row of rows){
     const url=await previewUrl(row.preview_path);
     const item=document.createElement('article');item.className='account-item';item.dataset.id=row.id;
-    item.innerHTML=`${url?`<img class="account-preview" src="${escapeHtml(url)}" alt="${escapeHtml(row.name)} preview">`:'<div class="account-preview placeholder">✦</div>'}<div><h3>${escapeHtml(row.name)}</h3><div class="account-meta">${escapeHtml(row.product_name)} · Version ${Number(row.version)||1}<br>${row.status==='purchased'?'Purchased':'Draft'} · Updated ${escapeHtml(formatDate(row.updated_at))}</div></div><div class="account-actions"><button class="btn" data-action="open" type="button">${row.status==='purchased'?'View / Edit':'Open'}</button><button class="btn" data-action="duplicate" type="button">Duplicate</button>${row.status==='purchased'?'<button class="btn orange" data-action="buy" type="button">Buy Again</button>':''}</div>`;
+    item.innerHTML=`${url?`<img class="account-preview" src="${escapeHtml(url)}" alt="${escapeHtml(row.name)} preview">`:'<div class="account-preview placeholder">✦</div>'}<div><h3>${escapeHtml(row.name)}</h3><div class="account-meta">${escapeHtml(row.product_name)} · Version ${Number(row.version)||1}<br>${row.status==='purchased'?'Purchased':'Draft'} · Updated ${escapeHtml(formatDate(row.updated_at))}</div></div><div class="account-actions"><button class="btn" data-action="open" type="button">${row.status==='purchased'?'View / Edit':'Open'}</button><button class="btn" data-action="duplicate" type="button">Duplicate</button>${row.status==='purchased'?'<button class="btn orange" data-action="buy" type="button">Buy Again</button>':'<button class="btn danger" data-action="delete" type="button">Delete</button>'}</div>`;
     list.appendChild(item);
   }
 }
@@ -888,7 +929,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     const button=e.target.closest('[data-action]'),item=e.target.closest('.account-item');if(!button||!item)return;
     const row=accountDesigns.find(x=>x.id===item.dataset.id);if(!row)return;
     button.disabled=true;
-    try{if(button.dataset.action==='open')await openCloudDesign(row);else if(button.dataset.action==='duplicate')await duplicateCloudDesign(row);else if(button.dataset.action==='buy')await buyAgain(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
+    try{if(button.dataset.action==='open')await openCloudDesign(row);else if(button.dataset.action==='duplicate')await duplicateCloudDesign(row);else if(button.dataset.action==='buy')await buyAgain(row);else if(button.dataset.action==='delete')await deleteCloudDesign(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
   });
   $('ordersList')?.addEventListener('click',async e=>{
     const button=e.target.closest('[data-order-action="buy"]'),item=e.target.closest('.account-item');if(!button||!item?.dataset.designId)return;
