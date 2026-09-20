@@ -4,6 +4,7 @@ const cuts={"tshirt::Front":{"left":-0.010204081632653048,"right":1.034499514091
 export function isShirtSplash(productId,zone,layer){
  return !!(cuts[productId+'::'+zone]&&layer?.type==='image'&&layer.libraryLocked&&layer.libraryAssetId===ASSET);
 }
+export function shirtSplashCutFrame(productId,zone){return cuts[productId+'::'+zone]||null;}
 export function clipShirtSplash(ctx,productId,zone,layer,b){
  if(!isShirtSplash(productId,zone,layer))return;
  const c=cuts[productId+'::'+zone];
