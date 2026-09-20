@@ -1,6 +1,8 @@
-// Isolated fitting for Background 2. Do not change previously approved assets.
+// Only these approved edge artworks use visible-pixel cutline fitting.
 export const WATER_SPLASH_2='e39b3c60-1854-4655-890c-e1815d50cc2e';
 export const isWaterSplash2=layer=>layer?.type==='image'&&layer.libraryLocked&&layer.libraryAssetId===WATER_SPLASH_2;
+export const GRASS_BOTTOM='a610a709-e5d2-4d15-9452-cf0f29d86420';
+export const isCutlineBottomArtwork=layer=>isWaterSplash2(layer)||(layer?.type==='image'&&layer.libraryLocked&&layer.libraryAssetId===GRASS_BOTTOM);
 
 // Visible source pixels, not the transparent image rectangle, meet the cut edges.
 // Return normalized flat coordinates first; preview adapters only change the frame.
