@@ -1384,30 +1384,39 @@ async function downloadMockupPNG(){
  const blob=await captureCurrent3DPreview();
  savePreviewBlob(blob,product.id+'-mockup.png');
 }
-async function take3DScreenshot(){
- const button=$('takeScreenshot');
- if(button){button.disabled=true;button.textContent='Capturing…';}
+async function save3DScreenshot(){
+ const button=$('saveScreenshot');
+ if(button){button.disabled=true;button.textContent='Saving…';}
+ try{
+  const blob=await captureCurrent3DPreview();
+  if(!blob)return;
+  savePreviewBlob(blob,product.id+'-3d-screenshot.png');
+ }finally{
+  if(button){button.disabled=false;button.textContent='⬇ Save PNG';}
+ }
+}
+async function share3DScreenshot(){
+ const button=$('shareScreenshot');
+ if(button){button.disabled=true;button.textContent='Opening…';}
  try{
   const blob=await captureCurrent3DPreview();
   if(!blob)return;
   const filename=product.id+'-3d-screenshot.png';
   const file=new File([blob],filename,{type:'image/png'});
   if(navigator.share&&navigator.canShare?.({files:[file]})){
-   try{
     await navigator.share({files:[file],title:product.name+' 3D Preview',text:'My MQD garment preview'});
     return;
-   }catch(error){
-    if(error?.name==='AbortError')return;
-    console.warn('Share sheet unavailable, downloading screenshot instead.',error);
-   }
   }
-  savePreviewBlob(blob,filename);
+  alert('Sharing is not available on this device. Use Save PNG instead.');
+ }catch(error){
+  if(error?.name!=='AbortError'){console.warn('Screenshot share failed.',error);alert('Could not open sharing. Use Save PNG instead.');}
  }finally{
-  if(button){button.disabled=false;button.textContent='📸 Take Screenshot';}
+  if(button){button.disabled=false;button.textContent='↗ Share';}
  }
 }
 $('downloadMockup').onclick=downloadMockupPNG;
-$('takeScreenshot')?.addEventListener('click',take3DScreenshot);
+$('saveScreenshot')?.addEventListener('click',save3DScreenshot);
+$('shareScreenshot')?.addEventListener('click',share3DScreenshot);
 function clearDecals(){while(decalGroup.children.length){const o=decalGroup.children[0];decalGroup.remove(o);o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map?.dispose();m.dispose();});}}
 function zonePlacement(zone){
   const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3()),p=new THREE.Vector3(),r=new THREE.Euler(),d=new THREE.Vector3();
