@@ -1362,14 +1362,52 @@ function setProductionProofView(view){
  controls.enableDamping=damping;
  return true;
 }
-function downloadMockupPNG(){
- if(!renderer||!garment)return;
- renderer.render(scene,camera);
- const src=renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;
- const c=out.getContext('2d');c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);c.drawImage(src,0,0,out.width,out.height);
- out.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=product.id+'-mockup.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);},'image/png');
+function captureCurrent3DPreview(){
+ return new Promise(resolve=>{
+  if(!renderer||!garment)return resolve(null);
+  renderer.render(scene,camera);
+  const src=renderer.domElement,out=document.createElement('canvas');
+  out.width=src.width;out.height=src.height;
+  const c=out.getContext('2d');
+  c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);
+  c.drawImage(src,0,0,out.width,out.height);
+  out.toBlob(resolve,'image/png');
+ });
+}
+function savePreviewBlob(blob,filename){
+ if(!blob)return;
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=filename;a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function downloadMockupPNG(){
+ const blob=await captureCurrent3DPreview();
+ savePreviewBlob(blob,product.id+'-mockup.png');
+}
+async function take3DScreenshot(){
+ const button=$('takeScreenshot');
+ if(button){button.disabled=true;button.textContent='Capturing…';}
+ try{
+  const blob=await captureCurrent3DPreview();
+  if(!blob)return;
+  const filename=product.id+'-3d-screenshot.png';
+  const file=new File([blob],filename,{type:'image/png'});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+   try{
+    await navigator.share({files:[file],title:product.name+' 3D Preview',text:'My MQD garment preview'});
+    return;
+   }catch(error){
+    if(error?.name==='AbortError')return;
+    console.warn('Share sheet unavailable, downloading screenshot instead.',error);
+   }
+  }
+  savePreviewBlob(blob,filename);
+ }finally{
+  if(button){button.disabled=false;button.textContent='📸 Take Screenshot';}
+ }
 }
 $('downloadMockup').onclick=downloadMockupPNG;
+$('takeScreenshot')?.addEventListener('click',take3DScreenshot);
 function clearDecals(){while(decalGroup.children.length){const o=decalGroup.children[0];decalGroup.remove(o);o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map?.dispose();m.dispose();});}}
 function zonePlacement(zone){
   const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3()),p=new THREE.Vector3(),r=new THREE.Euler(),d=new THREE.Vector3();
