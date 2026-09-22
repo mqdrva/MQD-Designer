@@ -1623,7 +1623,11 @@ function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const tar
 function rebuildJacketPreview(){
  clearDecals();garment.updateMatrixWorld(true);
  for(const [zone,target] of lightweightJacketZones){
-  if(zone==='Front'||zone==='Back'){
+  // Keep the approved direct-surface Front mapping. The Back stays on the
+  // established projector so the splash does not shear across the folded side
+  // seam; render that projected artwork double-sided so folded rear faces do
+  // not disappear and expose a white wedge through the water.
+  if(zone==='Front'){
    const state=zoneState(zone),artwork=makeCleanZoneArtworkCanvas(zone,1600,{imageFrame:layer=>jacketSplashPreviewFrame(zone,layer)});
    const canvas=document.createElement('canvas');canvas.width=artwork.width;canvas.height=artwork.height;
    const ctx=canvas.getContext('2d');ctx.fillStyle=state.background||'#FFFFFF';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(artwork,0,0);
@@ -1632,14 +1636,16 @@ function rebuildJacketPreview(){
    target.material.map?.dispose();target.material.map=texture;target.material.color.set('#FFFFFF');target.material.needsUpdate=true;
    continue;
   }
-  const state=zoneState(zone);target.material.color.set(state.background||'#FFFFFF');
+  const state=zoneState(zone);
+  if(target.material.map){target.material.map.dispose();target.material.map=null;}
+  target.material.color.set(state.background||'#FFFFFF');target.material.needsUpdate=true;
   if(!state.layers.some(l=>l.visible!==false))continue;
   const canvas=makeCleanZoneArtworkCanvas(zone,1600,{imageFrame:layer=>jacketSplashPreviewFrame(zone,layer)}),tex=new THREE.CanvasTexture(canvas);
-  tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
   const q=jacketProjection(target,zone);
   try{
    const geometry=new DecalGeometry(target,q.p,q.r,q.d);
-   const material=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});
+   const material=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,side:zone==='Back'?THREE.DoubleSide:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});
    const artwork=new THREE.Mesh(geometry,material);artwork.renderOrder=10;decalGroup.add(artwork);
   }catch(e){tex.dispose();console.error('Lightweight Jacket artwork projection failed',zone,e);}
  }
