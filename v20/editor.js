@@ -6,6 +6,7 @@ import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panel
 import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
+import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js?v=3';
 import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,shirtSplashCutFrame} from './shirt-splash-preview.js?v=2';
 import {isCutlineBottomArtwork,drawFittedSplash} from './water-splash-fit.js?v=grass-1';
@@ -195,7 +196,7 @@ function ensureTemplateImage(zone=activeZone){
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
       rec.status='ready';
-      if(product.id==='shorts'||product.id==='long-sleeve-tshirt'||zoneState(zone).layers.some(isCutlineBottomArtwork))scheduleGarmentPreview(0);
+      if(product.id==='shorts'||product.id==='long-sleeve-tshirt'||zoneState(zone).layers.some(l=>isCutlineBottomArtwork(l)||isJacketSplash5(product.id,zone,l)))scheduleGarmentPreview(0);
     }catch(err){
       console.warn('Template mask build failed',t.path,err);
       rec.status='guide-only';
@@ -852,9 +853,16 @@ function drawWaterSplash2(c,zone,l,b,preview=false){
   const patternUv=product.id==='long-sleeve-tshirt'&&['Front','Back'].includes(zone);
   drawFittedSplash(c,l.image,content,waterSplashCut(zone,rec),b,flatAspect,preview&&!patternUv,!!l.flipX,!!l.flipY);
 }
+function drawJacketSplash5Layer(c,zone,l,b,preview){
+  const rec=ensureTemplateImage(zone),t=product.templates?.[zone];
+  if(!l.image||rec?.status!=='ready')return;
+  const flatAspect=(t.width/t.height)*(rec.bounds.w/(rec.img.naturalWidth||rec.img.width))/(rec.bounds.h/(rec.img.naturalHeight||rec.img.height));
+  const content=l.waterSplashContentBounds||(l.waterSplashContentBounds=measureVisibleImageBounds(l.image));
+  drawJacketSplash5(c,l,content,waterSplashCut(zone,rec),b,flatAspect,preview);
+}
 function drawLayerStack(c,zone,b,preview=false){
   const z=zoneState(zone);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
-  (z.layers||[]).forEach(l=>{if(l.visible===false)return;if(isCutlineBottomArtwork(l)){drawWaterSplash2(c,zone,l,b,preview);return;}c.save();clipShirtSplash(c,product.id,zone,l,b);const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
+  (z.layers||[]).forEach(l=>{if(l.visible===false)return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(c,zone,l,b,preview);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(c,zone,l,b,preview);return;}c.save();clipShirtSplash(c,product.id,zone,l,b);const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,b);}
     else if(l.type==='text'){drawTextLayer(c,l,b);}c.restore();});
 }
@@ -878,7 +886,7 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
 }
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h},true);return c;}
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;if(isCutlineBottomArtwork(l)){drawWaterSplash2(x,zone,l,b,textMap.flat!==true);return;}x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='text'&&textMap.textScaleY)x.scale(1,textMap.textScaleY);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,textMap.textStyle?textMap.textStyle(l):l,b);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(x,zone,l,b,textMap.flat!==true);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(x,zone,l,b,textMap.flat!==true);return;}x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='text'&&textMap.textScaleY)x.scale(1,textMap.textScaleY);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,textMap.textStyle?textMap.textStyle(l):l,b);x.restore();});return c;}
 
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600,preview=false){
   // No per-type shifts or second text pass: preserve layer order, spacing,
