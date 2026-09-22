@@ -4,7 +4,7 @@ import {createHoodedLongSleevePanels,hoodedLongSleeveArtworkTransform} from './h
 let hoodedLongSleevePanels=null;
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
 import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
-import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
+import {createJacketZones,jacketProjection,setJacketPanelUvs} from './lightweight-jacket-renderer.js?v=surface-1';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
 import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js?v=back-1';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js?v=3';
@@ -1623,6 +1623,15 @@ function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const tar
 function rebuildJacketPreview(){
  clearDecals();garment.updateMatrixWorld(true);
  for(const [zone,target] of lightweightJacketZones){
+  if(zone==='Front'||zone==='Back'){
+   const state=zoneState(zone),artwork=makeCleanZoneArtworkCanvas(zone,1600,{imageFrame:layer=>jacketSplashPreviewFrame(zone,layer)});
+   const canvas=document.createElement('canvas');canvas.width=artwork.width;canvas.height=artwork.height;
+   const ctx=canvas.getContext('2d');ctx.fillStyle=state.background||'#FFFFFF';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(artwork,0,0);
+   if(!target.geometry.getAttribute('uv'))setJacketPanelUvs(target,zone);
+   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
+   target.material.map?.dispose();target.material.map=texture;target.material.color.set('#FFFFFF');target.material.needsUpdate=true;
+   continue;
+  }
   const state=zoneState(zone);target.material.color.set(state.background||'#FFFFFF');
   if(!state.layers.some(l=>l.visible!==false))continue;
   const canvas=makeCleanZoneArtworkCanvas(zone,1600,{imageFrame:layer=>jacketSplashPreviewFrame(zone,layer)}),tex=new THREE.CanvasTexture(canvas);

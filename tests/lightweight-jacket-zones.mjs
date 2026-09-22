@@ -11,11 +11,20 @@ assert.ok(matchesJacketGeometry(g.attributes.position,g.index));
 const changed=g.index.clone();changed.array[0]++;assert.equal(matchesJacketGeometry(g.attributes.position,changed),false,'Changed topology must not use stale ownership');
 const url=new URL('../v20/lightweight-jacket-renderer.js',import.meta.url);let code=fs.readFileSync(url,'utf8').replace("'three'",JSON.stringify(pathToFileURL(threePath).href)).replace("'./lightweight-jacket-zones.js'",JSON.stringify(new URL('../v20/lightweight-jacket-zones.js',import.meta.url).href));
 code=code.replace("'./lightweight-jacket-hood.js'",JSON.stringify(new URL('../v20/lightweight-jacket-hood.js',import.meta.url).href));
-const {createJacketZones,jacketProjection}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {createJacketZones,jacketProjection,setJacketPanelUvs}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 const root=new THREE.Group(),source=new THREE.Mesh(g,new THREE.MeshStandardMaterial());root.add(source);const zones=createJacketZones(source);
 assert.equal(zones.size,5);assert.equal(source.visible,false);assert.equal(new Set([...zones.values()].map(m=>m.material)).size,5);
 let total=0;for(const [zone,mesh] of zones){assert.ok(mesh.geometry.attributes.position.count>0);total+=mesh.geometry.attributes.position.count;const projection=jacketProjection(mesh,zone);assert.ok(projection.d.toArray().every(v=>Number.isFinite(v)&&v>0));}
 assert.ok(total>=g.index.count,'Hood crossing triangles can be subdivided');
+for(const zone of ['Front','Back']){
+ const mesh=zones.get(zone),before=mesh.geometry.attributes.position.array.slice();
+ setJacketPanelUvs(mesh,zone);
+ const uv=mesh.geometry.attributes.uv;
+ assert.equal(uv.count,mesh.geometry.attributes.position.count,'Every panel vertex receives artwork coordinates');
+ for(const value of uv.array)assert.ok(Number.isFinite(value)&&value>=-1e-6&&value<=1.000001,'UV stays in the artwork frame');
+ assert.deepEqual(mesh.geometry.attributes.position.array,before,'Surface mapping must preserve garment geometry');
+ assert.equal(mesh.material.side,THREE.DoubleSide,'Folded panel faces stay visible');
+}
 function area(geometry){let sum=0;const p=geometry.attributes.position,i=geometry.index,n=i?i.count:p.count;const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();for(let k=0;k<n;k+=3){a.fromBufferAttribute(p,i?i.getX(k):k);b.fromBufferAttribute(p,i?i.getX(k+1):k+1);c.fromBufferAttribute(p,i?i.getX(k+2):k+2);sum+=b.sub(a).cross(c.sub(a)).length()/2;}return sum;}
 assert.ok(Math.abs([...zones.values()].reduce((sum,m)=>sum+area(m.geometry),0)-area(g))<1e-6,'Clipped hood must conserve surface area');
 for(const [name,id] of [['Left Sleeve',2],['Right Sleeve',3]]){const output=zones.get(name).geometry.attributes.position;let k=0;for(let face=0;face<g.index.count/3;face++)if(jacketFaceZone(face)===id)for(let j=0;j<3;j++){const source=g.index.getX(face*3+j);assert.equal(output.getX(k),g.attributes.position.getX(source));assert.equal(output.getY(k),g.attributes.position.getY(source));assert.equal(output.getZ(k++),g.attributes.position.getZ(source));}assert.equal(k,output.count,'Sleeve geometry must stay unchanged');}

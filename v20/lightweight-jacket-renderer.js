@@ -3,6 +3,18 @@ import {jacketFaceZone,matchesJacketGeometry} from './lightweight-jacket-zones.j
 import {jacketHoodValue,splitJacketHood} from './lightweight-jacket-hood.js';
 
 export const jacketZones=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
+
+// Keep the established projection coordinates, but put artwork on the actual
+// panel surface. A separate, front-sided decal can disappear on folded faces.
+export function setJacketPanelUvs(mesh,zone){
+ const q=jacketProjection(mesh,zone),inverse=new THREE.Matrix4().makeRotationFromEuler(q.r).invert();
+ const positions=mesh.geometry.getAttribute('position'),uv=new Float32Array(positions.count*2),v=new THREE.Vector3();
+ for(let i=0;i<positions.count;i++){
+  v.fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld).sub(q.p).applyMatrix4(inverse);
+  uv[i*2]=v.x/q.d.x+.5;uv[i*2+1]=v.y/q.d.y+.5;
+ }
+ mesh.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+}
 // Pull the rear transition onto the hood, removing the hood-colored skirt
 // on the upper Back. Keep a continuous scalar for crack-free triangle clipping.
 function rearHoodValue(i,z){
