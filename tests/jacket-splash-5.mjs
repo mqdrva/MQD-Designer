@@ -19,7 +19,7 @@ const content=vm.runInContext('measureVisibleImageBounds(image)',ctx);
 function alphaBounds(canvas){const d=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let l=canvas.width,r=-1,b=-1;for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(d[(y*canvas.width+x)*4+3]>12){l=Math.min(l,x);r=Math.max(r,x);b=Math.max(b,y);}return{l,r,b};}
 for(const product of products.filter(p=>p.id==='lightweight-jacket')){
  ctx.product=product;
- for(const zone of ['Front']){
+ for(const zone of ['Front','Back']){
   const t=product.templates[zone];let rec=null;
   if(t.path&&product.id!=='sweat-pants'){
    const img=await loadImage(new URL('..'+t.path,import.meta.url));
@@ -43,6 +43,7 @@ for(const product of products.filter(p=>p.id==='lightweight-jacket')){
   vm.runInContext('drawJacketSplash5Layer(canvas.getContext("2d"),zone,layer,b,true)',ctx);
   const fb=alphaBounds(flat),pb=alphaBounds(preview);
   assert.ok(Math.abs((fb.b/h-cut.top)/(cut.bottom-cut.top)-pb.b/h)<.02,'hem matches across frames');
+  assert.ok(Math.abs(fb.l/w-cut.left)<.02&&Math.abs((fb.r+1)/w-cut.right)<.02,'flat artwork reaches both cut lines');
   assert.ok(fb.r>fb.l&&fb.b>0,product.id+'/'+zone+' flat visible');
   assert.ok(pb.r>pb.l&&pb.b>0,product.id+'/'+zone+' preview visible');
   assert.ok(pb.l<=5&&pb.r>=w-6&&pb.b>=h-6,product.id+'/'+zone+' reaches preview sides and hem '+JSON.stringify(pb));
@@ -51,6 +52,6 @@ for(const product of products.filter(p=>p.id==='lightweight-jacket')){
 }
 
 assert.equal(isJacketSplash5('tshirt','Front',ctx.layer),false);
-assert.equal(isJacketSplash5('lightweight-jacket','Back',ctx.layer),false);
+assert.equal(isJacketSplash5('lightweight-jacket','Back',ctx.layer),true);
 assert.equal(isJacketSplash5('lightweight-jacket','Front',{...ctx.layer,libraryLocked:false}),false);
 console.log('Jacket Splash 5 actual-image fit and isolation passed');

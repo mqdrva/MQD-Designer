@@ -1,8 +1,8 @@
 import {drawFittedSplash} from './water-splash-fit.js?v=grass-1';
 
-// Scoped to the reported front artwork; garment geometry and other art stay frozen.
+// Scoped to the front and back artwork; garment geometry and other art stay frozen.
 export function isJacketSplash5(productId,zone,layer){
-  return productId==='lightweight-jacket'&&zone==='Front'&&layer?.type==='image'&&
+  return productId==='lightweight-jacket'&&['Front','Back'].includes(zone)&&layer?.type==='image'&&
     layer.libraryLocked&&layer.libraryAssetId==='3599008d-9fe7-4c04-b65b-b65494f71aa7';
 }
 

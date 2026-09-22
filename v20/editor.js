@@ -6,7 +6,7 @@ import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panel
 import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection} from './lightweight-jacket-renderer.js';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
-import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js';
+import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js?v=back-1';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js?v=3';
 import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,shirtSplashCutFrame} from './shirt-splash-preview.js?v=2';
 import {isCutlineBottomArtwork,drawFittedSplash} from './water-splash-fit.js?v=grass-1';
