@@ -483,16 +483,23 @@ function patchCartItem(draftKey,patch){
 }
 
 async function runCartSync(draftKey,payload){
+  let localSaveError='';
   try{
     const preview=await mockupBlob();
-    await savePayloadToDrafts(draftKey,payload);
+    try{
+      await savePayloadToDrafts(draftKey,payload);
+    }catch(error){
+      localSaveError=error?.message||String(error);
+      console.warn('MQD local cart snapshot save skipped:',error);
+    }
     await saveCartCloudDesign(payload,payload.designId,{preview});
     const result=await submitDesignToBackend(payload,{retry:true,mockup:preview});
     if(!result?.orderNumber||!result?.designId)throw new Error('The upload did not return an order reference.');
     patchCartItem(draftKey,{designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,syncing:false,backendError:''});
   }catch(error){
     console.warn('MQD cart background sync deferred:',error);
-    patchCartItem(draftKey,{pendingSync:true,syncing:false,backendError:error?.message||String(error)});
+    const message=error?.message||String(error);
+    patchCartItem(draftKey,{pendingSync:true,syncing:false,backendError:localSaveError?message+' · Local backup: '+localSaveError:message});
   }finally{
     cartSyncJobs.delete(draftKey);
   }
