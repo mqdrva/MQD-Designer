@@ -1306,11 +1306,33 @@ function renderGarmentCopyControl(){
     $('cloneAllTool')?.parentElement?.appendChild(button);
   }
   button.hidden=!garmentCopyTargets().length;
-  button.disabled=hasLibraryArtwork();
-  button.title=hasLibraryArtwork()?'Remove MQD library artwork before copying this design to another garment.':'Copy Design to Another Garment';
+  button.disabled=false;
+  button.title=hasLibraryArtwork()
+    ?'Copy design to another garment. MQD Library artwork will use its approved destination placement.'
+    :'Copy Design to Another Garment';
+}
+async function garmentCopyLayer(layer,targetProduct,zone){
+  if(!layer.libraryAssetId){
+    return {...layer,id:'layer-'+layerSeq++,crop:layer.crop?{...layer.crop}:undefined};
+  }
+  const resolver=window.MQDArtworkLibrary?.assetForZone;
+  if(typeof resolver!=='function')throw new Error('The MQD Library is still loading. Please try again in a moment.');
+  const asset=await resolver(layer.libraryAssetId,targetProduct.id,zone);
+  if(!asset)return null;
+  if(asset.placementMode==='locked')return makeLockedLibraryCopy(layer,asset);
+  return {
+    ...layer,
+    id:'layer-'+layerSeq++,
+    src:asset.renderUrl||layer.src,
+    libraryLocked:false,
+    libraryCategory:asset.category||layer.libraryCategory||'artwork',
+    libraryPreset:asset.placementPreset||layer.libraryPreset||'full',
+    libraryStackOrder:Number(asset.stackOrder)||layer.libraryStackOrder||20,
+    libraryPlacements:asset.placements||{},
+    crop:layer.crop?{...layer.crop}:undefined
+  };
 }
 function openGarmentCopy(){
-  if(hasLibraryArtwork()){alert('MQD library artwork is approved for specific garment zones and cannot be copied automatically. Remove it, copy the design, then choose compatible artwork from the library on the destination garment.');return;}
   const targets=garmentCopyTargets();if(!targets.length)return;
   const source=product,dialog=document.createElement('dialog');
   dialog.setAttribute('aria-label','Copy Design to Another Garment');
@@ -1320,23 +1342,36 @@ function openGarmentCopy(){
   const select=document.createElement('select');select.id='copyGarmentTarget';Object.assign(select.style,{display:'block',width:'100%',margin:'10px 0',padding:'10px',font:'inherit'});
   for(const p of targets){const o=document.createElement('option');o.value=p.id;o.textContent=p.name;select.appendChild(o);}
   const details=document.createElement('p'),note=document.createElement('p');
-  note.textContent='Your original design stays intact. Placement is copied proportionally; review the preview because garment shapes differ.';
+  note.textContent='Your original design stays intact. Customer artwork and text copy proportionally. MQD Library artwork uses the approved placement for the destination garment when available.';
   const update=()=>{const target=targets.find(p=>p.id===select.value),matched=source.zones.filter(z=>target.zones.includes(z)),skipped=source.zones.filter(z=>!target.zones.includes(z)),empty=target.zones.filter(z=>!source.zones.includes(z));details.textContent='Copy: '+matched.join(', ')+'.'+(skipped.length?' Not transferred: '+skipped.join(', ')+'.':'')+(empty.length?' Starts blank: '+empty.join(', ')+'.':'');};select.onchange=update;update();
-  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'12px',justifyContent:'flex-end'});
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'12px',justifyContent:'flex-end',flexWrap:'wrap'});
   const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.onclick=()=>dialog.close();
   const copy=document.createElement('button');copy.type='button';copy.className='primary';copy.textContent='Copy & Preview';
-  copy.onclick=()=>{
+  copy.onclick=async()=>{
     const target=targets.find(p=>p.id===select.value);
     if(product.id!==source.id||!target)return;
     const existing=designs[target.id];
     const hasDesign=Object.values(existing?.zones||{}).some(z=>(z.layers||[]).length||(z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF');
     if(hasDesign&&!confirm('Replace the existing '+target.name+' design? Your '+source.name+' design will stay intact.'))return;
-    const sourceState=stateFor(source.id),zones={};
-    for(const zone of target.zones){
-      const original=source.zones.includes(zone)?sourceState.zones[zone]:null;
-      zones[zone]={background:original?.background||'#FFFFFF',layers:(original?.layers||[]).map(layer=>({...layer,id:'layer-'+layerSeq++,crop:layer.crop?{...layer.crop}:undefined}))};
+    const oldText=copy.textContent;copy.disabled=true;cancel.disabled=true;select.disabled=true;copy.textContent='Copying…';
+    try{
+      const sourceState=stateFor(source.id),zones={},skippedLibrary=[];
+      for(const zone of target.zones){
+        const original=source.zones.includes(zone)?sourceState.zones[zone]:null,layers=[];
+        for(const layer of original?.layers||[]){
+          const copied=await garmentCopyLayer(layer,target,zone);
+          if(copied)layers.push(copied);
+          else if(layer.libraryAssetId)skippedLibrary.push((layer.label||'MQD artwork')+' · '+zone);
+        }
+        zones[zone]={background:original?.background||'#FFFFFF',layers};
+      }
+      snapshot();designs[target.id]={zones};dialog.close();selectProduct(target.id);
+      if(skippedLibrary.length)alert('Design copied. These MQD Library items are not published for the destination garment/zone and were skipped: '+skippedLibrary.join(', ')+'.');
+    }catch(error){
+      console.error(error);
+      alert('The design could not be copied yet: '+(error?.message||String(error)));
+      copy.disabled=false;cancel.disabled=false;select.disabled=false;copy.textContent=oldText;
     }
-    snapshot();designs[target.id]={zones};dialog.close();selectProduct(target.id);
   };
   actions.append(cancel,copy);dialog.append(heading,label,select,details,note,actions);dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.appendChild(dialog);dialog.showModal();
 }
