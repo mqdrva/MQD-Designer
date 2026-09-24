@@ -331,6 +331,25 @@ async function saveCloudDesign(payload,{forceNew=false,name=null}={}){
   return data;
 }
 
+async function saveCartCloudDesign(payload,designId,{preview=null}={}){
+  const user=accountUser();if(!user)throw new Error('Please sign in first.');
+  const cloudPayload=await prepareCloudPayload(payload,designId,user.id);
+  let previewPath=null;
+  if(preview){
+    previewPath=`${user.id}/designs/${designId}/preview.png`;
+    await uploadCustomerArtwork(previewPath,preview);
+  }
+  const record={
+    id:designId,user_id:user.id,product_id:String(payload.product?.id||''),product_name:String(payload.product?.name||'Custom design'),
+    name:`${payload.product?.name||'Custom design'} — ${new Date().toLocaleDateString()}`,
+    status:'draft',design_json:cloudPayload,preview_path:previewPath,zone_colors:designColors(payload),
+    parent_design_id:null,version:1,updated_at:new Date().toISOString()
+  };
+  const {data,error}=await supabase.from('customer_designs').upsert(record,{onConflict:'id'}).select('id').single();
+  if(error)throw new Error(error.message);
+  return data;
+}
+
 async function saveDraft(){
   if(!requirePermanentAccount('Continue with Google or Email to save this design and reopen it from any device.',saveDraft))return;
   const btn=$('saveDraft');
@@ -448,6 +467,44 @@ async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
   return result;
 }
 
+const cartSyncJobs=new Map();
+
+function patchCartItem(draftKey,patch){
+  let changed=false;
+  const items=cartItems().map(item=>{
+    if(item.draftKey!==draftKey)return item;
+    changed=true;
+    return {...item,...patch};
+  });
+  if(!changed)return;
+  saveCart(items);
+  updateCartButton();
+  if(!$('cartOverlay')?.classList.contains('hidden'))renderCart();
+}
+
+async function runCartSync(draftKey,payload){
+  try{
+    const preview=await mockupBlob();
+    await savePayloadToDrafts(draftKey,payload);
+    await saveCartCloudDesign(payload,payload.designId,{preview});
+    const result=await submitDesignToBackend(payload,{retry:true,mockup:preview});
+    if(!result?.orderNumber||!result?.designId)throw new Error('The upload did not return an order reference.');
+    patchCartItem(draftKey,{designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,syncing:false,backendError:''});
+  }catch(error){
+    console.warn('MQD cart background sync deferred:',error);
+    patchCartItem(draftKey,{pendingSync:true,syncing:false,backendError:error?.message||String(error)});
+  }finally{
+    cartSyncJobs.delete(draftKey);
+  }
+}
+
+function startCartSync(draftKey,payload){
+  if(cartSyncJobs.has(draftKey))return cartSyncJobs.get(draftKey);
+  const job=runCartSync(draftKey,structuredClone(payload));
+  cartSyncJobs.set(draftKey,job);
+  return job;
+}
+
 async function addToCart(){
   if(!requireAccount('Create or sign into your account before adding this custom design to the cart.',addToCart))return;
   const btn=$('addToCart');
@@ -458,47 +515,43 @@ async function addToCart(){
     if(!selection.ok)throw new Error(selection.message);
     const payload=await captureDesignJSON();
     if(payload?.product?.id)payload.product.price=priceFor(payload.product.id,payload.product.price);
-    const cloudDesign=await saveCloudDesign(payload);
-    payload.designId=cloudDesign.id;
-    payload.orderOptions=selection.options;
-    payload.totalQuantity=selection.options.reduce((n,x)=>n+x.quantity,0);
-    let result=null;
-    let pendingSync=false;
-    let backendError='';
-    try{
-      result=await submitDesignToBackend(payload);
-    }catch(err){
-      pendingSync=true;
-      backendError=err?.message||String(err);
-      console.warn('MQD backend submission deferred:',err);
-    }
 
+    const designId=crypto.randomUUID();
     const localId=crypto.randomUUID();
     const draftKey='cart:'+localId;
-    await savePayloadToDrafts(draftKey,payload);
+    payload.designId=designId;
+    payload.orderOptions=selection.options;
+    payload.totalQuantity=selection.options.reduce((n,x)=>n+x.quantity,0);
 
     const items=cartItems();
     items.push({
-      designId:result?.designId||localId,
-      orderNumber:result?.orderNumber||('LOCAL-'+localId.slice(0,8).toUpperCase()),
+      designId,
+      orderNumber:'LOCAL-'+localId.slice(0,8).toUpperCase(),
       productId:payload.product?.id,
       productName:payload.product?.name,
       price:priceFor(payload.product?.id,payload.product?.price),
       orderOptions:payload.orderOptions,
       totalQuantity:payload.totalQuantity,
       addedAt:new Date().toISOString(),
-      pendingSync,
+      pendingSync:true,
+      syncing:true,
       draftKey,
-      backendError
+      backendError:''
     });
-    saveCart(items);updateCartButton();
+    saveCart(items);
+    updateCartButton();
+
     btn.textContent='Added ✓';
     setTimeout(()=>btn.textContent=old,1200);
-    if(pendingSync) alert('Added to cart. This design is saved safely on this device and will be synced to production storage when the backend connection is available.');
+
+    // Do the expensive uploads after the cart has already updated.
+    startCartSync(draftKey,payload);
   }catch(err){
     console.error(err);btn.textContent=old;
     alert('Could not add this design to cart: '+err.message);
-  }finally{btn.disabled=false;}
+  }finally{
+    btn.disabled=false;
+  }
 }
 
 let cartSyncInProgress=false;
@@ -514,46 +567,30 @@ async function loadCartDraft(key){
 async function retryPendingCart(){
   const user=accountUser();
   if(!user)throw new Error('Please sign in to sync your saved cart.');
-  for(const item of cartItems().filter(x=>x.pendingSync)){
-    let update;
-    try{
-      const payload=await hydrateLibraryArtwork(structuredClone(await loadCartDraft(item.draftKey)));
-      if(!payload?.designId||!payload.design?.zones)throw new Error('The saved cart design could not be found on this device.');
-      const {data:design,error}=await supabase.from('customer_designs').select('id,design_json,preview_path').eq('id',payload.designId).eq('user_id',user.id).single();
-      if(error||!design)throw new Error('Sign in with the account that saved this cart design.');
-      const snapshotJSON=value=>JSON.stringify(value,(key,value)=>['src','image','storagePath'].includes(key)?undefined:value);
-      const sameSnapshot=snapshotJSON(payload.design)===snapshotJSON(design.design_json?.design);
-      // Keep the cart snapshot, including its sizes and placement, not the current editor.
-      for(const [zone,state] of Object.entries(payload.design.zones)){
-        for(const layer of state.layers||[]){
-          if(layer.type!=='image')continue;
-          if(layer.libraryAssetId)continue;
-          if(layer.src?.startsWith('data:'))continue;
-          const savedLayer=design.design_json?.design?.zones?.[zone]?.layers?.find(x=>x.id===layer.id);
-          const path=layer.storagePath||(sameSnapshot?savedLayer?.storagePath:null);
-          if(!path)throw new Error('Saved artwork is unavailable. Reopen the saved design before trying again.');
-          const {data:blob,error:downloadError}=await supabase.storage.from('customer-artwork').download(path);
-          if(downloadError)throw new Error('Could not retrieve saved artwork: '+downloadError.message);
-          layer.src=await new Promise((resolve,reject)=>{
-            const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
-          });
-        }
-      }
-      // Never attach a mockup of a different garment currently open in the editor.
-      let mockup=null;
-      if(sameSnapshot&&design.preview_path){
-        const {data,error}=await supabase.storage.from('customer-artwork').download(design.preview_path);
-        if(error)throw new Error('Could not retrieve the saved preview: '+error.message);
-        mockup=data;
-      }
-      const result=await submitDesignToBackend(payload,{retry:true,mockup});
-      if(!result.orderNumber||!result.designId)throw new Error('The upload did not return an order reference.');
-      update={designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,backendError:''};
-    }catch(error){
-      update={pendingSync:true,backendError:error.message||String(error)};
+  for(const initial of cartItems().filter(x=>x.pendingSync)){
+    const activeJob=cartSyncJobs.get(initial.draftKey);
+    if(activeJob){
+      await activeJob;
+      const refreshed=cartItems().find(x=>x.draftKey===initial.draftKey);
+      if(refreshed&&!refreshed.pendingSync)continue;
     }
-    // Merge with current storage so additions made during upload are preserved.
-    saveCart(cartItems().map(x=>x.draftKey===item.draftKey?{...x,...update}:x));
+
+    const item=cartItems().find(x=>x.draftKey===initial.draftKey);
+    if(!item||!item.pendingSync)continue;
+
+    patchCartItem(item.draftKey,{syncing:true,backendError:''});
+    try{
+      const stored=await loadCartDraft(item.draftKey);
+      if(!stored?.design?.zones)throw new Error('The saved cart design could not be found on this device.');
+      const payload=await hydrateLibraryArtwork(structuredClone(stored));
+      payload.designId=item.designId||payload.designId||crypto.randomUUID();
+      await saveCartCloudDesign(payload,payload.designId);
+      const result=await submitDesignToBackend(payload,{retry:true,mockup:null});
+      if(!result?.orderNumber||!result?.designId)throw new Error('The upload did not return an order reference.');
+      patchCartItem(item.draftKey,{designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,syncing:false,backendError:''});
+    }catch(error){
+      patchCartItem(item.draftKey,{pendingSync:true,syncing:false,backendError:error?.message||String(error)});
+    }
   }
 }
 
@@ -592,7 +629,7 @@ function renderCart(){
   list.innerHTML=items.map((item,index)=>{
     const quantity=Number(item.totalQuantity)||1;
     const options=(item.orderOptions||[]).map(option=>`<span>${escapeHtml(option.size||'Item')} × ${Number(option.quantity)||1}</span>`).join('');
-    const syncState=item.pendingSync?'<div class="cart-sync pending">Saved locally · sync required before checkout</div>':'<div class="cart-sync ready">Ready for checkout</div>';
+    const syncState=item.syncing?'<div class="cart-sync pending">Syncing design…</div>':item.pendingSync?'<div class="cart-sync pending">Saved locally · sync required before checkout</div>':'<div class="cart-sync ready">Ready for checkout</div>';
     return `<article class="cart-item"><div class="cart-item-main"><div class="cart-item-heading"><h3>${escapeHtml(item.productName||'Custom product')}</h3><strong>$${((Number(item.price)||0)*quantity).toFixed(2)}</strong></div><div class="cart-item-options">${options||`<span>Quantity × ${quantity}</span>`}</div><div class="cart-reference">Ref: ${escapeHtml(item.orderNumber||'Pending')}</div>${syncState}</div><button class="btn danger cart-remove" type="button" data-cart-remove="${index}" aria-label="Remove ${escapeHtml(item.productName||'item')} from cart">Remove</button></article>`;
   }).join('');
   empty?.classList.toggle('hidden',items.length>0);
