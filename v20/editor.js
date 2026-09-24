@@ -1311,12 +1311,21 @@ function renderGarmentCopyControl(){
     ?'Copy design to another garment. MQD Library artwork will use its approved destination placement.'
     :'Copy Design to Another Garment';
 }
+async function waitForLibraryAssetResolver(timeoutMs=5000){
+  const started=Date.now();
+  while(Date.now()-started<timeoutMs){
+    const resolver=window.MQDArtworkLibrary?.assetForZone;
+    if(typeof resolver==='function')return resolver;
+    await new Promise(resolve=>setTimeout(resolve,75));
+  }
+  return null;
+}
 async function garmentCopyLayer(layer,targetProduct,zone){
   if(!layer.libraryAssetId){
     return {...layer,id:'layer-'+layerSeq++,crop:layer.crop?{...layer.crop}:undefined};
   }
-  const resolver=window.MQDArtworkLibrary?.assetForZone;
-  if(typeof resolver!=='function')throw new Error('The MQD Library is still loading. Please try again in a moment.');
+  const resolver=await waitForLibraryAssetResolver();
+  if(typeof resolver!=='function')throw new Error('The MQD Library could not finish loading. Please close this window and try Copy to Garment again.');
   const asset=await resolver(layer.libraryAssetId,targetProduct.id,zone);
   if(!asset)return null;
   if(asset.placementMode==='locked')return makeLockedLibraryCopy(layer,asset);
