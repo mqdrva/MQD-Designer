@@ -228,11 +228,15 @@ async function libraryAssetsForZone(productId,zone){
   const pending=libraryRequest({action:'catalog',productId,zone}).then(result=>result.assets||[]).catch(error=>{libraryZoneCache.delete(key);throw error;});
   libraryZoneCache.set(key,pending);return pending;
 }
+async function assetForZone(assetId,productId,zone){
+  const assets=await libraryAssetsForZone(productId,zone);
+  return assets.find(row=>row.id===assetId)||null;
+}
 async function lockedAssetForZone(assetId,productId,zone){
-  const assets=await libraryAssetsForZone(productId,zone),asset=assets.find(row=>row.id===assetId);
+  const asset=await assetForZone(assetId,productId,zone);
   return asset?.placementMode==='locked'?asset:null;
 }
-window.MQDArtworkLibrary={...(window.MQDArtworkLibrary||{}),lockedAssetForZone};
+window.MQDArtworkLibrary={...(window.MQDArtworkLibrary||{}),assetForZone,lockedAssetForZone};
 function filteredLibraryAssets(){
   const query=($('artworkLibrarySearch')?.value||'').trim().toLowerCase(),category=$('artworkLibraryCategory')?.value||'all';
   return libraryAssets.filter(asset=>(category==='all'||asset.category===category)&&(!query||`${asset.name} ${asset.category}`.toLowerCase().includes(query)));
