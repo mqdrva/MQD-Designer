@@ -1058,7 +1058,17 @@ function selectionGeometry(l,q){
   const raw=[[q.x,q.y],[q.x+q.w,q.y],[q.x+q.w,q.y+q.h],[q.x,q.y+q.h]];
   const corners=raw.map(([x,y])=>rotateSelectionPoint(x,y,cx,cy,a));
   const top=rotateSelectionPoint(q.x+q.w/2,q.y,cx,cy,a),rotateHandle=rotateSelectionPoint(q.x+q.w/2,q.y-34,cx,cy,a);
-  return{corners,top,rotateHandle,resizeHandle:corners[2]};
+  const edgeRaw=[
+    [q.x,q.y+q.h/2,'l'],
+    [q.x+q.w,q.y+q.h/2,'r'],
+    [q.x+q.w/2,q.y,'t'],
+    [q.x+q.w/2,q.y+q.h,'b']
+  ];
+  const cropHandles=[
+    {...corners[0],id:'tl'},{...corners[1],id:'tr'},{...corners[2],id:'br'},{...corners[3],id:'bl'},
+    ...edgeRaw.map(([x,y,id])=>({...rotateSelectionPoint(x,y,cx,cy,a),id}))
+  ];
+  return{corners,top,rotateHandle,resizeHandles:corners,cropHandles};
 }
 function drawSelectionOverlay(){
   const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.lineWidth=2;
@@ -1066,12 +1076,17 @@ function drawSelectionOverlay(){
     const g=selectionGeometry(l,q);ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText('Locked',g.corners[0].x,g.corners[0].y-9);
   }else if(cropMode&&l.type==='image'){
-    ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.strokeRect(q.x,q.y,q.w,q.h);ctx.setLineDash([]);
-    for(const [x,y] of[[q.x,q.y],[q.x+q.w,q.y],[q.x,q.y+q.h],[q.x+q.w,q.y+q.h]]){ctx.fillStyle='#fff';ctx.strokeStyle='#ff6b00';ctx.beginPath();ctx.rect(x-6,y-6,12,12);ctx.fill();ctx.stroke();}
+    const g=selectionGeometry(l,q);
+    ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
+    for(const handle of g.cropHandles){
+      const side=handle.id.length===1,size=side?10:12;
+      ctx.fillStyle='#fff';ctx.strokeStyle='#ff6b00';ctx.beginPath();ctx.rect(handle.x-size/2,handle.y-size/2,size,size);ctx.fill();ctx.stroke();
+    }
   }else{
     const g=selectionGeometry(l,q);ctx.strokeStyle='#1b78ff';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
     ctx.beginPath();ctx.moveTo(g.top.x,g.top.y);ctx.lineTo(g.rotateHandle.x,g.rotateHandle.y);ctx.stroke();
-    ctx.fillStyle='#fff';ctx.strokeStyle='#1b78ff';ctx.beginPath();ctx.rect(g.resizeHandle.x-6,g.resizeHandle.y-6,12,12);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#fff';ctx.strokeStyle='#1b78ff';
+    for(const handle of g.resizeHandles){ctx.beginPath();ctx.rect(handle.x-6,handle.y-6,12,12);ctx.fill();ctx.stroke();}
     ctx.beginPath();ctx.arc(g.rotateHandle.x,g.rotateHandle.y,7,0,Math.PI*2);ctx.fill();ctx.stroke();
   }
   ctx.restore();
@@ -2020,8 +2035,54 @@ $('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').on
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();const arr=zoneState().layers;arr.splice(arr.findIndex(x=>x.id===l.id),1);activeLayerId=arr.at(-1)?.id||null;renderAll();};$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
 function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
-editorCanvas.addEventListener('pointerdown',e=>{const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l))return;const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=18;snapshot();let mode='move',corner=null;if(cropMode&&l.type==='image'){const hs=[[q.x,q.y,'tl'],[q.x+q.w,q.y,'tr'],[q.x,q.y+q.h,'bl'],[q.x+q.w,q.y+q.h,'br']];const hit=hs.find(h=>near(h[0],h[1]));if(hit){mode='crop';corner=hit[2];}}else{const g=selectionGeometry(l,q);if(near(g.rotateHandle.x,g.rotateHandle.y))mode='rotate';else if(near(g.resizeHandle.x,g.resizeHandle.y))mode='resize';}dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,rotation:Number(l.rotation)||0,startAngle:Math.atan2(p.y-q.cy,p.x-q.cx),crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');});
-editorCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const l=activeLayer();if(!l)return;const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;if(dragState.mode==='move'){l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));}else if(dragState.mode==='resize'){const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);l.scale=Math.max(.05,Math.min(maxLayerScale(l),dragState.scale*d1/d0));}else if(dragState.mode==='rotate'){const angle=Math.atan2(p.y-q.cy,p.x-q.cx),delta=(angle-dragState.startAngle)*180/Math.PI;let value=dragState.rotation+delta;if(e.shiftKey)value=Math.round(value/15)*15;l.rotation=Math.round(((value+180)%360+360)%360-180);}else if(dragState.mode==='crop'&&l.type==='image'){const c={...dragState.crop},fx=dx/Math.max(40,q.fullW||q.w),fy=dy/Math.max(40,q.fullH||q.h),corner=dragState.corner;if(corner.includes('l'))c.left=Math.max(0,Math.min(.45,(dragState.crop.left||0)+fx));if(corner.includes('r'))c.right=Math.max(0,Math.min(.45,(dragState.crop.right||0)-fx));if(corner.includes('t'))c.top=Math.max(0,Math.min(.45,(dragState.crop.top||0)+fy));if(corner.includes('b'))c.bottom=Math.max(0,Math.min(.45,(dragState.crop.bottom||0)-fy));if(c.left+c.right<.9&&c.top+c.bottom<.9)l.crop=c;}drawEditor();renderLayerPanel();scheduleGarmentPreview();});
+function localDragDelta(dx,dy,rotation=0){
+  const a=-(Number(rotation)||0)*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
+  return{x:dx*co-dy*si,y:dx*si+dy*co};
+}
+function clampCropValue(value,opposite){
+  return Math.max(0,Math.min(.88-Math.max(0,Number(opposite)||0),value));
+}
+editorCanvas.addEventListener('pointerdown',e=>{
+  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l))return;
+  const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=22,g=selectionGeometry(l,q);
+  snapshot();
+  let mode='move',corner=null;
+  if(cropMode&&l.type==='image'){
+    const hit=g.cropHandles.find(h=>near(h.x,h.y));
+    if(hit){mode='crop';corner=hit.id;}
+  }else{
+    if(near(g.rotateHandle.x,g.rotateHandle.y))mode='rotate';
+    else{
+      const hit=g.resizeHandles.find(h=>near(h.x,h.y));
+      if(hit)mode='resize';
+    }
+  }
+  dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,rotation:Number(l.rotation)||0,startAngle:Math.atan2(p.y-q.cy,p.x-q.cx),crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};
+  editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');
+});
+editorCanvas.addEventListener('pointermove',e=>{
+  if(!dragState)return;const l=activeLayer();if(!l)return;
+  const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;
+  if(dragState.mode==='move'){
+    l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));
+  }else if(dragState.mode==='resize'){
+    const d0=Math.hypot(dragState.start.x-q.cx,dragState.start.y-q.cy)||1,d1=Math.hypot(p.x-q.cx,p.y-q.cy);
+    l.scale=Math.max(.05,Math.min(maxLayerScale(l),dragState.scale*d1/d0));
+  }else if(dragState.mode==='rotate'){
+    const angle=Math.atan2(p.y-q.cy,p.x-q.cx),delta=(angle-dragState.startAngle)*180/Math.PI;let value=dragState.rotation+delta;
+    if(e.shiftKey)value=Math.round(value/15)*15;l.rotation=Math.round(((value+180)%360+360)%360-180);
+  }else if(dragState.mode==='crop'&&l.type==='image'){
+    const c={...dragState.crop},local=localDragDelta(dx,dy,dragState.rotation),fx=local.x/Math.max(40,q.fullW||q.w),fy=local.y/Math.max(40,q.fullH||q.h),handle=dragState.corner||'';
+    // Only the edge(s) represented by the handle move. The opposite crop
+    // values stay untouched, so dragging one side never crops the other side.
+    if(handle.includes('l'))c.left=clampCropValue((dragState.crop.left||0)+fx,dragState.crop.right);
+    if(handle.includes('r'))c.right=clampCropValue((dragState.crop.right||0)-fx,dragState.crop.left);
+    if(handle.includes('t'))c.top=clampCropValue((dragState.crop.top||0)+fy,dragState.crop.bottom);
+    if(handle.includes('b'))c.bottom=clampCropValue((dragState.crop.bottom||0)-fy,dragState.crop.top);
+    l.crop=c;
+  }
+  drawEditor();renderLayerPanel();scheduleGarmentPreview();
+});
 editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
 
 function designJSON(){
