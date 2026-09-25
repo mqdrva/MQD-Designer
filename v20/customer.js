@@ -347,7 +347,7 @@ async function saveCartCloudDesign(payload,designId,{preview=null}={}){
   };
   const {data,error}=await supabase.from('customer_designs').upsert(record,{onConflict:'id'}).select('id').single();
   if(error)throw new Error(error.message);
-  return data;
+  return {data,cloudPayload,previewPath};
 }
 
 async function saveDraft(){
@@ -492,8 +492,8 @@ async function runCartSync(draftKey,payload){
       localSaveError=error?.message||String(error);
       console.warn('MQD local cart snapshot save skipped:',error);
     }
-    await saveCartCloudDesign(payload,payload.designId,{preview});
-    const result=await submitDesignToBackend(payload,{retry:true,mockup:preview});
+    const saved=await saveCartCloudDesign(payload,payload.designId,{preview});
+    const result=await submitDesignToBackend(saved.cloudPayload,{retry:true,mockup:null});
     if(!result?.orderNumber||!result?.designId)throw new Error('The upload did not return an order reference.');
     patchCartItem(draftKey,{designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,syncing:false,backendError:''});
   }catch(error){
@@ -591,8 +591,8 @@ async function retryPendingCart(){
       if(!stored?.design?.zones)throw new Error('The saved cart design could not be found on this device.');
       const payload=await hydrateLibraryArtwork(structuredClone(stored));
       payload.designId=item.designId||payload.designId||crypto.randomUUID();
-      await saveCartCloudDesign(payload,payload.designId);
-      const result=await submitDesignToBackend(payload,{retry:true,mockup:null});
+      const saved=await saveCartCloudDesign(payload,payload.designId);
+      const result=await submitDesignToBackend(saved.cloudPayload,{retry:true,mockup:null});
       if(!result?.orderNumber||!result?.designId)throw new Error('The upload did not return an order reference.');
       patchCartItem(item.draftKey,{designId:result.designId,orderNumber:result.orderNumber,pendingSync:false,syncing:false,backendError:''});
     }catch(error){
