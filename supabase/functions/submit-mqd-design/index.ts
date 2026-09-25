@@ -11,7 +11,7 @@ function hasGoogleIdentity(user:any){const providers=Array.isArray(user?.app_met
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  const url=Deno.env.get('SUPABASE_URL')||'',key=serviceKey();
- if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:7});
+ if(req.method==='GET')return json({ok:true,service:'submit-mqd-design',version:8});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try{
   if(!url||!key)return json({error:'Backend service credentials are not configured'},500);
@@ -37,9 +37,11 @@ Deno.serve(async(req:Request)=>{
    else layer.libraryLocked=false;
    delete layer.src;delete layer.storagePath;libraryJobs.push({zone,layer,asset,placement});
   }
-  const {data:design,error:designError}=await supabase.from('customer_designs').select('id').eq('id',designId).eq('user_id',user.id).maybeSingle();
+  const {data:design,error:designError}=await supabase.from('customer_designs').select('id,preview_path').eq('id',designId).eq('user_id',user.id).maybeSingle();
   if(designError)return json({error:designError.message,stage:'design_lookup'},500);
   if(!design)return json({error:'The saved design does not belong to this account'},403);
+  const customerPrefix=`${user.id}/designs/${designId}/`;
+  const validCustomerPath=(path:unknown)=>typeof path==='string'&&path.startsWith(customerPrefix)&&!path.includes('..');
   const backgrounds:Record<string,string>={};
   for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))backgrounds[zone]=String(state?.background||'#FFFFFF').toUpperCase();
   const {data:order,error:orderErr}=await supabase.from('mqd_orders').insert({user_id:user.id,design_id:designId,status:'submitted',customer_email:user.email||null,product_id:String(p.id),product_name:String(p.name),product_price:Number(p.price)||null,engine_calibration:String(payload?.engine?.calibration||''),design_json:payload,background_colors:backgrounds}).select('id,order_number').single();
@@ -49,10 +51,16 @@ Deno.serve(async(req:Request)=>{
   const {error:itemErr}=await supabase.from('mqd_order_items').insert({order_id:order.id,design_id:designId,product_id:String(p.id),product_name:String(p.name),unit_price:Number(p.price)||null,quantity,order_options:orderOptions});
   if(itemErr)return json({error:itemErr.message,stage:'order_item_insert'},500);
   let mockupPath:string|null=null;const mockup=form.get('mockup');
-  if(mockup instanceof File&&mockup.size){
-   if(mockup.size>12*1024*1024)return json({error:'Mockup image is too large',stage:'mockup'},400);
+  let productionMockup:Blob|null=mockup instanceof File&&mockup.size?mockup:null;
+  if(!productionMockup&&validCustomerPath(design.preview_path)){
+   const {data:storedPreview,error:previewDownloadError}=await supabase.storage.from('customer-artwork').download(design.preview_path);
+   if(previewDownloadError)return json({error:previewDownloadError.message,stage:'saved_mockup_download'},500);
+   productionMockup=storedPreview;
+  }
+  if(productionMockup&&productionMockup.size){
+   if(productionMockup.size>12*1024*1024)return json({error:'Mockup image is too large',stage:'mockup'},400);
    mockupPath=`${order.id}/mockup.png`;
-   const {error}=await supabase.storage.from('mqd-production').upload(mockupPath,mockup,{contentType:'image/png',upsert:true});
+   const {error}=await supabase.storage.from('mqd-production').upload(mockupPath,productionMockup,{contentType:'image/png',upsert:true});
    if(error)return json({error:error.message,stage:'mockup_upload'},500);
    const {error:updateErr}=await supabase.from('mqd_orders').update({mockup_path:mockupPath}).eq('id',order.id);
    if(updateErr)return json({error:updateErr.message,stage:'order_update'},500);
@@ -67,6 +75,29 @@ Deno.serve(async(req:Request)=>{
    if(upErr)return json({error:upErr.message,stage:'asset_upload'},500);
    const {error:assetErr}=await supabase.from('mqd_order_assets').insert({order_id:order.id,zone_name:String(meta.zone||''),layer_id:String(meta.layerId||''),layer_type:'image',original_filename:file.name,storage_path:path,mime_type:file.type,background_hex:backgrounds[String(meta.zone||'')]||null,metadata:meta});
    if(assetErr)return json({error:assetErr.message,stage:'asset_insert'},500);
+  }
+  const uploadedLayerIds=new Set(metaRaw.map(raw=>{try{return String(JSON.parse(raw||'{}').layerId||'');}catch{return'';}}).filter(Boolean));
+  let savedAssetIndex=files.length;
+  for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))for(const layer of state?.layers||[]){
+   if(layer?.type!=='image'||layer?.libraryAssetId||uploadedLayerIds.has(String(layer.id||'')))continue;
+   const paths:Array<{path:string;kind:string}>=[];
+   if(validCustomerPath(layer.storagePath))paths.push({path:String(layer.storagePath),kind:layer.backgroundRemoved===true?'background-removed':'artwork'});
+   if(validCustomerPath(layer.originalStoragePath)&&layer.originalStoragePath!==layer.storagePath)paths.push({path:String(layer.originalStoragePath),kind:'original-source'});
+   if(!paths.length)return json({error:`Saved artwork is unavailable for ${zone}`,stage:'saved_asset_path'},400);
+   for(const source of paths){
+    const {data:blob,error:downloadError}=await supabase.storage.from('customer-artwork').download(source.path);
+    if(downloadError||!blob)return json({error:downloadError?.message||'Saved artwork could not be loaded',stage:'saved_asset_download'},500);
+    if(blob.size>20*1024*1024)return json({error:'Artwork file is too large',stage:'saved_asset_validation'},400);
+    const filename=safe(source.path.split('/').pop()||'artwork.png'),contentType=mimeFor(blob,source.path);
+    if(!['image/png','image/jpeg','image/webp'].includes(contentType))return json({error:`Unsupported artwork type: ${contentType||'unknown'}`,stage:'saved_asset_validation'},400);
+    savedAssetIndex++;
+    const path=`${order.id}/${safe(String(zone||'zone'))}/${String(savedAssetIndex).padStart(2,'0')}-${filename}`;
+    const {error:upErr}=await supabase.storage.from('mqd-production').upload(path,blob,{contentType,upsert:true});
+    if(upErr)return json({error:upErr.message,stage:'saved_asset_upload'},500);
+    const metadata={...layer,zone,layerId:String(layer.id||''),kind:source.kind,source:'customer-artwork'};delete metadata.src;delete metadata.image;delete metadata.storagePath;delete metadata.originalStoragePath;
+    const {error:assetErr}=await supabase.from('mqd_order_assets').insert({order_id:order.id,zone_name:String(zone),layer_id:String(layer.id||''),layer_type:'image',original_filename:filename,storage_path:path,mime_type:contentType,background_hex:backgrounds[String(zone)]||null,metadata});
+    if(assetErr)return json({error:assetErr.message,stage:'saved_asset_insert'},500);
+   }
   }
   for(let i=0;i<libraryJobs.length;i++){
    const job=libraryJobs[i],{data:master,error:downloadError}=await supabase.storage.from('mqd-library-assets').download(job.asset.master_path);
