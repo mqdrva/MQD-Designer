@@ -1285,7 +1285,7 @@ function renderLayerPanel(){
     }
   }
   imageQuick?.querySelectorAll('button').forEach(button=>button.disabled=locked);
-  if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
+  if(isText){$('textValue').value=l.text||'';$('textFont').value=l.font||'Inter';syncTextFontPreview(l.font||'Inter');$('textColor').value=(l.color||'#111111').toLowerCase();$('textStrokeColor').value=(l.strokeColor||'#FFFFFF').toLowerCase();$('textStrokeWidth').value=Number(l.strokeWidth)||0;$('textStrokeWidthVal').textContent=Number(l.strokeWidth)||0;$('textLetterSpacing').value=Number(l.letterSpacing)||0;$('textLetterSpacingVal').textContent=Number(l.letterSpacing)||0;$('textBold').classList.toggle('primary',l.bold!==false);$('textItalic').classList.toggle('primary',!!l.italic);$('textAlign').value=l.align||'center';}
 }
 
 function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZone;$('zoneSize').textContent=t?.width&&t?.height?`${t.width.toLocaleString()} × ${t.height.toLocaleString()} px`:'Custom zone';const c=zoneState().background||'#FFFFFF';$('zoneColor').value=c.toLowerCase();$('zoneHex').value=c;}
@@ -1951,8 +1951,59 @@ $('duplicateTool')?.addEventListener('click',e=>{e.stopPropagation();openDuplica
 $('resetTool')?.addEventListener('click',resetActive);
 $('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.addEventListener('click',()=>nudgeActive(0,2));$('nudgeLeft')?.addEventListener('click',()=>nudgeActive(-2,0));$('nudgeRight')?.addEventListener('click',()=>nudgeActive(2,0));$('nudgeCenter')?.addEventListener('click',alignActive);
 
-function initTextFonts(){const sel=$('textFont');if(!sel)return;sel.innerHTML=TEXT_FONTS.map(f=>`<option value="${f}">${f}</option>`).join('');}
-function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'&&document.fonts?.load)document.fonts.load(`32px "${val}"`).finally(()=>renderAll());else renderAll();}
+function syncTextFontPreview(font='Inter'){
+  const button=$('textFontPreviewButton');if(!button)return;
+  button.textContent=font+'  ▾';
+  button.style.fontFamily=`"${font}", sans-serif`;
+}
+function openTextFontPicker(){
+  const layer=activeLayer();if(!layer||layer.type!=='text')return;
+  document.getElementById('textFontPickerDialog')?.remove();
+  const dialog=document.createElement('dialog');dialog.id='textFontPickerDialog';dialog.className='font-picker-dialog';dialog.setAttribute('aria-label','Choose a font');
+  const head=document.createElement('div');head.className='font-picker-head';
+  const title=document.createElement('div');title.innerHTML='<strong>Choose a font</strong><span>Each name is shown in that font.</span>';
+  const close=document.createElement('button');close.type='button';close.className='font-picker-close';close.textContent='×';close.setAttribute('aria-label','Close font picker');close.onclick=()=>dialog.close();
+  head.append(title,close);
+  const search=document.createElement('input');search.type='search';search.className='input font-picker-search';search.placeholder='Search fonts';search.setAttribute('aria-label','Search fonts');
+  const list=document.createElement('div');list.className='font-picker-list';
+  const render=(query='')=>{
+    const q=query.trim().toLowerCase();list.innerHTML='';
+    for(const font of TEXT_FONTS.filter(name=>!q||name.toLowerCase().includes(q))){
+      const button=document.createElement('button');button.type='button';button.className='font-picker-option';button.dataset.font=font;button.textContent=font;
+      button.style.fontFamily=`"${font}", sans-serif`;
+      if((layer.font||'Inter')===font)button.classList.add('selected');
+      button.onclick=()=>{
+        snapshot();
+        $('textFont').value=font;
+        syncTextFontPreview(font);
+        updateTextProp('font',font);
+        dialog.close();
+      };
+      list.appendChild(button);
+      document.fonts?.load?.(`24px "${font}"`).catch(()=>{});
+    }
+  };
+  search.addEventListener('input',()=>render(search.value));
+  dialog.append(head,search,list);
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  document.body.appendChild(dialog);render();
+  dialog.showModal();
+  setTimeout(()=>search.focus(),0);
+}
+function initTextFonts(){
+  const sel=$('textFont');if(!sel)return;
+  sel.innerHTML='';
+  for(const font of TEXT_FONTS){
+    const option=document.createElement('option');option.value=font;option.textContent=font;option.style.fontFamily=`"${font}", sans-serif`;sel.appendChild(option);
+  }
+  sel.classList.add('font-native-select');
+  let preview=$('textFontPreviewButton');
+  if(!preview){
+    preview=document.createElement('button');preview.id='textFontPreviewButton';preview.type='button';preview.className='input font-picker-trigger';preview.setAttribute('aria-haspopup','dialog');preview.setAttribute('aria-label','Choose font');preview.onclick=openTextFontPicker;sel.insertAdjacentElement('afterend',preview);
+  }
+  syncTextFontPreview(sel.value||'Inter');
+}
+function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px "${val}"`).finally(()=>renderAll());else renderAll();}else renderAll();}
 $('textValue')?.addEventListener('input',e=>updateTextProp('text',e.target.value));
 $('textFont')?.addEventListener('change',e=>updateTextProp('font',e.target.value));
 $('textColor')?.addEventListener('input',e=>updateTextProp('color',e.target.value.toUpperCase()));
