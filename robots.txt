@@ -2,7 +2,9 @@ User-agent: *
 Allow: /
 Disallow: /owner
 Disallow: /owner-orders.html
+Disallow: /owner-backup.html
 Disallow: /library-admin.html
 Disallow: /order-confirmation.html
+Disallow: /*?owner=1
 
 Sitemap: https://mymerchnow.app/sitemap.xml
