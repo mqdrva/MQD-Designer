@@ -1134,7 +1134,10 @@ async function removeBackgroundActive(){
    const source=await fetch(layer.src);if(!source.ok)throw new Error('The uploaded artwork could not be read.');
    const blob=await source.blob();
    const form=new FormData();form.append('image_file',blob,layer.filename||'artwork.png');
-   const response=await fetch(MQD_REMOVE_BACKGROUND_URL,{method:'POST',headers:{apikey:MQD_SUPABASE_PUBLISHABLE_KEY},body:form});
+   const accessToken=await window.MQDCustomerAuth?.getAccessToken?.().catch?.(()=> '')||'';
+   const headers={apikey:MQD_SUPABASE_PUBLISHABLE_KEY};
+   if(accessToken)headers.Authorization='Bearer '+accessToken;
+   const response=await fetch(MQD_REMOVE_BACKGROUND_URL,{method:'POST',headers,body:form});
    if(!response.ok){
      const result=await response.json().catch(()=>({}));
      throw new Error(result.error||'Background removal could not finish.');
