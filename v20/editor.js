@@ -146,6 +146,7 @@ function ensureTemplateImage(zone=activeZone){
   if(!t?.path)return null;
   const jacketSleeve=product.id==='lightweight-jacket'&&zone.includes('Sleeve');
   const jacketBack=product.id==='lightweight-jacket'&&zone==='Back';
+  const jacketFront=product.id==='lightweight-jacket'&&zone==='Front';
   const hoodMaskBody=product.id==='hood-mask-shirt'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const hoodedLongBody=product.id==='hooded-long-sleeve'&&['Front','Back','Left Sleeve','Right Sleeve'].includes(zone);
   const tshirtBody2d=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
@@ -172,6 +173,26 @@ function ensureTemplateImage(zone=activeZone){
         }
       }
       const built=buildTemplateMask(buildSource,zone,jacketSleeve,jacketBack,solidBodyTemplate,poloSleeve2d);
+      if(jacketFront){
+        // Trace the red perimeter, not the template's grid, pockets or zipper.
+        // Only replace the flat clipping mask; keep approved artwork/3D bounds.
+        const mask=document.createElement('canvas');
+        mask.width=built.maskCanvas.width;mask.height=built.maskCanvas.height;
+        const mx=mask.getContext('2d');
+        mx.scale(mask.width/796,mask.height/878);
+        mx.beginPath();mx.moveTo(138,125);mx.lineTo(300,62);
+        mx.bezierCurveTo(316,121,346,142,413,151);
+        mx.bezierCurveTo(480,142,510,121,527,62);
+        mx.lineTo(689,125);
+        mx.bezierCurveTo(666,201,660,265,688,297);
+        mx.bezierCurveTo(704,314,729,319,756,320);
+        mx.lineTo(756,812);
+        mx.bezierCurveTo(543,820,282,820,69,812);
+        mx.lineTo(69,320);
+        mx.bezierCurveTo(96,319,121,314,138,297);
+        mx.bezierCurveTo(166,265,160,201,138,125);
+        mx.closePath();mx.fill();built.maskCanvas=mask;
+      }
       if(poloSleeve2d){
         // Correct the flat silhouette without rescaling approved 3D artwork.
         const previous=buildTemplateMask(buildSource,zone).bounds;
