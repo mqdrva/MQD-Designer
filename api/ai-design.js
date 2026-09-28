@@ -119,7 +119,7 @@ export default async function handler(req,res){
     const apiKey=process.env.OPENAI_API_KEY;
     if(!apiKey)return send(res,503,{error:'AI Designer is installed but the server API key has not been connected yet.',code:'AI_KEY_MISSING'});
 
-    const model=process.env.OPENAI_MODEL||'gpt-5.6-luna';
+    const aiModel=process.env.OPENAI_MODEL||'gpt-5.6-luna';
     const userContext={
       mode,
       message,
@@ -132,7 +132,7 @@ export default async function handler(req,res){
       method:'POST',
       headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
       body:JSON.stringify({
-        model,
+        model:aiModel,
         input:[
           {role:'system',content:[{type:'input_text',text:SYSTEM}]},
           {role:'user',content:[{type:'input_text',text:JSON.stringify(userContext)}]}
@@ -155,7 +155,7 @@ export default async function handler(req,res){
       return send(res,502,{error:'The AI designer returned an invalid draft.'});
     }
     const plan=sanitizePlan(parsed,{fallbackProductId:currentProductId});
-    return send(res,200,{plan,model});
+    return send(res,200,{plan,model:aiModel});
   }catch(error){
     console.error('AI designer request failed',error);
     return send(res,500,{error:'The AI designer request failed.'});
