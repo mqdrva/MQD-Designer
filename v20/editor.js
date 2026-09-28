@@ -1,4 +1,4 @@
-import {installFlatMockup} from './flat-mockup.js?v=1';
+import {installFlatMockup} from './flat-mockup.js?v=2';
 let flatMockup=null;
 import {createHoodMaskPanels} from './hood-mask-panels.js';
 let hoodMaskPanels=null;
@@ -1538,7 +1538,7 @@ $('downloadMockup').onclick=downloadMockupPNG;
 function captureVisiblePreview(){return flatMockup?.isActive()?flatMockup.capture():captureCurrent3DPreview();}
 flatMockup=installFlatMockup({getProduct:()=>product,drawZone:zone=>{
  const canvas=document.createElement('canvas'),ratio=zoneDesignAspect(zone);
- canvas.height=800;canvas.width=Math.max(1,Math.round(800*ratio));
+ const max=1000;canvas.width=ratio>=1?max:Math.max(1,Math.round(max*ratio));canvas.height=ratio>=1?Math.max(1,Math.round(max/ratio)):max;
  drawLayerStack(canvas.getContext('2d'),zone,{x:0,y:0,w:canvas.width,h:canvas.height});
  return canvas;
 }});
