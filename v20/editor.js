@@ -105,7 +105,11 @@ function scheduleGarmentPreview(delay=110){
 }
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
-const TEXT_FONTS=['Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Oswald','Raleway','Merriweather','Playfair Display','Nunito','Ubuntu','PT Sans','Source Sans 3','Noto Sans','Noto Serif','Rubik','Work Sans','DM Sans','Manrope','Bebas Neue','Anton','Archivo','Cabin','Karla','Mulish','Quicksand','Fira Sans','Hind','Arvo','Bitter','Libre Baskerville','Libre Franklin','Josefin Sans','Exo 2','Barlow','Barlow Condensed','Fjalla One','Titillium Web','Yanone Kaffeesatz','Abril Fatface','Lobster','Pacifico','Dancing Script','Permanent Marker','Caveat','Cinzel','Cormorant Garamond','Space Grotesk','League Spartan'];
+const TEXT_FONTS=['Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Oswald','Raleway','Merriweather','Playfair Display','Nunito','Ubuntu','PT Sans','Source Sans 3','Noto Sans','Noto Serif','Rubik','Work Sans','DM Sans','Manrope','Bebas Neue','Anton','Archivo','Cabin','Karla','Mulish','Quicksand','Fira Sans','Hind','Arvo','Bitter','Libre Baskerville','Libre Franklin','Josefin Sans','Exo 2','Barlow','Barlow Condensed','Fjalla One','Titillium Web','Yanone Kaffeesatz','Abril Fatface','Lobster','Pacifico','Dancing Script','Permanent Marker','Caveat','Cinzel','Cormorant Garamond','Space Grotesk','League Spartan',
+'Impact','Archivo Black','Bangers','Black Ops One','Bowlby One SC','Bungee','Bungee Inline','Bungee Shade','Changa One','Concert One','Creepster','Fredoka','Graduate','Gravitas One','Luckiest Guy','Passion One','Paytone One','Righteous','Russo One','Saira Condensed','Staatliches','Teko','Ultra','Alfa Slab One','Baloo 2','Boogaloo','Chewy','Comfortaa','Courgette','Great Vibes','Indie Flower','Kaushan Script','Marck Script','Monoton','Orbitron','Press Start 2P','Rock Salt','Sacramento','Satisfy','Shadows Into Light','Special Elite','Yellowtail','Zeyada','Amatic SC','Cookie','Berkshire Swash','Fugaz One','Lilita One','Mochiy Pop One','Sigmar'];
+function textFontFamily(font='Inter'){
+  return font==='Impact'?'Impact, Anton, sans-serif':`"${font}", sans-serif`;
+}
 
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
@@ -2008,7 +2012,7 @@ $('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.ad
 function syncTextFontPreview(font='Inter'){
   const button=$('textFontPreviewButton');if(!button)return;
   button.textContent=font+'  ▾';
-  button.style.fontFamily=`"${font}", sans-serif`;
+  button.style.fontFamily=textFontFamily(font);
 }
 function openTextFontPicker(){
   const layer=activeLayer();if(!layer||layer.type!=='text')return;
