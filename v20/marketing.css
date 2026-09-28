@@ -5,3 +5,11 @@
 @media(max-width:900px){.hero{grid-template-columns:1fr;margin-top:30px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.steps{grid-template-columns:repeat(2,minmax(0,1fr))}.site-header{position:static}.site-header nav a:not(.designer-link){display:none}}@media(max-width:620px){.grid,.grid.two,.steps{grid-template-columns:1fr}.hero-copy,.hero-card,.section-card{padding:22px 18px}.hero{width:min(100% - 20px,1160px)}.section,.breadcrumbs,.site-footer{width:min(100% - 20px,1160px)}.cta{align-items:flex-start;flex-direction:column}.site-header img{height:35px}}
 
 .feature-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.feature-item{background:#fafafa;border:1px solid var(--line);border-radius:14px;padding:18px}.feature-item strong{display:block;margin-bottom:6px}.feature-item p{margin:0;color:#555;line-height:1.6}.keyword-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}.keyword-links a{display:inline-flex;padding:9px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;text-decoration:none;font-weight:750;font-size:13px}.proof-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}.proof-strip>div{background:#171717;color:#fff;border-radius:14px;padding:18px}.proof-strip strong{display:block;font-size:18px;margin-bottom:5px}.proof-strip span{color:#cfcfcf;font-size:14px;line-height:1.5}@media(max-width:700px){.feature-list,.proof-strip{grid-template-columns:1fr}}
+.photo-gallery{display:grid;grid-template-columns:1.25fr .85fr .85fr;gap:14px;margin-top:20px}
+.photo-card{margin:0;background:#0d0d0d;border-radius:16px;overflow:hidden;border:1px solid #202020}
+.photo-card img{display:block;width:100%;height:100%;min-height:340px;max-height:520px;object-fit:cover}
+.photo-card figcaption{padding:12px 14px;color:#d8d8d8;font-size:13px;line-height:1.45}
+.photo-card:first-child{grid-row:span 2}
+.photo-card:first-child img{min-height:520px}
+@media(max-width:850px){.photo-gallery{grid-template-columns:1fr 1fr}.photo-card:first-child{grid-row:auto;grid-column:1/-1}.photo-card:first-child img{min-height:380px}}
+@media(max-width:560px){.photo-gallery{grid-template-columns:1fr}.photo-card:first-child{grid-column:auto}.photo-card img,.photo-card:first-child img{min-height:0;max-height:none;aspect-ratio:4/5}}
