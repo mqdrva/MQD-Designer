@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:launch": "node tests/run-launch-regression.mjs"
+    "test:launch": "node tests/run-launch-regression.mjs",
+    "test:ai-boundary": "node tests/ai-boundary-regression.mjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "0.1.100",
