@@ -105,7 +105,11 @@ function scheduleGarmentPreview(delay=110){
 }
 const templateCache=new Map();
 const editorCanvas=$('editorCanvas'),ctx=editorCanvas.getContext('2d');
-const TEXT_FONTS=['Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Oswald','Raleway','Merriweather','Playfair Display','Nunito','Ubuntu','PT Sans','Source Sans 3','Noto Sans','Noto Serif','Rubik','Work Sans','DM Sans','Manrope','Bebas Neue','Anton','Archivo','Cabin','Karla','Mulish','Quicksand','Fira Sans','Hind','Arvo','Bitter','Libre Baskerville','Libre Franklin','Josefin Sans','Exo 2','Barlow','Barlow Condensed','Fjalla One','Titillium Web','Yanone Kaffeesatz','Abril Fatface','Lobster','Pacifico','Dancing Script','Permanent Marker','Caveat','Cinzel','Cormorant Garamond','Space Grotesk','League Spartan'];
+const TEXT_FONTS=['Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Oswald','Raleway','Merriweather','Playfair Display','Nunito','Ubuntu','PT Sans','Source Sans 3','Noto Sans','Noto Serif','Rubik','Work Sans','DM Sans','Manrope','Bebas Neue','Anton','Archivo','Cabin','Karla','Mulish','Quicksand','Fira Sans','Hind','Arvo','Bitter','Libre Baskerville','Libre Franklin','Josefin Sans','Exo 2','Barlow','Barlow Condensed','Fjalla One','Titillium Web','Yanone Kaffeesatz','Abril Fatface','Lobster','Pacifico','Dancing Script','Permanent Marker','Caveat','Cinzel','Cormorant Garamond','Space Grotesk','League Spartan',
+'Impact','Archivo Black','Bangers','Black Ops One','Bowlby One SC','Bungee','Bungee Inline','Bungee Shade','Changa One','Concert One','Creepster','Fredoka','Graduate','Gravitas One','Luckiest Guy','Passion One','Paytone One','Righteous','Russo One','Saira Condensed','Staatliches','Teko','Ultra','Alfa Slab One','Baloo 2','Boogaloo','Chewy','Comfortaa','Courgette','Great Vibes','Indie Flower','Kaushan Script','Marck Script','Monoton','Orbitron','Press Start 2P','Rock Salt','Sacramento','Satisfy','Shadows Into Light','Special Elite','Yellowtail','Zeyada','Amatic SC','Cookie','Berkshire Swash','Fugaz One','Lilita One','Mochiy Pop One','Sigmar'];
+function textFontFamily(font='Inter'){
+  return font==='Impact'?'Impact, Anton, sans-serif':`"${font}", sans-serif`;
+}
 
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
@@ -808,7 +812,7 @@ function drawImageLayer(c,l,b){
 function drawTextLayer(c,l,b){
   const fs=Math.max(18,b.w*.10*(l.scale||1));
   const font=l.font||'Inter',weight=l.bold===false?400:(l.weight||800),style=l.italic?'italic':'normal';
-  c.font=`${style} ${weight} ${fs}px "${font}", sans-serif`;
+  c.font=`${style} ${weight} ${fs}px ${textFontFamily(font)}`;
   c.textAlign=l.align||'center';c.textBaseline='middle';
   if('letterSpacing' in c)c.letterSpacing=`${fs*((Number(l.letterSpacing)||0)/100)}px`;
   const text=l.text||'Text',maxWidth=b.w*.85,stroke=Math.max(0,Number(l.strokeWidth)||0);
@@ -2008,7 +2012,7 @@ $('nudgeUp')?.addEventListener('click',()=>nudgeActive(0,-2));$('nudgeDown')?.ad
 function syncTextFontPreview(font='Inter'){
   const button=$('textFontPreviewButton');if(!button)return;
   button.textContent=font+'  ▾';
-  button.style.fontFamily=`"${font}", sans-serif`;
+  button.style.fontFamily=textFontFamily(font);
 }
 function openTextFontPicker(){
   const layer=activeLayer();if(!layer||layer.type!=='text')return;
@@ -2024,7 +2028,7 @@ function openTextFontPicker(){
     const q=query.trim().toLowerCase();list.innerHTML='';
     for(const font of TEXT_FONTS.filter(name=>!q||name.toLowerCase().includes(q))){
       const button=document.createElement('button');button.type='button';button.className='font-picker-option';button.dataset.font=font;button.textContent=font;
-      button.style.fontFamily=`"${font}", sans-serif`;
+      button.style.fontFamily=textFontFamily(font);
       if((layer.font||'Inter')===font)button.classList.add('selected');
       button.onclick=()=>{
         snapshot();
@@ -2034,7 +2038,7 @@ function openTextFontPicker(){
         dialog.close();
       };
       list.appendChild(button);
-      document.fonts?.load?.(`24px "${font}"`).catch(()=>{});
+      document.fonts?.load?.(`24px ${textFontFamily(font)}`).catch(()=>{});
     }
   };
   search.addEventListener('input',()=>render(search.value));
@@ -2048,7 +2052,7 @@ function initTextFonts(){
   const sel=$('textFont');if(!sel)return;
   sel.innerHTML='';
   for(const font of TEXT_FONTS){
-    const option=document.createElement('option');option.value=font;option.textContent=font;option.style.fontFamily=`"${font}", sans-serif`;sel.appendChild(option);
+    const option=document.createElement('option');option.value=font;option.textContent=font;option.style.fontFamily=textFontFamily(font);sel.appendChild(option);
   }
   sel.classList.add('font-native-select');
   let preview=$('textFontPreviewButton');
@@ -2057,7 +2061,7 @@ function initTextFonts(){
   }
   syncTextFontPreview(sel.value||'Inter');
 }
-function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px "${val}"`).finally(()=>renderAll());else renderAll();}else renderAll();}
+function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px ${textFontFamily(val)}`).finally(()=>renderAll());else renderAll();}else renderAll();}
 $('textValue')?.addEventListener('input',e=>updateTextProp('text',e.target.value));
 $('textFont')?.addEventListener('change',e=>updateTextProp('font',e.target.value));
 $('textColor')?.addEventListener('input',e=>updateTextProp('color',e.target.value.toUpperCase()));
