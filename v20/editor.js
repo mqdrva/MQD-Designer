@@ -1149,8 +1149,14 @@ function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.
 function zoneIconLabel(z){if(z==='Front')return'▰\nFront';if(z==='Back')return'▱\nBack';if(z.includes('Sleeve'))return'▭\n'+(z.startsWith('Left')?'L Sleeve':'R Sleeve');if(z==='Collar')return'⌒\nCollar';if(z==='Hood')return'◠\nHood';return z;}
 function renderZones(){const rail=$('zoneRail');rail.innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone-icon'+(z===activeZone?' active':'')+(zoneHasContent(z)?' complete':'');b.innerHTML=escapeHtml(zoneIconLabel(z)).replace('\n','<br>');b.title=zoneHasContent(z)?z+' — design added':z+' — not designed yet';b.onclick=()=>selectZone(z);rail.appendChild(b);});}
 function maxLayerScale(layer=activeLayer()){
+  // Text can be scaled to twice its previous maximum without changing
+  // image sizing limits or any garment mapping/calibration.
+  if(layer?.type==='text'){
+    if(product.id==='lightweight-jacket')return 5.2;
+    if(product.id==='sweat-pants'&&(activeZone==='Front'||activeZone==='Back'))return 8;
+    return 4.4;
+  }
   if(product.id==='lightweight-jacket')return 2.6;
-  if(product.id==='sweat-pants'&&(activeZone==='Front'||activeZone==='Back')&&layer?.type==='text')return 4;
   return 2.2;
 }
 function reorderLayer(id,targetId){
