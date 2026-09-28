@@ -23,7 +23,13 @@
     // Automatically forwards the same event to GA4 later if a Google tag is added.
     try {
       if (typeof window.gtag === 'function') {
-        const gaName = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const gaNames = {
+          'Garment Selected': 'select_item',
+          'Add To Cart Clicked': 'add_to_cart',
+          'Begin Checkout': 'begin_checkout',
+          'Purchase Confirmed': 'purchase'
+        };
+        const gaName = gaNames[name] || String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
         window.gtag('event', gaName, payload);
       }
     } catch (_) {}
@@ -57,12 +63,25 @@
     const check = function () {
       if (!/paid/i.test(status.textContent || '')) return;
       const sessionId = new URLSearchParams(window.location.search).get('session_id') || 'confirmed';
-      if (trackedPurchases.has(sessionId)) return;
+      let alreadyTracked = trackedPurchases.has(sessionId);
+      try {
+        alreadyTracked = alreadyTracked || sessionStorage.getItem('mqd-analytics-purchase') === sessionId;
+      } catch (_) {}
+      if (alreadyTracked) return;
       trackedPurchases.add(sessionId);
+      try {
+        sessionStorage.setItem('mqd-analytics-purchase', sessionId);
+      } catch (_) {}
 
       const product = (document.getElementById('productName')?.textContent || '').trim();
       const amount = parseMoney(document.getElementById('amount')?.textContent);
-      track('Purchase Confirmed', { product, amount });
+      const sandboxBadge = document.getElementById('sandboxBadge');
+      const isTest = Boolean(sandboxBadge && !sandboxBadge.hidden);
+      track(isTest ? 'Test Purchase Confirmed' : 'Purchase Confirmed', {
+        product,
+        amount,
+        currency: 'USD'
+      });
     };
 
     check();
