@@ -50,10 +50,18 @@ Deno.serve(async(req:Request)=>{
     const forwarded=(req.headers.get("x-forwarded-for")||"").split(",")[0].trim();
     const ip=forwarded||req.headers.get("cf-connecting-ip")||req.headers.get("x-real-ip")||"unknown";
     const salt=Deno.env.get("SUPABASE_URL")||"mqd";
-    const ipHash=await sha256(ip+"|"+salt);
-    const {data:allowed,error:limitError}=await supabase.rpc("mqd_consume_background_removal",{p_ip_hash:ipHash,p_limit:20});
+    const authorization=req.headers.get("authorization")||"";
+    const bearer=authorization.toLowerCase().startsWith("bearer ")?authorization.slice(7).trim():"";
+    let customerId="";
+    if(bearer){
+      const {data:userData,error:userError}=await supabase.auth.getUser(bearer);
+      if(!userError&&userData?.user?.id)customerId=userData.user.id;
+    }
+    const usageIdentity=customerId?("customer:"+customerId):("ip:"+ip);
+    const usageHash=await sha256(usageIdentity+"|"+salt);
+    const {data:allowed,error:limitError}=await supabase.rpc("mqd_consume_background_removal",{p_ip_hash:usageHash,p_limit:10});
     if(limitError || (allowed!==true && allowed!==false))return json({error:"Usage limits are temporarily unavailable. Please try again later.",code:"rate_limit_unavailable"},503,origin);
-    if(allowed===false)return json({error:"Daily background-removal limit reached. Please try again tomorrow.",code:"rate_limited"},429,origin);
+    if(allowed===false)return json({error:"Daily background-removal limit reached (10 per customer). Please try again tomorrow.",code:"rate_limited"},429,origin);
 
     const form=await req.formData();
     const file=form.get("image_file");
