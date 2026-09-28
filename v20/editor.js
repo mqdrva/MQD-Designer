@@ -1,3 +1,5 @@
+import {installFlatMockup} from './flat-mockup.js?v=1';
+let flatMockup=null;
 import {createHoodMaskPanels} from './hood-mask-panels.js';
 let hoodMaskPanels=null;
 import {createHoodedLongSleevePanels,hoodedLongSleeveArtworkTransform} from './hooded-long-sleeve-panels.js';
@@ -1112,7 +1114,7 @@ function drawSelectionOverlay(){
   }
   ctx.restore();
 }
-function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();}
+function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();flatMockup?.update();}
 function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
 const MQD_BACKGROUND_REMOVAL_ENABLED=true;
@@ -1499,16 +1501,16 @@ function savePreviewBlob(blob,filename){
  setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 async function downloadMockupPNG(){
- const blob=await captureCurrent3DPreview();
+ const blob=await captureVisiblePreview();
  savePreviewBlob(blob,product.id+'-mockup.png');
 }
 async function save3DScreenshot(){
  const button=$('saveScreenshot');
  if(button){button.disabled=true;button.textContent='Saving…';}
  try{
-  const blob=await captureCurrent3DPreview();
+  const blob=await captureVisiblePreview();
   if(!blob)return;
-  savePreviewBlob(blob,product.id+'-3d-screenshot.png');
+  savePreviewBlob(blob,product.id+(flatMockup?.isActive()?'-flat-mockup.png':'-3d-screenshot.png'));
  }finally{
   if(button){button.disabled=false;button.textContent='⬇ Save PNG';}
  }
@@ -1517,12 +1519,12 @@ async function share3DScreenshot(){
  const button=$('shareScreenshot');
  if(button){button.disabled=true;button.textContent='Opening…';}
  try{
-  const blob=await captureCurrent3DPreview();
+  const blob=await captureVisiblePreview();
   if(!blob)return;
-  const filename=product.id+'-3d-screenshot.png';
+  const filename=product.id+(flatMockup?.isActive()?'-flat-mockup.png':'-3d-screenshot.png');
   const file=new File([blob],filename,{type:'image/png'});
   if(navigator.share&&navigator.canShare?.({files:[file]})){
-    await navigator.share({files:[file],title:product.name+' 3D Preview',text:'My MQD garment preview'});
+    await navigator.share({files:[file],title:product.name+' Preview',text:'My MQD garment preview'});
     return;
   }
   alert('Sharing is not available on this device. Use Save PNG instead.');
@@ -1533,6 +1535,13 @@ async function share3DScreenshot(){
  }
 }
 $('downloadMockup').onclick=downloadMockupPNG;
+function captureVisiblePreview(){return flatMockup?.isActive()?flatMockup.capture():captureCurrent3DPreview();}
+flatMockup=installFlatMockup({getProduct:()=>product,drawZone:zone=>{
+ const canvas=document.createElement('canvas'),ratio=zoneDesignAspect(zone);
+ canvas.height=800;canvas.width=Math.max(1,Math.round(800*ratio));
+ drawLayerStack(canvas.getContext('2d'),zone,{x:0,y:0,w:canvas.width,h:canvas.height});
+ return canvas;
+}});
 $('saveScreenshot')?.addEventListener('click',save3DScreenshot);
 $('shareScreenshot')?.addEventListener('click',share3DScreenshot);
 function clearDecals(){while(decalGroup.children.length){const o=decalGroup.children[0];decalGroup.remove(o);o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map?.dispose();m.dispose();});}}
