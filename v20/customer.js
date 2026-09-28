@@ -193,6 +193,15 @@ async function savePayloadToDrafts(key,payload){
 }
 
 function accountUser(){return currentSession?.user||null;}
+window.MQDCustomerAuth={
+  getAccessToken:async()=>{
+    try{
+      const {data,error}=await supabase.auth.getSession();
+      if(error)return'';
+      return data.session?.access_token||'';
+    }catch{return'';}
+  }
+};
 function isGuestUser(user=accountUser()){return !!user?.is_anonymous;}
 function isPermanentUser(user=accountUser()){return !!user&&!isGuestUser(user);}
 function openAuth(reason='Sign in to save designs across devices, or continue as a guest to purchase without an account.',after=null){
