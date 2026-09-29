@@ -77,7 +77,7 @@ async function applyPlan(plan){
   $('productSelect').value=payload.product.id;
   lastPlan=sanitizePlan(plan);
   setStatus('Draft applied with all required images. Review the front, back, and print quality before saving.','good');
-  $('aiGenerate').textContent='Copy revision & open ChatGPT';$('aiApply').hidden=false;
+  $('aiGenerate').textContent='Revise in ChatGPT';$('aiApply').hidden=false;
   return lastPlan;
 }
 function buildChatGPTRequest(prompt){
@@ -97,7 +97,7 @@ function buildChatGPTRequest(prompt){
     lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
     `Return website: ${location.origin}${location.pathname}${location.search}`,
     'After the image is generated, call prepare_design_preview with productId, summary, contextId, EVERY zone, returnUrl set to the exact return website above, backgroundAction="generate", and the REAL GENERATED IMAGE attached as backgroundFile. ChatGPT supplies the file reference; never invent a download URL. Use backgroundAction="reuse" only for an existing website background, or "none" for a plain solid-color design with no artwork layers. Do not stop at showing the image: complete the transfer tool call.',
-    'Your main answer must be the tool-provided clickable link labeled "Open your design in MyMerchNow". Do not show JSON or ask me to download/upload files. The site retrieves the attached image, restores my original logo, and applies the layout when I open it in this browser. Do not claim the website has already changed or the transfer succeeded if the tool returns an error. For an expired file, resend that same generated image through the tool instead of generating a replacement.',
+    'Your main answer must be the tool-provided clickable link labeled "View my shirt". Do not show JSON or ask me to download/upload files. The site retrieves the attached image, restores my original logo, and applies the layout when I open it in this browser. Do not claim the website has already changed or the transfer succeeded if the tool returns an error. For an expired file, resend that same generated image through the tool instead of generating a replacement.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
   ].filter(Boolean).join('\n');
 }
@@ -109,7 +109,7 @@ async function openInChatGPT(){
   try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)availability=await response.json();}catch{}
   if(!availability?.enabled)throw new Error('Automatic background transfer is not connected on this test page yet. Your logo and request are saved. No ChatGPT request was sent; wait for the connected test link.');
   const request=buildChatGPTRequest(prompt);
-  await copyAndOpen(request,'Request copied. Enable MyMerchNow in ChatGPT and paste the request. ChatGPT will generate the background and send it with your layout. Open the returned design link in this browser.');
+  await copyAndOpen(request,'Request copied. In ChatGPT, select @MyMerchNow, paste, and send. Then open “View my shirt” here in the same browser. Your logo is saved.');
 }
 async function openBackgroundInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
@@ -136,7 +136,7 @@ async function resetAI(){
   for(const id of ['aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiDesignerPrompt','aiDraftJson','aiCopiedRequest'])$(id).value='';
   $('aiRequestDetails').hidden=true;$('aiRequestDetails').open=false;$('aiChatGPTLink').hidden=true;
   updateAssetLabels();rememberSession();
-  $('aiApply').hidden=true;$('aiGenerate').textContent='Copy request & open ChatGPT';
+  $('aiApply').hidden=true;$('aiGenerate').textContent='Continue in ChatGPT';
   setStatus('New draft started. Upload your logo and describe your design.','');
 }
 async function initialize(){
