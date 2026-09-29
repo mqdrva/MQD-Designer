@@ -133,7 +133,7 @@ const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929-upload-clarity');
+  await import('/v20/ai-designer.js?v=20260929-fresh-background');
 } else {
   aiTestUI.remove();
 }
