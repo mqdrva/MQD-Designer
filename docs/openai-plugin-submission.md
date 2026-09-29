@@ -30,7 +30,7 @@ Prepared: September 29, 2026
 - **Domain verification base:** https://mymerchnow.app
 - **Challenge URL:** https://mymerchnow.app/.well-known/openai-apps-challenge
 
-When the OpenAI submission portal creates the domain-verification token, publish exactly that token at the challenge URL. The endpoint must return only the token as plain text.
+When the OpenAI submission portal creates the domain-verification token, set the production Vercel environment variable `OPENAI_APPS_CHALLENGE_TOKEN` to exactly that token and redeploy. The routed challenge endpoint will then return only the token as plain text. Until the real token is configured, the endpoint intentionally returns 404.
 
 ## Tool annotations and justification
 
