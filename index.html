@@ -75,28 +75,29 @@
     </div>
     <template id="aiDesignerPrivateTestUI">
     <div class="ai-designer-launch">
-      <button id="aiDesignerToggle" class="ai-toggle" type="button" aria-expanded="false" aria-controls="aiDesignerPanel">
-        <span><span class="spark">✦</span><span>Design with your ChatGPT</span></span><span>›</span>
+      <button id="chatBackgroundToggle" class="ai-toggle" type="button" aria-expanded="false" aria-controls="chatBackgroundPanel">
+        <span><span class="spark">✦</span><span>Create background with ChatGPT</span></span><span>›</span>
       </button>
     </div>
-    <section id="aiDesignerPanel" class="ai-designer-panel hidden" aria-label="AI Designer">
+    <section id="chatBackgroundPanel" class="ai-designer-panel hidden" aria-label="Create background with ChatGPT">
       <div class="ai-designer-head">
-        <div><strong>Design with ChatGPT · Test version</strong><p>Upload your logo and tell us what your shirt should look like.</p></div>
-        <button id="aiDesignerClose" class="ai-close" type="button" aria-label="Close AI Designer">×</button>
+        <div><strong>Create your background</strong><p>Create it with your ChatGPT account, then upload it here.</p></div>
+        <button id="chatBackgroundClose" class="ai-close" type="button" aria-label="Close background creator">×</button>
       </div>
       <div class="ai-designer-body">
-        <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
-        <label for="aiDesignerPrompt"><strong>Describe your shirt (required)</strong></label>
-        <textarea id="aiDesignerPrompt" class="ai-prompt" aria-label="Describe your shirt" aria-describedby="aiPromptExample" maxlength="1200" placeholder="Type your design request here…" required></textarea>
-        <p id="aiPromptExample" class="ai-note">Example: Black shirt with a colorful kid-friendly background, my logo centered on the front, a smaller logo on the upper back, and my phone number underneath.</p>
-        <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Continue in ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
-        <div class="ai-note">Your ChatGPT account prepares the shirt layout. If you want a generated background, make it separately in ChatGPT Images, then upload it once through the shirt link to see the finished preview.</div>
-        <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
-        <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
-        <details id="aiBackgroundStep" class="ai-background-step"><summary>Upload background from ChatGPT to finish shirt</summary><p class="ai-background-hint">Save the background image from ChatGPT to your device. Choose it here once; your saved logo, text, and layout will appear with it automatically.</p><div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label ai-background-upload">Choose background image<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div></details>
-        <details><summary>How it works</summary><ol class="ai-steps"><li>In ChatGPT, select <strong>@MyMerchNow</strong>, paste the copied request, and send. Sign in or approve the connection if asked.</li><li>Save the <strong>Upload background and view shirt</strong> link. If you asked for a background, open <a href="https://chatgpt.com/images/" target="_blank" rel="noopener noreferrer">ChatGPT Images</a> in a separate chat and use the short image prompt ChatGPT gives you. Save the resulting image.</li><li>Open the shirt link in the same browser. Choose the saved image once; MyMerchNow applies it with your logo and text.</li></ol><p class="ai-note">Your logo stays in this browser for 24 hours; ChatGPT does not redraw it. Review every side and print quality before ordering. Clear removes the saved draft images.</p></details>
-        <details id="aiRequestDetails" hidden><summary>View request to copy manually</summary><textarea id="aiCopiedRequest" class="ai-prompt" aria-label="Request for ChatGPT" readonly></textarea></details>
-        <details><summary>Backup: import a draft file or code</summary><label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
+        <label for="chatBackgroundPrompt"><strong>1. Describe your background</strong></label>
+        <textarea id="chatBackgroundPrompt" class="ai-prompt" maxlength="1200" placeholder="Type the colors and pattern you want…" required></textarea>
+        <p class="ai-note">Example: Black background with bright blue water splashes along the bottom.</p>
+        <button id="chatBackgroundCreate" class="primary" type="button">Copy prompt &amp; open ChatGPT</button>
+        <p class="ai-note">Paste the prompt into ChatGPT Images and send. Your ChatGPT account and its usage limits apply. Save the image and return to this tab.</p>
+        <a id="chatBackgroundOpen" href="https://chatgpt.com/images/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT Images</a>
+        <details id="chatBackgroundManual" hidden><summary>View prompt to copy</summary><textarea id="chatBackgroundCopy" class="ai-prompt" aria-label="Background prompt to copy" readonly></textarea></details>
+        <strong>2. Upload your saved background</strong>
+        <label for="chatBackgroundAreas">Apply background to</label>
+        <select id="chatBackgroundAreas" class="input"><option value="all">All garment areas</option><option value="current">Selected area only</option></select>
+        <div class="ai-logo-row"><span id="chatBackgroundFilename" class="ai-logo-name">No background selected</span><label class="ai-logo-label">Upload background<input id="chatBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
+        <p class="ai-note">The background fills each selected area beneath your existing artwork. Use Add Image for your logo and Add Text for words.</p>
+        <div id="chatBackgroundStatus" class="ai-status" role="status" aria-live="polite"></div>
       </div>
     </section>
     </template>
@@ -135,7 +136,7 @@ const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929-prompt-label');
+  await import('/v20/chat-background.js?v=20260929-background-only');
 } else {
   aiTestUI.remove();
 }
