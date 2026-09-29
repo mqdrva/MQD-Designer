@@ -82,19 +82,22 @@ async function applyPlan(plan){
 function buildChatGPTRequest(prompt){
   const product=productForPlan(currentProductId());
   return [
-    'Create a downloadable apparel layout draft in this chat. This is the MyMerchNow file-import workflow: do not call the MyMerchNow plugin, which is paused. Create the JSON file directly. Do not generate an image in this step; I will request the background separately.',
+    'Create an apparel layout and a working return link to MyMerchNow. Do not call the MyMerchNow plugin, which is paused. Do not generate an image in this step; I will request the background separately.',
     `Starting garment: ${product.name} (${product.id}). Valid zones: ${product.zones.join(', ')}.`,
     `Customer request: ${prompt}`,
     `Draft contextId: ${contextId}. Copy this exactly into the draft so my uploaded logo is restored in the website.`,
     `Logo selected on website: ${assets.logo?'yes':'no'}. Background image selected on website: ${assets.artwork?'yes':'no'}.`,
     'If a patterned, abstract, photographic, water, or illustrated background is requested, include kind artwork layers for a background image I will generate and upload separately. Never substitute solid color or text slashes for the requested artwork.',
-    'Return a downloadable design-plan.json AND a JSON code block using this shape:',
+    'Build the layout internally using this shape (do not show the JSON as your main answer):',
     JSON.stringify({version:'mqd-ai-plan-v1',contextId,productId:product.id,summary:'Brief description',zones:[{zone:product.zones[0],background:'#000000',elements:[{kind:'artwork',x:0,y:0,scale:1,rotation:0},AI_TSHIRT_CHEST_LAYOUT.frontLogo]}]}),
     'Use kind artwork for the downloaded background image, kind logo for my original logo, and kind text with text, color, font, bold, x, y, scale, rotation for words or a phone number. Allowed fonts: Inter, Montserrat, Poppins, Oswald, Bebas Neue, Anton, Archivo Black, Black Ops One, Righteous, Russo One, League Spartan.',
     'Include EVERY garment zone. For an all-over background, include an artwork layer in every zone at x 0, y 0, scale 1. Use x/y -100 to 100 (negative y is higher), at most six layers per zone. Logo scale is a fraction of the contained zone size, at most 0.8. Text scale is a font-size multiplier: use 0.8 to 1.0 for a readable phone number, NOT 0.18. letterSpacing is allowed from -10 to 30.',
     product.id==='tshirt'?`For a standard centered chest logo with smaller back logo and phone below, use this placement reference unless the customer explicitly asks for a different location or size: ${JSON.stringify(AI_TSHIRT_CHEST_LAYOUT)}. Replace the phone text with the customer's wording. Center means horizontally centered on the chest, not low on the stomach. The back phone remains near the upper-back logo, not below the middle of the shirt. Preserve explicit adjustments in a revision.`:'',
     lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
-    'Explain that I must return to the original website tab, import design-plan.json using Import draft, and upload the downloaded background image. The draft is not complete until its required images have been applied. Do not invent a website link or claim to have changed the website.',
+    `Return website: ${location.origin}${location.pathname}${location.search}`,
+    'Use your code execution tool to create the return link. Set plan to the complete layout dictionary, then use Python: import json, base64; token = base64.urlsafe_b64encode(json.dumps(plan, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("="); url = RETURN_WEBSITE + "#ai-plan=" + token. Replace RETURN_WEBSITE with the exact return website above. Compute the token with code; never guess or manually shorten it.',
+    'Your main answer must be a clickable Markdown link labeled "Open your design in MyMerchNow" using that computed URL. Opening it restores my uploaded images from this browser and applies the layout automatically when its required images are available. Do not show a JSON code block or ask me to import a layout file when the link is available. You may attach design-plan.json only as a backup. If code execution is unavailable, clearly offer that backup instead of inventing an encoded link.',
+    'If a required background image has not been uploaded yet, explain that after opening the link I only need to upload that background image; the website will apply the complete design automatically. Do not claim the website has already been changed before I open the link.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
   ].filter(Boolean).join('\n');
 }
@@ -103,7 +106,7 @@ async function openInChatGPT(){
   if(!prompt)throw new Error('Describe the design before opening ChatGPT.');
   await persist();
   const request=buildChatGPTRequest(prompt);
-  await copyAndOpen(request,'Request copied. Paste it into ChatGPT, download design-plan.json, and import it here. Your logo is saved in this browser for 24 hours.');
+  await copyAndOpen(request,'Request copied. Paste it into ChatGPT, then click Open your design in MyMerchNow in its reply. Your uploaded images will be restored in this browser.');
 }
 async function openBackgroundInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
@@ -163,7 +166,8 @@ for(const [id,kind] of [['aiLogoUpload','logo'],['aiArtworkUpload','artwork']]){
     const next={...assets,[kind]:asset};
     await saveDraftAssets(contextId,{assets:next,prompt:$('aiDesignerPrompt').value,plan:lastPlan});
     assets=next;updateAssetLabels();rememberSession();
-    setStatus(lastPlan?'Image saved. Click Apply Draft to preview the complete design.':'Image saved. Describe your design and continue in ChatGPT.','good');
+    if(lastPlan)await applyPlan(lastPlan);
+    else setStatus('Image saved. Describe your design and continue in ChatGPT.','good');
   }));
 }
 $('aiDraftUpload').addEventListener('change',event=>run(async()=>{
