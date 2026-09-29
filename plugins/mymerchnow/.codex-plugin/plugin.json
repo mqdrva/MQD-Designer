@@ -1,0 +1,25 @@
+{
+  "name": "mymerchnow",
+  "version": "0.1.0",
+  "description": "Create protected MyMerchNow apparel design drafts in ChatGPT.",
+  "author": {
+    "name": "MyMerchNow"
+  },
+  "homepage": "https://mymerchnow.app/",
+  "repository": "https://github.com/mqdrva/MQD-Designer",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MyMerchNow",
+    "shortDescription": "Design custom apparel using your ChatGPT plan.",
+    "longDescription": "Choose a MyMerchNow garment, place customer artwork and text, and create a protected draft link that opens in the MyMerchNow 2D/3D editor.",
+    "developerName": "MyMerchNow",
+    "category": "Lifestyle",
+    "capabilities": ["Design custom apparel", "Create protected draft links"],
+    "websiteURL": "https://mymerchnow.app/",
+    "privacyPolicyURL": "https://mymerchnow.app/privacy.html",
+    "termsOfServiceURL": "https://mymerchnow.app/terms.html",
+    "brandColor": "#FF6500",
+    "defaultPrompt": ["Create a MyMerchNow apparel design draft from my description."]
+  },
+  "mcpServers": "./.mcp.json"
+}

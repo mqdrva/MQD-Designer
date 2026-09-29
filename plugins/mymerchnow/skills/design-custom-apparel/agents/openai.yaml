@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design custom apparel"
+  short_description: "Create a protected MyMerchNow draft link from a customer brief."
+  default_prompt: "Create a MyMerchNow apparel design draft from my description."

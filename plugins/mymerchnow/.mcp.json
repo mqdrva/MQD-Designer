@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mymerchnow": {
+      "type": "http",
+      "url": "https://mymerchnow.app/api/mcp"
+    }
+  }
+}

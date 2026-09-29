@@ -1,30 +1,16 @@
 import {AI_PRODUCTS,AI_FONTS,sanitizePlan,productForPlan,decodePlan,decodePrompt} from './ai-design-contract.js';
 
 const $=id=>document.getElementById(id);
-const API_URL='/api/ai-design';
+const CHATGPT_URL='https://chatgpt.com/';
 let logoDataUrl='';
 let logoFilename='uploaded-logo.png';
 let lastPlan=null;
-let busy=false;
 
 function setStatus(message,tone=''){
   const el=$('aiDesignerStatus');
   if(!el)return;
   el.textContent=message||'';
   el.dataset.tone=tone;
-}
-function addMessage(role,text){
-  const host=$('aiDesignerConversation');
-  if(!host||!text)return;
-  const row=document.createElement('div');
-  row.className='ai-message '+(role==='user'?'user':'assistant');
-  const label=document.createElement('strong');
-  label.textContent=role==='user'?'You':'AI Designer';
-  const body=document.createElement('div');
-  body.textContent=text;
-  row.append(label,body);
-  host.appendChild(row);
-  host.scrollTop=host.scrollHeight;
 }
 function currentProductId(){
   return $('productSelect')?.value||window.MQDDesigner?.getContext?.()?.productId||'tshirt';
@@ -146,44 +132,32 @@ async function applyPlan(plan){
   }else{
     setStatus('AI draft applied. You can keep editing normally, or type another instruction below.','good');
   }
-  addMessage('assistant',safe.summary);
-  $('aiGenerate').textContent='Update Design';
+  $('aiGenerate').textContent='Copy revision & open ChatGPT';
   $('aiApply').hidden=false;
   return safe;
 }
-async function requestPlan(mode){
-  if(busy)return;
+function buildChatGPTRequest(prompt){
+  const product=productForPlan(currentProductId());
+  return [
+    'Use the MyMerchNow plugin to create a protected apparel design draft.',
+    `Starting garment: ${product?.name||'Short Sleeve T-Shirt'} (${currentProductId()}).`,
+    `Customer request: ${prompt}`,
+    'Use list_products if you need valid garment or print-zone names, then call create_design_draft.',
+    'Return the MyMerchNow draft link so I can open and review the design in the 2D/3D editor.',
+    'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
+  ].join('\n');
+}
+async function openInChatGPT(){
   const prompt=$('aiDesignerPrompt')?.value.trim();
   if(!prompt){setStatus('Describe what you want the shirt to look like.','warn');$('aiDesignerPrompt')?.focus();return;}
-  busy=true;
-  $('aiGenerate').disabled=true;
-  $('aiApply').disabled=true;
-  setStatus(mode==='revise'?'Updating your design…':'Creating your first draft…','working');
-  addMessage('user',prompt);
+  const request=buildChatGPTRequest(prompt);
   try{
-    const response=await fetch(API_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        message:prompt,
-        mode,
-        currentProductId:currentProductId(),
-        currentPlan:mode==='revise'?lastPlan:null,
-        hasLogo:Boolean(logoDataUrl||findExistingLogo())
-      })
-    });
-    const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(result.error||'The AI designer could not create a draft.');
-    lastPlan=sanitizePlan(result.plan,{fallbackProductId:currentProductId()});
-    await applyPlan(lastPlan);
-    $('aiDesignerPrompt').value='';
-  }catch(error){
-    console.error(error);
-    setStatus(error.message||'The AI designer could not create a draft.','bad');
-  }finally{
-    busy=false;
-    $('aiGenerate').disabled=false;
-    $('aiApply').disabled=false;
+    await navigator.clipboard.writeText(request);
+    window.open(CHATGPT_URL,'_blank','noopener,noreferrer');
+    setStatus('Request copied and ChatGPT opened. Enable the MyMerchNow plugin, paste the request, then open the draft link ChatGPT returns.','good');
+  }catch{
+    window.open(CHATGPT_URL,'_blank','noopener,noreferrer');
+    setStatus('ChatGPT opened. Copy your description manually, enable the MyMerchNow plugin, and ask it to create a design draft.','warn');
   }
 }
 function openPanel(){
@@ -201,11 +175,10 @@ function resetAI(){
   logoFilename='uploaded-logo.png';
   $('aiLogoUpload').value='';
   $('aiLogoName').textContent='No AI logo selected';
-  $('aiDesignerConversation').innerHTML='';
   $('aiDesignerPrompt').value='';
-  $('aiGenerate').textContent='Generate Draft';
+  $('aiGenerate').textContent='Copy request & open ChatGPT';
   $('aiApply').hidden=true;
-  setStatus('Describe a design. AI can change customer artwork, text, colors, placement and garment choice — never the frozen garment engine.','');
+  setStatus('Describe a design, then continue in ChatGPT using the MyMerchNow plugin.','');
 }
 function handleLaunchLink(){
   const raw=location.hash.slice(1);
@@ -229,7 +202,7 @@ function handleLaunchLink(){
     if(prompt){
       openPanel();
       $('aiDesignerPrompt').value=prompt;
-      setStatus('This request came from ChatGPT. Add your logo if needed, then click Generate Draft.','good');
+      setStatus('This request is ready. Click Copy request & open ChatGPT to create the protected draft.','good');
     }
   }
   if(encodedPlan||encodedPrompt)history.replaceState(null,'',location.pathname+location.search);
@@ -239,7 +212,7 @@ $('aiDesignerToggle')?.addEventListener('click',()=>{
   if($('aiDesignerPanel')?.classList.contains('hidden'))openPanel();else closePanel();
 });
 $('aiDesignerClose')?.addEventListener('click',closePanel);
-$('aiGenerate')?.addEventListener('click',()=>requestPlan(lastPlan?'revise':'create'));
+$('aiGenerate')?.addEventListener('click',openInChatGPT);
 $('aiApply')?.addEventListener('click',async()=>{
   if(!lastPlan)return;
   try{await applyPlan(lastPlan)}catch(error){setStatus(error.message,'bad');}
@@ -262,7 +235,7 @@ $('aiLogoUpload')?.addEventListener('change',async event=>{
   }
 });
 $('aiDesignerPrompt')?.addEventListener('keydown',event=>{
-  if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();requestPlan(lastPlan?'revise':'create');}
+  if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();openInChatGPT();}
 });
 
 resetAI();

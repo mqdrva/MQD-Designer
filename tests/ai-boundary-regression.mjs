@@ -58,5 +58,8 @@ for(const method of allowedDesignerCalls){
 
 assert(client.includes("product:{id:product.id}"),'AI load payload must identify only the existing product id.');
 assert(client.includes('design\n  };')||client.includes('design\n  }'),'AI load payload must carry customer design state.');
+assert(!client.includes("fetch(API_URL"),'Customer ChatGPT flow must not call the merchant-funded AI endpoint.');
+assert(client.includes("const CHATGPT_URL='https://chatgpt.com/'"),'Customer AI flow must hand off to ChatGPT.');
+assert(client.includes('navigator.clipboard.writeText(request)'),'Customer AI flow must copy a bounded MCP request.');
 
 console.log('AI boundary regression passed: customer-design state only; frozen garment engine remains outside the AI interface.');
