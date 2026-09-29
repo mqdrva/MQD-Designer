@@ -83,12 +83,9 @@ function callTool(name,args){
     const structuredContent={url,productId:safe.productId,summary:safe.summary,needsLogoUpload};
     return{
       structuredContent,
-      content:[
-        {type:'text',text:needsLogoUpload
-          ?'Draft created. Open the attached MyMerchNow resource, upload the logo in the AI Designer panel, click Apply Draft, and review the 2D/3D garment before saving or purchasing.'
-          :'Draft created. Open the attached MyMerchNow resource, click Apply Draft, and review the 2D/3D garment before saving or purchasing.'},
-        {type:'resource_link',uri:url,name:'Open the draft in MyMerchNow',description:'Open this protected MyMerchNow apparel design draft in the 2D/3D editor.'}
-      ]
+      content:[{type:'text',text:needsLogoUpload
+        ?`Draft ready. Open this exact link to see it on the garment: ${url}\nUpload the logo in the AI Designer panel, then click Apply Draft to place it. Review the 2D/3D garment before saving or purchasing.`
+        :`Draft ready. Open this exact link to see it on the garment: ${url}\nReview the 2D/3D garment before saving or purchasing.`}]
     };
   }
   return null;
