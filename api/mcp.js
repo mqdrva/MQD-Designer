@@ -80,7 +80,7 @@ export function prepareDesignPreview(args){
   const plan=validateTransferPlan(args);
   const destination=new URL(args.returnUrl);
   const local=['localhost','127.0.0.1','[::1]'].includes(destination.hostname)&&destination.protocol==='http:';
-  const remote=destination.protocol==='https:'&&(destination.hostname==='mymerchnow.app'||destination.hostname===process.env.VERCEL_URL);
+  const remote=destination.protocol==='https:'&&!destination.port&&(destination.hostname==='mymerchnow.app'||destination.hostname===process.env.VERCEL_URL||destination.hostname===process.env.VERCEL_BRANCH_URL);
   if((!local&&!remote)||destination.username||destination.password||destination.pathname!=='/')throw new Error('Use the original MyMerchNow return website.');
   const artwork=args.backgroundFile?validateArtworkFile(args.backgroundFile):null;
   if(!['generate','reuse','none'].includes(args.backgroundAction))throw new Error('Specify whether the background is generated, reused, or not requested.');
