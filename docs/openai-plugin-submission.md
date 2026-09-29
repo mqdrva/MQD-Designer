@@ -13,7 +13,7 @@ Prepared: September 29, 2026
 - **Plugin name:** MyMerchNow
 - **Developer / publisher:** Select the verified OpenAI Platform business identity that owns MyMerchNow. The public website identifies the service as MyMerchNow by Morales Quality Designs.
 - **Category:** Lifestyle
-- **Short description:** Design custom apparel in ChatGPT and review it in MyMerchNow.
+- **Short description:** Design custom apparel
 - **Long description:** Use MyMerchNow to choose a garment, plan colors, artwork, logo and text placement, and open a protected design link in the MyMerchNow 2D/3D editor. MyMerchNow limits the AI handoff to customer-controlled design fields and does not let the plugin change garment models, UV mappings, production templates, renderer behavior, pricing, checkout, or authentication.
 - **Website:** https://mymerchnow.app/
 - **Support:** https://mymerchnow.app/contact.html
@@ -136,5 +136,20 @@ Initial public MyMerchNow plugin submission. The plugin lets ChatGPT users brows
 5. Copy the portal’s domain-verification token and publish it at the challenge URL.
 6. Enter the starter prompts, five positive tests, and three negative tests above.
 7. Select United States availability for the initial release.
-8. Complete the policy attestations and submit for review.
-9. After approval, choose **Publish** in the portal.
+8. Add the required reviewer-accessible demo recording URL showing the main MyMerchNow plugin workflows and tool results.
+9. Complete the policy attestations and submit for review.
+10. After approval, choose **Publish** in the portal.
+
+
+## Demo recording shot list
+
+OpenAI requires a reviewer-accessible demo recording URL for the initial MCP review. Record one concise walkthrough that shows:
+
+1. Open MyMerchNow from ChatGPT/Work and invoke the plugin.
+2. Ask: “What can I customize with MyMerchNow?” Show `list_products` returning the garment catalog.
+3. Ask for a simple Short Sleeve T-Shirt with front text. Show `prepare_design_preview` returning the MyMerchNow link.
+4. Open that link and show the 2D/3D design editor loading the requested layout.
+5. Run one background example and show the “Upload background and view shirt” handoff.
+6. Briefly show that checkout/payment remains on MyMerchNow rather than inside the MCP tool.
+
+Host the recording at a reviewer-accessible HTTPS URL that does not require MFA, email verification, SMS, or private-network access.
