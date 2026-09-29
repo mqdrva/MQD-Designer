@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {prepareDesignPreview} from '../api/mcp.js';
 import handler from '../api/ai-artwork.js';
 import mcp from '../api/mcp.js';
 import {decodeTransfer,validateArtworkFile} from '../v20/ai-transfer-contract.js';
-import {AI_PRODUCTS} from '../v20/ai-design-contract.js';
+import {AI_PRODUCTS,AI_TSHIRT_CHEST_LAYOUT} from '../v20/ai-design-contract.js';
 import {buildDraftPayload} from '../v20/ai-draft-builder.js';
 
 const file={download_url:'https://files.oaiusercontent.com/test.png?signature=test',file_id:'file-test',mime_type:'image/png',file_name:'background.png'};
@@ -72,4 +73,19 @@ try{
 const copiedRequest=readFileSync(new URL('../v20/ai-designer.js',import.meta.url),'utf8');
 assert.match(copiedRequest,/SECOND visibly show.*BEFORE invoking image generation/);
 assert.doesNotMatch(copiedRequest,/After generating the background, call/);
+const requestBuilderSource=copiedRequest.slice(copiedRequest.indexOf('function buildChatGPTRequest(prompt){'),copiedRequest.indexOf('\nasync function openInChatGPT()'));
+const buildRequest=runInNewContext(`${requestBuilderSource}\nbuildChatGPTRequest`,{
+  productForPlan:id=>AI_PRODUCTS.find(product=>product.id===id),currentProductId:()=> 'tshirt',
+  contextId:'a'.repeat(32),assets:{logo:{filename:'original-logo.png'},artwork:{filename:'old-red-water.png'}},
+  lastPlan:{summary:'OLD_RED_WATER_BACKGROUND',zones:[{zone:'Front',background:'#000000',elements:[
+    {kind:'artwork',text:'OLD_RED_WATER_BACKGROUND',x:0,y:0,scale:1},
+    {kind:'logo',x:0,y:-37,scale:.59,rotation:0,order:1}
+  ]}]},
+  location:{origin:'https://mymerchnow.app',pathname:'/',search:'?ai-test=1'},AI_TSHIRT_CHEST_LAYOUT
+});
+const generatedRequest=buildRequest('Create a new black and blue water splash background. Keep my logo centered.');
+assert.doesNotMatch(generatedRequest,/OLD_RED_WATER_BACKGROUND|old-red-water\.png/,'A new image request must not carry old artwork into ChatGPT.');
+assert.match(generatedRequest,/"y":-37/,'Earlier logo placement must remain in the layout request.');
+assert.match(generatedRequest,/standalone prompt distilled ONLY from the background portion/);
+assert.match(generatedRequest,/Do not use edit mode or supply an existing image target/);
 console.log('Automatic transfer passed: real file descriptor, context-preserving link, streamed image retrieval, missing-file/expiry/host/type/size rejection, original logo and chest placement preserved. No AI calls.');
