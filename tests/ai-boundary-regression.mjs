@@ -34,7 +34,8 @@ assert.equal(logo.font,'Inter');
 const client=readFileSync(new URL('../v20/ai-designer.js',import.meta.url),'utf8');
 const server=readFileSync(new URL('../api/ai-design.js',import.meta.url),'utf8');
 const mcp=readFileSync(new URL('../api/mcp.js',import.meta.url),'utf8');
-const executable=client+'\n'+server+'\n'+mcp;
+const builder=readFileSync(new URL('../v20/ai-draft-builder.js',import.meta.url),'utf8');
+const executable=client+'\n'+server+'\n'+mcp+'\n'+builder;
 
 const forbiddenCodePatterns=[
   /from\s+['"][^'"]*editor\.js['"]/,
@@ -56,8 +57,7 @@ for(const method of allowedDesignerCalls){
   assert(['exportDesign','loadDesign','getContext'].includes(method),'AI called unsupported designer method: '+method);
 }
 
-assert(client.includes("product:{id:product.id}"),'AI load payload must identify only the existing product id.');
-assert(client.includes('design\n  };')||client.includes('design\n  }'),'AI load payload must carry customer design state.');
+assert(builder.includes('product:{id:product.id}'),'AI load payload must identify only the existing product id.');
 assert(!client.includes("fetch(API_URL"),'Customer ChatGPT flow must not call the merchant-funded AI endpoint.');
 assert(client.includes("const CHATGPT_URL='https://chatgpt.com/'"),'Customer AI flow must hand off to ChatGPT.');
 assert(client.includes('navigator.clipboard.writeText(request)'),'Customer AI flow must copy a bounded MCP request.');

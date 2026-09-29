@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import {prepareDesignPreview} from '../api/mcp.js';
+import handler from '../api/ai-artwork.js';
+import mcp from '../api/mcp.js';
+import {decodeTransfer,validateArtworkFile} from '../v20/ai-transfer-contract.js';
+import {AI_PRODUCTS} from '../v20/ai-design-contract.js';
+import {buildDraftPayload} from '../v20/ai-draft-builder.js';
+
+const file={download_url:'https://files.oaiusercontent.com/test.png?signature=test',file_id:'file-test',mime_type:'image/png',file_name:'background.png'};
+const args={contextId:'a'.repeat(32),returnUrl:'http://127.0.0.1:8765/?ai-test=1',productId:'tshirt',summary:'Background and logo',backgroundAction:'generate',backgroundFile:file,zones:AI_PRODUCTS[0].zones.map(zone=>({zone,background:'#000000',elements:[{kind:'artwork',x:0,y:0,scale:1},...(zone==='Front'?[{kind:'logo',x:0,y:-30,scale:.54}]:[])]}))};
+const result=prepareDesignPreview(args);
+const transfer=decodeTransfer(new URL(result.url).hash.slice('#ai-transfer='.length));
+assert.equal(transfer.plan.contextId,args.contextId);
+assert.equal(transfer.artwork.download_url,file.download_url);
+assert.throws(()=>prepareDesignPreview({...args,backgroundFile:null}),/Attach the generated/);
+assert.throws(()=>prepareDesignPreview({...args,returnUrl:'https://attacker.example/'}),/original MyMerchNow/);
+for(const url of ['http://files.oaiusercontent.com/a','https://127.0.0.1/a','https://files.oaiusercontent.com.attacker.example/a','https://files.oaiusercontent.com:444/a','https://user:pass@files.oaiusercontent.com/a'])assert.throws(()=>validateArtworkFile({...file,download_url:url}));
+const nativeFetch=globalThis.fetch;
+const png=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
+const request=(body=file)=>new Request('https://mymerchnow.app/api/ai-artwork',{method:'POST',body:JSON.stringify(body)});
+let calls=0;
+try{
+  globalThis.fetch=async(url,options)=>{
+    calls++;assert.equal(url,file.download_url);assert.equal(options.redirect,'error');assert.equal(options.credentials,'omit');
+    return new Response(new ReadableStream({start(c){c.enqueue(png.slice(0,2));c.enqueue(png.slice(2));c.close();}}));
+  };
+  const response=await handler(request());
+  assert.equal(response.status,200);assert.equal(response.headers.get('Content-Type'),'image/png');
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()),png);
+  const invalid=await handler(request({...file,download_url:'https://localhost/private'}));
+  assert.equal(invalid.status,400);assert.equal(calls,1,'Rejected hosts are never fetched');
+  globalThis.fetch=async()=>new Response('<html>not an image</html>',{headers:{'Content-Type':'image/png'}});
+  assert.equal((await handler(request())).status,415,'Content is sniffed rather than trusting MIME headers');
+  globalThis.fetch=async()=>new Response(null,{status:403});
+  const expired=await handler(request());assert.equal(expired.status,410);assert.match((await expired.json()).error,/resend the existing image/);
+  globalThis.fetch=async()=>new Response(png,{headers:{'Content-Length':String(21*1024*1024)}});
+  assert.equal((await handler(request())).status,413);
+}finally{globalThis.fetch=nativeFetch;}
+const current={product:{id:'tshirt'},templates:Object.fromEntries(AI_PRODUCTS[0].zones.map(z=>[z,{width:3000,height:4000}])),design:{zones:{}}};
+const payload=buildDraftPayload(transfer.plan,{logo:{src:'data:image/png;base64,original',width:2000,height:1000},artwork:{src:'data:image/png;base64,received'}},current);
+assert.equal(payload.design.zones.Front.layers[0].src,'data:image/png;base64,received');
+assert.equal(payload.design.zones.Front.layers[1].y,-30);
+assert.equal(payload.design.zones.Front.layers[1].src,'data:image/png;base64,original');
+const old=process.env.MQD_AI_HANDOFF_ENABLED;
+try{
+  process.env.MQD_AI_HANDOFF_ENABLED='1';
+  let output;
+  await mcp({method:'POST',body:{jsonrpc:'2.0',id:1,method:'tools/list'}},{setHeader(){},end(value){output=JSON.parse(value);}});
+  const tool=output.result.tools.find(t=>t.name==='prepare_design_preview');
+  assert.deepEqual(tool._meta['openai/fileParams'],['backgroundFile']);
+  assert.deepEqual(tool.inputSchema.properties.backgroundFile.required,['download_url','file_id']);
+  for(const p of ['download_url','file_id','mime_type','file_name'])assert(tool.inputSchema.properties.backgroundFile.properties[p]);
+}finally{if(old===undefined)delete process.env.MQD_AI_HANDOFF_ENABLED;else process.env.MQD_AI_HANDOFF_ENABLED=old;}
+console.log('Automatic transfer passed: real file descriptor, context-preserving link, streamed image retrieval, missing-file/expiry/host/type/size rejection, original logo and chest placement preserved. No AI calls.');

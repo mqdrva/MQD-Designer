@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {panelUv} from '../v20/panels.js';
-import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from '../v20/tshirt-artwork-calibration.js';
+import {TSHIRT_BODY_ARTWORK_OFFSET_Y,TSHIRT_AI_FRONT_LOGO_OFFSET_Y,tshirtBodyImageOffsetY} from '../v20/tshirt-artwork-calibration.js';
 
 const bounds={min:{x:-.7,y:-.8,z:-.4},max:{x:.7,y:.8,z:.4}};
 const near=(a,b,e=1e-9)=>Math.abs(a-b)<=e;
@@ -40,8 +40,13 @@ assert.equal(TSHIRT_BODY_ARTWORK_OFFSET_Y,-.09);
 assert.equal(tshirtBodyImageOffsetY({type:'image'}),-.09,'uploaded customer logos must receive the T-shirt body correction');
 assert.equal(tshirtBodyImageOffsetY({type:'image',libraryAssetId:'editable',libraryLocked:false}),-.09,'editable library artwork must receive the T-shirt body correction');
 assert.equal(tshirtBodyImageOffsetY({type:'image',libraryAssetId:'grass',libraryLocked:true}),0,'locked library backgrounds must preserve their approved placement');
+assert.equal(tshirtBodyImageOffsetY({type:'image',aiManaged:true,aiAssetKind:'artwork'}),0,'AI backgrounds must match the 2D frame, without an artificial blank hem');
+assert.equal(tshirtBodyImageOffsetY({type:'image',aiManaged:true,aiAssetKind:'logo'}),-.09,'AI logos retain foreground calibration independently of backgrounds');
+assert.equal(TSHIRT_AI_FRONT_LOGO_OFFSET_Y,-.12);
+assert.equal(tshirtBodyImageOffsetY({type:'image',aiManaged:true,aiAssetKind:'logo',aiZone:'Front'}),-.12,'Front AI logo moves higher in 3D without changing its 2D anchor');
+assert.equal(tshirtBodyImageOffsetY({type:'image',aiManaged:true,aiAssetKind:'logo',aiZone:'Back'}),-.09,'Back AI logo preserves the user-approved mapping');
 
 console.log({
   zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],
-  checks:'T-shirt Front/Back movable artwork is calibrated 9% higher in 3D; locked library backgrounds, sleeves, collar and approved fill remain locked.'
+  checks:'AI backgrounds unshifted; front AI logos raised 12%; back foreground remains 9%. Ordinary artwork, locked library backgrounds, sleeves, collar and approved fill unchanged.'
 });
