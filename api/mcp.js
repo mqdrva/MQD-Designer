@@ -1,4 +1,5 @@
 import {AI_PRODUCTS,AI_FONTS} from '../v20/ai-design-contract.js';
+import {encodeTransfer,validateTransferPlan,validateArtworkFile} from '../v20/ai-transfer-contract.js';
 
 const PRODUCT_IDS=AI_PRODUCTS.map(p=>p.id);
 const HEX_PATTERN='^#[0-9A-Fa-f]{6}$';
@@ -53,6 +54,44 @@ const tools=[
   }
 ];
 
+const previewTool={
+  name:'prepare_design_preview',title:'Send finished artwork to MyMerchNow',
+  description:'After generating the requested flat background in this ChatGPT conversation, pass the actual image file as backgroundFile with the full garment layout. Returns the MyMerchNow link that automatically retrieves the background and restores the customer logo saved on the website. Use the exact contextId and returnUrl from the customer request. Never invent file URLs. If no new background is requested, omit backgroundFile. Do not claim the garment has loaded until the customer opens the returned link.',
+  inputSchema:{type:'object',additionalProperties:false,required:['contextId','returnUrl','productId','summary','zones','backgroundAction'],properties:{
+    ...tools[1].inputSchema.properties,
+    contextId:{type:'string',pattern:'^[a-f0-9]{32}$'},
+    returnUrl:{type:'string',maxLength:2000},
+    backgroundAction:{type:'string',enum:['generate','reuse','none'],description:'generate requires the actual generated backgroundFile. reuse retains a background already uploaded on the website. none means no image background was requested.'},
+    backgroundFile:{type:'object',additionalProperties:false,required:['download_url','file_id'],properties:{download_url:{type:'string'},file_id:{type:'string'},mime_type:{type:'string'},file_name:{type:'string'}}}
+  }},
+  annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true},
+  _meta:{'openai/fileParams':['backgroundFile']}
+};
+// Expand the customer-layer vocabulary without altering the garment engine.
+previewTool.inputSchema.properties.zones=JSON.parse(JSON.stringify(tools[1].inputSchema.properties.zones));
+const previewElement=previewTool.inputSchema.properties.zones.items.properties.elements.items;
+previewElement.properties.kind.enum=['logo','text','artwork'];
+previewElement.properties.letterSpacing={type:'number',minimum:-10,maximum:30};
+previewElement.required=['kind','x','y','scale'];
+tools.push(previewTool);
+
+export function handoffEnabled(){return process.env.MQD_AI_HANDOFF_ENABLED==='1'||process.env.VERCEL_ENV==='preview';}
+export function prepareDesignPreview(args){
+  const plan=validateTransferPlan(args);
+  const destination=new URL(args.returnUrl);
+  const local=['localhost','127.0.0.1','[::1]'].includes(destination.hostname)&&destination.protocol==='http:';
+  const remote=destination.protocol==='https:'&&(destination.hostname==='mymerchnow.app'||destination.hostname===process.env.VERCEL_URL);
+  if((!local&&!remote)||destination.username||destination.password||destination.pathname!=='/')throw new Error('Use the original MyMerchNow return website.');
+  const artwork=args.backgroundFile?validateArtworkFile(args.backgroundFile):null;
+  if(!['generate','reuse','none'].includes(args.backgroundAction))throw new Error('Specify whether the background is generated, reused, or not requested.');
+  if(args.backgroundAction==='generate'&&!artwork)throw new Error('Attach the generated backgroundFile before creating the preview. Reuse the image already generated; do not generate it again.');
+  if(plan.zones.some(z=>z.elements.some(e=>e.kind==='artwork'))&&args.backgroundAction==='none')throw new Error('Artwork layers need a generated or reused background image.');
+  // A revision may intentionally reuse the background already stored by the site.
+  // A newly requested image must always be attached by ChatGPT as a file param.
+  destination.hash='ai-transfer='+encodeTransfer(plan,artwork);
+  return {url:destination.href,productId:plan.productId,summary:plan.summary,backgroundAttached:!!artwork};
+}
+
 function json(res,status,payload){
   res.statusCode=status;
   res.setHeader('Content-Type','application/json; charset=utf-8');
@@ -69,6 +108,13 @@ async function readBody(req){
   try{return JSON.parse(raw||'{}')}catch{return null}
 }
 function callTool(name,args){
+  if(name==='prepare_design_preview'){
+    if(!handoffEnabled())return {isError:true,content:[{type:'text',text:'Automatic artwork transfer is not enabled on this deployment yet. Do not generate another image or claim the design is ready.'}]};
+    try{
+      const draft=prepareDesignPreview(args);
+      return {structuredContent:draft,content:[{type:'text',text:`[Open your design in MyMerchNow](${draft.url})\nOpen in the same browser used to upload the logo. The website will retrieve the attached background and apply the layout automatically. If the file link expires, resend the existing image through this tool; do not regenerate it.`}]};
+    }catch(err){return {isError:true,content:[{type:'text',text:err.message}]};}
+  }
   if(name==='list_products'){
     return{
       structuredContent:{products:AI_PRODUCTS},
@@ -101,15 +147,15 @@ export default async function handler(req,res){
     return json(res,200,result(id,{
       protocolVersion,
       capabilities:{tools:{}},
-      serverInfo:{name:'mymerchnow-designer',version:'0.1.0'},
-      instructions:'AI design creation is temporarily paused. Do not create or invent draft links or claim a design is complete. Customers can use the manual designer at https://mymerchnow.app/. Garment models, UVs, templates, mappings, renderer, pricing, checkout, and authentication remain outside this interface.'
+      serverInfo:{name:'mymerchnow-designer',version:'0.2.0'},
+      instructions:handoffEnabled()?'For a customer background request, generate the flat background image in this conversation, then pass that real file to prepare_design_preview together with the full layout, contextId and returnUrl supplied by the website. Return only the tool-provided preview link. Never use a merchant API key or claim the garment is ready when file transfer fails.':'AI design creation is temporarily paused. Do not create or invent draft links or claim a design is complete.'
     }));
   }
   if(body.method==='notifications/initialized'){
     res.statusCode=202;return res.end();
   }
   if(body.method==='ping')return json(res,200,result(id,{}));
-  if(body.method==='tools/list')return json(res,200,result(id,{tools:tools.filter(tool=>tool.name==='list_products')}));
+  if(body.method==='tools/list')return json(res,200,result(id,{tools:tools.filter(tool=>tool.name==='list_products'||(handoffEnabled()&&tool.name==='prepare_design_preview'))}));
   if(body.method==='tools/call'){
     if(!tools.some(tool=>tool.name===body.params?.name))return json(res,200,error(id,-32602,'Unknown tool or invalid arguments'));
     const out=callTool(body.params?.name,body.params?.arguments||{});
