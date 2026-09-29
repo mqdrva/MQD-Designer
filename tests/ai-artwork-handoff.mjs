@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {sanitizePlan,encodePlan,decodePlan,AI_PRODUCTS} from '../v20/ai-design-contract.js';
+import {sanitizePlan,encodePlan,decodePlan,AI_PRODUCTS,AI_TSHIRT_CHEST_LAYOUT} from '../v20/ai-design-contract.js';
 import {buildDraftPayload} from '../v20/ai-draft-builder.js';
 const contextId='a'.repeat(32);
 const plan=sanitizePlan({contextId,productId:'tshirt',zones:AI_PRODUCTS[0].zones.map(zone=>({zone,background:'#000000',elements:[{kind:'artwork',scale:1},...(zone==='Front'?[{kind:'logo',scale:.4,y:-15}]:zone==='Back'?[{kind:'logo',scale:.22,y:-15},{kind:'text',text:'888-888-8888',color:'#FFFFFF',y:25}]:[])]}))});
@@ -29,4 +29,17 @@ const revised=buildDraftPayload(plan,{logo,artwork},{...payload,templates:curren
 assert.equal(revised.design.zones.Front.layers.length,3,'Reapplying duplicates neither customer nor AI layers');
 const crowded={product:{id:'tshirt'},design:{zones:{Front:{layers:Array.from({length:6},(_,id)=>({id,type:'text'}))}}}};
 assert.throws(()=>buildDraftPayload(plan,{logo,artwork},crowded),/six layers/);
+const chestPlan=sanitizePlan({productId:'tshirt',zones:[
+  {zone:'Front',elements:[AI_TSHIRT_CHEST_LAYOUT.frontLogo]},
+  {zone:'Back',elements:[AI_TSHIRT_CHEST_LAYOUT.backLogo,{...AI_TSHIRT_CHEST_LAYOUT.backPhone,text:'888-888-8888'}]}
+]});
+assert.deepEqual(decodePlan(encodePlan(chestPlan)).zones,chestPlan.zones,'Chest layout and phone spacing survive a draft-link round trip');
+const chest=buildDraftPayload(chestPlan,{logo},current);
+assert.equal(chest.design.zones.Front.layers[0].aiZone,'Front');
+assert.equal(chest.design.zones.Front.layers[0].y,-30,'2D front position is independent of 3D calibration');
+assert.equal(chest.design.zones.Back.layers[0].aiZone,'Back');
+assert.equal(chest.design.zones.Back.layers[0].y,-55);
+assert.equal(chest.design.zones.Back.layers[1].y,-25);
+assert.equal(chest.design.zones.Back.layers[1].scale,.89);
+assert.equal(chest.design.zones.Back.layers[1].letterSpacing,5);
 console.log('Artwork draft regression passed: complete images required, logo preserved, background below foreground, phone/back scale correct, no layer loss or duplicated revisions.');
