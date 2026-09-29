@@ -1,7 +1,7 @@
 {
   "name": "mymerchnow",
-  "version": "0.1.0",
-  "description": "Create protected MyMerchNow apparel design drafts in ChatGPT.",
+  "version": "0.2.0",
+  "description": "Plan custom apparel in ChatGPT and open the design in MyMerchNow's 2D/3D editor.",
   "author": {
     "name": "MyMerchNow"
   },
@@ -10,16 +10,23 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "MyMerchNow",
-    "shortDescription": "Design custom apparel using your ChatGPT plan.",
-    "longDescription": "Choose a MyMerchNow garment, place customer artwork and text, and create a protected draft link that opens in the MyMerchNow 2D/3D editor.",
-    "developerName": "MyMerchNow",
+    "shortDescription": "Plan custom apparel and open it in MyMerchNow.",
+    "longDescription": "Choose a garment, plan customer artwork, text, colors, and placement, then open a protected MyMerchNow link to review the design in the 2D/3D apparel editor.",
+    "developerName": "Morales Quality Designs",
     "category": "Lifestyle",
-    "capabilities": ["Design custom apparel", "Create protected draft links"],
+    "capabilities": [
+      "Browse customizable garments",
+      "Prepare protected apparel design links"
+    ],
     "websiteURL": "https://mymerchnow.app/",
     "privacyPolicyURL": "https://mymerchnow.app/privacy.html",
     "termsOfServiceURL": "https://mymerchnow.app/terms.html",
     "brandColor": "#FF6500",
-    "defaultPrompt": ["Create a MyMerchNow apparel design draft from my description."]
+    "defaultPrompt": [
+      "Use MyMerchNow to help me design a custom shirt from my description.",
+      "Show me the garments I can customize with MyMerchNow."
+    ],
+    "supportURL": "https://mymerchnow.app/contact.html"
   },
   "mcpServers": "./.mcp.json"
 }
