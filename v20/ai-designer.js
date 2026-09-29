@@ -183,20 +183,32 @@ function resetAI(){
 function handleLaunchLink(){
   const raw=location.hash.slice(1);
   if(!raw)return;
-  const params=new URLSearchParams(raw);
-  
-  const encodedPlan=params.get('ai-plan')?.replace(/ /g,'+');
-        const encodedPrompt=params.get('ai-prompt');
+  // Draft links may contain standard Base64. Avoid URLSearchParams here because
+  // it treats "+" as a space and can corrupt otherwise valid plugin payloads.
+  const hashValue=name=>{
+    const prefix=`${name}=`;
+    const part=raw.split('&').find(value=>value.startsWith(prefix));
+    if(!part)return null;
+    try{return decodeURIComponent(part.slice(prefix.length));}catch{return null;}
+  };
+  const encodedPlan=hashValue('ai-plan');
+  const encodedPrompt=hashValue('ai-prompt');
   if(encodedPlan){
     const plan=decodePlan(encodedPlan);
     if(plan){
       lastPlan=plan;
       openPanel();
-      $('aiDesignerPrompt').value='Apply the design draft from ChatGPT.';
-      setStatus(plan.zones.some(z=>z.elements.some(e=>e.kind==='logo'))
-        ?'ChatGPT sent a draft. Upload your logo if the design uses one, then click Apply Draft.'
-        :'ChatGPT sent a draft. Click Apply Draft to open it in the designer.','good');
+      $('aiDesignerPrompt').value='Revise this design in ChatGPT.';
+      setStatus('Applying your ChatGPT draft to the garment…','working');
       $('aiApply').hidden=false;
+      applyPlan(plan).then(()=>{
+        history.replaceState(null,'',location.pathname+location.search);
+      }).catch(error=>{
+        setStatus('The draft could not be applied: '+error.message+' Click Apply Draft to try again.','bad');
+      });
+    }else{
+      openPanel();
+      setStatus('This ChatGPT draft link is incomplete. Ask ChatGPT to create a new MyMerchNow draft and open the new link.','bad');
     }
   }else if(encodedPrompt){
     const prompt=decodePrompt(encodedPrompt);
@@ -206,7 +218,7 @@ function handleLaunchLink(){
       setStatus('This request is ready. Click Copy request & open ChatGPT to create the protected draft.','good');
     }
   }
-  if(encodedPlan||encodedPrompt)history.replaceState(null,'',location.pathname+location.search);
+  if(encodedPrompt)history.replaceState(null,'',location.pathname+location.search);
 }
 
 $('aiDesignerToggle')?.addEventListener('click',()=>{
