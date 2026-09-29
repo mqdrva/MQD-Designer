@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test:launch": "node tests/run-launch-regression.mjs",
-    "test:ai-boundary": "node tests/ai-boundary-regression.mjs",
+    "test:ai-boundary": "node tests/ai-boundary-regression.mjs && node tests/plugin-public-submission.mjs",
     "test:plugin-public": "node tests/plugin-public-submission.mjs"
   },
   "devDependencies": {
