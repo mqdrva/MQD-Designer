@@ -1066,8 +1066,8 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   }
   targetCtx.restore();
 }
-function activeLayerScreenRect(){
-  const l=activeLayer();if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
+function activeLayerScreenRect(l=activeLayer()){
+  if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
   if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
   const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
   if(l.type==='image'&&l.image){
@@ -2078,6 +2078,25 @@ $('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').on
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();const arr=zoneState().layers;arr.splice(arr.findIndex(x=>x.id===l.id),1);activeLayerId=arr.at(-1)?.id||null;renderAll();};$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
 function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
+function layerAtCanvasPoint(p){
+  for(const l of [...zoneState().layers].reverse()){
+    if(l.visible===false)continue;
+    const q=activeLayerScreenRect(l);if(!q)continue;
+    const local=rotateSelectionPoint(p.x,p.y,q.cx,q.cy,-(Number(l.rotation)||0)*Math.PI/180);
+    let x=q.x,y=q.y,w=q.w,h=q.h;
+    if(l.type==='text'){
+      const fs=Math.max(18,q.b.w*.10*(l.scale||1));
+      ctx.save();ctx.font=`${l.italic?'italic':'normal'} ${l.bold===false?400:(l.weight||800)} ${fs}px ${textFontFamily(l.font||'Inter')}`;
+      if('letterSpacing' in ctx)ctx.letterSpacing=`${fs*((Number(l.letterSpacing)||0)/100)}px`;
+      w=Math.min(q.b.w*.85,ctx.measureText(l.text||'Text').width)+12;ctx.restore();
+      h=fs*1.15+12;
+      x=q.cx-(l.align==='left'?0:l.align==='right'?w:w/2);
+      y=q.cy-h/2;
+    }
+    if(local.x>=x&&local.x<=x+w&&local.y>=y&&local.y<=y+h)return l;
+  }
+  return null;
+}
 function localDragDelta(dx,dy,rotation=0){
   const a=-(Number(rotation)||0)*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
   return{x:dx*co-dy*si,y:dx*si+dy*co};
@@ -2086,8 +2105,17 @@ function clampCropValue(value,opposite){
   return Math.max(0,Math.min(.88-Math.max(0,Number(opposite)||0),value));
 }
 editorCanvas.addEventListener('pointerdown',e=>{
+  const p=pointerToCanvas(e),current=activeLayer(),currentRect=activeLayerScreenRect(),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=22;
+  const currentGeometry=current&&currentRect?selectionGeometry(current,currentRect):null;
+  const onHandle=currentGeometry&&!isLockedLibraryLayer(current)&&(cropMode&&current.type==='image'?currentGeometry.cropHandles.some(h=>near(h.x,h.y)):near(currentGeometry.rotateHandle.x,currentGeometry.rotateHandle.y)||currentGeometry.resizeHandles.some(h=>near(h.x,h.y)));
+  const pointed=layerAtCanvasPoint(p);
+  // A different foreground item takes precedence when it happens to overlap
+  // the selected item's handle; a full background remains the fallback.
+  const hit=onHandle&&(!pointed||pointed===current||pointed.chatBackground)?current:pointed;
+  if(!hit)return;
+  if(hit.id!==activeLayerId){activeLayerId=hit.id;cropMode=false;renderLayerPanel();drawEditor();}
   const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l))return;
-  const p=pointerToCanvas(e),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=22,g=selectionGeometry(l,q);
+  const g=selectionGeometry(l,q);
   snapshot();
   let mode='move',corner=null;
   if(cropMode&&l.type==='image'){
