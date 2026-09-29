@@ -1,260 +1,182 @@
-import {AI_PRODUCTS,AI_FONTS,sanitizePlan,productForPlan,decodePlan,decodePrompt} from './ai-design-contract.js';
+import {AI_PRODUCTS,sanitizePlan,productForPlan,decodePlan,decodePrompt} from './ai-design-contract.js';
+import {createContextId,validContextId,saveDraftAssets,loadDraftAssets,removeDraftAssets} from './ai-draft-assets.js';
+import {buildDraftPayload} from './ai-draft-builder.js';
 
 const $=id=>document.getElementById(id);
 const CHATGPT_URL='https://chatgpt.com/';
-let logoDataUrl='';
-let logoFilename='uploaded-logo.png';
+let contextId=createContextId();
+let assets={logo:null,artwork:null};
 let lastPlan=null;
+let busy=false;
+const sessionKey='mqd-ai-draft-context';
 
-function setStatus(message,tone=''){
-  const el=$('aiDesignerStatus');
-  if(!el)return;
-  el.textContent=message||'';
-  el.dataset.tone=tone;
+function setStatus(message,tone=''){$('aiDesignerStatus').textContent=message;$('aiDesignerStatus').dataset.tone=tone;}
+function currentProductId(){return $('productSelect')?.value||window.MQDDesigner?.getContext?.()?.productId||'tshirt';}
+function updateAssetLabels(){
+  $('aiLogoName').textContent=assets.logo?.filename||'No logo selected';
+  $('aiArtworkName').textContent=assets.artwork?.filename||'No background image selected';
 }
-function currentProductId(){
-  return $('productSelect')?.value||window.MQDDesigner?.getContext?.()?.productId||'tshirt';
+function rememberSession(){try{sessionStorage.setItem(sessionKey,contextId);}catch{}}
+async function persist(){
+  await saveDraftAssets(contextId,{assets,prompt:$('aiDesignerPrompt').value,plan:lastPlan});
+  rememberSession();
 }
-function findExistingLogo(){
-  try{
-    const payload=window.MQDDesigner?.exportDesign?.();
-    for(const zone of Object.values(payload?.design?.zones||{})){
-      for(const layer of zone?.layers||[]){
-        if(layer?.type==='image'&&!layer.libraryAssetId&&typeof layer.src==='string'&&layer.src.startsWith('data:image/')){
-          return{src:layer.src,filename:layer.filename||'current-artwork.png'};
-        }
-      }
-    }
-  }catch{}
-  return null;
+async function restore(id){
+  const record=await loadDraftAssets(id);
+  contextId=id;assets=record?.assets||{logo:null,artwork:null};lastPlan=record?.plan||null;
+  $('aiDesignerPrompt').value=record?.prompt||'';
+  updateAssetLabels();rememberSession();return record;
 }
-function waitForDesigner(timeout=12000){
-  const started=Date.now();
+function waitForDesigner(timeout=20000){
+  const start=Date.now();
   return new Promise((resolve,reject)=>{
     const tick=()=>{
       if(window.MQDDesigner?.exportDesign&&window.MQDDesigner?.loadDesign)return resolve(window.MQDDesigner);
-      if(Date.now()-started>timeout)return reject(new Error('The designer is still loading. Please try again.'));
+      if(Date.now()-start>timeout)return reject(new Error('The designer is still loading. Please try again.'));
       setTimeout(tick,80);
-    };
-    tick();
+    };tick();
   });
 }
-function fileToOptimizedDataUrl(file){
-  return new Promise((resolve,reject)=>{
-    if(!file?.type?.startsWith('image/'))return reject(new Error('Choose a PNG, JPG, or WebP logo.'));
-    if(file.size>15*1024*1024)return reject(new Error('Please use a logo smaller than 15 MB.'));
-    const reader=new FileReader();
-    reader.onerror=()=>reject(new Error('The logo could not be read.'));
-    reader.onload=()=>{
-      const img=new Image();
-      img.onerror=()=>reject(new Error('The logo image could not be opened.'));
-      img.onload=()=>{
-        const max=1800,ratio=Math.min(1,max/Math.max(img.naturalWidth||1,img.naturalHeight||1));
-        const canvas=document.createElement('canvas');
-        canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));
-        canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
-        const ctx=canvas.getContext('2d');
-        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-        ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        const png=canvas.toDataURL('image/png');
-        resolve(png);
-      };
-      img.src=String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
+async function readImage(file){
+  if(!['image/png','image/jpeg','image/webp'].includes(file?.type))throw new Error('Choose a PNG, JPG, or WebP image.');
+  if(file.size>20*1024*1024)throw new Error('Choose an image smaller than 20 MB.');
+  const src=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('The image could not be read.'));reader.readAsDataURL(file);});
+  const img=new Image();img.src=src;
+  try{await img.decode();}catch{throw new Error('This image could not be opened. Choose a valid PNG, JPG, or WebP.');}
+  if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>64000000)throw new Error('Choose an image with fewer than 64 million pixels.');
+  return {src,filename:file.name,width:img.naturalWidth,height:img.naturalHeight};
 }
-function makeLogoLayer(el,id){
-  return{
-    id,type:'image',label:'AI Logo',filename:logoFilename,src:logoDataUrl,
-    x:el.x,y:el.y,scale:el.scale,rotation:el.rotation,
-    flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},
-    visible:true,aiManaged:true
-  };
+async function run(action){
+  if(busy)return;
+  busy=true;
+  const controls=['aiGenerate','aiArtworkGenerate','aiApply','aiDesignerReset','aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiImportJson'].map($);
+  controls.forEach(control=>{control.disabled=true;});
+  try{await action();}catch(error){setStatus(error.message,'bad');}
+  finally{busy=false;controls.forEach(control=>{control.disabled=false;});}
 }
-function makeTextLayer(el,id){
-  return{
-    id,type:'text',label:'AI Text',text:el.text||'Text',
-    x:el.x,y:el.y,scale:el.scale,rotation:el.rotation,visible:true,
-    color:el.color,font:AI_FONTS.includes(el.font)?el.font:'Inter',
-    strokeColor:el.strokeColor,strokeWidth:el.strokeWidth,letterSpacing:0,
-    bold:el.bold!==false,italic:el.italic===true,align:el.align||'center',
-    aiManaged:true
-  };
-}
-function nextLayerId(){
-  return 'ai-layer-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+async function acceptPlan(raw){
+  if(!raw||raw.version!=='mqd-ai-plan-v1'||!AI_PRODUCTS.some(p=>p.id===raw.productId)||!Array.isArray(raw.zones)||!raw.zones.length)throw new Error('This is not a MyMerchNow draft. Import the design-plan.json file from ChatGPT.');
+  const product=productForPlan(raw.productId);
+  if(raw.zones.length!==product.zones.length||new Set(raw.zones.map(z=>z?.zone)).size!==product.zones.length)throw new Error('The draft must include every garment zone exactly once. Ask ChatGPT to include the sleeves and collar too.');
+  if(raw.contextId!=null&&!validContextId(raw.contextId))throw new Error('The draft reference was changed. Ask ChatGPT to copy the contextId exactly from your request.');
+  for(const zone of raw.zones){
+    if(!product.zones.includes(zone.zone)||!Array.isArray(zone.elements)||zone.elements.length>6||zone.elements.some(el=>!['logo','text','artwork'].includes(el?.kind)))throw new Error('The draft contains an unsupported zone or layer. Ask ChatGPT to correct the draft.');
+  }
+  const safe=sanitizePlan(raw);
+  if(safe.contextId&&safe.contextId!==contextId)await restore(safe.contextId);
+  // An unmatched draft cannot silently borrow artwork from another request.
+  if(!safe.contextId){contextId=createContextId();assets={logo:null,artwork:null};updateAssetLabels();}
+  lastPlan={...safe,contextId};$('aiApply').hidden=false;
+  await persist();await applyPlan(lastPlan);
 }
 async function applyPlan(plan){
   const designer=await waitForDesigner();
-  const safe=sanitizePlan(plan,{fallbackProductId:currentProductId()});
-  const product=productForPlan(safe.productId);
-  if(!product)throw new Error('The AI selected an unavailable garment.');
-
-  const current=designer.exportDesign();
-  if(!logoDataUrl){
-    const existing=findExistingLogo();
-    if(existing){logoDataUrl=existing.src;logoFilename=existing.filename;}
-  }
-
-  const sameProduct=current?.product?.id===product.id;
-  const existingZones=sameProduct?(current?.design?.zones||{}):{};
-  const design={zones:{}};
-  let skippedLogo=false;
-
-  for(const row of safe.zones){
-    const preserved=(existingZones[row.zone]?.layers||[]).filter(layer=>layer?.libraryAssetId);
-    const layers=[...preserved];
-    for(const el of row.elements){
-      if(el.kind==='logo'){
-        if(!logoDataUrl){skippedLogo=true;continue;}
-        if(layers.length<6)layers.push(makeLogoLayer(el,nextLayerId()));
-      }else if(el.kind==='text'&&layers.length<6){
-        layers.push(makeTextLayer(el,nextLayerId()));
-      }
-    }
-    design.zones[row.zone]={background:row.background,layers};
-  }
-
-  const active=safe.zones.find(z=>z.elements.length)?.zone||product.zones[0];
-  const payload={
-    schema:'mqd-design-v1',
-    product:{id:product.id},
-    activeZone:active,
-    design
-  };
+  const payload=buildDraftPayload(plan,assets,designer.exportDesign());
   await designer.loadDesign(payload,{notify:false});
-  if($('productSelect'))$('productSelect').value=product.id;
-  lastPlan=safe;
-
-  if(skippedLogo){
-    setStatus('Draft applied. Upload your logo in the AI panel and click Apply Draft to place the logo elements.','warn');
-  }else{
-    setStatus('AI draft applied. You can keep editing normally, or type another instruction below.','good');
-  }
-  $('aiGenerate').textContent='Copy revision & open ChatGPT';
-  $('aiApply').hidden=false;
-  return safe;
+  $('productSelect').value=payload.product.id;
+  lastPlan=sanitizePlan(plan);
+  setStatus('Draft applied with all required images. Review the front, back, and print quality before saving.','good');
+  $('aiGenerate').textContent='Copy revision & open ChatGPT';$('aiApply').hidden=false;
+  return lastPlan;
 }
 function buildChatGPTRequest(prompt){
   const product=productForPlan(currentProductId());
   return [
-    'Use the MyMerchNow plugin to create a protected apparel design draft.',
-    `Starting garment: ${product?.name||'Short Sleeve T-Shirt'} (${currentProductId()}).`,
+    'Create a downloadable apparel layout draft in this chat. This is the MyMerchNow file-import workflow: do not call the MyMerchNow plugin, which is paused. Create the JSON file directly. Do not generate an image in this step; I will request the background separately.',
+    `Starting garment: ${product.name} (${product.id}). Valid zones: ${product.zones.join(', ')}.`,
     `Customer request: ${prompt}`,
-    'Use list_products if you need valid garment or print-zone names, then call create_design_draft.',
-    'Return the MyMerchNow draft link so I can open and review the design in the 2D/3D editor.',
+    `Draft contextId: ${contextId}. Copy this exactly into the draft so my uploaded logo is restored in the website.`,
+    `Logo selected on website: ${assets.logo?'yes':'no'}. Background image selected on website: ${assets.artwork?'yes':'no'}.`,
+    'If a patterned, abstract, photographic, water, or illustrated background is requested, include kind artwork layers for a background image I will generate and upload separately. Never substitute solid color or text slashes for the requested artwork.',
+    'Return a downloadable design-plan.json AND a JSON code block using this shape:',
+    JSON.stringify({version:'mqd-ai-plan-v1',contextId,productId:product.id,summary:'Brief description',zones:[{zone:product.zones[0],background:'#000000',elements:[{kind:'artwork',x:0,y:0,scale:1,rotation:0},{kind:'logo',x:0,y:-15,scale:.4,rotation:0}]}]}),
+    'Use kind artwork for the downloaded background image, kind logo for my original logo, and kind text with text, color, font, bold, x, y, scale, rotation for words or a phone number. Allowed fonts: Inter, Montserrat, Poppins, Oswald, Bebas Neue, Anton, Archivo Black, Black Ops One, Righteous, Russo One, League Spartan.',
+    'Include EVERY garment zone. For an all-over background, include an artwork layer in every zone at scale 1. Use x/y -100 to 100 (0=center), at most six layers per zone. Logo scale is a fraction of the contained zone size: use about 0.4 for a centered front logo and 0.25 for a smaller back logo, at most 0.8. Text scale is a font-size multiplier: use 0.8 to 1.0 for a readable phone number, NOT 0.18. Put the phone number below the logo with a larger y, such as 25.',
+    lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
+    'Explain that I must return to the original website tab, import design-plan.json using Import draft, and upload the downloaded background image. The draft is not complete until its required images have been applied. Do not invent a website link or claim to have changed the website.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 async function openInChatGPT(){
-  const prompt=$('aiDesignerPrompt')?.value.trim();
-  if(!prompt){setStatus('Describe what you want the shirt to look like.','warn');$('aiDesignerPrompt')?.focus();return;}
+  const prompt=$('aiDesignerPrompt').value.trim();
+  if(!prompt)throw new Error('Describe the design before opening ChatGPT.');
+  await persist();
   const request=buildChatGPTRequest(prompt);
-  try{
-    await navigator.clipboard.writeText(request);
-    window.open(CHATGPT_URL,'_blank','noopener,noreferrer');
-    setStatus('Request copied and ChatGPT opened. Enable the MyMerchNow plugin, paste the request, then open the draft link ChatGPT returns.','good');
-  }catch{
-    window.open(CHATGPT_URL,'_blank','noopener,noreferrer');
-    setStatus('ChatGPT opened. Copy your description manually, enable the MyMerchNow plugin, and ask it to create a design draft.','warn');
+  await copyAndOpen(request,'Request copied. Paste it into ChatGPT, download design-plan.json, and import it here. Your logo is saved in this browser for 24 hours.');
+}
+async function openBackgroundInChatGPT(){
+  const prompt=$('aiDesignerPrompt').value.trim();
+  if(!prompt)throw new Error('Describe your background in the design request first.');
+  await persist();
+  const request=`Generate a flat, high-resolution background artwork image for an all-over print garment. Brief: ${prompt}\nCreate ONLY the background described in the brief. No shirt mockup, garment silhouette, logo, text, letters, phone number, watermark, or cutlines. Let the pattern fill the entire rectangular image edge to edge. Keep it suitable for placing a separate logo on top. I will download this image and upload it into MyMerchNow myself. Do not call the MyMerchNow plugin or claim to have changed the website.`;
+  await copyAndOpen(request,'Background request copied. Paste it into ChatGPT, download the generated image, then upload it here under Background image.');
+}
+async function copyAndOpen(request,message){
+  $('aiCopiedRequest').value=request;$('aiRequestDetails').hidden=false;$('aiChatGPTLink').hidden=false;
+  try{await navigator.clipboard.writeText(request);}catch{
+    $('aiRequestDetails').open=true;
+    throw new Error('Automatic copying was blocked. Copy the request shown below, then use Open ChatGPT. Your logo is saved.');
   }
+  window.open(CHATGPT_URL,'_blank','noopener,noreferrer');
+  setStatus(message,'good');
+  $('aiChatGPTLink').hidden=false;
 }
-function openPanel(){
-  $('aiDesignerPanel')?.classList.remove('hidden');
-  $('aiDesignerToggle')?.setAttribute('aria-expanded','true');
-  setTimeout(()=>$('aiDesignerPrompt')?.focus(),50);
+function openPanel(){$('aiDesignerPanel').classList.remove('hidden');$('aiDesignerToggle').setAttribute('aria-expanded','true');}
+function closePanel(){$('aiDesignerPanel').classList.add('hidden');$('aiDesignerToggle').setAttribute('aria-expanded','false');}
+async function resetAI(){
+  await removeDraftAssets(contextId);
+  contextId=createContextId();assets={logo:null,artwork:null};lastPlan=null;
+  for(const id of ['aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiDesignerPrompt','aiDraftJson','aiCopiedRequest'])$(id).value='';
+  $('aiRequestDetails').hidden=true;$('aiRequestDetails').open=false;$('aiChatGPTLink').hidden=true;
+  updateAssetLabels();rememberSession();
+  $('aiApply').hidden=true;$('aiGenerate').textContent='Copy request & open ChatGPT';
+  setStatus('New draft started. Upload your logo and describe your design.','');
 }
-function closePanel(){
-  $('aiDesignerPanel')?.classList.add('hidden');
-  $('aiDesignerToggle')?.setAttribute('aria-expanded','false');
-}
-function resetAI(){
-  lastPlan=null;
-  logoDataUrl='';
-  logoFilename='uploaded-logo.png';
-  $('aiLogoUpload').value='';
-  $('aiLogoName').textContent='No AI logo selected';
-  $('aiDesignerPrompt').value='';
-  $('aiGenerate').textContent='Copy request & open ChatGPT';
-  $('aiApply').hidden=true;
-  setStatus('Describe a design, then continue in ChatGPT using the MyMerchNow plugin.','');
-}
-function handleLaunchLink(){
-  const raw=location.hash.slice(1);
-  if(!raw)return;
-  // Draft links may contain standard Base64. Avoid URLSearchParams here because
-  // it treats "+" as a space and can corrupt otherwise valid plugin payloads.
-  const hashValue=name=>{
-    const prefix=`${name}=`;
-    const part=raw.split('&').find(value=>value.startsWith(prefix));
-    if(!part)return null;
-    try{return decodeURIComponent(part.slice(prefix.length));}catch{return null;}
-  };
-  const encodedPlan=hashValue('ai-plan');
-  const encodedPrompt=hashValue('ai-prompt');
-  if(encodedPlan){
-    const plan=decodePlan(encodedPlan);
-    if(plan){
-      lastPlan=plan;
-      openPanel();
-      $('aiDesignerPrompt').value='Revise this design in ChatGPT.';
-      setStatus('Applying your ChatGPT draft to the garment…','working');
-      $('aiApply').hidden=false;
-      applyPlan(plan).then(()=>{
-        history.replaceState(null,'',location.pathname+location.search);
-      }).catch(error=>{
-        setStatus('The draft could not be applied: '+error.message+' Click Apply Draft to try again.','bad');
-      });
-    }else{
-      openPanel();
-      setStatus('This ChatGPT draft link is incomplete. Ask ChatGPT to create a new MyMerchNow draft and open the new link.','bad');
-    }
-  }else if(encodedPrompt){
-    const prompt=decodePrompt(encodedPrompt);
-    if(prompt){
-      openPanel();
-      $('aiDesignerPrompt').value=prompt;
-      setStatus('This request is ready. Click Copy request & open ChatGPT to create the protected draft.','good');
-    }
+async function initialize(){
+  const hash=new URLSearchParams(location.hash.slice(1));
+  const rawPlan=location.hash.slice(1).split('&').find(part=>part.startsWith('ai-plan='));
+  let plan=null;
+  if(rawPlan){
+    try{plan=decodePlan(decodeURIComponent(rawPlan.slice(8)));}catch{}
+    if(!plan){openPanel();throw new Error('This draft link is incomplete. Import the draft file from ChatGPT instead.');}
   }
-  if(encodedPrompt)history.replaceState(null,'',location.pathname+location.search);
+  let storedId=null;try{storedId=sessionStorage.getItem(sessionKey);}catch{}
+  const id=plan?.contextId||(!rawPlan&&validContextId(storedId)?storedId:null);
+  if(id)await restore(id);else rememberSession();
+  if(plan){openPanel();await acceptPlan(plan);history.replaceState(null,'',location.pathname+location.search);}
+  else if(hash.has('ai-prompt')){$('aiDesignerPrompt').value=decodePrompt(hash.get('ai-prompt'));openPanel();}
+  else if(lastPlan){$('aiApply').hidden=false;setStatus('Your draft and images are restored. Click Apply Draft to preview it.','');}
 }
 
-$('aiDesignerToggle')?.addEventListener('click',()=>{
-  if($('aiDesignerPanel')?.classList.contains('hidden'))openPanel();else closePanel();
-});
-$('aiDesignerClose')?.addEventListener('click',closePanel);
-$('aiGenerate')?.addEventListener('click',openInChatGPT);
-$('aiApply')?.addEventListener('click',async()=>{
-  if(!lastPlan)return;
-  try{await applyPlan(lastPlan)}catch(error){setStatus(error.message,'bad');}
-});
-$('aiDesignerReset')?.addEventListener('click',resetAI);
-$('aiLogoUpload')?.addEventListener('change',async event=>{
-  const file=event.target.files?.[0];
-  if(!file)return;
-  try{
-    setStatus('Preparing your logo…','working');
-    logoDataUrl=await fileToOptimizedDataUrl(file);
-    logoFilename=file.name||'uploaded-logo.png';
-    $('aiLogoName').textContent=logoFilename;
-    setStatus(lastPlan?'Logo ready. Click Apply Draft to place it, or give AI another instruction.':'Logo ready. Describe the design you want.','good');
-  }catch(error){
-    event.target.value='';
-    logoDataUrl='';
-    $('aiLogoName').textContent='No AI logo selected';
-    setStatus(error.message,'bad');
-  }
-});
-$('aiDesignerPrompt')?.addEventListener('keydown',event=>{
-  if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();openInChatGPT();}
-});
-
-resetAI();
-handleLaunchLink();
-window.MQDAIDesigner={
-  getPlan:()=>lastPlan,
-  applyPlan,
-  open:openPanel
-};
+$('aiDesignerToggle').addEventListener('click',()=>{$('aiDesignerPanel').classList.contains('hidden')?openPanel():closePanel();});
+$('aiDesignerClose').addEventListener('click',closePanel);
+$('aiGenerate').addEventListener('click',()=>run(openInChatGPT));
+$('aiArtworkGenerate').addEventListener('click',()=>run(openBackgroundInChatGPT));
+$('aiApply').addEventListener('click',()=>run(async()=>{if(lastPlan)await applyPlan(lastPlan);}));
+$('aiDesignerReset').addEventListener('click',()=>run(resetAI));
+for(const [id,kind] of [['aiLogoUpload','logo'],['aiArtworkUpload','artwork']]){
+  $(id).addEventListener('change',event=>run(async()=>{
+    const file=event.target.files?.[0];if(!file)return;
+    setStatus('Saving your image…','working');
+    const asset=await readImage(file);
+    const next={...assets,[kind]:asset};
+    await saveDraftAssets(contextId,{assets:next,prompt:$('aiDesignerPrompt').value,plan:lastPlan});
+    assets=next;updateAssetLabels();rememberSession();
+    setStatus(lastPlan?'Image saved. Click Apply Draft to preview the complete design.':'Image saved. Describe your design and continue in ChatGPT.','good');
+  }));
+}
+$('aiDraftUpload').addEventListener('change',event=>run(async()=>{
+  const file=event.target.files?.[0];if(!file)return;
+  if(file.size>64000)throw new Error('The draft file is too large. Upload only design-plan.json here.');
+  let plan;try{plan=JSON.parse(await file.text());}catch{throw new Error('This file is not valid draft JSON. Choose design-plan.json from ChatGPT.');}
+  await acceptPlan(plan);
+}));
+$('aiImportJson').addEventListener('click',()=>run(async()=>{
+  const text=$('aiDraftJson').value.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
+  if(text.length>64000)throw new Error('The draft is too large.');
+  let plan;try{plan=JSON.parse(text);}catch{throw new Error('Paste only the draft JSON code block from ChatGPT.');}
+  await acceptPlan(plan);
+}));
+$('aiDesignerPrompt').addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();run(openInChatGPT);}});
+updateAssetLabels();run(initialize);
+window.MQDAIDesigner={getPlan:()=>lastPlan,applyPlan,open:openPanel};
