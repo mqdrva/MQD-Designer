@@ -81,7 +81,7 @@
     </div>
     <section id="aiDesignerPanel" class="ai-designer-panel hidden" aria-label="AI Designer">
       <div class="ai-designer-head">
-        <div><strong>Design with your ChatGPT · Private test</strong><p>Create a draft and background in your ChatGPT account, then import them here.</p></div>
+        <div><strong>Design with your ChatGPT · Private test</strong><p>Create your design in ChatGPT, then open its return link to preview your shirt here.</p></div>
         <button id="aiDesignerClose" class="ai-close" type="button" aria-label="Close AI Designer">×</button>
       </div>
       <div class="ai-designer-body">
@@ -89,8 +89,8 @@
         <ol class="ai-steps">
           <li>Upload your logo and describe the design below.</li>
           <li>Click <strong>Copy request &amp; open ChatGPT</strong>.</li>
-          <li>Paste into ChatGPT, download <strong>design-plan.json</strong>, then return here and import it.</li>
-          <li>For a custom background, use <strong>Create background in ChatGPT</strong>. Download that image, upload it here, then click <strong>Apply Draft</strong>.</li>
+          <li>Paste into ChatGPT, then click <strong>Open your design in MyMerchNow</strong> in its reply. Your saved images and layout load automatically.</li>
+          <li>For a new custom background, use <strong>Create background in ChatGPT</strong>. Download that image and upload it here; your design applies automatically.</li>
         </ol>
         <div class="ai-safety"><strong>Protected engine:</strong> ChatGPT can only choose the garment and change customer artwork, text, colors, and placement. UVs, GLBs, mappings, templates, renderer settings, pricing, checkout, and authentication stay outside the AI interface.</div>
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
@@ -100,8 +100,7 @@
         <div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background in ChatGPT</button></div>
         <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
         <details id="aiRequestDetails" hidden><summary>View request to copy manually</summary><textarea id="aiCopiedRequest" class="ai-prompt" aria-label="Request for ChatGPT" readonly></textarea></details>
-        <label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label>
-        <details><summary>Or paste the draft from ChatGPT</summary><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
+        <details><summary>Backup: import a draft file or code</summary><label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
         <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
         <div class="ai-note">Your original logo stays in this browser for 24 hours and is matched to this draft. ChatGPT creates the layout and background; it does not receive or redraw your logo. Use Clear to remove the saved draft images. Review every side and the print-quality estimate before ordering.</div>
       </div>
@@ -140,7 +139,7 @@ const aiPrivateTest = ['localhost', '127.0.0.1', '[::1]'].includes(location.host
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929c');
+  await import('/v20/ai-designer.js?v=20260929-return-link');
 } else {
   aiTestUI.remove();
 }
