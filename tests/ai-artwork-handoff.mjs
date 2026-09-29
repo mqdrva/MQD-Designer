@@ -6,6 +6,9 @@ const plan=sanitizePlan({contextId,productId:'tshirt',zones:AI_PRODUCTS[0].zones
 const decoded=decodePlan(encodePlan(plan));
 assert.equal(decoded.contextId,contextId);
 assert.deepEqual(decoded.zones,plan.zones);
+const chatReturnToken=Buffer.from(JSON.stringify(plan),'utf8').toString('base64url');
+assert.deepEqual(decodePlan(chatReturnToken).zones,plan.zones,'ChatGPT-computed return links preserve the complete layout');
+assert.equal(decodePlan(chatReturnToken).contextId,contextId,'Return links restore only their own saved images');
 assert.equal(decodePlan(encodePlan(plan).slice(0,-1)+'!'),null);
 const legacy='WzIsMCxbWzAsIjAwMDAwMCIsW1sxLCJURVNUIERFU0lHTiIsMCwwLDEsMCwiRkYwMDAwIiwiMDAwMDAwIiwwLDAsMSwwLDFdXV1dXQ.fehcj1';
 assert.equal(decodePlan(legacy).zones[0].elements[0].text,'TEST DESIGN');
