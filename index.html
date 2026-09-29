@@ -88,9 +88,9 @@
         <label for="chatBackgroundPrompt"><strong>1. Describe your background</strong></label>
         <textarea id="chatBackgroundPrompt" class="ai-prompt" maxlength="1200" placeholder="Type the colors and pattern you want…" required></textarea>
         <p class="ai-note">Example: Black background with bright blue water splashes along the bottom.</p>
-        <button id="chatBackgroundCreate" class="primary" type="button">Copy prompt &amp; open ChatGPT</button>
-        <p class="ai-note">Paste the prompt into ChatGPT Images and send. Your ChatGPT account and its usage limits apply. Save the image and return to this tab.</p>
-        <a id="chatBackgroundOpen" href="https://chatgpt.com/images/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT Images</a>
+        <button id="chatBackgroundCreate" class="primary" type="button">Open prompt in ChatGPT</button>
+        <p class="ai-note">Your prompt opens in ChatGPT; click Send to generate. If it is not filled in, paste the copied prompt. Your ChatGPT account and its usage limits apply. Save the image and return to this tab.</p>
+        <a id="chatBackgroundOpen" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open prompt in ChatGPT</a>
         <details id="chatBackgroundManual" hidden><summary>View prompt to copy</summary><textarea id="chatBackgroundCopy" class="ai-prompt" aria-label="Background prompt to copy" readonly></textarea></details>
         <strong>2. Upload your saved background</strong>
         <label for="chatBackgroundAreas">Apply background to</label>
@@ -136,7 +136,7 @@ const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/chat-background.js?v=20260929-background-only');
+  await import('/v20/chat-background.js?v=20260929-background-prefill');
 } else {
   aiTestUI.remove();
 }

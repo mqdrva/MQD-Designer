@@ -15,13 +15,15 @@ $('chatBackgroundClose').addEventListener('click',()=>{
 $('chatBackgroundCreate').addEventListener('click',async()=>{
   if(!prompt.value.trim()){prompt.focus();setStatus('Describe the background you want first.','bad');return;}
   const request=backgroundPrompt(prompt.value);
+  const chatUrl='https://chatgpt.com/?q='+encodeURIComponent(request);
+  $('chatBackgroundOpen').href=chatUrl;
   $('chatBackgroundCopy').value=request;$('chatBackgroundManual').hidden=false;$('chatBackgroundOpen').hidden=false;
   try{await navigator.clipboard.writeText(request);}catch{
     $('chatBackgroundManual').open=true;
-    setStatus('Copy the prompt shown below, then click Open ChatGPT Images.','');return;
+    setStatus('Click Open prompt in ChatGPT below. If the message box is empty, copy the prompt shown here and paste it.','');return;
   }
-  window.open('https://chatgpt.com/images/','_blank','noopener,noreferrer');
-  setStatus('Prompt copied. Paste it into ChatGPT Images and send. Save the image, then return to this tab and upload it below. If no tab opened, click Open ChatGPT Images.','good');
+  window.open(chatUrl,'_blank','noopener,noreferrer');
+  setStatus('Your prompt opens in ChatGPT. Click Send to generate, save the image, then return here to upload it. If the message box is empty, paste the copied prompt. If no tab opened, use Open prompt in ChatGPT below.','good');
 });
 $('chatBackgroundUpload').addEventListener('change',async event=>{
   const input=event.target,file=input.files?.[0];if(!file)return;
