@@ -115,7 +115,10 @@ function buildChatGPTRequest(prompt){
 }
 async function openInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
-  if(!prompt)throw new Error('Describe the design before opening ChatGPT.');
+  if(!prompt){
+    $('aiDesignerPrompt').focus();
+    throw new Error('Type your shirt description in the box above, then click Continue in ChatGPT. The example is only a guide.');
+  }
   await persist();
   let availability;
   try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)availability=await response.json();}catch{}
