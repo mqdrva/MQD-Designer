@@ -132,11 +132,11 @@
 <script type="module" src="/v20/editor.js?v=20260928-fonts-100"></script>
 <script type="module" src="/v20/customer.js?v=20260928-bg-limit-10"></script>
 <script type="module">
-// Keep unfinished AI controls out of public deployments, including old draft links.
-// Local testing requires an explicit opt-in and never enables the public site.
+// The normal storefront stays hidden until public rollout is enabled.
+// An explicit test URL can exercise an enabled backend on its real ChatGPT origin.
 let aiAvailability={};
 try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)aiAvailability=await response.json();}catch{}
-const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)||aiAvailability.privatePreview)
+const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)||aiAvailability.enabled)
   && new URLSearchParams(location.search).get('ai-test') === '1';
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
