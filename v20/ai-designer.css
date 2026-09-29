@@ -2,3 +2,4 @@
 
 /* Customer-funded ChatGPT handoff */
 .ai-designer-head p{font-size:12px}.ai-funding{border:1px solid #ffd0ad;background:#fff7f0;border-radius:10px;padding:10px 11px;font-size:12px;line-height:1.5;color:#6d3710}.ai-steps{margin:0;padding:0 0 0 22px;display:grid;gap:6px;color:#444;font-size:12px;line-height:1.45}.ai-safety{font-size:11px}.ai-logo-name,.ai-logo-label{font-size:12px}.ai-prompt{font-size:14px}.ai-actions button{font-size:12px;line-height:1.2}.ai-status{min-height:18px;font-size:12px}.ai-note{font-size:11px;color:#747474}
+.ai-background-step{border:1px solid #ffd0ad;background:#fff7f0;border-radius:10px;padding:10px}.ai-background-step summary{font-size:12px;font-weight:800;color:#7d390d;cursor:pointer}.ai-background-hint{margin:9px 0;color:#4b3b30;font-size:12px;line-height:1.45}.ai-background-upload{background:#ff6500;border-color:#ff6500;color:#fff}
