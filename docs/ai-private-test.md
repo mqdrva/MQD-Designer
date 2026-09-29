@@ -5,9 +5,9 @@ Public AI controls and MCP draft creation remain paused. This repair is enabled 
 From the repository, serve the static site bound to loopback (for example `python3 -m http.server 8765 --bind 127.0.0.1`) and open `http://127.0.0.1:8765/?ai-test=1`.
 
 1. Open Design with your ChatGPT and upload a logo.
-2. Describe the garment, background, logo placement, and wording. Copy the layout request and paste it into ChatGPT. Download `design-plan.json` and import it in the original designer tab. A JSON-code-block paste is available if ChatGPT cannot attach a file.
+2. Describe the garment, background, logo placement, and wording. Copy the layout request and paste it into ChatGPT. Click **Open your design in MyMerchNow** in its response. ChatGPT computes the layout URL using code execution; the exact originating website and context ID preserve local test access and restore that draft's saved images. File/code import remains a collapsed backup when code execution is unavailable.
 3. Use Create background in ChatGPT to copy the separate image request. Paste it into ChatGPT, then download the generated flat background image. Image generation and layout creation are separate requests so an image-only response cannot silently omit the layout.
-4. Return to the original designer tab, upload the background image, then apply the draft. This first version uses file import; it does not use the paused plugin or a merchant OpenAI API key. Missing background artwork blocks application without changing the garment.
+4. If a new background is needed, upload it on the returned designer page. A pending draft applies automatically after the image upload; a return link with all saved images applies immediately. Missing required artwork blocks application without changing the garment. The paused plugin and merchant OpenAI API key are not used.
 5. Inspect all zones in 2D and rotate the 3D preview. Check print quality at the intended size. Generated artwork is not automatically print-resolution artwork.
 
 The logo/background are stored in IndexedDB for 24 hours and matched using a random draft context ID. Reloading the originating tab restores its context. Importing a draft in another tab of the same origin restores that draft's images. Other browsers/devices and expired or cleared storage require re-upload. Clear removes only the current draft's saved images, not other drafts or the displayed garment.
@@ -20,7 +20,7 @@ Verified locally on 2026-09-29: real ChatGPT-generated red/black water backgroun
 
 Run `node tests/ai-artwork-handoff.mjs` and `node tests/ai-boundary-regression.mjs` for the contract/payload and frozen-engine checks. The repository's broader frozen-product test currently has a pre-existing catalog-name baseline mismatch; do not update that baseline as part of this repair.
 
-Do not re-enable the public button or MCP endpoint until the actual customer flow has been reviewed. The manual file-import experience is separate from the previous automatic draft-link experience.
+Do not re-enable the public button or MCP endpoint until the actual customer flow has been reviewed. Return links carry the layout only; original logo/background images restore from same-browser storage. Newly generated background files still require the agreed manual image upload.
 
 ## User-reviewed chest placement calibration (2026-09-29)
 
