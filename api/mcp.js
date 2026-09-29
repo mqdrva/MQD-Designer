@@ -56,12 +56,12 @@ const tools=[
 
 const previewTool={
   name:'prepare_design_preview',title:'Send finished artwork to MyMerchNow',
-  description:'After generating the requested flat background in this ChatGPT conversation, pass the actual image file as backgroundFile with the full garment layout. Returns the MyMerchNow link that automatically retrieves the background and restores the customer logo saved on the website. Use the exact contextId and returnUrl from the customer request. Never invent file URLs. If no new background is requested, omit backgroundFile. Do not claim the garment has loaded until the customer opens the returned link.',
+  description:'Prepare a MyMerchNow layout return link. For the one-upload workflow, generate the flat background in this ChatGPT conversation, offer its download, then use backgroundAction upload and OMIT backgroundFile. The returned link restores the saved website logo and asks for the background once, then applies it across the artwork zones. Use the exact contextId and returnUrl supplied by the website. Never invent file URLs or claim the shirt is finished before the background is uploaded. For layout-only revisions reuse the website background.',
   inputSchema:{type:'object',additionalProperties:false,required:['contextId','returnUrl','productId','summary','zones','backgroundAction'],properties:{
     ...tools[1].inputSchema.properties,
     contextId:{type:'string',pattern:'^[a-f0-9]{32}$'},
     returnUrl:{type:'string',maxLength:2000},
-    backgroundAction:{type:'string',enum:['generate','reuse','none'],description:'generate requires the actual generated backgroundFile. reuse retains a background already uploaded on the website. none means no image background was requested.'},
+    backgroundAction:{type:'string',enum:['upload','generate','reuse','none'],description:'upload is the one-upload customer workflow: generate an image in ChatGPT, offer its download, omit backgroundFile, and return the layout link. The site asks for that image once and applies it to all artwork zones. generate requires an actual transferable backgroundFile. reuse retains a website background. none is a solid-color design.'},
     backgroundFile:{type:'object',additionalProperties:false,required:['download_url','file_id'],properties:{download_url:{type:'string'},file_id:{type:'string'},mime_type:{type:'string'},file_name:{type:'string'}}}
   }},
   annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true},
@@ -83,13 +83,14 @@ export function prepareDesignPreview(args){
   const remote=destination.protocol==='https:'&&!destination.port&&(destination.hostname==='mymerchnow.app'||destination.hostname===process.env.VERCEL_URL||destination.hostname===process.env.VERCEL_BRANCH_URL);
   if((!local&&!remote)||destination.username||destination.password||destination.pathname!=='/')throw new Error('Use the original MyMerchNow return website.');
   const artwork=args.backgroundFile?validateArtworkFile(args.backgroundFile):null;
-  if(!['generate','reuse','none'].includes(args.backgroundAction))throw new Error('Specify whether the background is generated, reused, or not requested.');
+  if(!['upload','generate','reuse','none'].includes(args.backgroundAction))throw new Error('Specify whether the background is uploaded, generated, reused, or not requested.');
+  if(args.backgroundAction==='upload'&&artwork)throw new Error('For the one-upload workflow, omit backgroundFile.');
   if(args.backgroundAction==='generate'&&!artwork)throw new Error('Attach the generated backgroundFile before creating the preview. Reuse the image already generated; do not generate it again.');
   if(plan.zones.some(z=>z.elements.some(e=>e.kind==='artwork'))&&args.backgroundAction==='none')throw new Error('Artwork layers need a generated or reused background image.');
   // A revision may intentionally reuse the background already stored by the site.
   // A newly requested image must always be attached by ChatGPT as a file param.
-  destination.hash='ai-transfer='+encodeTransfer(plan,artwork);
-  return {url:destination.href,productId:plan.productId,summary:plan.summary,backgroundAttached:!!artwork};
+  destination.hash='ai-transfer='+encodeTransfer(plan,artwork,args.backgroundAction==='upload');
+  return {url:destination.href,productId:plan.productId,summary:plan.summary,backgroundAttached:!!artwork,needsBackgroundUpload:args.backgroundAction==='upload'};
 }
 
 function json(res,status,payload){
@@ -112,7 +113,7 @@ function callTool(name,args){
     if(!handoffEnabled())return {isError:true,content:[{type:'text',text:'Automatic artwork transfer is not enabled on this deployment yet. Do not generate another image or claim the design is ready.'}]};
     try{
       const draft=prepareDesignPreview(args);
-      return {structuredContent:draft,content:[{type:'text',text:`[Open your design in MyMerchNow](${draft.url})\nOpen in the same browser used to upload the logo. The website will retrieve the attached background and apply the layout automatically. If the file link expires, resend the existing image through this tool; do not regenerate it.`}]};
+      return {structuredContent:draft,content:[{type:'text',text:`[View my shirt](${draft.url})\n${draft.needsBackgroundUpload?'Download the background image from this chat, then open this link in the same browser used to upload the logo. Upload the background once; the website applies it across the artwork zones with the saved logo and text. The design is not complete until that upload.':'Open in the same browser used to upload the logo. The website applies the layout with the available images. If a file link expires, resend the existing image; do not regenerate it.'}`}]};
     }catch(err){return {isError:true,content:[{type:'text',text:err.message}]};}
   }
   if(name==='list_products'){
@@ -148,7 +149,7 @@ export default async function handler(req,res){
       protocolVersion,
       capabilities:{tools:{}},
       serverInfo:{name:'mymerchnow-designer',version:'0.2.0'},
-      instructions:handoffEnabled()?'For a customer background request, generate the flat background image in this conversation, then pass that real file to prepare_design_preview together with the full layout, contextId and returnUrl supplied by the website. Return only the tool-provided preview link. Never use a merchant API key or claim the garment is ready when file transfer fails.':'AI design creation is temporarily paused. Do not create or invent draft links or claim a design is complete.'
+      instructions:handoffEnabled()?'Use the one-upload workflow: generate the requested flat background in this conversation, offer its download, and call prepare_design_preview with backgroundAction upload, no backgroundFile, and the full layout, exact contextId and returnUrl from the website. Return the tool-provided View my shirt link. The customer uploads the background once on the site; then the saved logo, background, and text are applied. Never claim completion before that upload. Never use a merchant API key.':'AI design creation is temporarily paused. Do not create or invent draft links or claim a design is complete.'
     }));
   }
   if(body.method==='notifications/initialized'){
