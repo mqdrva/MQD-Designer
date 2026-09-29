@@ -12,8 +12,8 @@ export function buildDraftPayload(plan,assets,current){
     const preserved=(existingZones[row.zone]?.layers||[]).filter(layer=>!layer.aiManaged);
     if(preserved.length+row.elements.length>6)throw new Error(`${row.zone} would exceed six layers. Remove an unneeded layer before applying; your current design has not changed.`);
     const layers=row.elements.map((el,index)=>{
-      const base={id:`ai-${row.zone.replaceAll(' ','-')}-${index}`,x:el.x,y:el.y,scale:el.scale,rotation:el.rotation,visible:true,aiManaged:true};
-      if(el.kind==='text')return {...base,type:'text',label:'AI Text',text:el.text,color:el.color,font:AI_FONTS.includes(el.font)?el.font:'Inter',strokeColor:el.strokeColor,strokeWidth:el.strokeWidth,letterSpacing:0,bold:el.bold,italic:el.italic,align:el.align};
+      const base={id:`ai-${row.zone.replaceAll(' ','-')}-${index}`,x:el.x,y:el.y,scale:el.scale,rotation:el.rotation,visible:true,aiManaged:true,aiZone:row.zone};
+      if(el.kind==='text')return {...base,type:'text',label:'AI Text',text:el.text,color:el.color,font:AI_FONTS.includes(el.font)?el.font:'Inter',strokeColor:el.strokeColor,strokeWidth:el.strokeWidth,letterSpacing:el.letterSpacing,bold:el.bold,italic:el.italic,align:el.align};
       const asset=assets[el.kind];
       // The editor's image scale uses cover-fit, which can crop wide logos.
       // Interpret AI logo scale relative to contain-fit in the import payload only.
