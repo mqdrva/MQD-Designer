@@ -86,7 +86,9 @@
       </div>
       <div class="ai-designer-body">
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
-        <textarea id="aiDesignerPrompt" class="ai-prompt" aria-label="Describe your shirt" maxlength="1200" placeholder="Black shirt with a colorful kid-friendly background. My logo centered on the front, smaller on the back, with 888-888-8888 underneath."></textarea>
+        <label for="aiDesignerPrompt"><strong>Describe your shirt (required)</strong></label>
+        <textarea id="aiDesignerPrompt" class="ai-prompt" aria-label="Describe your shirt" aria-describedby="aiPromptExample" maxlength="1200" placeholder="Type your design request here…" required></textarea>
+        <p id="aiPromptExample" class="ai-note">Example: Black shirt with a colorful kid-friendly background, my logo centered on the front, a smaller logo on the upper back, and my phone number underneath.</p>
         <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Continue in ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
         <div class="ai-note">Your ChatGPT account prepares the shirt layout. If you want a generated background, make it separately in ChatGPT Images, then upload it once through the shirt link to see the finished preview.</div>
         <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
@@ -133,7 +135,7 @@ const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929-separate-images');
+  await import('/v20/ai-designer.js?v=20260929-prompt-label');
 } else {
   aiTestUI.remove();
 }
