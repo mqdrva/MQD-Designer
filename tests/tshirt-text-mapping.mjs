@@ -37,6 +37,7 @@ assert(editor.includes("product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.
 assert(editor.includes("const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back')"));
 assert(editor.includes("offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY:tshirtBodyImageOffsetY"));
 assert.equal(TSHIRT_BODY_ARTWORK_OFFSET_Y,-.09);
+assert.equal(tshirtBodyImageOffsetY({type:'image',chatBackground:true}),0,'ChatGPT backgrounds must match the 2D frame without the foreground upward offset');
 assert.equal(tshirtBodyImageOffsetY({type:'image'}),-.09,'uploaded customer logos must receive the T-shirt body correction');
 assert.equal(tshirtBodyImageOffsetY({type:'image',libraryAssetId:'editable',libraryLocked:false}),-.09,'editable library artwork must receive the T-shirt body correction');
 assert.equal(tshirtBodyImageOffsetY({type:'image',libraryAssetId:'grass',libraryLocked:true}),0,'locked library backgrounds must preserve their approved placement');
