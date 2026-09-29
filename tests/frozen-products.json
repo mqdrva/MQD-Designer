@@ -1,7 +1,7 @@
 [
   {
     "id": "tshirt",
-    "name": "All-Over Print T-Shirt",
+    "name": "Short Sleeve T-Shirt",
     "category": "T-Shirts",
     "price": 39,
     "model": "https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/tshirt.glb",
