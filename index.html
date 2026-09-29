@@ -81,7 +81,7 @@
     </div>
     <section id="aiDesignerPanel" class="ai-designer-panel hidden" aria-label="AI Designer">
       <div class="ai-designer-head">
-        <div><strong>Design with your ChatGPT · Private test</strong><p>Create your design in ChatGPT, then open its return link to preview your shirt here.</p></div>
+        <div><strong>Design with your ChatGPT · Private test</strong><p>Describe your complete shirt, including the background. ChatGPT creates the artwork and sends it back with your layout.</p></div>
         <button id="aiDesignerClose" class="ai-close" type="button" aria-label="Close AI Designer">×</button>
       </div>
       <div class="ai-designer-body">
@@ -89,15 +89,15 @@
         <ol class="ai-steps">
           <li>Upload your logo and describe the design below.</li>
           <li>Click <strong>Copy request &amp; open ChatGPT</strong>.</li>
-          <li>Paste into ChatGPT, then click <strong>Open your design in MyMerchNow</strong> in its reply. Your saved images and layout load automatically.</li>
-          <li>For a new custom background, use <strong>Create background in ChatGPT</strong>. Download that image and upload it here; your design applies automatically.</li>
+          <li>Enable the <strong>MyMerchNow</strong> connection in ChatGPT, then paste the request.</li>
+          <li>ChatGPT generates the requested background and transfers it with your layout. Click <strong>Open your design in MyMerchNow</strong> in its reply using this same browser.</li>
         </ol>
         <div class="ai-safety"><strong>Protected engine:</strong> ChatGPT can only choose the garment and change customer artwork, text, colors, and placement. UVs, GLBs, mappings, templates, renderer settings, pricing, checkout, and authentication stay outside the AI interface.</div>
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
         <div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label">Background image<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
         <textarea id="aiDesignerPrompt" class="ai-prompt" maxlength="1200" placeholder="Example: Make me a black and blue pressure washing long-sleeve shirt. Put my logo small on the upper front, large on the back, and add my phone number on the right sleeve."></textarea>
         <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Copy request &amp; open ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
-        <div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background in ChatGPT</button></div>
+        <details><summary>Manual background fallback</summary><div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background separately</button></div></details>
         <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
         <details id="aiRequestDetails" hidden><summary>View request to copy manually</summary><textarea id="aiCopiedRequest" class="ai-prompt" aria-label="Request for ChatGPT" readonly></textarea></details>
         <details><summary>Backup: import a draft file or code</summary><label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
@@ -134,12 +134,14 @@
 <script type="module">
 // Keep unfinished AI controls out of public deployments, including old draft links.
 // Local testing requires an explicit opt-in and never enables the public site.
-const aiPrivateTest = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+let aiAvailability={};
+try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)aiAvailability=await response.json();}catch{}
+const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)||aiAvailability.privatePreview)
   && new URLSearchParams(location.search).get('ai-test') === '1';
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
-if (aiPrivateTest) {
+if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929-return-link');
+  await import('/v20/ai-designer.js?v=20260929-file-transfer');
 } else {
   aiTestUI.remove();
 }
