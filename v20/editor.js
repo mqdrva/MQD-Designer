@@ -1675,6 +1675,24 @@ function rebuildFleeceHoodiePreview(){
 }
 
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
+const opaqueImageEdgeCache=new WeakMap();
+function hasOpaqueImageEdges(image){
+ if(!image?.complete||!(image.naturalWidth||image.width)||!(image.naturalHeight||image.height))return false;
+ if(opaqueImageEdgeCache.has(image))return opaqueImageEdgeCache.get(image);
+ let opaque=false;
+ try{
+  const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const width=image.naturalWidth||image.width,height=image.naturalHeight||image.height;
+  for(let row=0;row<2;row++)for(let col=0;col<2;col++){
+   const sx=Math.min(width-1,Math.floor(width*(col?.98:.02))),sy=Math.min(height-1,Math.floor(height*(row?.98:.02)));
+   ctx.drawImage(image,sx,sy,1,1,col,row,1,1);
+  }
+  const pixels=ctx.getImageData(0,0,2,2).data;
+  opaque=[3,7,11,15].every(index=>pixels[index]>=250);
+ }catch(error){console.warn('Background coverage could not be checked',error);}
+ opaqueImageEdgeCache.set(image,opaque);return opaque;
+}
 function makeShirtPreviewArtwork(zone,maxSide,options={}){
  // Correct the folded long-polo collar reading direction for text only.
  const longPoloCollar=product.id==='long-sleeve-polo'&&zone==='Collar';
@@ -1731,9 +1749,11 @@ function updateTshirtZoneTextures(){
   // artwork by 9% so logos and text match the 2D editor. Locked MQD library
   // backgrounds, fill, sleeves, collar and every other garment stay unchanged.
   const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  const baseVisibleLayer=state.layers.find(layer=>layer.visible!==false);
+  const imageOffsetY=layer=>tshirtBodyImageOffsetY(layer,{zone,baseLayer:layer===baseVisibleLayer,opaqueEdges:zone==='Back'&&hasOpaqueImageEdges(layer.image)});
   const artwork=product.id==='long-sleeve-tshirt'
     ?makeLongSleeveTshirtArtworkCanvas(zone,textureMax,true)
-    :makeShirtPreviewArtwork(zone,textureMax,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY:tshirtBodyImageOffsetY}:{}),canvas=document.createElement('canvas');
+    :makeShirtPreviewArtwork(zone,textureMax,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY}:{}),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
   const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
