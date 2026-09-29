@@ -1,6 +1,7 @@
 import {AI_PRODUCTS,AI_TSHIRT_CHEST_LAYOUT,sanitizePlan,productForPlan,decodePlan,decodePrompt} from './ai-design-contract.js';
 import {createContextId,validContextId,saveDraftAssets,loadDraftAssets,removeDraftAssets} from './ai-draft-assets.js';
 import {buildDraftPayload} from './ai-draft-builder.js';
+import {decodeTransfer} from './ai-transfer-contract.js';
 
 const $=id=>document.getElementById(id);
 const CHATGPT_URL='https://chatgpt.com/';
@@ -82,12 +83,12 @@ async function applyPlan(plan){
 function buildChatGPTRequest(prompt){
   const product=productForPlan(currentProductId());
   return [
-    'Create an apparel layout and a working return link to MyMerchNow. Do not call the MyMerchNow plugin, which is paused. Do not generate an image in this step; I will request the background separately.',
+    'Complete this MyMerchNow shirt request in this conversation: generate any requested background and send it with the layout through the connected MyMerchNow prepare_design_preview tool. FIRST check that this tool is available. If it is unavailable, stop and tell me to connect or refresh MyMerchNow before generating anything. Do not spend image-generation usage when the transfer tool is unavailable.',
     `Starting garment: ${product.name} (${product.id}). Valid zones: ${product.zones.join(', ')}.`,
     `Customer request: ${prompt}`,
     `Draft contextId: ${contextId}. Copy this exactly into the draft so my uploaded logo is restored in the website.`,
     `Logo selected on website: ${assets.logo?'yes':'no'}. Background image selected on website: ${assets.artwork?'yes':'no'}.`,
-    'If a patterned, abstract, photographic, water, or illustrated background is requested, include kind artwork layers for a background image I will generate and upload separately. Never substitute solid color or text slashes for the requested artwork.',
+    'If a patterned, kid-friendly, abstract, photographic, water, or illustrated background is requested, generate the actual flat background image now using image generation in this ChatGPT account. Make the background only: no shirt mockup, logo, phone number, text, cutlines, or garment silhouette. Fill the rectangular image edge to edge. Keep my original logo separate. Include kind artwork layers in the requested zones. Never substitute solid color, text slashes, or a promise for the requested image. Reuse an existing background only when the request is a layout-only revision.',
     'Build the layout internally using this shape (do not show the JSON as your main answer):',
     JSON.stringify({version:'mqd-ai-plan-v1',contextId,productId:product.id,summary:'Brief description',zones:[{zone:product.zones[0],background:'#000000',elements:[{kind:'artwork',x:0,y:0,scale:1,rotation:0},AI_TSHIRT_CHEST_LAYOUT.frontLogo]}]}),
     'Use kind artwork for the downloaded background image, kind logo for my original logo, and kind text with text, color, font, bold, x, y, scale, rotation for words or a phone number. Allowed fonts: Inter, Montserrat, Poppins, Oswald, Bebas Neue, Anton, Archivo Black, Black Ops One, Righteous, Russo One, League Spartan.',
@@ -95,9 +96,8 @@ function buildChatGPTRequest(prompt){
     product.id==='tshirt'?`For a standard centered chest logo with smaller back logo and phone below, use this placement reference unless the customer explicitly asks for a different location or size: ${JSON.stringify(AI_TSHIRT_CHEST_LAYOUT)}. Replace the phone text with the customer's wording. Center means horizontally centered on the chest, not low on the stomach. The back phone remains near the upper-back logo, not below the middle of the shirt. Preserve explicit adjustments in a revision.`:'',
     lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
     `Return website: ${location.origin}${location.pathname}${location.search}`,
-    'Use your code execution tool to create the return link. Set plan to the complete layout dictionary, then use Python: import json, base64; token = base64.urlsafe_b64encode(json.dumps(plan, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("="); url = RETURN_WEBSITE + "#ai-plan=" + token. Replace RETURN_WEBSITE with the exact return website above. Compute the token with code; never guess or manually shorten it.',
-    'Your main answer must be a clickable Markdown link labeled "Open your design in MyMerchNow" using that computed URL. Opening it restores my uploaded images from this browser and applies the layout automatically when its required images are available. Do not show a JSON code block or ask me to import a layout file when the link is available. You may attach design-plan.json only as a backup. If code execution is unavailable, clearly offer that backup instead of inventing an encoded link.',
-    'If a required background image has not been uploaded yet, explain that after opening the link I only need to upload that background image; the website will apply the complete design automatically. Do not claim the website has already been changed before I open the link.',
+    'After the image is generated, call prepare_design_preview with productId, summary, contextId, EVERY zone, returnUrl set to the exact return website above, backgroundAction="generate", and the REAL GENERATED IMAGE attached as backgroundFile. ChatGPT supplies the file reference; never invent a download URL. Use backgroundAction="reuse" only for an existing website background, or "none" for a plain solid-color design with no artwork layers. Do not stop at showing the image: complete the transfer tool call.',
+    'Your main answer must be the tool-provided clickable link labeled "Open your design in MyMerchNow". Do not show JSON or ask me to download/upload files. The site retrieves the attached image, restores my original logo, and applies the layout when I open it in this browser. Do not claim the website has already changed or the transfer succeeded if the tool returns an error. For an expired file, resend that same generated image through the tool instead of generating a replacement.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
   ].filter(Boolean).join('\n');
 }
@@ -105,8 +105,11 @@ async function openInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
   if(!prompt)throw new Error('Describe the design before opening ChatGPT.');
   await persist();
+  let availability;
+  try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)availability=await response.json();}catch{}
+  if(!availability?.enabled)throw new Error('Automatic background transfer is not connected on this test page yet. Your logo and request are saved. No ChatGPT request was sent; wait for the connected test link.');
   const request=buildChatGPTRequest(prompt);
-  await copyAndOpen(request,'Request copied. Paste it into ChatGPT, then click Open your design in MyMerchNow in its reply. Your uploaded images will be restored in this browser.');
+  await copyAndOpen(request,'Request copied. Enable MyMerchNow in ChatGPT and paste the request. ChatGPT will generate the background and send it with your layout. Open the returned design link in this browser.');
 }
 async function openBackgroundInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
@@ -138,6 +141,24 @@ async function resetAI(){
 }
 async function initialize(){
   const hash=new URLSearchParams(location.hash.slice(1));
+  if(hash.has('ai-transfer')){
+    openPanel();
+    const transfer=decodeTransfer(hash.get('ai-transfer'));
+    await restore(transfer.plan.contextId);
+    lastPlan=transfer.plan;
+    await persist();
+    if(transfer.artwork){
+      setStatus('Receiving your generated background from ChatGPT…','working');
+      const response=await fetch('/api/ai-artwork',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(transfer.artwork)});
+      if(!response.ok){const problem=await response.json().catch(()=>({}));throw new Error(problem.error||'The background could not be transferred. Reopen this link to retry; you do not need to generate another image.');}
+      const blob=await response.blob();
+      assets.artwork=await readImage(new File([blob],transfer.artwork.file_name,{type:blob.type}));
+      await persist();updateAssetLabels();
+    }
+    await acceptPlan(transfer.plan);
+    history.replaceState(null,'',location.pathname+location.search);
+    return;
+  }
   const rawPlan=location.hash.slice(1).split('&').find(part=>part.startsWith('ai-plan='));
   let plan=null;
   if(rawPlan){
@@ -184,4 +205,5 @@ $('aiImportJson').addEventListener('click',()=>run(async()=>{
 }));
 $('aiDesignerPrompt').addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();run(openInChatGPT);}});
 updateAssetLabels();run(initialize);
+window.addEventListener('hashchange',()=>{if(location.hash.includes('ai-transfer=')||location.hash.includes('ai-plan='))run(initialize);});
 window.MQDAIDesigner={getPlan:()=>lastPlan,applyPlan,open:openPanel};
