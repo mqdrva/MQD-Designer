@@ -59,19 +59,19 @@ try{
   let output;
   await mcp({method:'POST',body:{jsonrpc:'2.0',id:1,method:'tools/list'}},{setHeader(){},end(value){output=JSON.parse(value);}});
   const tool=output.result.tools.find(t=>t.name==='prepare_design_preview');
-  assert.match(tool.description,/BEFORE image generation/);
-  assert.match(tool.description,/Visibly show/);
+  assert.match(tool.description,/Do not generate an image in this layout conversation/);
+  assert.match(tool.description,/separate ChatGPT Images chat/);
   await mcp({method:'POST',body:{jsonrpc:'2.0',id:2,method:'initialize'}},{setHeader(){},end(value){output=JSON.parse(value);}});
-  assert.match(output.result.instructions,/Visibly show.*BEFORE invoking image generation/);
+  assert.match(output.result.instructions,/Do not invoke image generation in this layout conversation/);
   await mcp({method:'POST',body:{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'prepare_design_preview',arguments:{...args,backgroundAction:'upload',backgroundFile:undefined}}}},{setHeader(){},end(value){output=JSON.parse(value);}});
   assert.equal(output.result.structuredContent.needsBackgroundUpload,true);
-  assert.match(output.result.content[0].text,/Visibly show this exact link BEFORE image generation/);
+  assert.match(output.result.content[0].text,/Show this exact link now/);
   assert.deepEqual(tool._meta['openai/fileParams'],['backgroundFile']);
   assert.deepEqual(tool.inputSchema.properties.backgroundFile.required,['download_url','file_id']);
   for(const p of ['download_url','file_id','mime_type','file_name'])assert(tool.inputSchema.properties.backgroundFile.properties[p]);
 }finally{if(old===undefined)delete process.env.MQD_AI_HANDOFF_ENABLED;else process.env.MQD_AI_HANDOFF_ENABLED=old;}
 const copiedRequest=readFileSync(new URL('../v20/ai-designer.js',import.meta.url),'utf8');
-assert.match(copiedRequest,/SECOND visibly show.*BEFORE invoking image generation/);
+assert.match(copiedRequest,/Do NOT generate an image in this conversation/);
 assert.doesNotMatch(copiedRequest,/After generating the background, call/);
 const requestBuilderSource=copiedRequest.slice(copiedRequest.indexOf('function buildChatGPTRequest(prompt){'),copiedRequest.indexOf('\nasync function openInChatGPT()'));
 const buildRequest=runInNewContext(`${requestBuilderSource}\nbuildChatGPTRequest`,{
@@ -86,6 +86,6 @@ const buildRequest=runInNewContext(`${requestBuilderSource}\nbuildChatGPTRequest
 const generatedRequest=buildRequest('Create a new black and blue water splash background. Keep my logo centered.');
 assert.doesNotMatch(generatedRequest,/OLD_RED_WATER_BACKGROUND|old-red-water\.png/,'A new image request must not carry old artwork into ChatGPT.');
 assert.match(generatedRequest,/"y":-37/,'Earlier logo placement must remain in the layout request.');
-assert.match(generatedRequest,/standalone prompt distilled ONLY from the background portion/);
-assert.match(generatedRequest,/Do not use edit mode or supply an existing image target/);
+assert.match(generatedRequest,/separate ChatGPT Images chat/);
+assert.match(generatedRequest,/Do not generate an image in this layout conversation/);
 console.log('Automatic transfer passed: real file descriptor, context-preserving link, streamed image retrieval, missing-file/expiry/host/type/size rejection, original logo and chest placement preserved. No AI calls.');
