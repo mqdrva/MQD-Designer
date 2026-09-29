@@ -184,8 +184,9 @@ function handleLaunchLink(){
   const raw=location.hash.slice(1);
   if(!raw)return;
   const params=new URLSearchParams(raw);
-  const encodedPlan=params.get('ai-plan');
-  const encodedPrompt=params.get('ai-prompt');
+  
+  const encodedPlan=params.get('ai-plan')?.replace(/ /g,'+');
+        const encodedPrompt=params.get('ai-prompt');
   if(encodedPlan){
     const plan=decodePlan(encodedPlan);
     if(plan){
