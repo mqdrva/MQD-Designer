@@ -2,6 +2,12 @@
 
 Static multi-product 3D apparel designer and catalog-admin prototype.
 
+## Customer-funded ChatGPT design flow
+
+The customer-facing AI panel hands design requests to ChatGPT instead of calling OpenAI with a merchant-funded API key. Customers enable the MyMerchNow plugin in ChatGPT, paste the copied request, and open the protected draft link returned by the `create_design_draft` MCP tool. MyMerchNow then validates and imports only customer-controlled garment, artwork, text, color, and placement fields.
+
+The public MCP endpoint is `https://mymerchnow.app/api/mcp`. It does not accept or require customer API keys. The legacy `/api/ai-design` endpoint is not used by the customer interface.
+
 ## Included products
 - All-Over Print T-Shirt — Front, Back, Left Sleeve, Right Sleeve, Collar
 - Long Sleeve T-Shirt — Front, Back, Left Sleeve, Right Sleeve, Collar

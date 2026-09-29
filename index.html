@@ -74,22 +74,28 @@
     </div>
     <div class="ai-designer-launch">
       <button id="aiDesignerToggle" class="ai-toggle" type="button" aria-expanded="false" aria-controls="aiDesignerPanel">
-        <span><span class="spark">✦</span><span>Design with AI</span></span><span>›</span>
+        <span><span class="spark">✦</span><span>Design with your ChatGPT</span></span><span>›</span>
       </button>
     </div>
     <section id="aiDesignerPanel" class="ai-designer-panel hidden" aria-label="AI Designer">
       <div class="ai-designer-head">
-        <div><strong>MyMerchNow AI Designer</strong><p>Describe the garment. Upload your logo once, then revise the draft by talking to AI.</p></div>
+        <div><strong>Design with your ChatGPT</strong><p>Use your own ChatGPT plan to create a MyMerchNow draft, then return through the draft link ChatGPT provides.</p></div>
         <button id="aiDesignerClose" class="ai-close" type="button" aria-label="Close AI Designer">×</button>
       </div>
       <div class="ai-designer-body">
-        <div class="ai-safety"><strong>Protected engine:</strong> AI can only change customer artwork, text, colors, layer placement and garment choice. UVs, GLBs, mappings, templates and renderer settings are outside the AI interface.</div>
+        <div class="ai-funding"><strong>Customer-funded AI:</strong> the design conversation runs in your ChatGPT account. MyMerchNow does not use or collect your OpenAI API key.</div>
+        <ol class="ai-steps">
+          <li>Describe the design below.</li>
+          <li>Click <strong>Copy request &amp; open ChatGPT</strong>.</li>
+          <li>In ChatGPT, enable the <strong>MyMerchNow</strong> plugin and paste the request.</li>
+          <li>Open the MyMerchNow draft link ChatGPT returns.</li>
+        </ol>
+        <div class="ai-safety"><strong>Protected engine:</strong> ChatGPT can only choose the garment and change customer artwork, text, colors, and placement. UVs, GLBs, mappings, templates, renderer settings, pricing, checkout, and authentication stay outside the AI interface.</div>
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
         <textarea id="aiDesignerPrompt" class="ai-prompt" maxlength="1200" placeholder="Example: Make me a black and blue pressure washing long-sleeve shirt. Put my logo small on the upper front, large on the back, and add my phone number on the right sleeve."></textarea>
-        <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Generate Draft</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">New AI Draft</button></div>
+        <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Copy request &amp; open ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
         <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
-        <div id="aiDesignerConversation" class="ai-conversation" aria-live="polite"></div>
-        <div class="ai-note">Tip: after the first draft, type changes like “make the back logo bigger,” “switch to a hoodie,” or “move the phone number higher.” You can still use all normal editor controls afterward.</div>
+        <div class="ai-note">Your logo stays in this browser. ChatGPT creates placement instructions and a protected draft link; it does not receive the uploaded image from this panel.</div>
       </div>
     </section>
     <input id="artUpload" class="upload-input" type="file" accept="image/png,image/jpeg,image/webp">
