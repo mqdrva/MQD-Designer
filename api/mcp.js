@@ -1,4 +1,4 @@
-import {AI_PRODUCTS,AI_FONTS,sanitizePlan,encodePlan} from '../v20/ai-design-contract.js';
+import {AI_PRODUCTS,AI_FONTS} from '../v20/ai-design-contract.js';
 
 const PRODUCT_IDS=AI_PRODUCTS.map(p=>p.id);
 const HEX_PATTERN='^#[0-9A-Fa-f]{6}$';
@@ -76,17 +76,8 @@ function callTool(name,args){
     };
   }
   if(name==='create_design_draft'){
-    const productId=PRODUCT_IDS.includes(args?.productId)?args.productId:'tshirt';
-    const safe=sanitizePlan({version:'mqd-ai-plan-v1',productId,summary:args?.summary,zones:args?.zones},{fallbackProductId:productId});
-    const needsLogoUpload=safe.zones.some(zone=>zone.elements.some(el=>el.kind==='logo'));
-    const url=`https://mymerchnow.app/#ai-plan=${encodePlan(safe)}`;
-    const structuredContent={url,productId:safe.productId,summary:safe.summary,needsLogoUpload};
-    return{
-      structuredContent,
-      content:[{type:'text',text:needsLogoUpload
-        ?`Draft ready. Open this exact link to see it on the garment: ${url}\nUpload the logo in the AI Designer panel, then click Apply Draft to place it. Review the 2D/3D garment before saving or purchasing.`
-        :`Draft ready. Open this exact link to see it on the garment: ${url}\nReview the 2D/3D garment before saving or purchasing.`}]
-    };
+    // Draft creation is paused while the logo and generated-artwork flow is repaired.
+    return {isError:true,content:[{type:'text',text:'MyMerchNow AI design is temporarily unavailable while we improve it. No draft was created. You can still upload artwork and design manually at https://mymerchnow.app/. Do not claim that the requested design is complete.'}]};
   }
   return null;
 }
@@ -111,15 +102,16 @@ export default async function handler(req,res){
       protocolVersion,
       capabilities:{tools:{}},
       serverInfo:{name:'mymerchnow-designer',version:'0.1.0'},
-      instructions:'Create customer-design drafts only. Never claim access to or attempt to change garment models, UVs, mesh data, templates, garment mappings, calibration, renderer behavior, pricing, checkout, or authentication. Use list_products when the garment or zone names are unclear.'
+      instructions:'AI design creation is temporarily paused. Do not create or invent draft links or claim a design is complete. Customers can use the manual designer at https://mymerchnow.app/. Garment models, UVs, templates, mappings, renderer, pricing, checkout, and authentication remain outside this interface.'
     }));
   }
   if(body.method==='notifications/initialized'){
     res.statusCode=202;return res.end();
   }
   if(body.method==='ping')return json(res,200,result(id,{}));
-  if(body.method==='tools/list')return json(res,200,result(id,{tools}));
+  if(body.method==='tools/list')return json(res,200,result(id,{tools:tools.filter(tool=>tool.name==='list_products')}));
   if(body.method==='tools/call'){
+    if(!tools.some(tool=>tool.name===body.params?.name))return json(res,200,error(id,-32602,'Unknown tool or invalid arguments'));
     const out=callTool(body.params?.name,body.params?.arguments||{});
     if(!out)return json(res,200,error(id,-32602,'Unknown tool or invalid arguments'));
     return json(res,200,result(id,out));
