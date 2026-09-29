@@ -1750,7 +1750,7 @@ function updateTshirtZoneTextures(){
   // backgrounds, fill, sleeves, collar and every other garment stay unchanged.
   const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
   const baseVisibleLayer=state.layers.find(layer=>layer.visible!==false);
-  const imageOffsetY=layer=>tshirtBodyImageOffsetY(layer,{zone,baseLayer:layer===baseVisibleLayer,opaqueEdges:zone==='Back'&&hasOpaqueImageEdges(layer.image)});
+  const imageOffsetY=layer=>tshirtBodyImageOffsetY(layer,{zone,baseLayer:layer===baseVisibleLayer,opaqueEdges:tshirtBodyArtwork&&hasOpaqueImageEdges(layer.image)});
   const artwork=product.id==='long-sleeve-tshirt'
     ?makeLongSleeveTshirtArtworkCanvas(zone,textureMax,true)
     :makeShirtPreviewArtwork(zone,textureMax,tshirtBodyArtwork?{offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY}:{}),canvas=document.createElement('canvas');
