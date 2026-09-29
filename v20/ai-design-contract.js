@@ -1,5 +1,13 @@
 export const AI_DESIGN_VERSION='mqd-ai-plan-v1';
 
+// Chest-layout reference approved from the user's adjusted T-shirt screenshots.
+// These guide new drafts; explicit placement requests and revisions take priority.
+export const AI_TSHIRT_CHEST_LAYOUT={
+  frontLogo:{kind:'logo',x:0,y:-30,scale:.54,rotation:0},
+  backLogo:{kind:'logo',x:0,y:-55,scale:.45,rotation:0},
+  backPhone:{kind:'text',x:0,y:-25,scale:.89,rotation:0,font:'Anton',color:'#FFFFFF',bold:true,letterSpacing:5}
+};
+
 export const AI_PRODUCTS=[
   {id:'tshirt',name:'Short Sleeve T-Shirt',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar']},
   {id:'long-sleeve-tshirt',name:'Long Sleeve T-Shirt',zones:['Front','Back','Left Sleeve','Right Sleeve','Collar']},
@@ -44,6 +52,7 @@ function safeElement(raw,index){
     color:normalizeHex(raw?.color,'#111111'),
     strokeColor:normalizeHex(raw?.strokeColor,'#FFFFFF'),
     strokeWidth:clamp(raw?.strokeWidth,0,20,0),
+    letterSpacing:clamp(raw?.letterSpacing,-10,30,0),
     font:FONT_SET.has(raw?.font)?raw.font:'Inter',
     bold:raw?.bold!==false,
     italic:raw?.italic===true,
@@ -88,7 +97,7 @@ export function encodePlan(plan){
       el.kind==='text'?1:el.kind==='artwork'?2:0,el.text,el.x,el.y,el.scale,el.rotation,
       el.color.slice(1),el.strokeColor.slice(1),el.strokeWidth,
       AI_FONTS.indexOf(el.font),el.bold?1:0,el.italic?1:0,
-      ['left','center','right'].indexOf(el.align)
+      ['left','center','right'].indexOf(el.align),el.letterSpacing
     ])
   ]);
   const bytes=new TextEncoder().encode(JSON.stringify([3,AI_PRODUCTS.indexOf(product),zones,safe.contextId]));
@@ -115,11 +124,11 @@ export function decodePlan(value){
         seen.add(row[0]);
         const elements=[];
         for(const el of row[2]){
-          if(!Array.isArray(el)||el.length!==13||!(raw[0]===3?[0,1,2]:[0,1]).includes(el[0]))return null;
+          if(!Array.isArray(el)||!(raw[0]===3?[13,14]:[13]).includes(el.length)||!(raw[0]===3?[0,1,2]:[0,1]).includes(el[0]))return null;
           elements.push({
             kind:el[0]===1?'text':el[0]===2?'artwork':'logo',text:el[1],x:el[2],y:el[3],scale:el[4],rotation:el[5],
             color:'#'+el[6],strokeColor:'#'+el[7],strokeWidth:el[8],font:AI_FONTS[el[9]],
-            bold:!!el[10],italic:!!el[11],align:['left','center','right'][el[12]]
+            bold:!!el[10],italic:!!el[11],align:['left','center','right'][el[12]],letterSpacing:el[13]??0
           });
         }
         zones.push({zone:product.zones[row[0]],background:'#'+row[1],elements});
