@@ -1,5 +1,7 @@
 # Private AI artwork test
 
+Historical manual-test record. The current implementation and release gates are documented in [Automatic ChatGPT artwork transfer](ai-automatic-transfer.md); that flow replaces the separate background request and file import described below.
+
 Public AI controls and MCP draft creation remain paused. This repair is enabled only on loopback hosts with `?ai-test=1`; that query never enables a deployed site.
 
 From the repository, serve the static site bound to loopback (for example `python3 -m http.server 8765 --bind 127.0.0.1`) and open `http://127.0.0.1:8765/?ai-test=1`.
