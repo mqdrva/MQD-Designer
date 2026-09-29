@@ -21,3 +21,9 @@ Verified locally on 2026-09-29: real ChatGPT-generated red/black water backgroun
 Run `node tests/ai-artwork-handoff.mjs` and `node tests/ai-boundary-regression.mjs` for the contract/payload and frozen-engine checks. The repository's broader frozen-product test currently has a pre-existing catalog-name baseline mismatch; do not update that baseline as part of this repair.
 
 Do not re-enable the public button or MCP endpoint until the actual customer flow has been reviewed. The manual file-import experience is separate from the previous automatic draft-link experience.
+
+## User-reviewed chest placement calibration (2026-09-29)
+
+The user explicitly requested a limited T-shirt preview calibration: preserve the front logo's 2D height, raise it only in 3D, and preserve the already-correct back foreground mapping. AI layers now carry their source zone. Front AI logos receive a 12% upward preview offset (3 percentage points more than before); back logos/text retain the existing 9% correction. AI full-zone backgrounds receive no foreground offset, lowering their pattern to the 2D frame and removing the artificial blank hem. Other products, ordinary customer layers, locked library artwork, UV geometry, GLBs and templates are unchanged.
+
+Prompt defaults now suggest front chest logo y=-30/contained scale=.54, back logo y=-55/scale=.45, and back phone y=-25/text scale=.89/Anton/spacing=5. Explicit customer revisions take precedence. The private browser test reimported the user's exact adjusted coordinates and sizes through the actual file input; it did not overwrite the 2D heights to compensate for 3D. Run `node tests/tshirt-text-mapping.mjs` in addition to the AI tests. This calibration remains private pending visual approval.
