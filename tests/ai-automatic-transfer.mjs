@@ -9,6 +9,13 @@ import {buildDraftPayload} from '../v20/ai-draft-builder.js';
 const file={download_url:'https://files.oaiusercontent.com/test.png?signature=test',file_id:'file-test',mime_type:'image/png',file_name:'background.png'};
 const args={contextId:'a'.repeat(32),returnUrl:'http://127.0.0.1:8765/?ai-test=1',productId:'tshirt',summary:'Background and logo',backgroundAction:'generate',backgroundFile:file,zones:AI_PRODUCTS[0].zones.map(zone=>({zone,background:'#000000',elements:[{kind:'artwork',x:0,y:0,scale:1},...(zone==='Front'?[{kind:'logo',x:0,y:-30,scale:.54}]:[])]}))};
 const result=prepareDesignPreview(args);
+const pending=prepareDesignPreview({...args,backgroundAction:'upload',backgroundFile:undefined});
+assert.equal(pending.needsBackgroundUpload,true);
+const pendingTransfer=decodeTransfer(new URL(pending.url).hash.slice('#ai-transfer='.length));
+assert.equal(pendingTransfer.needsBackgroundUpload,true);
+assert.equal(pendingTransfer.artwork,null);
+assert.equal(pendingTransfer.plan.contextId,args.contextId);
+assert.throws(()=>prepareDesignPreview({...args,backgroundAction:'upload'}),/omit backgroundFile/);
 const transfer=decodeTransfer(new URL(result.url).hash.slice('#ai-transfer='.length));
 assert.equal(transfer.plan.contextId,args.contextId);
 assert.equal(transfer.artwork.download_url,file.download_url);
@@ -38,6 +45,9 @@ try{
 }finally{globalThis.fetch=nativeFetch;}
 const current={product:{id:'tshirt'},templates:Object.fromEntries(AI_PRODUCTS[0].zones.map(z=>[z,{width:3000,height:4000}])),design:{zones:{}}};
 const payload=buildDraftPayload(transfer.plan,{logo:{src:'data:image/png;base64,original',width:2000,height:1000},artwork:{src:'data:image/png;base64,received'}},current);
+assert.throws(()=>buildDraftPayload(pendingTransfer.plan,{logo:{src:'data:image/png;base64,original',width:2000,height:1000}},current),/background/i);
+const uploaded=buildDraftPayload(pendingTransfer.plan,{logo:{src:'data:image/png;base64,original',width:2000,height:1000},artwork:{src:'data:image/png;base64,uploaded-once'}},current);
+for(const zone of AI_PRODUCTS[0].zones)assert.equal(uploaded.design.zones[zone].layers[0].src,'data:image/png;base64,uploaded-once');
 assert.equal(payload.design.zones.Front.layers[0].src,'data:image/png;base64,received');
 assert.equal(payload.design.zones.Front.layers[1].y,-30);
 assert.equal(payload.design.zones.Front.layers[1].src,'data:image/png;base64,original');

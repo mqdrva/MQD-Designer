@@ -77,13 +77,13 @@ async function applyPlan(plan){
   $('productSelect').value=payload.product.id;
   lastPlan=sanitizePlan(plan);
   setStatus('Draft applied with all required images. Review the front, back, and print quality before saving.','good');
-  $('aiGenerate').textContent='Copy revision & open ChatGPT';$('aiApply').hidden=false;
+  $('aiGenerate').textContent='Revise in ChatGPT';$('aiApply').hidden=false;
   return lastPlan;
 }
 function buildChatGPTRequest(prompt){
   const product=productForPlan(currentProductId());
   return [
-    'Complete this MyMerchNow shirt request in this conversation: generate any requested background and send it with the layout through the connected MyMerchNow prepare_design_preview tool. FIRST check that this tool is available. If it is unavailable, stop and tell me to connect or refresh MyMerchNow before generating anything. Do not spend image-generation usage when the transfer tool is unavailable.',
+    'Complete this MyMerchNow shirt request using the one-upload workflow. FIRST check that the connected prepare_design_preview tool supports backgroundAction upload. If unavailable, stop before generating anything and ask me to connect or refresh MyMerchNow. Generate the requested flat background in this chat and provide its download. Return the layout through the tool; I will upload the background once on the website.',
     `Starting garment: ${product.name} (${product.id}). Valid zones: ${product.zones.join(', ')}.`,
     `Customer request: ${prompt}`,
     `Draft contextId: ${contextId}. Copy this exactly into the draft so my uploaded logo is restored in the website.`,
@@ -96,8 +96,8 @@ function buildChatGPTRequest(prompt){
     product.id==='tshirt'?`For a standard centered chest logo with smaller back logo and phone below, use this placement reference unless the customer explicitly asks for a different location or size: ${JSON.stringify(AI_TSHIRT_CHEST_LAYOUT)}. Replace the phone text with the customer's wording. Center means horizontally centered on the chest, not low on the stomach. The back phone remains near the upper-back logo, not below the middle of the shirt. Preserve explicit adjustments in a revision.`:'',
     lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
     `Return website: ${location.origin}${location.pathname}${location.search}`,
-    'After the image is generated, call prepare_design_preview with productId, summary, contextId, EVERY zone, returnUrl set to the exact return website above, backgroundAction="generate", and the REAL GENERATED IMAGE attached as backgroundFile. ChatGPT supplies the file reference; never invent a download URL. Use backgroundAction="reuse" only for an existing website background, or "none" for a plain solid-color design with no artwork layers. Do not stop at showing the image: complete the transfer tool call.',
-    'Your main answer must be the tool-provided clickable link labeled "Open your design in MyMerchNow". Do not show JSON or ask me to download/upload files. The site retrieves the attached image, restores my original logo, and applies the layout when I open it in this browser. Do not claim the website has already changed or the transfer succeeded if the tool returns an error. For an expired file, resend that same generated image through the tool instead of generating a replacement.',
+    'After generating the background, call prepare_design_preview with productId, summary, contextId, EVERY zone, the exact returnUrl above, and backgroundAction="upload". OMIT backgroundFile: do not send internal file paths or invent URLs. Use backgroundAction="reuse" only for a layout-only revision with an existing website background; use "none" for a plain solid-color design without artwork layers.',
+    'Finish with the background image download and the tool-provided link labeled "View my shirt". Briefly say: Download the background, open View my shirt in this browser, and upload it once. MyMerchNow then applies it across the garment with the saved logo and text. Do not show JSON or claim the shirt is finished before that upload. Reuse an image already generated for this request; do not generate it again after a tool error.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
   ].filter(Boolean).join('\n');
 }
@@ -109,7 +109,7 @@ async function openInChatGPT(){
   try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)availability=await response.json();}catch{}
   if(!availability?.enabled)throw new Error('Automatic background transfer is not connected on this test page yet. Your logo and request are saved. No ChatGPT request was sent; wait for the connected test link.');
   const request=buildChatGPTRequest(prompt);
-  await copyAndOpen(request,'Request copied. Enable MyMerchNow in ChatGPT and paste the request. ChatGPT will generate the background and send it with your layout. Open the returned design link in this browser.');
+  await copyAndOpen(request,'Request copied. In ChatGPT, select @MyMerchNow, paste, and send. Download your background, then open “View my shirt” and upload it once. Your logo is saved.');
 }
 async function openBackgroundInChatGPT(){
   const prompt=$('aiDesignerPrompt').value.trim();
@@ -136,7 +136,7 @@ async function resetAI(){
   for(const id of ['aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiDesignerPrompt','aiDraftJson','aiCopiedRequest'])$(id).value='';
   $('aiRequestDetails').hidden=true;$('aiRequestDetails').open=false;$('aiChatGPTLink').hidden=true;
   updateAssetLabels();rememberSession();
-  $('aiApply').hidden=true;$('aiGenerate').textContent='Copy request & open ChatGPT';
+  $('aiApply').hidden=true;$('aiGenerate').textContent='Continue in ChatGPT';
   setStatus('New draft started. Upload your logo and describe your design.','');
 }
 async function initialize(){
@@ -146,6 +146,15 @@ async function initialize(){
     const transfer=decodeTransfer(hash.get('ai-transfer'));
     await restore(transfer.plan.contextId);
     lastPlan=transfer.plan;
+    if(transfer.needsBackgroundUpload){
+      assets.artwork=null;
+      await persist();updateAssetLabels();
+      $('aiArtworkUpload').closest('details')?.setAttribute('open','');
+      $('aiApply').hidden=true;
+      setStatus('Your layout is ready. Upload the background downloaded from ChatGPT below. It will be applied across the garment automatically with your saved logo and text.','');
+      history.replaceState(null,'',location.pathname+location.search);
+      return;
+    }
     await persist();
     if(transfer.artwork){
       setStatus('Receiving your generated background from ChatGPT…','working');
@@ -170,7 +179,12 @@ async function initialize(){
   if(id)await restore(id);else rememberSession();
   if(plan){openPanel();await acceptPlan(plan);history.replaceState(null,'',location.pathname+location.search);}
   else if(hash.has('ai-prompt')){$('aiDesignerPrompt').value=decodePrompt(hash.get('ai-prompt'));openPanel();}
-  else if(lastPlan){$('aiApply').hidden=false;setStatus('Your draft and images are restored. Click Apply Draft to preview it.','');}
+  else if(lastPlan){
+    const needsBackground=lastPlan.zones.some(z=>z.elements.some(e=>e.kind==='artwork'))&&!assets.artwork;
+    $('aiApply').hidden=needsBackground;
+    if(needsBackground){openPanel();$('aiArtworkUpload').closest('details')?.setAttribute('open','');}
+    setStatus(needsBackground?'Your layout is saved. Upload the background downloaded from ChatGPT once to finish your shirt.':'Your draft and images are restored. Click Apply Draft to preview it.','');
+  }
 }
 
 $('aiDesignerToggle').addEventListener('click',()=>{$('aiDesignerPanel').classList.contains('hidden')?openPanel():closePanel();});

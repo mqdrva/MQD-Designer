@@ -15,8 +15,9 @@ export function validateTransferPlan(raw){
   }
   return sanitizePlan(raw);
 }
-export function encodeTransfer(plan,artwork){
-  const bytes=new TextEncoder().encode(JSON.stringify({version:1,plan:validateTransferPlan(plan),artwork:artwork?validateArtworkFile(artwork):null}));
+export function encodeTransfer(plan,artwork,needsBackgroundUpload=false){
+  if(needsBackgroundUpload&&artwork)throw new Error('Choose file transfer or background upload, not both.');
+  const bytes=new TextEncoder().encode(JSON.stringify({version:1,plan:validateTransferPlan(plan),artwork:artwork?validateArtworkFile(artwork):null,needsBackgroundUpload:!!needsBackgroundUpload}));
   let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
@@ -24,5 +25,6 @@ export function decodeTransfer(token){
   if(typeof token!=='string'||token.length>60000||!/^[A-Za-z0-9_-]+$/.test(token))throw new Error('The design return link is incomplete.');
   const raw=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-token.length%4)%4)),c=>c.charCodeAt(0))));
   if(raw.version!==1)throw new Error('Unsupported design return link.');
-  return {plan:validateTransferPlan(raw.plan),artwork:raw.artwork?validateArtworkFile(raw.artwork):null};
+  if(raw.needsBackgroundUpload&&raw.artwork)throw new Error('The design return link has conflicting background instructions.');
+  return {plan:validateTransferPlan(raw.plan),artwork:raw.artwork?validateArtworkFile(raw.artwork):null,needsBackgroundUpload:raw.needsBackgroundUpload===true};
 }

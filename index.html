@@ -81,28 +81,20 @@
     </div>
     <section id="aiDesignerPanel" class="ai-designer-panel hidden" aria-label="AI Designer">
       <div class="ai-designer-head">
-        <div><strong>Design with your ChatGPT · Private test</strong><p>Describe your complete shirt, including the background. ChatGPT creates the artwork and sends it back with your layout.</p></div>
+        <div><strong>Design with ChatGPT · Test version</strong><p>Upload your logo and tell us what your shirt should look like.</p></div>
         <button id="aiDesignerClose" class="ai-close" type="button" aria-label="Close AI Designer">×</button>
       </div>
       <div class="ai-designer-body">
-        <div class="ai-funding"><strong>Customer-funded AI:</strong> the design conversation runs in your ChatGPT account. MyMerchNow does not use or collect your OpenAI API key.</div>
-        <ol class="ai-steps">
-          <li>Upload your logo and describe the design below.</li>
-          <li>Click <strong>Copy request &amp; open ChatGPT</strong>.</li>
-          <li>Enable the <strong>MyMerchNow</strong> connection in ChatGPT, then paste the request.</li>
-          <li>ChatGPT generates the requested background and transfers it with your layout. Click <strong>Open your design in MyMerchNow</strong> in its reply using this same browser.</li>
-        </ol>
-        <div class="ai-safety"><strong>Protected engine:</strong> ChatGPT can only choose the garment and change customer artwork, text, colors, and placement. UVs, GLBs, mappings, templates, renderer settings, pricing, checkout, and authentication stay outside the AI interface.</div>
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
-        <div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label">Background image<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
-        <textarea id="aiDesignerPrompt" class="ai-prompt" maxlength="1200" placeholder="Example: Make me a black and blue pressure washing long-sleeve shirt. Put my logo small on the upper front, large on the back, and add my phone number on the right sleeve."></textarea>
-        <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Copy request &amp; open ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
-        <details><summary>Manual background fallback</summary><div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background separately</button></div></details>
+        <textarea id="aiDesignerPrompt" class="ai-prompt" aria-label="Describe your shirt" maxlength="1200" placeholder="Black shirt with a colorful kid-friendly background. My logo centered on the front, smaller on the back, with 888-888-8888 underneath."></textarea>
+        <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Continue in ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
+        <div class="ai-note">Uses your ChatGPT account and its usage limits. Copy your request to ChatGPT, download the background, then return here to upload it once.</div>
         <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
+        <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
+        <details><summary>How it works</summary><ol class="ai-steps"><li>In ChatGPT, select <strong>@MyMerchNow</strong>, paste the copied request, and send. Sign in or approve the connection if asked.</li><li>Download the generated background and open <strong>View my shirt</strong> in this browser. Upload the image once below; your background, saved logo, and text are applied automatically.</li></ol><p class="ai-note">Your logo stays in this browser for 24 hours; ChatGPT does not redraw it. Review every side and print quality before ordering. Clear removes the saved draft images.</p></details>
+        <details><summary>Upload your ChatGPT background</summary><div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label">Upload background<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div><div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background separately</button></div></details>
         <details id="aiRequestDetails" hidden><summary>View request to copy manually</summary><textarea id="aiCopiedRequest" class="ai-prompt" aria-label="Request for ChatGPT" readonly></textarea></details>
         <details><summary>Backup: import a draft file or code</summary><label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
-        <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
-        <div class="ai-note">Your original logo stays in this browser for 24 hours and is matched to this draft. ChatGPT creates the layout and background; it does not receive or redraw your logo. Use Clear to remove the saved draft images. Review every side and the print-quality estimate before ordering.</div>
       </div>
     </section>
     </template>
