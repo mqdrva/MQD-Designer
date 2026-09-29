@@ -50,7 +50,7 @@ async function readImage(file){
 async function run(action){
   if(busy)return;
   busy=true;
-  const controls=['aiGenerate','aiArtworkGenerate','aiApply','aiDesignerReset','aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiImportJson'].map($);
+  const controls=['aiGenerate','aiApply','aiDesignerReset','aiLogoUpload','aiArtworkUpload','aiDraftUpload','aiImportJson'].map($);
   controls.forEach(control=>{control.disabled=true;});
   try{await action();}catch(error){setStatus(error.message,'bad');}
   finally{busy=false;controls.forEach(control=>{control.disabled=false;});}
@@ -83,7 +83,7 @@ async function applyPlan(plan){
 function buildChatGPTRequest(prompt){
   const product=productForPlan(currentProductId());
   return [
-    'Complete this MyMerchNow shirt request using the LINK-FIRST one-upload workflow. FIRST call prepare_design_preview to prepare the layout. SECOND visibly show its exact View my shirt link and the upload instructions in a message BEFORE invoking image generation. THIRD generate the background. Do not wait until after image generation to show the link: image generation may end the response. If the tool is unavailable or fails, stop before generating anything and explain the connection error.',
+    'Complete this MyMerchNow shirt request using the LINK-FIRST one-upload workflow. FIRST call prepare_design_preview to prepare the layout. SECOND visibly show its exact Upload background and view shirt link and the upload instructions in a message BEFORE invoking image generation. THIRD generate the background. Do not wait until after image generation to show the link: image generation may end the response. If the tool is unavailable or fails, stop before generating anything and explain the connection error.',
     `Starting garment: ${product.name} (${product.id}). Valid zones: ${product.zones.join(', ')}.`,
     `Customer request: ${prompt}`,
     `Draft contextId: ${contextId}. Copy this exactly into the draft so my uploaded logo is restored in the website.`,
@@ -97,7 +97,7 @@ function buildChatGPTRequest(prompt){
     lastPlan?`Current draft to revise (retain unrequested details): ${JSON.stringify(lastPlan)}`:'',
     `Return website: ${location.origin}${location.pathname}${location.search}`,
     'BEFORE image generation, call prepare_design_preview with productId, summary, contextId, EVERY zone, the exact returnUrl above, and backgroundAction="upload". OMIT backgroundFile: the pending layout link does not require an image yet. Do not send internal file paths or invent URLs. Use backgroundAction="reuse" only for a layout-only revision with an existing website background; use "none" for a plain solid-color design without artwork layers.',
-    'BEFORE image generation, visibly publish the tool-provided link labeled "View my shirt" and say: After the background appears below, download it, open View my shirt in this browser, and upload it once. MyMerchNow then applies it across the garment with your saved logo and text. Then generate the image without waiting for another user message. Do not show JSON or claim the shirt is finished before that upload. If an image was already generated for this request, reuse it instead of generating again. If generation fails, the link remains usable with a later background upload.',
+    'BEFORE image generation, visibly publish the tool-provided link labeled "Upload background and view shirt" and say: After the background image appears below, save it to your device. Open this MyMerchNow link in the SAME browser where you uploaded your logo. Tap Choose background image and select the saved image once. Your logo, text, and layout are already waiting there; the shirt preview appears after the upload. Then generate the image without waiting for another user message. Do not show JSON or claim the shirt is finished before that upload. If an image was already generated for this request, reuse it instead of generating again. If generation fails, the link remains usable with a later background upload.',
     'Do not change garment models, UVs, mappings, templates, renderer behavior, pricing, checkout, or authentication.'
   ].filter(Boolean).join('\n');
 }
@@ -109,14 +109,7 @@ async function openInChatGPT(){
   try{const response=await fetch('/api/ai-handoff-status',{cache:'no-store'});if(response.ok)availability=await response.json();}catch{}
   if(!availability?.enabled)throw new Error('Automatic background transfer is not connected on this test page yet. Your logo and request are saved. No ChatGPT request was sent; wait for the connected test link.');
   const request=buildChatGPTRequest(prompt);
-  await copyAndOpen(request,'Request copied. In ChatGPT, select @MyMerchNow, paste, and send. Download your background, then open “View my shirt” and upload it once. Your logo is saved.');
-}
-async function openBackgroundInChatGPT(){
-  const prompt=$('aiDesignerPrompt').value.trim();
-  if(!prompt)throw new Error('Describe your background in the design request first.');
-  await persist();
-  const request=`Generate a flat, high-resolution background artwork image for an all-over print garment. Brief: ${prompt}\nCreate ONLY the background described in the brief. No shirt mockup, garment silhouette, logo, text, letters, phone number, watermark, or cutlines. Let the pattern fill the entire rectangular image edge to edge. Keep it suitable for placing a separate logo on top. I will download this image and upload it into MyMerchNow myself. Do not call the MyMerchNow plugin or claim to have changed the website.`;
-  await copyAndOpen(request,'Background request copied. Paste it into ChatGPT, download the generated image, then upload it here under Background image.');
+  await copyAndOpen(request,'Request copied. In ChatGPT, select @MyMerchNow, paste, and send. Save its background image, then open “Upload background and view shirt” in this browser. Choose the image once; your logo is saved here.');
 }
 async function copyAndOpen(request,message){
   $('aiCopiedRequest').value=request;$('aiRequestDetails').hidden=false;$('aiChatGPTLink').hidden=false;
@@ -149,9 +142,9 @@ async function initialize(){
     if(transfer.needsBackgroundUpload){
       assets.artwork=null;
       await persist();updateAssetLabels();
-      $('aiArtworkUpload').closest('details')?.setAttribute('open','');
+      $('aiBackgroundStep').open=true;
       $('aiApply').hidden=true;
-      setStatus('Your layout is ready. Upload the background downloaded from ChatGPT below. It will be applied across the garment automatically with your saved logo and text.','');
+      setStatus('Your logo and layout are ready. Save the background image from ChatGPT, then choose it below. Your finished shirt will appear automatically.','');
       history.replaceState(null,'',location.pathname+location.search);
       return;
     }
@@ -182,15 +175,14 @@ async function initialize(){
   else if(lastPlan){
     const needsBackground=lastPlan.zones.some(z=>z.elements.some(e=>e.kind==='artwork'))&&!assets.artwork;
     $('aiApply').hidden=needsBackground;
-    if(needsBackground){openPanel();$('aiArtworkUpload').closest('details')?.setAttribute('open','');}
-    setStatus(needsBackground?'Your layout is saved. Upload the background downloaded from ChatGPT once to finish your shirt.':'Your draft and images are restored. Click Apply Draft to preview it.','');
+    if(needsBackground){openPanel();$('aiBackgroundStep').open=true;}
+    setStatus(needsBackground?'Your logo and layout are saved. Choose the background image you saved from ChatGPT below to finish your shirt.':'Your draft and images are restored. Click Apply Draft to preview it.','');
   }
 }
 
 $('aiDesignerToggle').addEventListener('click',()=>{$('aiDesignerPanel').classList.contains('hidden')?openPanel():closePanel();});
 $('aiDesignerClose').addEventListener('click',closePanel);
 $('aiGenerate').addEventListener('click',()=>run(openInChatGPT));
-$('aiArtworkGenerate').addEventListener('click',()=>run(openBackgroundInChatGPT));
 $('aiApply').addEventListener('click',()=>run(async()=>{if(lastPlan)await applyPlan(lastPlan);}));
 $('aiDesignerReset').addEventListener('click',()=>run(resetAI));
 for(const [id,kind] of [['aiLogoUpload','logo'],['aiArtworkUpload','artwork']]){
