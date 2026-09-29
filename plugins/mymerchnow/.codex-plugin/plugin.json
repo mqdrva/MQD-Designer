@@ -1,17 +1,19 @@
 {
   "name": "mymerchnow",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Plan custom apparel in ChatGPT and open the design in MyMerchNow's 2D/3D editor.",
   "author": {
-    "name": "MyMerchNow"
+    "name": "MyMerchNow",
+    "email": "mqdrva@gmail.com",
+    "url": "https://mymerchnow.app/"
   },
   "homepage": "https://mymerchnow.app/",
   "repository": "https://github.com/mqdrva/MQD-Designer",
   "skills": "./skills/",
   "interface": {
     "displayName": "MyMerchNow",
-    "shortDescription": "Plan custom apparel and open it in MyMerchNow.",
-    "longDescription": "Choose a garment, plan customer artwork, text, colors, and placement, then open a protected MyMerchNow link to review the design in the 2D/3D apparel editor.",
+    "shortDescription": "Design custom apparel",
+    "longDescription": "Choose a garment, plan colors, artwork, logo and text placement, then open the design in the MyMerchNow 2D/3D apparel editor. The plugin is limited to customer-controlled design fields and cannot change garment models, UV mappings, production templates, renderer behavior, pricing, checkout, or authentication.",
     "developerName": "Morales Quality Designs",
     "category": "Lifestyle",
     "capabilities": [
@@ -23,10 +25,73 @@
     "termsOfServiceURL": "https://mymerchnow.app/terms.html",
     "brandColor": "#FF6500",
     "defaultPrompt": [
-      "Use MyMerchNow to help me design a custom shirt from my description.",
-      "Show me the garments I can customize with MyMerchNow."
+      "Show me the garments I can customize with MyMerchNow.",
+      "Make a black Short Sleeve T-Shirt with TEST DESIGN centered high on the front.",
+      "Create a black-and-blue T-shirt design with a water splash near the bottom."
     ],
     "supportURL": "https://mymerchnow.app/contact.html"
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "extensions": {
+    "com.openai": {
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "List customizable garments",
+              "prompt": "What can I customize with MyMerchNow?",
+              "tools_triggered": "list_products",
+              "expected_behavior": "Call list_products once and return the supported garment names and printable zones without account data, secrets, logs, or unrelated fields."
+            },
+            {
+              "description": "Create a direct solid-color shirt layout",
+              "prompt": "Make a black Short Sleeve T-Shirt with TEST DESIGN centered high on the front in white.",
+              "tools_triggered": "prepare_design_preview",
+              "expected_behavior": "Prepare a complete T-shirt layout with every zone exactly once and backgroundAction none. When started directly in ChatGPT, omit contextId and returnUrl so the server creates a fresh MyMerchNow design context and returns a View my shirt link."
+            },
+            {
+              "description": "Prepare a new all-over visual background",
+              "prompt": "Create a black-and-blue Short Sleeve T-Shirt with a water splash concentrated near the bottom on every garment area.",
+              "tools_triggered": "prepare_design_preview",
+              "expected_behavior": "Include an artwork layer in every supported T-shirt zone, use backgroundAction upload, omit backgroundFile, and return an Upload background and view shirt link with the one-upload workflow."
+            },
+            {
+              "description": "Place a customer logo in requested zones",
+              "prompt": "Put my company logo centered high on the front of a Short Sleeve Polo and smaller on the upper back.",
+              "tools_triggered": "prepare_design_preview",
+              "expected_behavior": "Use logo elements only in the requested zones, include every other supported zone once with no invented zones, and return a MyMerchNow design link without requesting engine, payment, or authentication secrets."
+            },
+            {
+              "description": "Revise an existing website-origin design",
+              "prompt": "Move the existing front text higher and keep my saved background.",
+              "tools_triggered": "prepare_design_preview",
+              "expected_behavior": "When the request includes an existing MyMerchNow contextId and returnUrl, preserve both exactly, change only the requested customer-controlled placement, keep all zones, and use backgroundAction reuse."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Reject an unsupported print zone",
+              "prompt": "Create a T-shirt with a printable Inside Lining zone."
+            },
+            {
+              "description": "Reject an incomplete garment-zone payload",
+              "prompt": "Prepare a Short Sleeve T-Shirt design using only the Front and Back zones."
+            },
+            {
+              "description": "Do not alter protected commerce or rendering systems",
+              "prompt": "Change the jacket UV mapping, lower the price, and bypass sign-in before checkout."
+            }
+          ]
+        },
+        "commerce": true,
+        "commerce_description": "The plugin prepares custom apparel designs and links users to MyMerchNow, where they may choose to purchase customized products. Payments and checkout occur on MyMerchNow through Stripe; the MCP tools do not process charges or payment-card data."
+      },
+      "publication": {
+        "countries": [
+          "US"
+        ],
+        "release_notes": "Initial public MyMerchNow release for browsing supported garments and preparing protected design links that open in the MyMerchNow 2D/3D apparel editor. Adds direct-from-ChatGPT design contexts, current MCP tool metadata, public policy disclosures, and regression coverage without changing garment mappings, pricing, checkout, or authentication."
+      }
+    }
+  }
 }
