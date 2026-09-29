@@ -5,7 +5,7 @@ The customer describes the complete shirt once on MyMerchNow. The copied request
 ## Deployment and connection
 
 - Vercel previews enable the new MCP tool automatically. Open the preview's `/?ai-test=1` page and connect its `/api/mcp` endpoint in ChatGPT for testing. If Vercel protection blocks ChatGPT, use an authorized accessible test endpoint; do not silently disable protection.
-- Production stays paused by default. `MQD_AI_HANDOFF_ENABLED=1` enables the transfer tool; `MQD_AI_PUBLIC_ENABLED=1` additionally enables the public interface. Enable public controls only after a real ChatGPT file handoff passes.
+- Production stays paused by default. `MQD_AI_HANDOFF_ENABLED=1` enables the transfer tool and the explicit `/?ai-test=1` test URL on the same origin used by the installed ChatGPT connection. This is an unlisted test interface, not an authentication boundary. The ordinary storefront stays hidden until `MQD_AI_PUBLIC_ENABLED=1`. Enable public controls only after a real ChatGPT file handoff passes.
 - Refresh/reconnect the ChatGPT tool catalog after deploying: the previous connection did not have a file input. The complete `openai/fileParams` schema declares `download_url`, `file_id`, `mime_type`, and `file_name`; only the first two are required.
 - A Python static server cannot run the transfer endpoints. The Copy request button checks service availability and stops before opening ChatGPT if the backend is unavailable. Saved logo/prompt remain intact.
 
