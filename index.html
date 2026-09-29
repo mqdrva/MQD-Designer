@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="/v20/editor.css?layer-order=1&v=20260925-font-preview">
 <link rel="stylesheet" href="/v20/flat-mockup.css?v=2">
 <link rel="stylesheet" href="/v20/help-chat.css?v=20260919a">
-<link rel="stylesheet" href="/v20/ai-designer.css?v=20260928a">
+<link rel="stylesheet" href="/v20/ai-designer.css?v=20260929-upload-clarity">
 <script src="/v20/analytics-init.js?v=20260928a"></script>
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
@@ -88,11 +88,11 @@
         <div class="ai-logo-row"><div id="aiLogoName" class="ai-logo-name">No AI logo selected</div><label class="ai-logo-label">Upload Logo<input id="aiLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
         <textarea id="aiDesignerPrompt" class="ai-prompt" aria-label="Describe your shirt" maxlength="1200" placeholder="Black shirt with a colorful kid-friendly background. My logo centered on the front, smaller on the back, with 888-888-8888 underneath."></textarea>
         <div class="ai-actions"><button id="aiGenerate" class="primary" type="button">Continue in ChatGPT</button><button id="aiApply" type="button" hidden>Apply Draft</button><button id="aiDesignerReset" type="button">Clear</button></div>
-        <div class="ai-note">Uses your ChatGPT account and its usage limits. Copy your request to ChatGPT, download the background, then return here to upload it once.</div>
+        <div class="ai-note">ChatGPT uses your account to make the background. Save the image it creates, then use its MyMerchNow link to upload the image once and see your finished shirt.</div>
         <a id="aiChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT</a>
         <div id="aiDesignerStatus" class="ai-status" role="status" aria-live="polite"></div>
-        <details><summary>How it works</summary><ol class="ai-steps"><li>In ChatGPT, select <strong>@MyMerchNow</strong>, paste the copied request, and send. Sign in or approve the connection if asked.</li><li>Download the generated background and open <strong>View my shirt</strong> in this browser. Upload the image once below; your background, saved logo, and text are applied automatically.</li></ol><p class="ai-note">Your logo stays in this browser for 24 hours; ChatGPT does not redraw it. Review every side and print quality before ordering. Clear removes the saved draft images.</p></details>
-        <details><summary>Upload your ChatGPT background</summary><div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label">Upload background<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div><div class="ai-actions"><button id="aiArtworkGenerate" type="button">Create background separately</button></div></details>
+        <details id="aiBackgroundStep" class="ai-background-step"><summary>Upload background from ChatGPT to finish shirt</summary><p class="ai-background-hint">Save the background image from ChatGPT to your device. Choose it here once; your saved logo, text, and layout will appear with it automatically.</p><div class="ai-logo-row"><div id="aiArtworkName" class="ai-logo-name">No background image selected</div><label class="ai-logo-label ai-background-upload">Choose background image<input id="aiArtworkUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div></details>
+        <details><summary>How it works</summary><ol class="ai-steps"><li>In ChatGPT, select <strong>@MyMerchNow</strong>, paste the copied request, and send. Sign in or approve the connection if asked.</li><li>ChatGPT gives you an <strong>Upload background and view shirt</strong> link and makes the background image. Save that image.</li><li>Open the link in the same browser. Choose the saved image once; MyMerchNow applies it with your logo and text.</li></ol><p class="ai-note">Your logo stays in this browser for 24 hours; ChatGPT does not redraw it. Review every side and print quality before ordering. Clear removes the saved draft images.</p></details>
         <details id="aiRequestDetails" hidden><summary>View request to copy manually</summary><textarea id="aiCopiedRequest" class="ai-prompt" aria-label="Request for ChatGPT" readonly></textarea></details>
         <details><summary>Backup: import a draft file or code</summary><label class="ai-logo-label">Import draft<input id="aiDraftUpload" type="file" accept="application/json,.json"></label><textarea id="aiDraftJson" class="ai-prompt" maxlength="64000" aria-label="Draft JSON" placeholder="Paste the draft code block here"></textarea><button id="aiImportJson" type="button">Import pasted draft</button></details>
       </div>
@@ -133,7 +133,7 @@ const aiPrivateTest = (['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const aiTestUI = document.getElementById('aiDesignerPrivateTestUI');
 if (aiPrivateTest||aiAvailability.publicEnabled) {
   aiTestUI.replaceWith(aiTestUI.content);
-  await import('/v20/ai-designer.js?v=20260929-link-first');
+  await import('/v20/ai-designer.js?v=20260929-upload-clarity');
 } else {
   aiTestUI.remove();
 }
