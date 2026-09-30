@@ -852,12 +852,37 @@ function zoneQuality(zone=activeZone){
   const values=images.map(l=>imageLayerEstimatedDpi(l,zone)).filter(Number.isFinite);if(!values.length)return{tone:'neutral',label:'Resolution unavailable',note:'Source pixel dimensions could not be read.'};
   const dpi=Math.round(Math.min(...values));if(dpi>=240)return{tone:'good',label:`≈ ${dpi} DPI ✓`,note:'Good print resolution at the current design size.'};if(dpi>=150)return{tone:'warn',label:`≈ ${dpi} DPI`,note:'Usable, but increasing the image size further may soften the print.'};return{tone:'bad',label:`≈ ${dpi} DPI ⚠`,note:'Low resolution — this image may print blurry at the current size.'};
 }
-function ensureCustomerUx(){
-  if(!document.getElementById('mqdUxStyles')){const style=document.createElement('style');style.id='mqdUxStyles';style.textContent=`.zone-icon{position:relative}.zone-icon.complete::after{content:'✓';position:absolute;right:4px;top:4px;width:14px;height:14px;border-radius:50%;background:#18a558;color:#fff;font-size:9px;font-weight:900;display:grid;place-items:center;box-shadow:0 0 0 2px #fff}.guide-legend{font-size:9px;color:#777;text-align:center;margin-top:-2px;margin-bottom:7px}.guide-legend .cut{color:#EB232D;font-weight:800}.guide-legend .safe{color:#D66F00;font-weight:800}.quality-card{border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;padding:9px;margin-top:8px}.quality-card .q-label{font-size:9px;color:#888}.quality-card .q-value{font-size:13px;font-weight:800;margin-top:3px}.quality-card .q-note{font-size:9px;color:#777;line-height:1.35;margin-top:3px}.quality-card.good .q-value{color:#157c3f}.quality-card.warn .q-value{color:#9a6100}.quality-card.bad .q-value{color:#b42318}`;document.head.appendChild(style);}
-  if(!document.getElementById('guideLegend')){const title=document.querySelector('.zone-title');if(title){const d=document.createElement('div');d.id='guideLegend';d.className='guide-legend';d.innerHTML='<span class="cut">Red</span> = cut / bleed edge &nbsp;·&nbsp; <span class="safe">Orange</span> = keep important text & logos inside';title.insertAdjacentElement('afterend',d);}}
-  if(!document.getElementById('printQualityCard')){const status=$('layerControls')?.closest('.section');if(status){const d=document.createElement('div');d.id='printQualityCard';d.className='section quality-card neutral';d.innerHTML='<div class="q-label">Estimated print quality</div><div id="printQualityValue" class="q-value">—</div><div id="printQualityNote" class="q-note">Select or add artwork to check resolution.</div>';status.insertAdjacentElement('afterend',d);}}
+function activeLayerSafeAreaStatus(){
+  const l=activeLayer();
+  if(!l)return{tone:'neutral',label:'No artwork selected',note:'Select a logo, image, or text layer to check its safe-area placement.'};
+  if(l.visible===false)return{tone:'neutral',label:'Selected layer is hidden',note:'Show the layer to check its safe-area placement.'};
+  if(isFullLockedLibraryBackground(l)||isCutlineBottomArtwork(l)||l.chatBackground)return{tone:'good',label:'Background placement ✓',note:'Full backgrounds are allowed to extend through the safe area to the cut line.'};
+  const q=activeLayerScreenRect(l);
+  if(!q?.b)return{tone:'neutral',label:'Placement check unavailable',note:'The selected artwork position could not be measured yet.'};
+  const b=q.b;
+  const tshirtSleeve=product.id==='tshirt'&&(activeZone==='Left Sleeve'||activeZone==='Right Sleeve');
+  const tshirtBody=product.id==='tshirt'&&(activeZone==='Front'||activeZone==='Back');
+  const inset=tshirtSleeve?.025:tshirtBody?.045:.075;
+  const ix=Math.max((tshirtSleeve||tshirtBody)?4:9,b.w*inset),iy=Math.max((tshirtSleeve||tshirtBody)?4:9,b.h*inset);
+  const safe={left:b.x+ix,top:b.y+iy,right:b.x+b.w-ix,bottom:b.y+b.h-iy};
+  const g=selectionGeometry(l,q);
+  const outside=g.corners.some(p=>p.x<safe.left||p.x>safe.right||p.y<safe.top||p.y>safe.bottom);
+  return outside
+    ?{tone:'warn',label:'Artwork crosses the safe area ⚠',note:'Keep important logos and text inside the orange safe-area guide. Decorative backgrounds may extend to the red cut line.'}
+    :{tone:'good',label:'Inside safe area ✓',note:'The selected artwork is inside the recommended safe area.'};
 }
-function renderPrintQuality(){ensureCustomerUx();const q=zoneQuality(activeZone),card=$('printQualityCard'),value=$('printQualityValue'),note=$('printQualityNote');if(!card||!value||!note)return;card.classList.remove('good','warn','bad','neutral');card.classList.add(q.tone);value.textContent=q.label;note.textContent=q.note+' Estimated against a 300-DPI production target.';}
+function ensureCustomerUx(){
+  if(!document.getElementById('mqdUxStyles')){const style=document.createElement('style');style.id='mqdUxStyles';style.textContent=`.zone-icon{position:relative}.zone-icon.complete::after{content:'✓';position:absolute;right:4px;top:4px;width:14px;height:14px;border-radius:50%;background:#18a558;color:#fff;font-size:9px;font-weight:900;display:grid;place-items:center;box-shadow:0 0 0 2px #fff}.guide-legend{font-size:9px;color:#777;text-align:center;margin-top:-2px;margin-bottom:7px}.guide-legend .cut{color:#EB232D;font-weight:800}.guide-legend .safe{color:#D66F00;font-weight:800}.quality-card{border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;padding:9px;margin-top:8px}.quality-card .q-check+.q-check{margin-top:9px;padding-top:9px;border-top:1px solid #e8e8e8}.quality-card .q-label{font-size:9px;color:#888}.quality-card .q-value{font-size:12px;font-weight:800;margin-top:3px}.quality-card .q-note{font-size:9px;color:#777;line-height:1.35;margin-top:3px}.quality-card .q-check.good .q-value{color:#157c3f}.quality-card .q-check.warn .q-value{color:#9a6100}.quality-card .q-check.bad .q-value{color:#b42318}.quality-card .q-check.neutral .q-value{color:#666}`;document.head.appendChild(style);}
+  if(!document.getElementById('guideLegend')){const title=document.querySelector('.zone-title');if(title){const d=document.createElement('div');d.id='guideLegend';d.className='guide-legend';d.innerHTML='<span class="cut">Red</span> = cut / bleed edge &nbsp;·&nbsp; <span class="safe">Orange</span> = keep important text & logos inside';title.insertAdjacentElement('afterend',d);}}
+  if(!document.getElementById('printQualityCard')){const status=$('layerControls')?.closest('.section');if(status){const d=document.createElement('div');d.id='printQualityCard';d.className='section quality-card';d.innerHTML='<div id="resolutionCheck" class="q-check neutral"><div class="q-label">Image resolution</div><div id="printQualityValue" class="q-value">—</div><div id="printQualityNote" class="q-note">Select or add artwork to check resolution.</div></div><div id="safeAreaCheck" class="q-check neutral"><div class="q-label">Artwork placement</div><div id="safeAreaValue" class="q-value">—</div><div id="safeAreaNote" class="q-note">Select artwork to check the safe area.</div></div>';status.insertAdjacentElement('afterend',d);}}
+}
+function renderPrintQuality(){
+  ensureCustomerUx();
+  const q=zoneQuality(activeZone),resolution=$('resolutionCheck'),value=$('printQualityValue'),note=$('printQualityNote');
+  if(resolution&&value&&note){resolution.className='q-check '+q.tone;value.textContent=q.label;note.textContent=q.note+' Estimated against a 300-DPI production target.';}
+  const s=activeLayerSafeAreaStatus(),safe=$('safeAreaCheck'),safeValue=$('safeAreaValue'),safeNote=$('safeAreaNote');
+  if(safe&&safeValue&&safeNote){safe.className='q-check '+s.tone;safeValue.textContent=s.label;safeNote.textContent=s.note;}
+}
 
 function waterSplashCut(zone,rec){
   const shirt=shirtSplashCutFrame(product.id,zone);if(shirt)return shirt;
@@ -1208,7 +1233,7 @@ function renderLayerPanel(){
       button.onclick=e=>{e.stopPropagation();const target=panelOrder[index+offset];if(target)reorderLayer(l.id,target.id);};actions.appendChild(button);
     }
     d.appendChild(actions);
-    d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();drawEditor();};
+    d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();renderPrintQuality();drawEditor();};
     d.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
     d.ondragend=()=>d.classList.remove('dragging-layer');
     d.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('layer-drop-target');};
@@ -2137,7 +2162,7 @@ editorCanvas.addEventListener('pointerdown',e=>{
   // the selected item's handle; a full background remains the fallback.
   const hit=onHandle&&(!pointed||pointed===current||pointed.chatBackground)?current:pointed;
   if(!hit)return;
-  if(hit.id!==activeLayerId){activeLayerId=hit.id;cropMode=false;renderLayerPanel();drawEditor();}
+  if(hit.id!==activeLayerId){activeLayerId=hit.id;cropMode=false;renderLayerPanel();renderPrintQuality();drawEditor();}
   const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l))return;
   const g=selectionGeometry(l,q);
   snapshot();
@@ -2176,7 +2201,7 @@ editorCanvas.addEventListener('pointermove',e=>{
     if(handle.includes('b'))c.bottom=clampCropValue((dragState.crop.bottom||0)-fy,dragState.crop.top);
     l.crop=c;
   }
-  drawEditor();renderLayerPanel();scheduleGarmentPreview();
+  drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
 });
 editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
 

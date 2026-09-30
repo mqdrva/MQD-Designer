@@ -1,0 +1,51 @@
+.sidebar-tour-replay{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  margin:0 0 8px auto;
+  border:0;
+  background:transparent;
+  color:#777;
+  font:700 10px/1 Inter,Arial,sans-serif;
+  cursor:pointer;
+  padding:4px 2px;
+}
+.sidebar-tour-replay:hover{color:#222}
+.mqd-tour-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9980;
+  background:rgba(0,0,0,.46);
+}
+.mqd-tour-target{
+  position:relative!important;
+  z-index:9982!important;
+  box-shadow:0 0 0 4px #fff,0 0 0 7px #ff6b00,0 12px 34px rgba(0,0,0,.24)!important;
+  border-radius:10px;
+}
+.mqd-tour-card{
+  position:fixed;
+  z-index:9985;
+  left:50%;
+  bottom:28px;
+  transform:translateX(-50%);
+  width:min(440px,calc(100vw - 28px));
+  box-sizing:border-box;
+  border:1px solid #dedede;
+  border-radius:14px;
+  background:#fff;
+  padding:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.24);
+  font-family:Inter,Arial,sans-serif;
+}
+.mqd-tour-progress{font-size:10px;font-weight:800;color:#ff6500;text-transform:uppercase;letter-spacing:.05em}
+.mqd-tour-card h3{margin:5px 0 6px;font-size:18px;color:#191919}
+.mqd-tour-card p{margin:0;color:#606060;font-size:12px;line-height:1.5}
+.mqd-tour-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px}
+.mqd-tour-actions button{border:1px solid #d8d8d8;background:#fff;border-radius:9px;padding:9px 12px;font-weight:750;cursor:pointer}
+.mqd-tour-actions .mqd-tour-next{background:#171717;border-color:#171717;color:#fff}
+.mqd-tour-actions .mqd-tour-skip{border:0;color:#777;padding-left:0}
+@media(max-width:850px){
+  .mqd-tour-card{bottom:14px}
+  .mqd-tour-target{z-index:9982!important}
+}
