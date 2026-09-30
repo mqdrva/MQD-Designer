@@ -15,7 +15,8 @@
     "v20/polo-collar-mask.js": "e5d3e45b575a49b864e9e139106ba98563a55614c45e40bc357fa1d8f02edabc",
     "v20/shorts-panels.js": "72749f27baa14a59110406bd7b3af22c072b76e2c400e806d4a0fe31e9d0610f",
     "v20/sweat-pants-panels.js": "8e902e568fed079cda09e0ef8fb489b2b75e7a928e503865bf5bb4e3c7ecd2a8",
-    "v20/tshirt-collar-mask.js": "f0de8d55df0209ac19105b0871922a3732807861b2a7b28edd68bdb1ab9c2966"
+    "v20/tshirt-collar-mask.js": "f0de8d55df0209ac19105b0871922a3732807861b2a7b28edd68bdb1ab9c2966",
+    "v20/tshirt-side-wrap.js": "2c82387be9b8e740e49e315a1eebaa7e36afc20e47af8cb88ccbb0915eabe067"
   },
   "templateFiles": {
     "assets/templates/hat/front-panel.png": "7270fd3c4736c138751a85923105421347186476a643abfe14e64e112772b894",
@@ -49,7 +50,7 @@
     "maxLayerScale": "6cac8584b0d3d8cbe972d09acfd784ee9665f048beb0246009b5f1a91a7e699b",
     "garmentCopyFamily": "2bd4c6bd5dcd965ec62d4d4c06cbec10be7e640818c76b780e4a6609a97bddc4",
     "zonePlacement": "90c062352b606a548662367868e4986c086820069531537eb841b8bb749d41ad",
-    "splitTshirtGeometry": "dd3d3f0f7a49fd1e62715803d78ece879ada0f11ac220496c8dcd51fb5d2f926",
+    "splitTshirtGeometry": "869725866badfd80183f079841d15e8a12fb9e1735b6184e6f8015d29ab49ee5",
     "splitFleeceHoodieGeometry": "33c57c07e61358ab64fe1e4a5110be19e2a704a4fdb3b66e28c882e6e2ddc69e",
     "rebuildFleeceHoodiePreview": "59b10d15a2827568336a01b3805caecd7a8ef69a977e75ba1079eeaaeadae245",
     "updateTshirtZoneTextures": "8b2bfbc57056e735e4c966424e9b9a97d0d7acfb1b13b63de0dfe5ce2b3d25e5",

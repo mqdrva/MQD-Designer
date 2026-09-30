@@ -28,6 +28,7 @@ import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './p
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
 import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from './tshirt-artwork-calibration.js';
+import {tshirtSideWrapUv,isTshirtSleeveInterior,isTshirtCollarInterior} from './tshirt-side-wrap.js';
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -1248,8 +1249,11 @@ function renderLayerPanel(){
   for(const id of['layerX','layerY','layerScale','layerRotation','fillLayer'])$(id).disabled=locked;
   for(const id of['flipXTool','flipYTool','alignTool','cropTool','resetTool'])$(id).disabled=locked;
   $('duplicateTool').disabled=!!(l.libraryAssetId&&!locked);
-  $('cloneAllTool').disabled=!!(l.libraryAssetId&&!locked);
-  $('cloneAllTool').title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
+  const cloneAllButton=$('cloneAllTool');
+  if(cloneAllButton){
+    cloneAllButton.disabled=!!(l.libraryAssetId&&!locked);
+    cloneAllButton.title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
+  }
   $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
   let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can change its layer order, add it to other print zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
   let lockedActions=$('lockedLibraryDuplicateActions');
@@ -1379,7 +1383,7 @@ function renderGarmentCopyControl(){
   if(!button){
     button=document.createElement('button');button.id='copyGarmentDesign';button.type='button';button.textContent='Copy to Garment';
     button.title='Copy Design to Another Garment';button.onclick=openGarmentCopy;
-    $('cloneAllTool')?.parentElement?.appendChild(button);
+    $('duplicateTool')?.parentElement?.appendChild(button);
   }
   button.hidden=!garmentCopyTargets().length;
   button.disabled=false;
@@ -1602,6 +1606,7 @@ function splitTshirtGeometry(sourceMesh){
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
  const buffers=panelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
+ const sleeveInterior={P:[],N:[]};
  const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=product.id==='tshirt'&&faceCount===TSHIRT_FACE_COUNT,useExactPoloCollar=shortPolo&&faceCount===POLO_FACE_COUNT;
  if(product.id==='tshirt'&&!useExactCollar)console.warn('MQD T-shirt collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);
  if(shortPolo&&!useExactPoloCollar)console.warn('MQD Short Sleeve Polo collar topology mask disabled: expected',POLO_FACE_COUNT,'faces but found',faceCount);
@@ -1611,9 +1616,13 @@ function splitTshirtGeometry(sourceMesh){
   const parts=longSleevePolo?partitionLongSleevePoloTriangle(triangle):longSleeve?partitionLongSleeveTriangle(triangle):useExactPoloCollar?(isPoloCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):useExactCollar?(isTshirtCollarFace(faceIndex)?[[4,triangle]]:partitionBodyTriangle(triangle)):partitionTriangle(triangle);
   for(const [zi,poly] of parts){
    const out=buffers[zi];
-   for(let k=1;k<poly.length-1;k++)for(const v of[poly[0],poly[k],poly[k+1]]){
-    out.P.push(...v.slice(0,3));const length=Math.hypot(...v.slice(3))||1;out.N.push(...v.slice(3).map(n=>n/length));
-    ['x','y','z'].forEach((axis,j)=>{out.min[axis]=Math.min(out.min[axis],v[j]);out.max[axis]=Math.max(out.max[axis],v[j]);});
+   for(let k=1;k<poly.length-1;k++){
+    const face=[poly[0],poly[k],poly[k+1]],target=useExactCollar&&(isTshirtSleeveInterior(panelNames[zi],face)||zi===4&&isTshirtCollarInterior(face))?sleeveInterior:out;
+    for(const v of face){
+     target.P.push(...v.slice(0,3));const length=Math.hypot(...v.slice(3))||1;target.N.push(...v.slice(3).map(n=>n/length));
+     // Retain full panel bounds so the sleeve artwork keeps its approved frame.
+     ['x','y','z'].forEach((axis,j)=>{out.min[axis]=Math.min(out.min[axis],v[j]);out.max[axis]=Math.max(out.max[axis],v[j]);});
+    }
    }
   }
  }
@@ -1621,15 +1630,21 @@ function splitTshirtGeometry(sourceMesh){
  const group=new THREE.Group();group.name='MQD_Tshirt_Zones';group.position.copy(sourceMesh.position);group.quaternion.copy(sourceMesh.quaternion);group.scale.copy(sourceMesh.scale);
  const base=Array.isArray(sourceMesh.material)?sourceMesh.material[0]:sourceMesh.material;
  buffers.forEach((b,zi)=>{
-  for(let i=0;i<b.P.length;i+=3)b.UV.push(...((longSleeve||longSleevePolo)?longSleevePanelUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));
+  for(let i=0;i<b.P.length;i+=3)b.UV.push(...((longSleeve||longSleevePolo)?longSleevePanelUv:product.id==='tshirt'?tshirtSideWrapUv:panelUv)(panelNames[zi],...b.P.slice(i,i+3),b));
   // Unwrap triangles across the angular seam without stretching across the entire texture.
   if(zi>=2)for(let i=0;i<b.UV.length;i+=6){const us=[b.UV[i],b.UV[i+2],b.UV[i+4]];if(Math.max(...us)-Math.min(...us)>.5)for(let k=0;k<6;k+=2)if(b.UV[i+k]<.5)b.UV[i+k]+=1;}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(b.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(b.N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(b.UV,2));g.computeBoundingBox();g.computeBoundingSphere();
   const m=base?.clone?base.clone():new THREE.MeshStandardMaterial();m.color.set('#fff');m.vertexColors=false;
   for(const key of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','displacementMap'])if(key in m)m[key]=null;
   m.roughness=.88;m.metalness=0;m.needsUpdate=true;
+  if(product.id==='tshirt'){m.side=THREE.FrontSide;m.depthTest=true;m.depthWrite=true;m.transparent=false;m.opacity=1;}
   const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+panelNames[zi].replace(/\s+/g,'_');group.add(mesh);tshirtZoneMeshes.set(panelNames[zi],mesh);
  });
+ if(sleeveInterior.P.length){
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(sleeveInterior.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(sleeveInterior.N,3));
+  const m=new THREE.MeshStandardMaterial({color:'#111111',roughness:1,metalness:0});
+  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_Tshirt_Sleeve_Interior';group.add(mesh);
+ }
  sourceMesh.parent.add(group);tshirtZoneGroup=group;sourceMesh.visible=false;return true;
 }
 
@@ -2020,12 +2035,10 @@ function cloneActiveToAllZones(){
     if(isLockedLibraryLayer(l))return cloneLockedLibraryToAllZones(l);
     return;
   }
-  const available=product.zones.filter(z=>zoneState(z).layers.length<MAX_ZONE_LAYERS);
+  const available=product.zones.filter(z=>z!==activeZone&&zoneState(z).layers.length<MAX_ZONE_LAYERS);
   if(!available.length){alert('All print zones are already at the 6-layer limit.');return;}
   snapshot();
-  let currentCopy=null;
-  for(const z of available){const copy=duplicateLayerIntoZone(l,z,{offset:z===activeZone});if(z===activeZone)currentCopy=copy;}
-  if(currentCopy)activeLayerId=currentCopy.id;
+  for(const z of available)duplicateLayerIntoZone(l,z);
   renderAll();
 }
 function closeDuplicateMenu(){document.getElementById('duplicateZoneMenu')?.remove();}
