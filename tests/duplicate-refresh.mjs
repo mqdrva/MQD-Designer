@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const extract=name=>{const start=source.indexOf('function '+name+'(');let brace=source.indexOf('{',start),depth=1,i=brace+1;for(;depth;i++){if(source[i]==='{')depth++;if(source[i]==='}')depth--;}return source.slice(start,i);};
+const layer={id:'original',type:'image',x:0,y:0,image:{complete:true}},zones={Front:{layers:[layer]},Back:{layers:[]},Collar:{layers:[]}};
+let refresh=0;
+const ctx={activeLayer:()=>layer,activeZone:'Front',product:{zones:Object.keys(zones)},zoneState:z=>zones[z],MAX_ZONE_LAYERS:6,snapshot(){},renderAll(){refresh++;},alert(){throw Error('unexpected alert')},duplicateLayerIntoZone(l,z){zones[z].layers.push({...l,id:z});return true;}};
+vm.runInNewContext(extract('cloneActiveToAllZones')+';cloneActiveToAllZones();',ctx);
+assert.equal(refresh,1);assert.equal(zones.Front.layers.length,1);assert.equal(zones.Back.layers.length,1);assert.equal(zones.Collar.layers.length,1);assert.equal(zones.Back.layers[0].image,layer.image);
+assert(!source.includes("$('cloneAllTool').disabled"));
+assert(!source.includes("$('cloneAllTool').title"));
+console.log('PASS: duplicate refresh runs immediately, source stays untouched, removed control cannot throw.');
