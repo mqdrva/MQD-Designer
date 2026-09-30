@@ -125,15 +125,10 @@ if(pane&&!pane.dataset.sidebarUxPreview){
   };
 
   const dockLayerControls=()=>{
-    if(!layersSection) return;
     const controls=document.getElementById('layerControls');
-    if(!controls) return;
-    const activeCard=layersSection.querySelector('#layers .layer.active');
-    if(activeCard){
-      if(controls.parentElement!==activeCard) activeCard.appendChild(controls);
-    }else if(layersBody&&controls.parentElement!==layersBody){
-      layersBody.appendChild(controls);
-    }
+    // #layers is rebuilt whenever a layer changes. Keep the persistent editor
+    // controls beside the list so Fill/Hide/Delete and sliders are never removed.
+    if(controls&&layersBody&&controls.parentElement!==layersBody)layersBody.appendChild(controls);
   };
 
   const placeQualityCard=()=>{
