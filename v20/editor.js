@@ -223,7 +223,7 @@ function ensureTemplateImage(zone=activeZone){
       rec.cutlineCanvas=built.cutlineCanvas;
       rec.bounds=built.bounds;
       rec.status='ready';
-      if(product.id==='shorts'||product.id==='long-sleeve-tshirt'||zoneState(zone).layers.some(l=>isCutlineBottomArtwork(l)||isJacketSplash5(product.id,zone,l)))scheduleGarmentPreview(0);
+      if(product.id==='shorts'||product.id==='long-sleeve-tshirt'||zoneHasContent(zone))scheduleGarmentPreview(0);
     }catch(err){
       console.warn('Template mask build failed',t.path,err);
       rec.status='guide-only';
@@ -1248,9 +1248,7 @@ function renderLayerPanel(){
   for(const id of['layerX','layerY','layerScale','layerRotation','fillLayer'])$(id).disabled=locked;
   for(const id of['flipXTool','flipYTool','alignTool','cropTool','resetTool'])$(id).disabled=locked;
   $('duplicateTool').disabled=!!(l.libraryAssetId&&!locked);
-  $('cloneAllTool').disabled=!!(l.libraryAssetId&&!locked);
-  $('cloneAllTool').title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
-  $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
+  $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to another print zone':'Duplicate the selected layer in this zone, another zone, or all other zones';
   let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can change its layer order, add it to other print zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
   let lockedActions=$('lockedLibraryDuplicateActions');
   if(locked&&!lockedActions){
@@ -1259,7 +1257,7 @@ function renderLayerPanel(){
     const row=document.createElement('div');row.className='locked-duplicate-row';
     const select=document.createElement('select');select.id='lockedDuplicateZone';select.className='input';select.setAttribute('aria-label','Choose another print zone');
     const addOne=document.createElement('button');addOne.id='lockedDuplicateOne';addOne.type='button';addOne.className='btn';addOne.textContent='Add to Zone';
-    const addAll=document.createElement('button');addAll.id='lockedDuplicateAll';addAll.type='button';addAll.className='btn orange';addAll.textContent='Add to All Zones';
+    const addAll=document.createElement('button');addAll.id='lockedDuplicateAll';addAll.type='button';addAll.className='btn orange';addAll.textContent='Add to All Other Zones';
     addOne.onclick=async()=>{const layer=activeLayer(),zone=select.value;if(!layer||!isLockedLibraryLayer(layer)||!zone)return;addOne.disabled=true;try{await duplicateLockedLibraryToZone(layer,zone);}finally{addOne.disabled=false;}};
     addAll.onclick=async()=>{const layer=activeLayer();if(!layer||!isLockedLibraryLayer(layer))return;addAll.disabled=true;try{await cloneLockedLibraryToAllZones(layer);}finally{addAll.disabled=false;}};
     row.append(select,addOne);lockedActions.append(title,row,addAll);controlsEl.insertBefore(lockedActions,controlsEl.querySelector('.action-row'));
@@ -1303,7 +1301,7 @@ function renderLayerPanel(){
     addAll.id='customerDuplicateAll';
     addAll.type='button';
     addAll.className='btn orange';
-    addAll.textContent='Add to All Zones';
+    addAll.textContent='Add to All Other Zones';
     addOne.onclick=()=>{
       const layer=activeLayer(),zone=select.value;
       if(!layer||layer.type!=='image'||layer.libraryAssetId||!zone)return;
@@ -1312,11 +1310,7 @@ function renderLayerPanel(){
     addAll.onclick=()=>{
       const layer=activeLayer();
       if(!layer||layer.type!=='image'||layer.libraryAssetId)return;
-      const zones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<MAX_ZONE_LAYERS);
-      if(!zones.length){alert('No additional print zones are available.');return;}
-      snapshot();
-      for(const zone of zones)duplicateLayerIntoZone(layer,zone);
-      renderAll();
+      cloneActiveToAllZones();
     };
     row.append(select,addOne);
     customerImageActions.append(title,row,addAll);
@@ -1379,7 +1373,7 @@ function renderGarmentCopyControl(){
   if(!button){
     button=document.createElement('button');button.id='copyGarmentDesign';button.type='button';button.textContent='Copy to Garment';
     button.title='Copy Design to Another Garment';button.onclick=openGarmentCopy;
-    $('cloneAllTool')?.parentElement?.appendChild(button);
+    $('duplicateTool')?.parentElement?.appendChild(button);
   }
   button.hidden=!garmentCopyTargets().length;
   button.disabled=false;
@@ -2015,13 +2009,16 @@ function cloneActiveToAllZones(){
     if(isLockedLibraryLayer(l))return cloneLockedLibraryToAllZones(l);
     return;
   }
-  const available=product.zones.filter(z=>zoneState(z).layers.length<MAX_ZONE_LAYERS);
-  if(!available.length){alert('All print zones are already at the 6-layer limit.');return;}
+  const targets=product.zones.filter(z=>z!==activeZone);
+  const available=targets.filter(z=>zoneState(z).layers.length<MAX_ZONE_LAYERS);
+  const skipped=targets.filter(z=>zoneState(z).layers.length>=MAX_ZONE_LAYERS);
+  if(!available.length){alert(targets.length?'No other print zones are available.':'This garment has no other print zones.');return;}
   snapshot();
-  let currentCopy=null;
-  for(const z of available){const copy=duplicateLayerIntoZone(l,z,{offset:z===activeZone});if(z===activeZone)currentCopy=copy;}
-  if(currentCopy)activeLayerId=currentCopy.id;
+  const added=[];
+  for(const z of available){if(duplicateLayerIntoZone(l,z))added.push(z);}
   renderAll();
+  scheduleGarmentPreview(0);
+  if(added.length)alert('Duplicated to: '+added.join(', ')+'.'+(skipped.length?' Skipped because the layer limit was reached: '+skipped.join(', ')+'.':''));
 }
 function closeDuplicateMenu(){document.getElementById('duplicateZoneMenu')?.remove();}
 function openDuplicateMenu(){
@@ -2037,7 +2034,7 @@ function openDuplicateMenu(){
   if(!locked)add('Same Zone',()=>duplicateActive());
   for(const z of product.zones.filter(z=>z!==activeZone))add('To '+z,()=>duplicateActiveToZone(z));
   const line=document.createElement('div');Object.assign(line.style,{height:'1px',background:'#ececec',margin:'6px 4px'});menu.appendChild(line);
-  add('To All Zones',()=>cloneActiveToAllZones(),true);
+  add('To All Other Zones',()=>cloneActiveToAllZones(),true);
   document.body.appendChild(menu);
   setTimeout(()=>document.addEventListener('click',closeDuplicateMenu,{once:true}),0);
 }
