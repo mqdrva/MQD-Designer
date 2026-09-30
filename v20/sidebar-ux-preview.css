@@ -1,0 +1,134 @@
+/* Sidebar UX preview: tabs, quieter guidance, contextual layer controls. */
+.control-pane.sidebar-ux-preview{
+  padding-top:0;
+}
+.sidebar-ux-tabs{
+  position:sticky;
+  top:0;
+  z-index:12;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  padding:10px 0;
+  background:rgba(255,255,255,.97);
+  border-bottom:1px solid #ececec;
+  backdrop-filter:blur(8px);
+}
+.sidebar-ux-tab{
+  min-height:36px;
+  border:1px solid #dddddd;
+  border-radius:9px;
+  background:#ffffff;
+  color:#555555;
+  font:750 11px/1 Inter,Arial,sans-serif;
+  cursor:pointer;
+}
+.sidebar-ux-tab:hover{
+  background:#f7f7f7;
+  color:#222222;
+}
+.sidebar-ux-tab.active{
+  background:#171717;
+  border-color:#171717;
+  color:#ffffff;
+}
+.sidebar-ux-panels{
+  padding-top:10px;
+}
+.sidebar-ux-panel{
+  display:none;
+}
+.sidebar-ux-panel.active{
+  display:block;
+}
+.sidebar-ux-panel > .section:first-child{
+  margin-top:0;
+  padding-top:0;
+  border-top:0;
+}
+.sidebar-ux-panel[data-sidebar-panel="design"] .add-grid{
+  margin-bottom:10px;
+}
+.sidebar-ux-panel[data-sidebar-panel="layers"] .section,
+.sidebar-ux-panel[data-sidebar-panel="order"] .section{
+  margin-top:0;
+  padding-top:0;
+  border-top:0;
+}
+
+/* Put the ChatGPT background handoff inside Background and make it secondary. */
+.sidebar-ux-panel #chatBackgroundPanel{
+  margin-bottom:4px;
+}
+.sidebar-ux-panel .section .ai-designer-launch{
+  margin:10px 0 0;
+}
+.control-pane.sidebar-ux-preview .ai-designer-launch .ai-toggle{
+  width:100%;
+  border:1px solid #d9d9d9;
+  background:#f7f7f7;
+  color:#333333;
+  border-radius:9px;
+  padding:9px 10px;
+  font:750 11px/1.25 Inter,Arial,sans-serif;
+  box-shadow:none;
+}
+.control-pane.sidebar-ux-preview .ai-designer-launch .ai-toggle:hover{
+  background:#f1f1f1;
+  border-color:#cfcfcf;
+}
+.control-pane.sidebar-ux-preview .ai-designer-launch .ai-toggle .spark{
+  width:21px;
+  height:21px;
+  border-radius:6px;
+  font-size:11px;
+}
+
+/* Sizing guidance should read as helpful information, not an error. */
+.control-pane.sidebar-ux-preview .order-options-note.fit-warning{
+  margin-top:7px;
+  padding:7px 8px;
+  border:1px solid #e3e3e3;
+  border-left:3px solid #c9c9c9;
+  border-radius:7px;
+  background:#f8f8f8;
+  color:#6f6f6f;
+  font-size:9px;
+  font-weight:600;
+  line-height:1.4;
+}
+
+/* Keep selected-object controls attached directly to the selected layer card. */
+.control-pane.sidebar-ux-preview .layer.active{
+  border-color:#bdbdbd;
+  background:#fcfcfc;
+}
+.control-pane.sidebar-ux-preview .layer.active > .layer-controls{
+  margin:9px -1px -1px;
+  padding:10px;
+  border:1px solid #dddddd;
+  border-radius:8px;
+  background:#f7f7f7;
+  cursor:default;
+}
+.control-pane.sidebar-ux-preview .layer.active > .layer-controls .layer-name{
+  padding-bottom:3px;
+}
+.control-pane.sidebar-ux-preview .layer.active > .layer-controls .range-line{
+  grid-template-columns:62px minmax(0,1fr) 38px;
+}
+
+/* Make each tab feel compact on smaller screens too. */
+@media(max-width:850px){
+  .control-pane.sidebar-ux-preview{
+    padding-top:0;
+  }
+  .sidebar-ux-tabs{
+    top:0;
+    padding-top:10px;
+  }
+  .sidebar-ux-tab{
+    min-height:40px;
+    font-size:12px;
+  }
+}
