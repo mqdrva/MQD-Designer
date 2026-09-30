@@ -1808,6 +1808,16 @@ function updateTshirtZoneTextures(){
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
   const splashBack=product.id==='short-sleeve-polo'&&zone==='Back'&&state.layers.some(layer=>layer.visible!==false&&(isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)));
   paint.drawImage(artwork,0,splashBack?0:artworkY);
+  const interior=tshirtInteriorMeshes.get(zone);
+  if(interior){
+    const samplePoints=[[.08,.08],[.92,.08],[.08,.92],[.92,.92]];
+    const rgb=[0,0,0];
+    for(const [u,v] of samplePoints){
+      const pixel=paint.getImageData(Math.floor(u*(canvas.width-1)),Math.floor(v*(canvas.height-1)),1,1).data;
+      for(let channel=0;channel<3;channel++)rgb[channel]+=pixel[channel]/samplePoints.length;
+    }
+    interior.material.color.set(`rgb(${rgb.map(Math.round).join(',')})`);
+  }
   const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=true;if(zone.includes('Sleeve')||zone==='Collar')tex.wrapS=THREE.RepeatWrapping;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
   mesh.material.map=tex;mesh.material.transparent=false;mesh.material.opacity=1;if(mesh.material.color)mesh.material.color.set('#fff');mesh.material.needsUpdate=true;
  });
