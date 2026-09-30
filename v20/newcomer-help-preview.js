@@ -13,9 +13,9 @@ const steps=[
   },
   {
     title:'2. Position and size it',
-    body:'Select the artwork on the 2D editor, then drag it into place. The Layers tab gives you precise position, size, rotate, nudge, hide, and delete controls.',
+    body:'Select the artwork on the 2D editor, then drag it into place. Open the Layers dropdown under Background for precise position, size, rotate, nudge, hide, and delete controls.',
     target:()=>document.getElementById('editorCanvas'),
-    tab:'layers'
+    tab:'design'
   },
   {
     title:'3. Choose size and quantity',
