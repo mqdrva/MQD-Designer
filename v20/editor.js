@@ -63,6 +63,7 @@ const history=[],future=[];
 let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null,cropMode=false;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
+const tshirtInteriorMeshes=new Map();
 let fleeceHoodieZoneGroup=null;
 const fleeceHoodieZoneMeshes=new Map();
 const MQD_TSHIRT_ZONE_CALIBRATION='v25-exact-collar-topology';
@@ -1606,7 +1607,7 @@ function splitTshirtGeometry(sourceMesh){
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
  const pos=geometry.getAttribute('position'),normal=geometry.getAttribute('normal'),index=geometry.index;
  const buffers=panelNames.map(()=>({P:[],N:[],UV:[],min:{x:Infinity,y:Infinity,z:Infinity},max:{x:-Infinity,y:-Infinity,z:-Infinity}}));
- const sleeveInterior={P:[],N:[]};
+ const sleeveInteriors=new Map();
  const count=index?index.count:pos.count,faceCount=(count/3)|0,useExactCollar=product.id==='tshirt'&&faceCount===TSHIRT_FACE_COUNT,useExactPoloCollar=shortPolo&&faceCount===POLO_FACE_COUNT;
  if(product.id==='tshirt'&&!useExactCollar)console.warn('MQD T-shirt collar topology mask disabled: expected',TSHIRT_FACE_COUNT,'faces but found',faceCount);
  if(shortPolo&&!useExactPoloCollar)console.warn('MQD Short Sleeve Polo collar topology mask disabled: expected',POLO_FACE_COUNT,'faces but found',faceCount);
@@ -1617,7 +1618,9 @@ function splitTshirtGeometry(sourceMesh){
   for(const [zi,poly] of parts){
    const out=buffers[zi];
    for(let k=1;k<poly.length-1;k++){
-    const face=[poly[0],poly[k],poly[k+1]],target=useExactCollar&&(isTshirtSleeveInterior(panelNames[zi],face)||zi===4&&isTshirtCollarInterior(face))?sleeveInterior:out;
+    const face=[poly[0],poly[k],poly[k+1]],interior=useExactCollar&&(isTshirtSleeveInterior(panelNames[zi],face)||zi===4&&isTshirtCollarInterior(face));
+    if(interior&&!sleeveInteriors.has(zi))sleeveInteriors.set(zi,{P:[],N:[]});
+    const target=interior?sleeveInteriors.get(zi):out;
     for(const v of face){
      target.P.push(...v.slice(0,3));const length=Math.hypot(...v.slice(3))||1;target.N.push(...v.slice(3).map(n=>n/length));
      // Retain full panel bounds so the sleeve artwork keeps its approved frame.
@@ -1640,10 +1643,10 @@ function splitTshirtGeometry(sourceMesh){
   if(product.id==='tshirt'){m.side=THREE.FrontSide;m.depthTest=true;m.depthWrite=true;m.transparent=false;m.opacity=1;}
   const mesh=new THREE.Mesh(g,m);mesh.name='MQD_'+panelNames[zi].replace(/\s+/g,'_');group.add(mesh);tshirtZoneMeshes.set(panelNames[zi],mesh);
  });
- if(sleeveInterior.P.length){
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(sleeveInterior.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(sleeveInterior.N,3));
-  const m=new THREE.MeshStandardMaterial({color:'#111111',roughness:1,metalness:0});
-  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_Tshirt_Sleeve_Interior';group.add(mesh);
+ for(const [zi,interior] of sleeveInteriors){
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(interior.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(interior.N,3));
+  const zone=panelNames[zi],m=new THREE.MeshStandardMaterial({color:zoneState(zone).background||'#FFFFFF',roughness:1,metalness:0,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(g,m);mesh.name='MQD_Tshirt_'+zone.replace(/\s+/g,'_')+'_Interior';group.add(mesh);tshirtInteriorMeshes.set(zone,mesh);
  }
  sourceMesh.parent.add(group);tshirtZoneGroup=group;sourceMesh.visible=false;return true;
 }
@@ -1763,6 +1766,7 @@ function makeShirtPreviewArtwork(zone,maxSide,options={}){
 }
 function updateTshirtZoneTextures(){
  if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
+ for(const [zone,mesh] of tshirtInteriorMeshes)mesh.material.color.set(zoneState(zone).background||'#FFFFFF');
  const textureMax=previewTextureMax();
  product.zones.forEach(zone=>{
   const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;
@@ -1929,7 +1933,7 @@ function rebuildGarmentPreview(){
  if(product.id==='sweat-pants'&&sweatPanels){clearDecals();for(const [zone,mesh] of sweatPanels.panels){disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();mesh.material.map=tex;mesh.material.needsUpdate=true;}return;}if(product.id==='mask'&&maskSurface){rebuildMaskPreview();return;}if(product.id==='hood-mask-shirt'&&hoodMaskPanels){rebuildHoodMaskPreview();return;}if(product.id==='hooded-long-sleeve'&&hoodedLongSleevePanels){rebuildHoodedLongSleevePreview();return;}if(product.id==='lightweight-jacket'&&lightweightJacketZones){rebuildJacketPreview();return;}if(product.id==='hat'&&hatZoneMeshes){rebuildHatPreview();return;}if(product.id==='shorts'&&shortsPanelMeshes?.size){rebuildShortsPreview();return;}if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}if(product.id==='fleece-hoodie'&&fleeceHoodieZoneMeshes.size){rebuildFleeceHoodiePreview();return;}rebuildDecals();}
 
 let garmentLoadVersion=0;
-function loadGarment(){const loadVersion=++garmentLoadVersion;if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}lightweightJacketZones=null;hoodMaskPanels=null;hoodedLongSleevePanels=null;hatZoneMeshes=null;shortsPanelMeshes=null;sweatPanels=null;maskSurface=null;tshirtZoneMeshes.clear();tshirtZoneGroup=null;fleeceHoodieZoneMeshes.clear();fleeceHoodieZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{if(loadVersion!==garmentLoadVersion){g.scene.traverse(o=>{o.geometry?.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];materials.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});return;}garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}if(product.id==='fleece-hoodie'){const source=findPrimaryMesh(garment);if(source)splitFleeceHoodieGeometry(source);}if(product.id==='mask'){const source=findPrimaryMesh(garment);if(source)maskSurface=createMaskSurface(source,THREE);}if(product.id==='hood-mask-shirt'){const source=findPrimaryMesh(garment);if(source)hoodMaskPanels=createHoodMaskPanels(source);}if(product.id==='hooded-long-sleeve'){const source=findPrimaryMesh(garment);if(source)hoodedLongSleevePanels=createHoodedLongSleevePanels(source);}if(product.id==='lightweight-jacket'){const source=findPrimaryMesh(garment);if(source)lightweightJacketZones=createJacketZones(source);}if(product.id==='hat'){const source=findPrimaryMesh(garment);if(source)hatZoneMeshes=createHatZones(source);}if(product.id==='sweat-pants'){const source=findPrimaryMesh(garment);if(source){sweatPanels=createSweatPanels(source,THREE);for(const [zone,mesh] of sweatPanels.panels)sweatTemplates.set(zone,sweatTemplate(mesh,sweatPanels.bounds));drawEditor();}}if(product.id==='shorts'){const source=findPrimaryMesh(garment);if(source)shortsPanelMeshes=createShortsPanels(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
+function loadGarment(){const loadVersion=++garmentLoadVersion;if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}lightweightJacketZones=null;hoodMaskPanels=null;hoodedLongSleevePanels=null;hatZoneMeshes=null;shortsPanelMeshes=null;sweatPanels=null;maskSurface=null;tshirtZoneMeshes.clear();tshirtInteriorMeshes.clear();tshirtZoneGroup=null;fleeceHoodieZoneMeshes.clear();fleeceHoodieZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,g=>{if(loadVersion!==garmentLoadVersion){g.scene.traverse(o=>{o.geometry?.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];materials.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});return;}garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)splitTshirtGeometry(source);}if(product.id==='fleece-hoodie'){const source=findPrimaryMesh(garment);if(source)splitFleeceHoodieGeometry(source);}if(product.id==='mask'){const source=findPrimaryMesh(garment);if(source)maskSurface=createMaskSurface(source,THREE);}if(product.id==='hood-mask-shirt'){const source=findPrimaryMesh(garment);if(source)hoodMaskPanels=createHoodMaskPanels(source);}if(product.id==='hooded-long-sleeve'){const source=findPrimaryMesh(garment);if(source)hoodedLongSleevePanels=createHoodedLongSleevePanels(source);}if(product.id==='lightweight-jacket'){const source=findPrimaryMesh(garment);if(source)lightweightJacketZones=createJacketZones(source);}if(product.id==='hat'){const source=findPrimaryMesh(garment);if(source)hatZoneMeshes=createHatZones(source);}if(product.id==='sweat-pants'){const source=findPrimaryMesh(garment);if(source){sweatPanels=createSweatPanels(source,THREE);for(const [zone,mesh] of sweatPanels.panels)sweatTemplates.set(zone,sweatTemplate(mesh,sweatPanels.bounds));drawEditor();}}if(product.id==='shorts'){const source=findPrimaryMesh(garment);if(source)shortsPanelMeshes=createShortsPanels(source);}rebuildGarmentPreview();},undefined,e=>console.error(e));}
 
 function selectProduct(id){cropMode=false;product=catalog.find(p=>p.id===id)||catalog[0];activeZone=product.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;preloadTemplates();renderAll();loadGarment();}
 function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
