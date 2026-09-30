@@ -125,15 +125,10 @@ if(pane&&!pane.dataset.sidebarUxPreview){
   };
 
   const dockLayerControls=()=>{
-    if(!layersSection) return;
     const controls=document.getElementById('layerControls');
-    if(!controls) return;
-    const activeCard=layersSection.querySelector('#layers .layer.active');
-    if(activeCard){
-      if(controls.parentElement!==activeCard) activeCard.appendChild(controls);
-    }else if(layersBody&&controls.parentElement!==layersBody){
-      layersBody.appendChild(controls);
-    }
+    // The editor replaces #layers on every render. Keep its persistent controls
+    // beside that list so selecting a zone cannot remove their DOM nodes.
+    if(controls&&layersBody&&controls.parentElement!==layersBody)layersBody.appendChild(controls);
   };
 
   const placeQualityCard=()=>{
