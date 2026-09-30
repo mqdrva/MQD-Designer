@@ -37,7 +37,6 @@ if(pane&&!pane.dataset.sidebarUxPreview){
   };
 
   const designPanel=makePanel('design','Design');
-  const layersPanel=makePanel('layers','Layers');
   const orderPanel=makePanel('order','Order');
 
   pane.insertBefore(tabs,pane.firstChild);
@@ -46,7 +45,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
   const addGrid=pane.querySelector('.add-grid');
   if(addGrid) designPanel.appendChild(addGrid);
   if(backgroundSection) designPanel.appendChild(backgroundSection);
-  if(layersSection) layersPanel.appendChild(layersSection);
+  if(layersSection) designPanel.appendChild(layersSection);
   if(orderSection) orderPanel.appendChild(orderSection);
 
   const buttons=[...tabs.querySelectorAll('.sidebar-ux-tab')];
@@ -73,12 +72,56 @@ if(pane&&!pane.dataset.sidebarUxPreview){
     activate(next.dataset.sidebarTab);
   });
 
+  const makeCollapsible=(section,name,open=false)=>{
+    if(!section||section.dataset.sidebarCollapseReady)return null;
+    section.dataset.sidebarCollapseReady='1';
+    section.classList.add('sidebar-collapsible-section');
+    section.dataset.sidebarSection=name;
+
+    const title=section.querySelector(':scope > .section-title');
+    if(!title)return null;
+    title.classList.add('sidebar-section-toggle');
+    title.setAttribute('role','button');
+    title.setAttribute('tabindex','0');
+
+    const caret=title.querySelector('.caret');
+    if(caret)caret.textContent='›';
+
+    const body=document.createElement('div');
+    body.className='sidebar-section-body';
+    body.id='sidebar'+name[0].toUpperCase()+name.slice(1)+'Body';
+    while(title.nextSibling)body.appendChild(title.nextSibling);
+    section.appendChild(body);
+
+    const setOpen=value=>{
+      section.classList.toggle('open',value);
+      body.hidden=!value;
+      title.setAttribute('aria-expanded',value?'true':'false');
+    };
+    const toggle=()=>setOpen(!section.classList.contains('open'));
+    title.addEventListener('click',toggle);
+    title.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}
+    });
+    section._sidebarSetOpen=setOpen;
+    setOpen(open);
+    return body;
+  };
+
+  const backgroundBody=makeCollapsible(backgroundSection,'background',false);
+  const layersBody=makeCollapsible(layersSection,'layers',true);
+
+  const openLayers=()=>{
+    activate('design');
+    layersSection?._sidebarSetOpen?.(true);
+  };
+
   const placeAi=()=>{
-    if(!backgroundSection) return;
+    if(!backgroundBody) return;
     const launch=document.querySelector('#controlPane .ai-designer-launch');
     const panel=document.getElementById('chatBackgroundPanel');
-    if(launch&&launch.parentElement!==backgroundSection) backgroundSection.appendChild(launch);
-    if(panel&&panel.parentElement!==backgroundSection) backgroundSection.appendChild(panel);
+    if(launch&&launch.parentElement!==backgroundBody) backgroundBody.appendChild(launch);
+    if(panel&&panel.parentElement!==backgroundBody) backgroundBody.appendChild(panel);
   };
 
   const dockLayerControls=()=>{
@@ -88,14 +131,14 @@ if(pane&&!pane.dataset.sidebarUxPreview){
     const activeCard=layersSection.querySelector('#layers .layer.active');
     if(activeCard){
       if(controls.parentElement!==activeCard) activeCard.appendChild(controls);
-    }else if(controls.parentElement!==layersSection){
-      layersSection.appendChild(controls);
+    }else if(layersBody&&controls.parentElement!==layersBody){
+      layersBody.appendChild(controls);
     }
   };
 
   const placeQualityCard=()=>{
     const card=document.getElementById('printQualityCard');
-    if(card&&card.parentElement!==layersPanel) layersPanel.appendChild(card);
+    if(card&&layersBody&&card.parentElement!==layersBody) layersBody.appendChild(card);
   };
 
   const controls=document.getElementById('layerControls');
@@ -116,7 +159,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
       const layerControls=document.getElementById('layerControls');
       if(layerControls&&!layerControls.classList.contains('hidden')){
         dockLayerControls();
-        activate('layers');
+        openLayers();
       }
     });
   });
@@ -125,7 +168,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
     requestAnimationFrame(()=>{
       dockLayerControls();
       const layerControls=document.getElementById('layerControls');
-      if(layerControls&&!layerControls.classList.contains('hidden')) activate('layers');
+      if(layerControls&&!layerControls.classList.contains('hidden')) openLayers();
     });
   });
 
@@ -133,7 +176,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
     setTimeout(()=>{
       dockLayerControls();
       const layerControls=document.getElementById('layerControls');
-      if(layerControls&&!layerControls.classList.contains('hidden')) activate('layers');
+      if(layerControls&&!layerControls.classList.contains('hidden')) openLayers();
     },250);
   });
 
