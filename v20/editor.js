@@ -1230,10 +1230,22 @@ function renderLayerPanel(){
   panelOrder.forEach((l,index)=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title='Drag to change layer order. Top layer appears in front.';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · position locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
     const actions=document.createElement('div');actions.className='layer-order-actions';
     for(const [offset,label] of [[-1,'Move up'],[1,'Move down']]){
-      const button=document.createElement('button');button.type='button';button.textContent=(offset<0?'↑ ':'↓ ')+label;button.disabled=!panelOrder[index+offset];button.setAttribute('aria-label',`${label}: ${l.label}`);
+      const button=document.createElement('button');button.type='button';button.textContent=offset<0?'↑':'↓';button.title=label;button.disabled=!panelOrder[index+offset];button.setAttribute('aria-label',`${label}: ${l.label}`);
       button.onclick=e=>{e.stopPropagation();const target=panelOrder[index+offset];if(target)reorderLayer(l.id,target.id);};actions.appendChild(button);
     }
     d.appendChild(actions);
+    const quick=document.createElement('div');quick.className='layer-inline-actions';
+    const addQuick=(label,html,handler,{disabled=false,danger=false,iconOnly=false}={})=>{
+      const button=document.createElement('button');button.type='button';button.className='layer-inline-action'+(danger?' danger':'')+(iconOnly?' icon-only':'');button.title=label;button.setAttribute('aria-label',label);button.disabled=disabled;button.innerHTML=html;
+      button.onclick=e=>{e.stopPropagation();activeLayerId=l.id;handler();};quick.appendChild(button);return button;
+    };
+    addQuick('Fill layer','Fill',()=>document.getElementById('fillLayer')?.click(),{disabled:locked});
+    const eye=l.visible===false
+      ?'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c5.5 0 9 5 9 5a17 17 0 0 1-2.4 2.9"/><path d="M6.6 6.7C4.3 8.2 3 10 3 10s3.5 5 9 5c1 0 1.9-.2 2.7-.4"/></svg>'
+      :'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+    addQuick(l.visible===false?'Show layer':'Hide layer',eye,()=>document.getElementById('toggleLayer')?.click(),{iconOnly:true});
+    addQuick('Delete layer','<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/><path d="M10 10v7M14 10v7"/></svg>',()=>document.getElementById('deleteLayer')?.click(),{danger:true,iconOnly:true});
+    d.querySelector('.layer-head')?.appendChild(quick);
     d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();renderPrintQuality();drawEditor();};
     d.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
     d.ondragend=()=>d.classList.remove('dragging-layer');
@@ -1263,7 +1275,7 @@ function renderLayerPanel(){
     const row=document.createElement('div');row.className='locked-duplicate-row';
     const select=document.createElement('select');select.id='lockedDuplicateZone';select.className='input';select.setAttribute('aria-label','Choose another print zone');
     const addOne=document.createElement('button');addOne.id='lockedDuplicateOne';addOne.type='button';addOne.className='btn';addOne.textContent='Add to Zone';
-    const addAll=document.createElement('button');addAll.id='lockedDuplicateAll';addAll.type='button';addAll.className='btn orange';addAll.textContent='Add to All Zones';
+    const addAll=document.createElement('button');addAll.id='lockedDuplicateAll';addAll.type='button';addAll.className='btn orange';addAll.textContent='Add to All Other Zones';
     addOne.onclick=async()=>{const layer=activeLayer(),zone=select.value;if(!layer||!isLockedLibraryLayer(layer)||!zone)return;addOne.disabled=true;try{await duplicateLockedLibraryToZone(layer,zone);}finally{addOne.disabled=false;}};
     addAll.onclick=async()=>{const layer=activeLayer();if(!layer||!isLockedLibraryLayer(layer))return;addAll.disabled=true;try{await cloneLockedLibraryToAllZones(layer);}finally{addAll.disabled=false;}};
     row.append(select,addOne);lockedActions.append(title,row,addAll);controlsEl.insertBefore(lockedActions,controlsEl.querySelector('.action-row'));
@@ -1307,7 +1319,7 @@ function renderLayerPanel(){
     addAll.id='customerDuplicateAll';
     addAll.type='button';
     addAll.className='btn orange';
-    addAll.textContent='Add to All Zones';
+    addAll.textContent='Add to All Other Zones';
     addOne.onclick=()=>{
       const layer=activeLayer(),zone=select.value;
       if(!layer||layer.type!=='image'||layer.libraryAssetId||!zone)return;
@@ -1347,7 +1359,7 @@ function renderLayerPanel(){
       }
     }
   }
-  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText);imageQuick?.classList.toggle('hidden',l.type!=='image');$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
+  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText);$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   let bgTools=$('backgroundRemovalTools');
   if(!bgTools&&imageQuick){
     bgTools=document.createElement('div');bgTools.id='backgroundRemovalTools';bgTools.className='background-removal-tools';
@@ -1356,6 +1368,7 @@ function renderLayerPanel(){
     $('removeImageBackground').onclick=removeBackgroundActive;$('restoreImageBackground').onclick=restoreBackgroundActive;
   }
   const bgEligible=MQD_BACKGROUND_REMOVAL_ENABLED&&l.type==='image'&&!l.libraryAssetId;
+  imageQuick?.classList.toggle('hidden',l.type!=='image'||(!bgEligible&&!(cropMode&&l.type==='image')));
   if(bgTools){
     bgTools.classList.toggle('hidden',!bgEligible);
     if(bgEligible){
@@ -2055,7 +2068,7 @@ function openDuplicateMenu(){
   if(!locked)add('Same Zone',()=>duplicateActive());
   for(const z of product.zones.filter(z=>z!==activeZone))add('To '+z,()=>duplicateActiveToZone(z));
   const line=document.createElement('div');Object.assign(line.style,{height:'1px',background:'#ececec',margin:'6px 4px'});menu.appendChild(line);
-  add('To All Zones',()=>cloneActiveToAllZones(),true);
+  add('To All Other Zones',()=>cloneActiveToAllZones(),true);
   document.body.appendChild(menu);
   setTimeout(()=>document.addEventListener('click',closeDuplicateMenu,{once:true}),0);
 }
