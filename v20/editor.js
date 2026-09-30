@@ -1758,12 +1758,17 @@ function updateTshirtZoneTextures(){
     mesh.material.transparent=false;mesh.material.opacity=1;mesh.material.needsUpdate=true;
     return;
   }
-  if(product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back')){
+  const accurateTshirtFront=product.id==='tshirt'&&zone==='Front';
+  if(accurateTshirtFront||product.id==='long-sleeve-tshirt'&&(zone==='Front'||zone==='Back')){
     const rec=ensureTemplateImage(zone);
     if(rec?.maskCanvas&&rec.bounds&&mesh.userData.patternMask!==rec.maskCanvas){
       const mask=rec.maskCanvas.getContext('2d').getImageData(0,0,rec.maskCanvas.width,rec.maskCanvas.height);
       const mapped=bodyPatternUv(mesh.geometry.getAttribute('position').array,zone,mask,rec.bounds);
-      mesh.geometry.getAttribute('uv').array.set(mapped);
+      const uv=mesh.geometry.getAttribute('uv').array;
+      if(accurateTshirtFront){
+        // Match the actual 2D neckline and hem without changing the side wrap.
+        for(let i=1;i<uv.length;i+=2)uv[i]=mapped[i];
+      }else uv.set(mapped);
       mesh.geometry.getAttribute('uv').needsUpdate=true;
       mesh.userData.patternMask=rec.maskCanvas;
     }
@@ -1773,7 +1778,7 @@ function updateTshirtZoneTextures(){
   // visually lower than the production-template frame. Raise movable customer
   // artwork by 9% so logos and text match the 2D editor. Locked MQD library
   // backgrounds, fill, sleeves, collar and every other garment stay unchanged.
-  const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back');
+  const tshirtBodyArtwork=product.id==='tshirt'&&zone==='Back';
   const baseVisibleLayer=state.layers.find(layer=>layer.visible!==false);
   const imageOffsetY=layer=>tshirtBodyImageOffsetY(layer,{zone,baseLayer:layer===baseVisibleLayer,opaqueEdges:tshirtBodyArtwork&&hasOpaqueImageEdges(layer.image)});
   const artwork=product.id==='long-sleeve-tshirt'
