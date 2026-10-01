@@ -142,10 +142,13 @@
 
   window.fetch=async function(input,init){
     const url=requestUrl(input);
-    if((url.includes(SUBMIT_PATH)||url.includes(GUEST_SUBMIT_PATH))&&init?.body instanceof FormData){
+    // The four-view proof renderer opens another full 3D designer. On phones it
+    // can stall or exhaust memory before the actual order upload is sent.
+    const mobile=window.matchMedia?.('(max-width: 560px)').matches;
+    if(!mobile&&(url.includes(SUBMIT_PATH)||url.includes(GUEST_SUBMIT_PATH))&&init?.body instanceof FormData){
       try{await appendProofViews(init.body);}catch(error){console.warn('MQD multi-angle order proof capture skipped:',error);}
     }
     return nativeFetch(input,init);
   };
-  import('/v20/guest-checkout.js?v=20260918a').catch(error=>console.error('MQD guest checkout module failed to load',error));
+  import('/v20/guest-checkout.js?v=20260930-mobile-cart-stall').catch(error=>console.error('MQD guest checkout module failed to load',error));
 })();
