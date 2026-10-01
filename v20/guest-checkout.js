@@ -116,7 +116,7 @@ function mockupBlob(){
   return new Promise(resolve=>{
     // A mockup is optional. Encoding the WebGL canvas can stall Mobile Safari
     // before the design upload even starts, so skip it on narrow screens.
-    if(window.matchMedia?.('(max-width: 560px)').matches)return resolve(null);
+    if(needsMaterializedUpload())return resolve(null);
     const src=document.getElementById('webgl');
     if(!src)return resolve(null);
     let settled=false;
@@ -130,6 +130,10 @@ function mockupBlob(){
       out.toBlob(finish,'image/png');
     }catch(error){console.warn('Guest mockup capture skipped',error);finish(null);}
   });
+}
+function needsMaterializedUpload(){
+  const nav=window.navigator;
+  return !!window.matchMedia?.('(max-width: 560px)').matches||/iPhone|iPad|iPod/i.test(nav?.userAgent||'')||(nav?.platform==='MacIntel'&&nav?.maxTouchPoints>1);
 }
 async function encodeGuestForm(form){
   // Materialize every file before transmission. Safari may lose file-backed
@@ -153,10 +157,10 @@ async function encodeGuestForm(form){
   return {body,contentType:`multipart/form-data; boundary=${boundary}`};
 }
 function submitGuestForm(upload,signal){
-  const {body,contentType}=upload;
-  if(!window.matchMedia?.('(max-width: 560px)').matches){
-    return window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':contentType},body,signal});
+  if(upload instanceof FormData){
+    return window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:upload,signal});
   }
+  const {body,contentType}=upload;
   return new Promise((resolve,reject)=>{
     const xhr=new XMLHttpRequest();
     let settled=false;
@@ -233,7 +237,7 @@ async function addGuestToCart(button){
     payload.orderOptions=options;
     payload.totalQuantity=options.reduce((sum,item)=>sum+item.quantity,0);
     const form=await withTimeout(buildGuestSubmission(payload),45000,'Preparing the artwork took too long. Your design is still on this page; please try again.');
-    const upload=await withTimeout(encodeGuestForm(form),45000,'Reading the artwork took too long. Your design is still on this page; please try again.');
+    const upload=needsMaterializedUpload()?await withTimeout(encodeGuestForm(form),45000,'Reading the artwork took too long. Your design is still on this page; please try again.'):form;
     button.textContent='Uploading design…';
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),90000);
