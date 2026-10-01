@@ -32,3 +32,37 @@ jobs:
         run: npm run test:launch
         env:
           MQD_GLB_CACHE_DIR: .cache/mqd-glbs
+
+  cart-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: regression
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: regression
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify mobile artwork upload and retry behavior
+        run: node tests/mobile-guest-cart.mjs
+      - name: Verify multi-order checkout schema
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/checkout-session-fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261001220545_allow_multiple_orders_per_checkout_session.sql
+          psql -v ON_ERROR_STOP=1 -f tests/checkout-session-sharing.sql
