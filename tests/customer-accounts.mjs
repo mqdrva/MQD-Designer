@@ -10,7 +10,7 @@ for(const feature of ['signInWithOAuth','signInWithOtp','signInAnonymously','cus
 assert(customer.includes('function authRedirectUrl(){return window.location.origin+window.location.pathname;}'),'auth email links must return customers to the site they signed in from');
 assert(customer.includes('Authorization:`Bearer ${token}`'),'checkout submission must send the signed-in customer JWT');
 assert(customer.includes("if(!requirePermanentAccount('Continue with Google or Email to save"),'cloud saving must require a permanent account');
-assert(customer.includes("if(!requireAccount('Create or sign into your account before adding"),'cart must require an account');
+assert(customer.includes("if(!requireAccount('Sign in or continue as a guest before adding"),'the signed-in cart handler must require a session or guest continuation');
 assert(editor.includes('window.MQDDesigner={')&&editor.includes('exportDesign:designJSON')&&editor.includes('loadDesign:loadDesignPayload'),'customer library must use the canonical editor serializer and loader');
 assert(!customer.includes('service_role'),'the browser bundle must never contain the service role key');
 
