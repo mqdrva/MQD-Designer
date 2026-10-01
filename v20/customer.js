@@ -15,6 +15,7 @@ let currentDesignFilter='all';
 let accountDesigns=[];
 let libraryAssets=[];
 let libraryContext=null;
+let orderOptionsProductId='';
 const libraryZoneCache=new Map();
 const CHECKOUT_URL=SUPABASE_URL+'/functions/v1/create-mqd-checkout';
 const MQD_PRICE_VERSION='2026-09-09-v2';
@@ -89,6 +90,7 @@ function makeOrderOptionRow(defaultSize=null,quantity=1){
 function renderOrderOptions(){
   const host=$('orderOptionRows'),add=$('addOrderOptionRow'),section=$('orderOptionsSection');
   if(!host||!section)return;
+  orderOptionsProductId=currentProductId();
   host.innerHTML='';
   const sizes=sizesForProduct();
   host.appendChild(makeOrderOptionRow(sizes[0]||null,1));
@@ -522,7 +524,8 @@ function startCartSync(draftKey,payload){
 }
 
 async function addToCart(){
-  if(!requireAccount('Create or sign into your account before adding this custom design to the cart.',addToCart))return;
+  if(!requireAccount('Sign in or continue as a guest before adding this custom design to the cart.',addToCart))return;
+  if(orderOptionsProductId!==currentProductId())renderOrderOptions();
   const btn=$('addToCart');
   const old=btn.textContent;
   btn.disabled=true;btn.textContent='Adding…';
@@ -944,6 +947,11 @@ window.addEventListener('DOMContentLoaded',()=>{
     observer.observe(select,{childList:true,subtree:true,characterData:true});
     select.addEventListener('change',()=>{activeCloudDesign=null;setTimeout(()=>{applyPriceOverridesToUI();renderOrderOptions();},0);});
   }
+  window.addEventListener('mqd:product-changed',()=>{
+    activeCloudDesign=null;
+    applyPriceOverridesToUI();
+    renderOrderOptions();
+  });
   renderOrderOptions();
   $('addOrderOptionRow')?.addEventListener('click',()=>{
     const sizes=sizesForProduct();if(!sizes.length)return;

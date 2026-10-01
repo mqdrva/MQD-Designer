@@ -24,3 +24,17 @@ function render(){
 for(const tab of tabs)tab.addEventListener('click',()=>{active=tab.dataset.mobilePane;render();});
 mobile.addEventListener?.('change',render);
 render();
+
+
+function showPreviewAfterGarmentCopy(){
+  if(!mobile.matches)return;
+  active='preview';
+  render();
+}
+window.addEventListener('mqd:show-preview',showPreviewAfterGarmentCopy);
+window.addEventListener('mqd:garment-ready',()=>{
+  if(!mobile.matches||active!=='preview')return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    window.MQDDesigner?.refreshMobileWorkspace?.('preview');
+  }));
+});
