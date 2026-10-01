@@ -131,11 +131,31 @@ function mockupBlob(){
     }catch(error){console.warn('Guest mockup capture skipped',error);finish(null);}
   });
 }
-function submitGuestForm(form,signal){
-  // Mobile Safari can send a multipart fetch with its boundary but no body.
-  // XMLHttpRequest uses the browser's upload path and preserves the FormData.
+async function encodeGuestForm(form){
+  // Materialize every file before transmission. Safari may lose file-backed
+  // FormData bodies (including IndexedDB originals) with both fetch and XHR.
+  const boundary='----MQD'+crypto.randomUUID().replace(/-/g,'');
+  const parts=[];
+  const quote=value=>String(value).replace(/[\r\n]/g,' ').replace(/"/g,'%22');
+  let size=0;
+  for(const [name,value] of form.entries()){
+    const file=value instanceof Blob;
+    const header=`--${boundary}\r\nContent-Disposition: form-data; name="${quote(name)}"${file?`; filename="${quote(value.name||'artwork.png')}"`:''}\r\n${file?`Content-Type: ${value.type||'application/octet-stream'}\r\n`:''}\r\n`;
+    const content=file?await value.arrayBuffer():String(value);
+    if(file&&(!value.size||content.byteLength!==value.size))throw new Error('The artwork could not be read. Your design is still on this page; please try again.');
+    parts.push(header,content,'\r\n');
+    size+=new TextEncoder().encode(header).byteLength+(file?content.byteLength:new TextEncoder().encode(content).byteLength)+2;
+    if(size>64*1024*1024)throw new Error('Design upload is too large. Maximum total upload is 64 MB.');
+  }
+  parts.push(`--${boundary}--\r\n`);
+  const body=await new Blob(parts).arrayBuffer();
+  if(body.byteLength>64*1024*1024)throw new Error('Design upload is too large. Maximum total upload is 64 MB.');
+  return {body,contentType:`multipart/form-data; boundary=${boundary}`};
+}
+function submitGuestForm(upload,signal){
+  const {body,contentType}=upload;
   if(!window.matchMedia?.('(max-width: 560px)').matches){
-    return window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:form,signal});
+    return window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':contentType},body,signal});
   }
   return new Promise((resolve,reject)=>{
     const xhr=new XMLHttpRequest();
@@ -149,6 +169,7 @@ function submitGuestForm(form,signal){
     const abort=()=>xhr.abort();
     xhr.open('POST',GUEST_SUBMIT_URL,true);
     xhr.setRequestHeader('apikey',SUPABASE_PUBLISHABLE_KEY);
+    xhr.setRequestHeader('Content-Type',contentType);
     xhr.timeout=90000;
     xhr.onload=()=>finish(null,{
       ok:xhr.status>=200&&xhr.status<300,
@@ -160,7 +181,7 @@ function submitGuestForm(form,signal){
     xhr.onabort=()=>finish(new DOMException('The design upload was interrupted.','AbortError'));
     if(signal?.aborted)return finish(new DOMException('The design upload was interrupted.','AbortError'));
     signal?.addEventListener('abort',abort,{once:true});
-    try{xhr.send(form);}catch(error){finish(error);}
+    try{xhr.send(body);}catch(error){finish(error);}
   });
 }
 async function buildGuestSubmission(payload){
@@ -212,12 +233,13 @@ async function addGuestToCart(button){
     payload.orderOptions=options;
     payload.totalQuantity=options.reduce((sum,item)=>sum+item.quantity,0);
     const form=await withTimeout(buildGuestSubmission(payload),45000,'Preparing the artwork took too long. Your design is still on this page; please try again.');
+    const upload=await withTimeout(encodeGuestForm(form),45000,'Reading the artwork took too long. Your design is still on this page; please try again.');
     button.textContent='Uploading design…';
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),90000);
     let response;
     try{
-      response=await submitGuestForm(form,controller.signal);
+      response=await submitGuestForm(upload,controller.signal);
     }finally{clearTimeout(timeout);}
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.ok||!result.orderNumber){
@@ -248,6 +270,7 @@ async function addGuestToCart(button){
     button.textContent=original;
     alert('Could not add this design to the cart: '+(error?.name==='AbortError'?'The upload took too long. Your design is still on this page; check your connection and try again.':error?.message||String(error)));
   }finally{
+    addBusy=false;
     button.disabled=false;
     if(button.textContent==='Preparing design…'||button.textContent==='Uploading design…')button.textContent=original;
   }
