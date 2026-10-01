@@ -38,4 +38,15 @@ assert.equal(cartButton.textContent,'Cart (1)');
 assert.equal(JSON.parse(saved.get('mqd-cart'))[0].orderNumber,'MQD-TEST123');
 assert.equal(addButton.disabled,false);
 await assert.rejects(vm.runInContext('withTimeout(new Promise(()=>{}),10,"Timed out")',context),/Timed out/);
+let forwarded=0;
+const proofSource=readFileSync(new URL('../v20/order-mockup-views.js',import.meta.url),'utf8')
+  .replace(/^  import\('\/v20\/guest-checkout\.js[^\n]+\n/m,'');
+const proofContext=vm.createContext({
+  window:{matchMedia:()=>({matches:true}),fetch:async()=>{forwarded++;return {ok:true};}},
+  location:{search:''},URLSearchParams,FormData,URL,console,
+  document:{createElement(){throw new Error('Mobile must not open a hidden 3D renderer');}}
+});
+vm.runInContext(proofSource,proofContext,{filename:'order-mockup-views.js'});
+await vm.runInContext('window.fetch("https://example.supabase.co/functions/v1/submit-mqd-guest-design",{body:new FormData()})',proofContext);
+assert.equal(forwarded,1);
 console.log('mobile guest cart checks passed');
