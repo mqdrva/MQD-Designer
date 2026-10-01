@@ -131,6 +131,38 @@ function mockupBlob(){
     }catch(error){console.warn('Guest mockup capture skipped',error);finish(null);}
   });
 }
+function submitGuestForm(form,signal){
+  // Mobile Safari can send a multipart fetch with its boundary but no body.
+  // XMLHttpRequest uses the browser's upload path and preserves the FormData.
+  if(!window.matchMedia?.('(max-width: 560px)').matches){
+    return window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:form,signal});
+  }
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    let settled=false;
+    const finish=(error,response)=>{
+      if(settled)return;
+      settled=true;
+      signal?.removeEventListener('abort',abort);
+      if(error)reject(error);else resolve(response);
+    };
+    const abort=()=>xhr.abort();
+    xhr.open('POST',GUEST_SUBMIT_URL,true);
+    xhr.setRequestHeader('apikey',SUPABASE_PUBLISHABLE_KEY);
+    xhr.timeout=90000;
+    xhr.onload=()=>finish(null,{
+      ok:xhr.status>=200&&xhr.status<300,
+      status:xhr.status,
+      json:async()=>JSON.parse(xhr.responseText||'{}')
+    });
+    xhr.onerror=()=>finish(new Error('The design upload could not connect. Please try again.'));
+    xhr.ontimeout=()=>finish(new DOMException('The design upload timed out.','AbortError'));
+    xhr.onabort=()=>finish(new DOMException('The design upload was interrupted.','AbortError'));
+    if(signal?.aborted)return finish(new DOMException('The design upload was interrupted.','AbortError'));
+    signal?.addEventListener('abort',abort,{once:true});
+    try{xhr.send(form);}catch(error){finish(error);}
+  });
+}
 async function buildGuestSubmission(payload){
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
@@ -185,7 +217,7 @@ async function addGuestToCart(button){
     const timeout=setTimeout(()=>controller.abort(),90000);
     let response;
     try{
-      response=await window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:form,signal:controller.signal});
+      response=await submitGuestForm(form,controller.signal);
     }finally{clearTimeout(timeout);}
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.ok||!result.orderNumber){
