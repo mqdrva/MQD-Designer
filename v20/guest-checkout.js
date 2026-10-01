@@ -54,6 +54,13 @@ function guestToken(){
   }
   return token;
 }
+function withTimeout(promise,ms,message){
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);})
+  ]).finally(()=>clearTimeout(timer));
+}
 function cartItems(){
   try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');return Array.isArray(items)?items:[];}catch{return[];}
 }
@@ -98,20 +105,30 @@ function openGuestOriginalArtworkDB(){
 async function guestOriginalArtworkBlob(filename){
   if(!filename)return null;
   try{
-    const db=await openGuestOriginalArtworkDB();
-    return await new Promise((resolve,reject)=>{
+    const db=await withTimeout(openGuestOriginalArtworkDB(),4000,'Original artwork lookup timed out');
+    return await withTimeout(new Promise((resolve,reject)=>{
       const tx=db.transaction('files','readonly'),req=tx.objectStore('files').get(filename);
       req.onsuccess=()=>resolve(req.result?.file||null);req.onerror=()=>reject(req.error);
-    });
+    }),4000,'Original artwork read timed out');
   }catch(error){console.warn('Guest original artwork lookup skipped',error);return null;}
 }
 function mockupBlob(){
   return new Promise(resolve=>{
+    // A mockup is optional. Encoding the WebGL canvas can stall Mobile Safari
+    // before the design upload even starts, so skip it on narrow screens.
+    if(window.matchMedia?.('(max-width: 560px)').matches)return resolve(null);
     const src=document.getElementById('webgl');
     if(!src)return resolve(null);
-    const out=document.createElement('canvas');out.width=src.width;out.height=src.height;
-    const context=out.getContext('2d');context.fillStyle='#F7F7F7';context.fillRect(0,0,out.width,out.height);context.drawImage(src,0,0);
-    out.toBlob(resolve,'image/png');
+    let settled=false;
+    const finish=blob=>{if(settled)return;settled=true;resolve(blob||null);};
+    setTimeout(()=>finish(null),4000);
+    try{
+      const out=document.createElement('canvas');out.width=src.width;out.height=src.height;
+      const context=out.getContext('2d');
+      if(!context)return finish(null);
+      context.fillStyle='#F7F7F7';context.fillRect(0,0,out.width,out.height);context.drawImage(src,0,0);
+      out.toBlob(finish,'image/png');
+    }catch(error){console.warn('Guest mockup capture skipped',error);finish(null);}
   });
 }
 async function buildGuestSubmission(payload){
@@ -153,7 +170,7 @@ async function addGuestToCart(button){
   if(addBusy)return;
   addBusy=true;
   const original=button.textContent;
-  button.disabled=true;button.textContent='Adding…';
+  button.disabled=true;button.textContent='Preparing design…';
   try{
     if(!window.MQDDesigner?.exportDesign)throw new Error('The designer is still loading. Please try again.');
     const options=selectedOrderOptions();
@@ -162,8 +179,14 @@ async function addGuestToCart(button){
     payload.product.price=priceFor(payload.product.id,payload.product.price);
     payload.orderOptions=options;
     payload.totalQuantity=options.reduce((sum,item)=>sum+item.quantity,0);
-    const form=await buildGuestSubmission(payload);
-    const response=await window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:form});
+    const form=await withTimeout(buildGuestSubmission(payload),45000,'Preparing the artwork took too long. Your design is still on this page; please try again.');
+    button.textContent='Uploading design…';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),90000);
+    let response;
+    try{
+      response=await window.fetch(GUEST_SUBMIT_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY},body:form,signal:controller.signal});
+    }finally{clearTimeout(timeout);}
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.ok||!result.orderNumber){
       const detail=[result.error||result.message,result.stage&&`stage: ${result.stage}`].filter(Boolean).join(' · ');
@@ -191,10 +214,10 @@ async function addGuestToCart(button){
   }catch(error){
     console.error('MQD guest add-to-cart failed',error);
     button.textContent=original;
-    alert('Could not add this design to the cart: '+(error?.message||String(error)));
+    alert('Could not add this design to the cart: '+(error?.name==='AbortError'?'The upload took too long. Your design is still on this page; check your connection and try again.':error?.message||String(error)));
   }finally{
     button.disabled=false;
-    if(button.textContent==='Adding…')button.textContent=original;
+    if(button.textContent==='Preparing design…'||button.textContent==='Uploading design…')button.textContent=original;
   }
 }
 function checkoutFailureMessage(result,status){
