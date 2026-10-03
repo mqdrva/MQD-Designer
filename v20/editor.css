@@ -57,3 +57,26 @@ header{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:
   .font-picker-option{min-height:58px;font-size:23px}
   .font-picker-trigger{font-size:21px}
 }
+
+/* Reserve separate space for guidance and fit the editor without changing artwork coordinates. */
+.workarea{width:calc(100% - 100px);height:calc(100% - 104px);margin-left:64px;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:8px;min-width:0;min-height:0}
+.zone-title{position:static;transform:none;white-space:normal;text-align:center;line-height:1.4}
+.workarea #guideLegend{margin:0;padding:7px 10px;font-size:11px;line-height:1.5;background:#fafafa;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.canvas-stage{min-width:0;min-height:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.canvas-stage canvas{flex:0 1 auto;max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:760/860}
+.add-text-dialog{width:min(440px,calc(100vw - 28px));padding:22px;border:1px solid var(--line);border-radius:14px;color:var(--ink);box-shadow:0 20px 60px #0003}
+.add-text-dialog::backdrop{background:#0007}
+.add-text-dialog h2{margin:0 0 18px;font-size:20px}
+.add-text-dialog label{display:block;margin-bottom:8px;font-weight:650;font-size:14px}
+.add-text-dialog .input{min-height:44px;font-size:16px}
+.text-entry-error{min-height:20px;font-size:12px;color:var(--danger)}
+.text-entry-actions{display:flex;justify-content:flex-end;gap:8px}
+.text-entry-actions .btn{min-height:44px}
+.order-selection-summary{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:9px;background:#fafafa;font-size:12px;line-height:1.6}
+.order-selection-summary strong{display:block;color:var(--ink);font-size:16px}
+@media(max-width:850px){
+  .mobile-workspace-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:7px 8px}
+  .mobile-workspace-tabs button{font-size:12px;padding:8px 3px;min-height:44px}
+  .workarea{width:calc(100% - 78px);height:calc(100% - 106px);margin-left:58px}
+  .zone-icon{min-height:44px}
+}

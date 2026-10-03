@@ -28,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter&family=Roboto&family=Open+Sans&family=Lato&family=Montserrat&family=Poppins&family=Oswald&family=Raleway&family=Merriweather&family=Playfair+Display&family=Nunito&family=Ubuntu&family=PT+Sans&family=Source+Sans+3&family=Noto+Sans&family=Noto+Serif&family=Rubik&family=Work+Sans&family=DM+Sans&family=Manrope&family=Bebas+Neue&family=Anton&family=Archivo&family=Cabin&family=Karla&family=Mulish&family=Quicksand&family=Fira+Sans&family=Hind&family=Arvo&family=Bitter&family=Libre+Baskerville&family=Libre+Franklin&family=Josefin+Sans&family=Exo+2&family=Barlow&family=Barlow+Condensed&family=Fjalla+One&family=Titillium+Web&family=Yanone+Kaffeesatz&family=Abril+Fatface&family=Lobster&family=Pacifico&family=Dancing+Script&family=Permanent+Marker&family=Caveat&family=Cinzel&family=Cormorant+Garamond&family=Space+Grotesk&family=League+Spartan&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Amatic+SC&family=Archivo+Black&family=Baloo+2&family=Bangers&family=Berkshire+Swash&family=Black+Ops+One&family=Boogaloo&family=Bowlby+One+SC&family=Bungee&family=Bungee+Inline&family=Bungee+Shade&family=Changa+One&family=Chewy&family=Comfortaa&family=Concert+One&family=Cookie&family=Courgette&family=Creepster&family=Fredoka&family=Fugaz+One&family=Graduate&family=Gravitas+One&family=Great+Vibes&family=Indie+Flower&family=Kaushan+Script&family=Lilita+One&family=Luckiest+Guy&family=Marck+Script&family=Mochiy+Pop+One&family=Monoton&family=Orbitron&family=Passion+One&family=Paytone+One&family=Press+Start+2P&family=Righteous&family=Rock+Salt&family=Russo+One&family=Sacramento&family=Saira+Condensed&family=Satisfy&family=Shadows+Into+Light&family=Sigmar&family=Special+Elite&family=Staatliches&family=Teko&family=Ultra&family=Yellowtail&family=Zeyada&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/v20/editor.css?layer-order=1&v=20260925-font-preview">
+<link rel="stylesheet" href="/v20/editor.css?v=20261003-designer-usability">
 <link rel="stylesheet" href="/v20/flat-mockup.css?v=2">
 <link rel="stylesheet" href="/v20/help-chat.css?v=20260919a">
 <link rel="stylesheet" href="/v20/ai-designer.css?v=20260929-upload-clarity">
@@ -48,6 +48,7 @@
   <button type="button" role="tab" aria-controls="previewPane" aria-selected="false" data-mobile-pane="preview">3D Preview</button>
   <button type="button" role="tab" aria-controls="canvasPane" aria-selected="true" data-mobile-pane="canvas" class="active">Design</button>
   <button type="button" role="tab" aria-controls="controlPane" aria-selected="false" data-mobile-pane="control">Add / Edit</button>
+  <button type="button" role="tab" aria-controls="controlPane" aria-selected="false" data-mobile-pane="order">Size &amp; Qty</button>
 </nav>
 <div class="app">
   <section id="previewPane" class="preview-pane">
@@ -63,7 +64,7 @@
       <div id="zoneRail" class="zone-rail"></div>
       <div class="workarea">
         <div class="zone-title"><strong id="zoneName">Front</strong> · <span id="zoneSize">3763 × 4992 px</span></div>
-        <canvas id="editorCanvas" width="760" height="860"></canvas>
+        <div class="canvas-stage"><canvas id="editorCanvas" width="760" height="860"></canvas></div>
       </div>
       <div class="zoom-stack"><button id="zoomIn" class="round-control">+</button><button id="zoomOut" class="round-control">−</button></div>
       <div class="bottom-controls"><div class="toolbox"><button id="undo" class="small-square">↶</button><span>Undo</span></div><div class="toolbox"><button id="redo" class="small-square">↷</button><span>Redo</span></div><div class="toolbox"><button id="gridToggle" class="small-square">#</button><span>Gridlines</span></div></div>
@@ -123,18 +124,27 @@
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.180.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.180.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/editor-canvas-guard.js?v=20260917a"></script>
+<dialog id="addTextDialog" class="add-text-dialog" aria-labelledby="addTextTitle">
+  <form id="addTextForm">
+    <h2 id="addTextTitle">Add text to your garment</h2>
+    <label for="newGarmentText">Your text</label>
+    <input id="newGarmentText" class="input" type="text" maxlength="500" autocomplete="off" required>
+    <p id="addTextError" class="text-entry-error" role="status" aria-live="polite"></p>
+    <div class="text-entry-actions"><button id="cancelAddText" class="btn" type="button">Cancel</button><button class="btn orange" type="submit">Add Text</button></div>
+  </form>
+</dialog>
 <script src="/v20/upload-optimizer.js?v=20260917a"></script>
 <script src="/v20/order-mockup-views.js?v=20261001-materialized-upload"></script>
-<script type="module" src="/v20/mobile-workspace.js?v=20260930-copy-cart-hotfix"></script>
-<script type="module" src="/v20/editor.js?v=20260930-copy-cart-hotfix"></script>
-<script type="module" src="/v20/customer.js?v=20260930-copy-cart-hotfix"></script>
+<script type="module" src="/v20/mobile-workspace.js?v=20261003-designer-usability"></script>
+<script type="module" src="/v20/editor.js?v=20261003-designer-usability"></script>
+<script type="module" src="/v20/customer.js?v=20261003-designer-usability"></script>
 <script type="module">
 // The background-only creator is available on the public storefront.
 const backgroundUI = document.getElementById('aiDesignerPrivateTestUI');
 backgroundUI.replaceWith(backgroundUI.content);
 await import('/v20/chat-background.js?v=20260929-background-prefill');
 </script>
-<script type="module" src="/v20/sidebar-ux-preview.js?v=20260930d"></script>
+<script type="module" src="/v20/sidebar-ux-preview.js?v=20261003-designer-usability"></script>
 <script type="module" src="/v20/newcomer-help-preview.js?v=20260930c"></script>
 <script type="module" src="/v20/help-chat.js?v=20260919a"></script>
 </body>

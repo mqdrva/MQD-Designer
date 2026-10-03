@@ -8,7 +8,8 @@ const mobile=window.matchMedia('(max-width: 850px)');
 let active='canvas';
 
 function render(){
-  for(const [name,pane] of Object.entries(panes))pane?.classList.toggle('mobile-active',mobile.matches&&name===active);
+  const paneName=active==='order'?'control':active;
+  for(const [name,pane] of Object.entries(panes))pane?.classList.toggle('mobile-active',mobile.matches&&name===paneName);
   for(const tab of tabs){
     const selected=tab.dataset.mobilePane===active;
     tab.classList.toggle('active',selected);
@@ -16,12 +17,12 @@ function render(){
   }
   if(!mobile.matches)return;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const refreshed=window.MQDDesigner?.refreshMobileWorkspace?.(active);
+    const refreshed=window.MQDDesigner?.refreshMobileWorkspace?.(paneName);
     if(active==='preview'&&!refreshed)window.dispatchEvent(new Event('resize'));
   }));
 }
 
-for(const tab of tabs)tab.addEventListener('click',()=>{active=tab.dataset.mobilePane;render();});
+for(const tab of tabs)tab.addEventListener('click',()=>{active=tab.dataset.mobilePane;window.dispatchEvent(new CustomEvent('mqd:sidebar-tab',{detail:active==='order'?'order':'design'}));render();});
 mobile.addEventListener?.('change',render);
 render();
 
@@ -37,4 +38,10 @@ window.addEventListener('mqd:garment-ready',()=>{
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     window.MQDDesigner?.refreshMobileWorkspace?.('preview');
   }));
+});
+
+window.addEventListener('mqd:sidebar-changed',event=>{
+  if(active!=='control'&&active!=='order')return;
+  active=event.detail==='order'?'order':'control';
+  render();
 });
