@@ -21,7 +21,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
     const panel=document.createElement('div');
     panel.className='sidebar-ux-panel';
     panel.dataset.sidebarPanel=name;
-    panel.id='sidebarPanel'+label;
+    panel.id='sidebarPanel'+name[0].toUpperCase()+name.slice(1);
     panel.setAttribute('role','tabpanel');
     panelHost.appendChild(panel);
 
@@ -37,7 +37,7 @@ if(pane&&!pane.dataset.sidebarUxPreview){
   };
 
   const designPanel=makePanel('design','Design');
-  const orderPanel=makePanel('order','Order');
+  const orderPanel=makePanel('order','Size & Quantity');
 
   pane.insertBefore(tabs,pane.firstChild);
   pane.insertBefore(panelHost,tabs.nextSibling);
@@ -59,7 +59,11 @@ if(pane&&!pane.dataset.sidebarUxPreview){
       button.tabIndex=active?0:-1;
     });
     panels.forEach(panel=>panel.classList.toggle('active',panel.dataset.sidebarPanel===name));
+    window.dispatchEvent(new CustomEvent('mqd:sidebar-changed',{detail:name}));
   };
+
+  window.addEventListener('mqd:sidebar-tab',event=>activate(event.detail==='order'?'order':'design'));
+  window.addEventListener('mqd:text-added',()=>{dockLayerControls();openLayers();});
 
   buttons.forEach(button=>button.addEventListener('click',()=>activate(button.dataset.sidebarTab)));
   tabs.addEventListener('keydown',event=>{

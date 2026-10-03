@@ -83,7 +83,7 @@ function makeOrderOptionRow(defaultSize=null,quantity=1){
   qty.addEventListener('change',()=>{qty.value=String(Math.max(1,Math.min(99,Number(qty.value)||1)));});
   qtyWrap.appendChild(qty);row.appendChild(qtyWrap);
   const remove=document.createElement('button');remove.type='button';remove.className='remove-order-row';remove.setAttribute('aria-label','Remove size');remove.textContent='×';
-  remove.onclick=()=>{const host=$('orderOptionRows');if(host?.children.length>1)row.remove();};
+  remove.onclick=()=>{const host=$('orderOptionRows');if(host?.children.length>1){row.remove();renderOrderSummary();}};
   row.appendChild(remove);
   return row;
 }
@@ -108,6 +108,24 @@ function renderOrderOptions(){
   }else{
     note.textContent='This item uses quantity only.';
   }
+  renderOrderSummary();
+}
+
+function renderOrderSummary(){
+  const section=$('orderOptionsSection');if(!section)return;
+  let summary=$('orderSelectionSummary');
+  if(!summary){
+    summary=document.createElement('div');summary.id='orderSelectionSummary';summary.className='order-selection-summary';
+    summary.setAttribute('role','status');summary.setAttribute('aria-live','polite');section.appendChild(summary);
+  }
+  const options=selectedOrderOptions();
+  const quantity=options.reduce((sum,item)=>sum+item.quantity,0);
+  const sizes=options.map(item=>`${item.size||'Item'} × ${item.quantity}`).join(' · ');
+  const subtotal=(priceFor(currentProductId())*quantity).toFixed(2);
+  const detail=document.createElement('div');detail.textContent=sizes;
+  const total=document.createElement('strong');total.textContent=`${quantity} ${quantity===1?'item':'items'} · $${subtotal}`;
+  const note=document.createElement('div');note.textContent='Estimated subtotal before shipping and tax';
+  summary.replaceChildren(detail,total,note);
 }
 
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
@@ -953,12 +971,15 @@ window.addEventListener('DOMContentLoaded',()=>{
     renderOrderOptions();
   });
   renderOrderOptions();
+  $('orderOptionRows')?.addEventListener('input',renderOrderSummary);
+  $('orderOptionRows')?.addEventListener('change',renderOrderSummary);
   $('addOrderOptionRow')?.addEventListener('click',()=>{
     const sizes=sizesForProduct();if(!sizes.length)return;
     const used=new Set(selectedOrderOptions().map(x=>x.size));
     const next=sizes.find(x=>!used.has(x));
     if(!next){alert('All available sizes are already listed.');return;}
     $('orderOptionRows')?.appendChild(makeOrderOptionRow(next,1));
+    renderOrderSummary();
   });
   $('openArtworkLibrary')?.addEventListener('click',()=>openArtworkLibrary().catch(error=>{console.error(error);alert(error.message);}));
   $('closeArtworkLibrary')?.addEventListener('click',closeArtworkLibrary);

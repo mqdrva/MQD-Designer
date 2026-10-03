@@ -1997,7 +1997,31 @@ function addLibraryAsset(asset){
     img.onerror=()=>reject(new Error('The library artwork could not be loaded.'));img.src=asset.renderUrl;
   });
 }
-function addText(){if(!canAddLayer())return;const text=prompt('Text to add');if(!text)return;snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
+function addText(){
+  if(!canAddLayer())return;
+  const dialog=$('addTextDialog');
+  $('addTextForm').reset();
+  $('addTextError').textContent='';
+  dialog.showModal();
+  $('newGarmentText').focus();
+}
+$('cancelAddText').onclick=()=>$('addTextDialog').close();
+$('addTextDialog').addEventListener('close',()=>$('addTextBtn').focus());
+$('addTextForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  const text=$('newGarmentText').value.trim();
+  if(!text){$('addTextError').textContent='Enter some text before adding it.';$('newGarmentText').focus();return;}
+  try{
+    if(!canAddLayer())return;
+    createTextLayer(text);
+    $('addTextDialog').close();
+    window.dispatchEvent(new Event('mqd:text-added'));
+  }catch(error){
+    console.error('Could not add garment text',error);
+    $('addTextError').textContent='Could not add your text. Please try again.';
+  }
+});
+function createTextLayer(text){snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
 function updateLayer(prop,val){const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;l[prop]=val;renderLayerPanel();renderPrintQuality();drawEditor();scheduleGarmentPreview();}
 function setBackground(hex,record=true){const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildGarmentPreview();}
 function applyBackgroundAll(){const c=normalizeHex($('zoneHex').value);if(!c)return;snapshot();product.zones.forEach(z=>{const old=activeZone;activeZone=z;zoneState().background=c;activeZone=old;});renderAll();}
