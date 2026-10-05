@@ -61,7 +61,9 @@
     if (!status) return;
 
     const check = function () {
-      if (!/paid/i.test(status.textContent || '')) return;
+      // Confirmation renders either the exact backend status or `Paid ✓`.
+      // Substring matching also accepts `unpaid` and consumes its dedup key.
+      if (!/^paid(?:\s*✓)?$/i.test((status.textContent || '').trim())) return;
       const sessionId = new URLSearchParams(window.location.search).get('session_id') || 'confirmed';
       let alreadyTracked = trackedPurchases.has(sessionId);
       try {
