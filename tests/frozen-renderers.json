@@ -50,10 +50,10 @@
     "maxLayerScale": "6cac8584b0d3d8cbe972d09acfd784ee9665f048beb0246009b5f1a91a7e699b",
     "garmentCopyFamily": "2bd4c6bd5dcd965ec62d4d4c06cbec10be7e640818c76b780e4a6609a97bddc4",
     "zonePlacement": "90c062352b606a548662367868e4986c086820069531537eb841b8bb749d41ad",
-    "splitTshirtGeometry": "869725866badfd80183f079841d15e8a12fb9e1735b6184e6f8015d29ab49ee5",
+    "splitTshirtGeometry": "cb965c85b01b8a85ff3c450c05336d72051b34f638328cdb70f35236714e47ff",
     "splitFleeceHoodieGeometry": "33c57c07e61358ab64fe1e4a5110be19e2a704a4fdb3b66e28c882e6e2ddc69e",
     "rebuildFleeceHoodiePreview": "59b10d15a2827568336a01b3805caecd7a8ef69a977e75ba1079eeaaeadae245",
-    "updateTshirtZoneTextures": "8b2bfbc57056e735e4c966424e9b9a97d0d7acfb1b13b63de0dfe5ce2b3d25e5",
+    "updateTshirtZoneTextures": "42c2e2af465fecf72c4064561a50eeb088b69ea7ca169b71e0d2c13b2e9df375",
     "rebuildJacketPreview": "00101898fab51b19b982bf9deec8454dc9cf59de58c83eeac725ef63079b4e03",
     "rebuildHoodMaskPreview": "631ccc5d5c9c53f0f296a118db5a24b573a53b5f14e9d09e504560b71deb584a",
     "rebuildHoodedLongSleevePreview": "d80c55ae0498661be100c72d2c21ec4b40b0a9a766355b4927983106796fe13d",
@@ -61,6 +61,6 @@
     "rebuildShortsPreview": "a3be1cff9981a049772d4fefccaea635e7904d160b8076feb893c16fed3d925d",
     "rebuildMaskPreview": "a5531f9496cabc43154390a8e7352a619880ad358e0843ede6c635f10b093062",
     "rebuildGarmentPreview": "762fc38ac511308b61805e0ed0bd96201fd29ae5a8e41007bb9db0e55bd57056",
-    "loadGarment": "4fcfdfe4b452e0639f6b3e6ca95ac9a707294800091e280fb3926aa29ac0a48e"
+    "loadGarment": "768d3221368a3cf3286734c8b60459891b5386250a3d97df4b4730db97752004"
   }
 }

@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: Verify frozen catalog and renderers
         run: node tests/frozen-product-baseline.mjs
+      - name: Install locked test dependencies
+        run: npm ci
       - name: Run mapping regressions
         run: |
           node --check v20/editor.js
@@ -36,3 +38,7 @@ jobs:
           node tests/long-sleeve-pattern-uv.mjs
           node tests/mask-renderer.mjs
           node tests/tshirt-text-mapping.mjs
+          node tests/tshirt-front-neckline.mjs
+          node tests/tshirt-side-wrap.mjs
+          node tests/tshirt-preview-contract.mjs
+          node tests/garment-load-lifecycle.mjs
