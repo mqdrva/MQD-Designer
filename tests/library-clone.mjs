@@ -85,7 +85,7 @@ assert.match(notices.at(-1),/duplicated to: Back/i,'the UI must confirm which de
 
 assert(editor.includes("$('duplicateTool').disabled=!!(l.libraryAssetId&&!locked)"),'Duplicate must be enabled for locked library artwork');
 assert(editor.includes("if(!locked)add('Same Zone',()=>duplicateActive())"),'Locked artwork must avoid same-zone stacking');
-assert(editor.includes("add('To All Zones',()=>cloneActiveToAllZones(),true)"),'Clone All must remain available');
+assert(editor.includes("add('To All Other Zones',()=>cloneActiveToAllZones(),true)"),'Duplicate to all other zones must remain available');
 assert(!extractFunction('openDuplicateMenu').includes("if(l.libraryAssetId){alert("),'Locked artwork must not be blocked from the destination-zone menu');
 
 console.log('PASS: locked MQD artwork clones to selected zones using approved placement and remains locked.');

@@ -26,15 +26,15 @@ const collarHigh=panelUv('Collar',.1,.8,0,bounds);
 assert.equal(collarLow[1],0);
 assert.equal(collarHigh[1],1);
 
-// Guard the calibrated All-Over Print T-Shirt artwork mapping. Front/Back text
-// and movable customer images are raised 9% in the 3D texture frame to match
-// the 2D template. Locked library backgrounds and the other zones stay put.
+// Guard the calibrated All-Over Print T-Shirt artwork mapping. The Front
+// uses production-pattern UVs at the front neckline/hem; Back text and movable
+// customer images retain the 9% correction. Locked backgrounds stay put.
 const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
 assert(editor.includes("MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved'"));
 assert(editor.includes("MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2'"));
 assert(editor.includes("MQD_TSHIRT_EDITABLE_ARTWORK_MAPPING_LOCK='front-back-editable-artwork-up-9pct-v3'"));
 assert(editor.includes("product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0"));
-assert(editor.includes("const tshirtBodyArtwork=product.id==='tshirt'&&(zone==='Front'||zone==='Back')"));
+assert(editor.includes("const tshirtBodyArtwork=product.id==='tshirt'&&zone==='Back'"));
 assert(editor.includes("offsetY:TSHIRT_BODY_ARTWORK_OFFSET_Y,imageOffsetY}"));
 assert.equal(TSHIRT_BODY_ARTWORK_OFFSET_Y,-.09);
 assert.equal(tshirtBodyImageOffsetY({type:'image',chatBackground:true}),0,'ChatGPT backgrounds must match the 2D frame without the foreground upward offset');
@@ -57,5 +57,5 @@ assert.equal(tshirtBodyImageOffsetY({type:'image',aiManaged:true,aiAssetKind:'lo
 
 console.log({
   zones:['Front','Back','Left Sleeve','Right Sleeve','Collar'],
-  checks:'AI backgrounds unshifted; front AI logos raised 12%; back foreground remains 9%. Ordinary artwork, locked library backgrounds, sleeves, collar and approved fill unchanged.'
+  checks:'Front uses calibrated pattern UVs; Back foreground remains 9%; background exceptions and legacy helper calibration preserved.'
 });
