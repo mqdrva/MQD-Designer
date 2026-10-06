@@ -1,0 +1,74 @@
+/* Mobile design studio preview. The existing editor and all artwork controls are reused. */
+.mobile-studio-tools,.mobile-sheet-head,.mobile-preview-note,.mobile-studio-menu{display:none}
+@media(max-width:850px){
+  .mobile-preview-note{display:block;padding:7px 12px;background:#fff4e9;color:#783800;font-size:12px;text-align:center;border-bottom:1px solid #f1d9c2}
+  .mobile-workspace-tabs{grid-template-columns:repeat(3,minmax(0,1fr));top:0}
+  .mobile-workspace-tabs [data-mobile-pane="control"]{display:none}
+  body>header{position:relative;flex-direction:row;align-items:center;height:62px;min-height:62px;padding:8px;gap:6px}
+  body>header .brand{flex:1;min-width:0;width:auto;gap:6px}
+  body>header .brand img{width:37px;height:auto}
+  body>header .product-select{min-width:0;max-width:none;width:100%;font-size:12px;padding:9px 20px 9px 7px}
+  .mobile-studio-menu{display:block;flex:0 0 auto}
+  .mobile-studio-menu>summary{list-style:none;min-height:44px;display:flex;align-items:center;padding:7px 10px;font-size:12px}
+  .mobile-studio-menu>summary::-webkit-details-marker{display:none}
+  .mobile-studio-menu .top-actions{position:absolute;top:calc(100% + 3px);left:8px;right:8px;width:auto;max-width:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 8px 28px #0002;z-index:30;overflow:visible}
+  .mobile-studio-menu:not([open]) .top-actions{display:none}
+  .mobile-studio-menu .top-actions>.btn,.mobile-studio-menu .top-actions>details{width:100%;min-width:0;font-size:12px}
+  .mobile-studio-menu .help-menu{grid-column:1/-1}
+  .mobile-studio-menu .top-actions #downloadMockup{display:block}
+  .app.mobile-design-studio[data-mobile-workspace="canvas"]{height:calc(100dvh - 150px);min-height:480px;display:flex;flex-direction:column;overflow:hidden}
+  .mobile-design-studio[data-mobile-workspace="canvas"]>.canvas-pane{display:block;flex:1 1 auto;height:auto;min-height:260px;overflow:hidden}
+  .mobile-design-studio[data-mobile-workspace="canvas"]>.control-pane{display:none;flex:0 1 auto;height:auto;min-height:0;max-height:32dvh;padding:0 0 env(safe-area-inset-bottom);overflow:auto;overscroll-behavior:contain;border:1px solid #ddd;border-radius:18px 18px 0 0;box-shadow:0 -4px 18px #00000009}
+  .mobile-design-studio[data-mobile-workspace="canvas"].studio-sheet-open>.control-pane{display:block}
+  .mobile-design-studio .mobile-studio-tools{position:absolute;bottom:0;left:0;right:0;display:block;z-index:10;background:#fff;border-top:1px solid #e7e7e7}
+  .mobile-selection-bar{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;background:#fffaf5;font-size:12px}
+  #mobileSelectedLayer{flex:1;min-width:0;overflow-wrap:anywhere;max-height:48px;overflow:auto;border-left:3px solid #ff6b00;padding-left:8px}
+  .mobile-selection-bar .btn{padding:6px 12px;min-height:36px;font-size:12px}
+  .mobile-studio-toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:7px 6px 9px}
+  .mobile-studio-toolbar button{min-height:44px;padding:5px 2px;border:1px solid #e1e1e1;border-radius:9px;background:#f8f8f8;color:#333;font:650 11px/1.25 Inter,system-ui,sans-serif;overflow-wrap:anywhere;cursor:pointer}
+  .mobile-studio-toolbar button[aria-pressed="true"]{background:#fff2e7;border-color:#ff6b00;color:#783800}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .editor-wrap{bottom:107px;top:0}
+  .mobile-design-studio>.control-pane>.editor-toolbar{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="more"]>.control-pane>.editor-toolbar{display:flex;flex-wrap:wrap;overflow:visible;height:auto;gap:5px;padding:12px;justify-content:flex-start}
+  .mobile-design-studio .editor-toolbar .tool{border:1px solid #ddd;min-height:44px;font-size:12px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .zone-rail{top:0;left:6px;right:6px;transform:none;display:flex;gap:5px;overflow-x:auto;padding:4px 0}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .zone-icon{min-width:48px;width:auto;height:44px;min-height:44px;flex:1 0 48px;max-width:95px;font-size:10px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .workarea{position:absolute;top:55px;bottom:45px;left:36px;right:36px;width:auto;height:auto;margin:0;grid-template-rows:auto minmax(0,1fr);gap:3px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .zone-title{font-size:11px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] #guideLegend{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .zoom-stack{right:3px;bottom:50px;gap:4px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .round-control{width:32px;height:40px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .bottom-controls{bottom:2px;gap:9px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .bottom-controls .toolbox{display:flex;gap:4px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .small-square{height:40px;width:40px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .mobile-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;z-index:15;padding:10px 12px;background:#fff;border-bottom:1px solid #e7e7e7;font-size:14px}
+  .mobile-sheet-head .btn{min-height:44px;color:#b84d00}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .sidebar-ux-tabs{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .sidebar-ux-panels{padding:0}
+  .mobile-design-studio[data-mobile-workspace="canvas"] [data-sidebar-panel="design"]>.add-grid,
+  .mobile-design-studio[data-mobile-workspace="canvas"] [data-sidebar-section="background"],
+  .mobile-design-studio[data-mobile-workspace="canvas"] [data-sidebar-section="layers"]{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="background"] [data-sidebar-section="background"],
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="more"] [data-sidebar-panel="design"]>.add-grid,
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="layers"] [data-sidebar-section="layers"],
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="edit"] [data-sidebar-section="layers"]{display:block}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="more"] [data-sidebar-panel="design"]>.add-grid{display:grid;margin:12px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .sidebar-section-toggle{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="edit"] #layers,
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="layers"] #layerControls{display:none!important}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="edit"] #layerControls{padding:12px;display:flex;flex-direction:column;gap:8px}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="edit"] #layerControls.hidden{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"] #textControls{order:-1;margin-top:0!important;padding-top:0!important;border-top:0!important}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .layer-controls>.action-row{display:flex!important}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .range-line{grid-template-columns:75px minmax(0,1fr) 36px;gap:6px;min-height:44px;margin:0}
+  .mobile-design-studio[data-mobile-workspace="canvas"] input[type="range"]{min-height:44px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .input{font-size:16px;min-height:44px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .layer-inline-action{min-width:44px;height:44px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .layer-order-actions button{width:44px;height:44px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] .layer-controls .btn{min-height:44px}
+  .mobile-design-studio[data-mobile-workspace="canvas"] #quickDesignTour{display:none}
+  .mobile-design-studio[data-mobile-workspace="canvas"][data-studio-panel="more"] #quickDesignTour{display:block}
+  .mobile-design-studio[data-mobile-workspace="canvas"] #printQualityCard{margin:10px 12px}
+  .mobile-design-studio[data-mobile-workspace="order"]>.control-pane{min-height:calc(100dvh - 59px)}
+}
+@media(max-width:850px){.mobile-studio-menu #mqdHelpLauncher{position:static;order:6;width:100%;height:44px;min-width:44px;border-radius:9px;box-shadow:none;font-size:12px}}

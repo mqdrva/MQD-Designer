@@ -1262,7 +1262,9 @@ function renderLayerPanel(){
     d.ondragleave=()=>d.classList.remove('layer-drop-target');
     d.ondrop=e=>{e.preventDefault();d.classList.remove('layer-drop-target');reorderLayer(e.dataTransfer.getData('text/plain'),l.id);};
     wrap.appendChild(d);});
-  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}
+  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);
+  window.dispatchEvent(new CustomEvent('mqd:selection-changed',{detail:mobileSelection()}));
+  if(!l){textControls?.classList.add('hidden');return;}
   // Lightweight Jacket 2D editor gets a little more sizing range without
   // changing any garment geometry or any other product's controls.
   $('layerScale').max=String(Math.round(maxLayerScale(l)*100));
@@ -2327,7 +2329,11 @@ function refreshMobileWorkspace(pane){
  }
  return false;
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+function mobileSelection(){
+ const l=activeLayer();
+ return{productId:product.id,zone:activeZone,id:l?.id||null,type:l?.type||null,label:l?.label||'',text:l?.text||'',filename:l?.filename||'',visible:l?.visible!==false,locked:isLockedLibraryLayer(l)};
+}
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
