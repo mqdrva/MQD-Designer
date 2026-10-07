@@ -116,7 +116,11 @@ document.getElementById('editorCanvas')?.addEventListener('pointerup',event=>{
   if(sheetOpen){sheetOpen=false;render();}
 });
 document.getElementById('editorCanvas')?.addEventListener('pointerdown',event=>{canvasPointers.add(event.pointerId);canvasGesture=true;},{capture:true});
-document.getElementById('editorCanvas')?.addEventListener('pointercancel',event=>{canvasPointers.delete(event.pointerId);canvasGesture=canvasPointers.size>0;});
+function clearCanvasGesture(){canvasPointers.clear();canvasGesture=false;}
+document.getElementById('editorCanvas')?.addEventListener('pointercancel',clearCanvasGesture);
+document.getElementById('editorCanvas')?.addEventListener('lostpointercapture',clearCanvasGesture);
+window.addEventListener('blur',clearCanvasGesture);
+window.addEventListener('pagehide',clearCanvasGesture);
 panes.control?.addEventListener('click',event=>{
   if(!mobile.matches||active!=='canvas'||!event.target.closest('#layers .layer'))return;
   if(event.target.closest('button'))return;

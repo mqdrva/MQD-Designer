@@ -2251,13 +2251,30 @@ function clampCropValue(value,opposite){
   return Math.max(0,Math.min(.88-Math.max(0,Number(opposite)||0),value));
 }
 const editorTouches=new Map();
-let layerPinch=null,waitForTouchRelease=false;
+let layerPinch=null,waitForTouchRelease=false,gestureRenderFrame=0;
+function queueGestureRender(){
+  if(!mobileEditorView()){drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();return;}
+  if(gestureRenderFrame)return;
+  gestureRenderFrame=requestAnimationFrame(()=>{gestureRenderFrame=0;drawEditor();});
+}
+function finishGestureRender(){
+  if(gestureRenderFrame){cancelAnimationFrame(gestureRenderFrame);gestureRenderFrame=0;}
+  drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
+}
+function resetEditorGesture(){
+  const changed=Boolean(dragState||layerPinch||waitForTouchRelease);
+  const ids=[...editorTouches.keys()];
+  editorTouches.clear();layerPinch=null;waitForTouchRelease=false;dragState=null;
+  for(const id of ids){try{editorCanvas.releasePointerCapture(id)}catch{}}
+  editorCanvas.classList.remove('dragging');
+  if(changed)finishGestureRender();
+}
 function touchPair(){return[...editorTouches.values()].slice(0,2);}
 function beginLayerPinch(){
   const l=activeLayer(),q=activeLayerScreenRect(l),points=touchPair();
   if(!l||!q||l.visible===false||isLockedLibraryLayer(l)||cropMode||points.length!==2)return;
   const[a,b]=points,distance=Math.hypot(b.x-a.x,b.y-a.y);
-  if(distance<1)return;
+  if(distance<16)return;
   // The first finger already captured undo when it started a drag.
   if(!dragState)snapshot();
   layerPinch={layer:l,distance,center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,bounds:q.b||editorRect()};
@@ -2271,10 +2288,14 @@ function updateLayerPinch(){
   l.scale=Math.max(.05,Math.min(maxLayerScale(l),layerPinch.scale*distance/layerPinch.distance));
   l.x=Math.max(-100,Math.min(100,layerPinch.x+(center.x-layerPinch.center.x)/Math.max(1,layerPinch.bounds.w)*200));
   l.y=Math.max(-100,Math.min(100,layerPinch.y+(center.y-layerPinch.center.y)/Math.max(1,layerPinch.bounds.h)*200));
-  drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
+  queueGestureRender();
 }
 editorCanvas.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch'&&window.matchMedia('(max-width:850px)').matches){
+    // Recover if Safari dropped a capture without delivering pointerup.
+    for(const id of editorTouches.keys()){
+      if(editorCanvas.hasPointerCapture&&!editorCanvas.hasPointerCapture(id)){resetEditorGesture();break;}
+    }
     editorTouches.set(e.pointerId,pointerToCanvas(e));
     editorCanvas.setPointerCapture(e.pointerId);
     if(editorTouches.size>1){
@@ -2336,17 +2357,23 @@ editorCanvas.addEventListener('pointermove',e=>{
     if(handle.includes('b'))c.bottom=clampCropValue((dragState.crop.bottom||0)-fy,dragState.crop.top);
     l.crop=c;
   }
-  drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
+  queueGestureRender();
 });
 function endEditorPointer(e){
+  const changed=Boolean(dragState||layerPinch||waitForTouchRelease);
   editorTouches.delete(e.pointerId);
   if(layerPinch||waitForTouchRelease){layerPinch=null;dragState=null;if(!editorTouches.size)waitForTouchRelease=false;}
   else if(dragState?.pointerId===e.pointerId)dragState=null;
   try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}
-  if(!dragState&&!layerPinch)editorCanvas.classList.remove('dragging');
+  if(!dragState&&!layerPinch){editorCanvas.classList.remove('dragging');if(changed)finishGestureRender();}
 }
 editorCanvas.addEventListener('pointerup',endEditorPointer);
-editorCanvas.addEventListener('pointercancel',endEditorPointer);
+editorCanvas.addEventListener('pointercancel',resetEditorGesture);
+editorCanvas.addEventListener('lostpointercapture',e=>{
+  if(editorTouches.has(e.pointerId)||dragState?.pointerId===e.pointerId)resetEditorGesture();
+});
+window.addEventListener('blur',resetEditorGesture);
+window.addEventListener('pagehide',resetEditorGesture);
 
 function designJSON(){
  const clean=JSON.parse(JSON.stringify(designs,function(k,v){if(k==='image'||k==='backgroundOriginalSrc')return undefined;if(k==='src'&&this?.libraryAssetId)return undefined;return v;}));
