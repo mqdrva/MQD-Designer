@@ -60,7 +60,9 @@ if(catalogMask&&seedMaskModel)catalogMask.model=seedMaskModel;
 let product=catalog[0],activeZone=product.zones[0],activeLayerId=null,layerSeq=1;
 const designs={};
 const history=[],future=[];
-let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null,cropMode=false;
+function mobileEditorView(){return window.matchMedia('(max-width:850px)').matches;}
+function defaultEditorZoom(){return mobileEditorView()?1.3:1;}
+let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=defaultEditorZoom(),showGrid=true,dragState=null,cropMode=false;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
 const tshirtInteriorMeshes=new Map();
@@ -1125,7 +1127,9 @@ function selectionGeometry(l,q){
   return{corners,top,rotateHandle,resizeHandles:corners,cropHandles};
 }
 function drawSelectionOverlay(){
-  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.lineWidth=2;
+  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();
+  if(mobileEditorView()){ctx.translate(editorCanvas.width/2,editorCanvas.height/2);ctx.scale(editorZoom,editorZoom);ctx.translate(-editorCanvas.width/2,-editorCanvas.height/2);}
+  ctx.lineWidth=2;
   if(isLockedLibraryLayer(l)){
     const g=selectionGeometry(l,q);ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText('Locked',g.corners[0].x,g.corners[0].y-9);
@@ -1972,14 +1976,14 @@ function selectProduct(id,{preview=false,reason='product-select'}={}){
   product=catalog.find(p=>p.id===id)||catalog[0];
   activeZone=product.zones[0];
   activeLayerId=zoneState().layers.at(-1)?.id||null;
-  editorZoom=1;
+  editorZoom=defaultEditorZoom();
   preloadTemplates();
   renderAll();
   window.dispatchEvent(new CustomEvent('mqd:product-changed',{detail:{productId:product.id,productName:product.name,reason}}));
   loadGarment();
   if(preview)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('mqd:show-preview',{detail:{productId:product.id,reason}})));
 }
-function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
+function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=defaultEditorZoom();ensureTemplateImage(z);renderAll();}
 const MAX_ZONE_LAYERS=6;
 function canAddLayer(zone=activeZone){const z=zoneState(zone);if(z.layers.length>=MAX_ZONE_LAYERS){alert(`This print zone can have up to ${MAX_ZONE_LAYERS} layers.`);return false;}return true;}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
@@ -2215,7 +2219,11 @@ function handleLayerDeleteKey(e){if(!e||!['Delete','Backspace'].includes(e.key)|
 document.addEventListener('keydown',handleLayerDeleteKey);
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=deleteActiveLayer;$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
-function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
+function pointerToCanvas(e){
+  const r=editorCanvas.getBoundingClientRect(),x=(e.clientX-r.left)*editorCanvas.width/r.width,y=(e.clientY-r.top)*editorCanvas.height/r.height;
+  if(!mobileEditorView())return{x,y};
+  return{x:editorCanvas.width/2+(x-editorCanvas.width/2)/editorZoom,y:editorCanvas.height/2+(y-editorCanvas.height/2)/editorZoom};
+}
 function layerAtCanvasPoint(p){
   for(const l of [...zoneState().layers].reverse()){
     if(l.visible===false)continue;
@@ -2361,7 +2369,7 @@ async function loadDesignPayload(payload,{notify=true}={}){
  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design.');
  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
- recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();
+ recomputeLayerSeq();repairImageObjects();editorZoom=defaultEditorZoom();renderAll();loadGarment();
  if(notify)alert('Design loaded.');
 }
 function refreshMobileWorkspace(pane){

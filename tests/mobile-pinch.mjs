@@ -17,3 +17,14 @@ h.event('pointerdown',5,100,100);h.event('pointermove',5,120,100);assert.equal(h
 for(const options of [{locked:true},{crop:true}]){const f=harness(options);f.event('pointerdown',1,100,100);f.event('pointerdown',2,200,100);f.event('pointermove',2,300,100);assert.equal(f.layer.scale,1,'locked artwork and crop mode do not pinch');}
 const mouse=harness({mobile:false});mouse.event('pointerdown',1,100,100,'mouse');mouse.event('pointermove',1,140,150,'mouse');assert.equal(mouse.layer.x,20);assert.equal(mouse.layer.y,20);assert.equal(mouse.layer.scale,1);
 console.log('Mobile pinch: proportional resize, bounds, undo, cancellation, locked layers, crop and desktop drag passed.');
+// Exercise the real coordinate mapping at the larger starting view.
+const mobileView=source.slice(source.indexOf('function mobileEditorView(){'),source.indexOf('let scene,camera'));
+const pointerMapping=source.slice(source.indexOf('function pointerToCanvas(e){'),source.indexOf('\nfunction layerAtCanvasPoint'));
+const zoomContext={window:{matchMedia:()=>({matches:true})},editorZoom:1.3,editorCanvas:{width:760,height:860,getBoundingClientRect:()=>({left:10,top:20,width:380,height:430})}};
+vm.createContext(zoomContext);vm.runInContext(mobileView+pointerMapping,zoomContext);
+assert.equal(vm.runInContext('defaultEditorZoom()',zoomContext),1.3);
+const mapped=vm.runInContext('pointerToCanvas({clientX:255,clientY:267.5})',zoomContext);
+assert.ok(Math.abs(mapped.x-(380+110/1.3))<1e-9);assert.ok(Math.abs(mapped.y-(430+65/1.3))<1e-9);
+zoomContext.window.matchMedia=()=>({matches:false});assert.equal(vm.runInContext('defaultEditorZoom()',zoomContext),1);
+assert.equal(vm.runInContext('pointerToCanvas({clientX:255,clientY:267.5}).x',zoomContext),490);
+console.log('Mobile starting zoom and inverse gesture coordinates passed; desktop default unchanged.');
