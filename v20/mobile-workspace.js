@@ -3,6 +3,7 @@ const panes={preview:document.querySelector('.preview-pane'),canvas:document.que
 const app=document.querySelector('.app');
 const mobile=window.matchMedia('(max-width: 850px)');
 let active='canvas',sheetOpen=false,sheetPanel='layers',lastSelection=null,canvasGesture=false;
+const canvasPointers=new Set();
 
 // Keep every existing header action available in a compact mobile menu.
 const header=document.querySelector('body > header');
@@ -107,13 +108,15 @@ editButton.addEventListener('click',()=>setSheet('edit'));
 doneButton.addEventListener('click',()=>{sheetOpen=false;render();editButton.focus();});
 mobile.addEventListener?.('change',()=>{placeHeaderActions();syncSelection();render();});
 window.addEventListener('mqd:selection-changed',event=>syncSelection(event.detail));
-document.getElementById('editorCanvas')?.addEventListener('pointerup',()=>{
-  canvasGesture=false;
+document.getElementById('editorCanvas')?.addEventListener('pointerup',event=>{
+  canvasPointers.delete(event.pointerId);canvasGesture=canvasPointers.size>0;
+  if(canvasGesture)return;
   if(!mobile.matches||active!=='canvas')return;
-  requestAnimationFrame(()=>{if(selection()?.id)setSheet('edit');});
+  // Keep the larger canvas available after positioning or pinching artwork.
+  if(sheetOpen){sheetOpen=false;render();}
 });
-document.getElementById('editorCanvas')?.addEventListener('pointerdown',()=>{canvasGesture=true;},{capture:true});
-document.getElementById('editorCanvas')?.addEventListener('pointercancel',()=>{canvasGesture=false;});
+document.getElementById('editorCanvas')?.addEventListener('pointerdown',event=>{canvasPointers.add(event.pointerId);canvasGesture=true;},{capture:true});
+document.getElementById('editorCanvas')?.addEventListener('pointercancel',event=>{canvasPointers.delete(event.pointerId);canvasGesture=canvasPointers.size>0;});
 panes.control?.addEventListener('click',event=>{
   if(!mobile.matches||active!=='canvas'||!event.target.closest('#layers .layer'))return;
   if(event.target.closest('button'))return;

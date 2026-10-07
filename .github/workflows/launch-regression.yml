@@ -61,6 +61,8 @@ jobs:
           node-version: 22
       - name: Verify mobile artwork upload and retry behavior
         run: node tests/mobile-guest-cart.mjs
+      - name: Verify mobile artwork pinch gestures
+        run: node tests/mobile-pinch.mjs
       - name: Verify multi-order checkout schema
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/checkout-session-fixture.sql
