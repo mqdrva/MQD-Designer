@@ -54,12 +54,20 @@ function showStep(index){
   if(step.tab)activateTab(step.tab);
   clearTarget();
   requestAnimationFrame(()=>{
-    activeTarget=step.target?.()||null;
+    const mobileStudio=document.querySelector('.app.mobile-design-studio');
+    const mobileCopy=[
+      'Use Add Image or Add Text below the shirt. More tools opens the MQD Library and advanced tools; Background opens your background controls.',
+      'Tap your artwork to edit it below the shirt. The selected area and layer stay labeled. Scroll inside the editing panel for font, color, size, position and rotation; Done gives you more shirt space.',
+      'Open Size & Qty to choose garment sizes and quantities. Add another size when the same design is needed in multiple sizes.',
+      'Open Menu for Add to Cart, Save Design, your account and other actions. Review your design and sizes before ordering.'
+    ];
+    if(mobileStudio&&activeIndex===3){const menu=document.querySelector('.mobile-studio-menu');if(menu)menu.open=true;}
+    activeTarget=mobileStudio&&activeIndex===0?document.querySelector('.mobile-studio-toolbar'):step.target?.()||null;
     activeTarget?.classList.add('mqd-tour-target');
     activeTarget?.scrollIntoView?.({behavior:'smooth',block:'center',inline:'nearest'});
     card.querySelector('.mqd-tour-progress').textContent=`Quick tour · ${activeIndex+1} of ${steps.length}`;
     card.querySelector('h3').textContent=step.title;
-    card.querySelector('p').textContent=step.body;
+    card.querySelector('p').textContent=mobileStudio?mobileCopy[activeIndex]:step.body;
     const next=card.querySelector('.mqd-tour-next');
     next.textContent=activeIndex===steps.length-1?'Finish':'Next';
   });

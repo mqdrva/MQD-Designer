@@ -60,7 +60,9 @@ if(catalogMask&&seedMaskModel)catalogMask.model=seedMaskModel;
 let product=catalog[0],activeZone=product.zones[0],activeLayerId=null,layerSeq=1;
 const designs={};
 const history=[],future=[];
-let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=1,showGrid=true,dragState=null,cropMode=false;
+function mobileEditorView(){return window.matchMedia('(max-width:850px)').matches;}
+function defaultEditorZoom(){return mobileEditorView()?1.3:1;}
+let scene,camera,renderer,controls,garment=null,decalGroup=null,editorZoom=defaultEditorZoom(),showGrid=true,dragState=null,cropMode=false;
 let tshirtZoneGroup=null;
 const tshirtZoneMeshes=new Map();
 const tshirtInteriorMeshes=new Map();
@@ -1125,7 +1127,9 @@ function selectionGeometry(l,q){
   return{corners,top,rotateHandle,resizeHandles:corners,cropHandles};
 }
 function drawSelectionOverlay(){
-  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();ctx.lineWidth=2;
+  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();
+  if(mobileEditorView()){ctx.translate(editorCanvas.width/2,editorCanvas.height/2);ctx.scale(editorZoom,editorZoom);ctx.translate(-editorCanvas.width/2,-editorCanvas.height/2);}
+  ctx.lineWidth=2;
   if(isLockedLibraryLayer(l)){
     const g=selectionGeometry(l,q);ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText('Locked',g.corners[0].x,g.corners[0].y-9);
@@ -1262,7 +1266,9 @@ function renderLayerPanel(){
     d.ondragleave=()=>d.classList.remove('layer-drop-target');
     d.ondrop=e=>{e.preventDefault();d.classList.remove('layer-drop-target');reorderLayer(e.dataTransfer.getData('text/plain'),l.id);};
     wrap.appendChild(d);});
-  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);if(!l){textControls?.classList.add('hidden');return;}
+  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);
+  window.dispatchEvent(new CustomEvent('mqd:selection-changed',{detail:mobileSelection()}));
+  if(!l){textControls?.classList.add('hidden');return;}
   // Lightweight Jacket 2D editor gets a little more sizing range without
   // changing any garment geometry or any other product's controls.
   $('layerScale').max=String(Math.round(maxLayerScale(l)*100));
@@ -1970,14 +1976,14 @@ function selectProduct(id,{preview=false,reason='product-select'}={}){
   product=catalog.find(p=>p.id===id)||catalog[0];
   activeZone=product.zones[0];
   activeLayerId=zoneState().layers.at(-1)?.id||null;
-  editorZoom=1;
+  editorZoom=defaultEditorZoom();
   preloadTemplates();
   renderAll();
   window.dispatchEvent(new CustomEvent('mqd:product-changed',{detail:{productId:product.id,productName:product.name,reason}}));
   loadGarment();
   if(preview)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('mqd:show-preview',{detail:{productId:product.id,reason}})));
 }
-function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=1;ensureTemplateImage(z);renderAll();}
+function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=defaultEditorZoom();ensureTemplateImage(z);renderAll();}
 const MAX_ZONE_LAYERS=6;
 function canAddLayer(zone=activeZone){const z=zoneState(zone);if(z.layers.length>=MAX_ZONE_LAYERS){alert(`This print zone can have up to ${MAX_ZONE_LAYERS} layers.`);return false;}return true;}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
@@ -2213,7 +2219,11 @@ function handleLayerDeleteKey(e){if(!e||!['Delete','Backspace'].includes(e.key)|
 document.addEventListener('keydown',handleLayerDeleteKey);
 $('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=deleteActiveLayer;$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
-function pointerToCanvas(e){const r=editorCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*editorCanvas.width/r.width,y:(e.clientY-r.top)*editorCanvas.height/r.height};}
+function pointerToCanvas(e){
+  const r=editorCanvas.getBoundingClientRect(),x=(e.clientX-r.left)*editorCanvas.width/r.width,y=(e.clientY-r.top)*editorCanvas.height/r.height;
+  if(!mobileEditorView())return{x,y};
+  return{x:editorCanvas.width/2+(x-editorCanvas.width/2)/editorZoom,y:editorCanvas.height/2+(y-editorCanvas.height/2)/editorZoom};
+}
 function layerAtCanvasPoint(p){
   for(const l of [...zoneState().layers].reverse()){
     if(l.visible===false)continue;
@@ -2240,7 +2250,40 @@ function localDragDelta(dx,dy,rotation=0){
 function clampCropValue(value,opposite){
   return Math.max(0,Math.min(.88-Math.max(0,Number(opposite)||0),value));
 }
+const editorTouches=new Map();
+let layerPinch=null,waitForTouchRelease=false;
+function touchPair(){return[...editorTouches.values()].slice(0,2);}
+function beginLayerPinch(){
+  const l=activeLayer(),q=activeLayerScreenRect(l),points=touchPair();
+  if(!l||!q||l.visible===false||isLockedLibraryLayer(l)||cropMode||points.length!==2)return;
+  const[a,b]=points,distance=Math.hypot(b.x-a.x,b.y-a.y);
+  if(distance<1)return;
+  // The first finger already captured undo when it started a drag.
+  if(!dragState)snapshot();
+  layerPinch={layer:l,distance,center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,bounds:q.b||editorRect()};
+  dragState=null;waitForTouchRelease=true;
+  editorCanvas.classList.add('dragging');
+}
+function updateLayerPinch(){
+  const points=touchPair(),l=activeLayer();
+  if(!layerPinch||points.length!==2||l!==layerPinch.layer||isLockedLibraryLayer(l))return;
+  const[a,b]=points,distance=Math.hypot(b.x-a.x,b.y-a.y),center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+  l.scale=Math.max(.05,Math.min(maxLayerScale(l),layerPinch.scale*distance/layerPinch.distance));
+  l.x=Math.max(-100,Math.min(100,layerPinch.x+(center.x-layerPinch.center.x)/Math.max(1,layerPinch.bounds.w)*200));
+  l.y=Math.max(-100,Math.min(100,layerPinch.y+(center.y-layerPinch.center.y)/Math.max(1,layerPinch.bounds.h)*200));
+  drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
+}
 editorCanvas.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch'&&window.matchMedia('(max-width:850px)').matches){
+    editorTouches.set(e.pointerId,pointerToCanvas(e));
+    editorCanvas.setPointerCapture(e.pointerId);
+    if(editorTouches.size>1){
+      e.preventDefault();
+      if(editorTouches.size===2&&!waitForTouchRelease)beginLayerPinch();
+      return;
+    }
+    if(waitForTouchRelease)return;
+  }
   const p=pointerToCanvas(e),current=activeLayer(),currentRect=activeLayerScreenRect(),near=(x,y)=>Math.hypot(p.x-x,p.y-y)<=22;
   const currentGeometry=current&&currentRect?selectionGeometry(current,currentRect):null;
   const onHandle=currentGeometry&&!isLockedLibraryLayer(current)&&(cropMode&&current.type==='image'?currentGeometry.cropHandles.some(h=>near(h.x,h.y)):near(currentGeometry.rotateHandle.x,currentGeometry.rotateHandle.y)||currentGeometry.resizeHandles.some(h=>near(h.x,h.y)));
@@ -2264,11 +2307,16 @@ editorCanvas.addEventListener('pointerdown',e=>{
       if(hit)mode='resize';
     }
   }
-  dragState={mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,rotation:Number(l.rotation)||0,startAngle:Math.atan2(p.y-q.cy,p.x-q.cx),crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};
+  dragState={pointerId:e.pointerId,mode,corner,start:p,x:Number(l.x)||0,y:Number(l.y)||0,scale:Number(l.scale)||1,rotation:Number(l.rotation)||0,startAngle:Math.atan2(p.y-q.cy,p.x-q.cx),crop:{...(l.crop||{left:0,top:0,right:0,bottom:0})},q};
   editorCanvas.setPointerCapture(e.pointerId);editorCanvas.classList.add('dragging');
 });
 editorCanvas.addEventListener('pointermove',e=>{
-  if(!dragState)return;const l=activeLayer();if(!l)return;
+  if(editorTouches.has(e.pointerId)){
+    editorTouches.set(e.pointerId,pointerToCanvas(e));
+    if(layerPinch){e.preventDefault();updateLayerPinch();return;}
+    if(editorTouches.size>1||waitForTouchRelease)return;
+  }
+  if(!dragState||dragState.pointerId!==e.pointerId)return;const l=activeLayer();if(!l)return;
   const p=pointerToCanvas(e),q=dragState.q,b=q.b||editorRect(),dx=p.x-dragState.start.x,dy=p.y-dragState.start.y;
   if(dragState.mode==='move'){
     l.x=Math.max(-100,Math.min(100,dragState.x+dx/Math.max(1,b.w)*200));l.y=Math.max(-100,Math.min(100,dragState.y+dy/Math.max(1,b.h)*200));
@@ -2290,7 +2338,15 @@ editorCanvas.addEventListener('pointermove',e=>{
   }
   drawEditor();renderLayerPanel();renderPrintQuality();scheduleGarmentPreview();
 });
-editorCanvas.addEventListener('pointerup',e=>{dragState=null;try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}editorCanvas.classList.remove('dragging');});
+function endEditorPointer(e){
+  editorTouches.delete(e.pointerId);
+  if(layerPinch||waitForTouchRelease){layerPinch=null;dragState=null;if(!editorTouches.size)waitForTouchRelease=false;}
+  else if(dragState?.pointerId===e.pointerId)dragState=null;
+  try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}
+  if(!dragState&&!layerPinch)editorCanvas.classList.remove('dragging');
+}
+editorCanvas.addEventListener('pointerup',endEditorPointer);
+editorCanvas.addEventListener('pointercancel',endEditorPointer);
 
 function designJSON(){
  const clean=JSON.parse(JSON.stringify(designs,function(k,v){if(k==='image'||k==='backgroundOriginalSrc')return undefined;if(k==='src'&&this?.libraryAssetId)return undefined;return v;}));
@@ -2313,7 +2369,7 @@ async function loadDesignPayload(payload,{notify=true}={}){
  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design.');
  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
- recomputeLayerSeq();repairImageObjects();editorZoom=1;renderAll();loadGarment();
+ recomputeLayerSeq();repairImageObjects();editorZoom=defaultEditorZoom();renderAll();loadGarment();
  if(notify)alert('Design loaded.');
 }
 function refreshMobileWorkspace(pane){
@@ -2327,7 +2383,11 @@ function refreshMobileWorkspace(pane){
  }
  return false;
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+function mobileSelection(){
+ const l=activeLayer();
+ return{productId:product.id,zone:activeZone,id:l?.id||null,type:l?.type||null,label:l?.label||'',text:l?.text||'',filename:l?.filename||'',visible:l?.visible!==false,locked:isLockedLibraryLayer(l)};
+}
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
