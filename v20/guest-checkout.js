@@ -1,4 +1,5 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
+import {garmentPrice,pricingEpoch} from './promotion-pricing.js';
 
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
@@ -62,7 +63,7 @@ function withTimeout(promise,ms,message){
   ]).finally(()=>clearTimeout(timer));
 }
 function cartItems(){
-  try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');return Array.isArray(items)?items:[];}catch{return[];}
+  try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');return Array.isArray(items)?items.map(item=>({...item,price:priceFor(item.productId,item.price)})):[];}catch{return[];}
 }
 function writeCart(items){
   localStorage.setItem('mqd-cart',JSON.stringify(items));
@@ -73,7 +74,7 @@ function updateCartButton(items=cartItems()){
   const button=document.getElementById('cartButton');
   if(button)button.textContent='Cart ('+items.reduce((sum,item)=>sum+(Number(item.totalQuantity)||1),0)+')';
 }
-function priceFor(id,fallback=0){return Object.prototype.hasOwnProperty.call(PRICES,id)?PRICES[id]:Number(fallback)||0;}
+function priceFor(id,fallback=0){return garmentPrice(id,fallback);}
 function sizesForProduct(id){if(NO_SIZE_PRODUCTS.has(id))return[];return id==='shorts'?SHORTS_SIZES:STANDARD_SIZES;}
 function selectedOrderOptions(){
   const productId=document.getElementById('productSelect')?.value||'';
@@ -304,7 +305,7 @@ async function runGuestCheckout(button){
     if(items.some(item=>!/^MQD-[A-Z0-9]{6,20}$/.test(String(item.orderNumber||''))))throw new Error('One or more cart items need to be re-added before checkout.');
     if(TEST_MODE&&items.some(item=>item.sandboxTest!==true))throw new Error('Your cart contains regular checkout items. Clear the cart and add a fresh test item while the SANDBOX TEST banner is visible.');
     if(!TEST_MODE&&items.some(item=>item.sandboxTest===true))throw new Error('Your cart contains a Stripe sandbox test item. Remove it before using live checkout.');
-    const signature=items.map(item=>item.orderNumber).sort().join('|');
+    const signature=pricingEpoch()+'|'+items.map(item=>item.orderNumber).sort().join('|');
     let state={};
     try{state=JSON.parse(localStorage.getItem(CHECKOUT_STATE_KEY)||'{}');}catch{}
     if(state.signature!==signature||!/^[0-9a-f-]{36}$/i.test(String(state.token||''))){

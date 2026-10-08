@@ -1,5 +1,6 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {shippingCentsForQuantity} from './checkout-pricing.js';
+import {garmentPrice,halloweenActive,BASE_CENTS,pricingEpoch} from './promotion-pricing.js';
 
 const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
@@ -124,12 +125,12 @@ function renderOrderSummary(){
   const subtotal=(priceFor(currentProductId())*quantity).toFixed(2);
   const detail=document.createElement('div');detail.textContent=sizes;
   const total=document.createElement('strong');total.textContent=`${quantity} ${quantity===1?'item':'items'} · $${subtotal}`;
-  const note=document.createElement('div');note.textContent='Estimated subtotal before shipping and tax';
+  const note=document.createElement('div');note.textContent=halloweenActive()?'Halloween Special: 20% off included. Before shipping and tax.':'Estimated subtotal before shipping and tax';
   summary.replaceChildren(detail,total,note);
 }
 
 function sleep(ms=0){return new Promise(r=>setTimeout(r,ms));}
-function priceFor(id,fallback=0){return Object.prototype.hasOwnProperty.call(MQD_PRICES,id)?MQD_PRICES[id]:Number(fallback)||0;}
+function priceFor(id,fallback=0){return garmentPrice(id,fallback);}
 
 function syncStoredCatalogPrices(){
   try{
@@ -149,10 +150,10 @@ function applyPriceOverridesToUI(){
   const sel=$('productSelect');
   if(!sel)return;
   for(const option of sel.options){
-    const price=MQD_PRICES[option.value];
-    if(price==null)continue;
-    const base=option.textContent.replace(/\s+—\s+\$[0-9,.]+(?:\.\d{2})?$/,'');
-    const target=`${base} — $${price.toFixed(2)}`;
+    const price=priceFor(option.value);
+    if(!Object.prototype.hasOwnProperty.call(BASE_CENTS,option.value))continue;
+    const base=option.textContent.replace(/\s+—\s+\$.*$/,'');
+    const target=`${base} — $${price.toFixed(2)}${halloweenActive()?` (was $${(BASE_CENTS[option.value]/100).toFixed(2)})`:""}`;
     if(option.textContent!==target)option.textContent=target;
   }
 }
@@ -717,7 +718,7 @@ async function checkoutCart(){
   }
   if(!requireAccount('Sign in before continuing to secure checkout.',checkoutCart))return;
 
-  const signature=items.map(x=>x.orderNumber).sort().join('|');
+  const signature=pricingEpoch()+'|'+items.map(x=>x.orderNumber).sort().join('|');
   let checkoutState={};
   try{checkoutState=JSON.parse(localStorage.getItem('mqd-checkout-request')||'{}');}catch{}
   if(checkoutState.signature!==signature||!checkoutState.token){
@@ -970,6 +971,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     applyPriceOverridesToUI();
     renderOrderOptions();
   });
+  window.addEventListener('mqd:pricing-changed',()=>{applyPriceOverridesToUI();renderOrderSummary();if(!$('cartOverlay')?.classList.contains('hidden'))renderCart();});
   renderOrderOptions();
   $('orderOptionRows')?.addEventListener('input',renderOrderSummary);
   $('orderOptionRows')?.addEventListener('change',renderOrderSummary);

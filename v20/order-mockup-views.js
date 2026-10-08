@@ -150,5 +150,5 @@
     }
     return nativeFetch(input,init);
   };
-  import('/v20/guest-checkout.js?v=20261001-materialized-upload').catch(error=>console.error('MQD guest checkout module failed to load',error));
+  import('/v20/guest-checkout.js?v=20261008-halloween').catch(error=>console.error('MQD guest checkout module failed to load',error));
 })();
