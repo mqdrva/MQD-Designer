@@ -10,9 +10,16 @@
 
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const safePart=value=>String(value||'artwork').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,100);
-  const nextFrames=(win,count=2)=>new Promise(resolve=>{
-    const tick=()=>count--<=0?resolve():win.requestAnimationFrame(tick);
-    win.requestAnimationFrame(tick);
+  async function withTimeout(work,ms,message){
+    let timer;
+    try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);})]);}
+    finally{clearTimeout(timer);}
+  }
+  const nextFrames=(win,count=2)=>new Promise((resolve,reject)=>{
+    let frame;
+    const timer=setTimeout(()=>{win.cancelAnimationFrame(frame);reject(new Error('Preview rendering paused; using the saved mockup.'));},5000);
+    const tick=()=>{if(count--<=0){clearTimeout(timer);resolve();}else frame=win.requestAnimationFrame(tick);};
+    frame=win.requestAnimationFrame(tick);
   });
   function dataUrl(blob){
     return new Promise((resolve,reject)=>{
@@ -47,7 +54,7 @@
   async function libraryAsset(productId,zone,assetId,cache){
     const key=`${productId}::${zone}`;
     if(!cache.has(key))cache.set(key,(async()=>{
-      const response=await nativeFetch(LIBRARY_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'catalog',productId,zone})});
+      const response=await nativeFetch(LIBRARY_URL,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'catalog',productId,zone}),signal:AbortSignal.timeout(10000)});
       if(!response.ok)return[];
       const result=await response.json().catch(()=>({}));return Array.isArray(result.assets)?result.assets:[];
     })());
@@ -103,8 +110,8 @@
       const win=frame.contentWindow,doc=frame.contentDocument,started=Date.now();
       while(!win?.MQDDesigner?.loadDesign&&Date.now()-started<12000)await sleep(80);
       if(!win?.MQDDesigner?.loadDesign)throw new Error('Preview renderer is not ready.');
-      await win.MQDDesigner.loadDesign(payload,{notify:false});
-      try{await doc.fonts?.ready;}catch{}
+      await withTimeout(win.MQDDesigner.loadDesign(payload,{notify:false}),15000,'Saved design preview load timed out.');
+      try{await withTimeout(doc.fonts?.ready,3000,'Preview fonts timed out.');}catch{}
       const canvas=doc.getElementById('webgl');if(!canvas)throw new Error('3D preview canvas is unavailable.');
       await waitForGarment(canvas);await sleep(900);await nextFrames(win,3);
       const output=[];
@@ -116,7 +123,7 @@
         }else if(i>0){
           await quarterOrbit(frame,canvas);
         }
-        output.push({view,blob:await canvasPng(canvas)});
+        output.push({view,blob:await withTimeout(canvasPng(canvas),5000,'Preview PNG timed out.')});
       }
       return output;
     }finally{frame.remove();}
