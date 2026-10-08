@@ -1,0 +1,9 @@
+/* Keep header menus above sticky designer tabs, but below modal dialogs. */
+body > header{z-index:40;overflow:visible}
+body > header .help-menu{z-index:1}
+body > header .help-menu nav{z-index:2}
+.site-apparel-link{display:inline-flex;align-items:center;text-decoration:none;white-space:nowrap;font-size:12px}
+/* The mobile Menu already contains the actions; expand Help within that panel. */
+@media(max-width:850px){
+  .mobile-studio-menu .help-menu nav{position:static;width:100%;box-sizing:border-box;margin-top:8px;max-height:50dvh;overflow-y:auto}
+}
