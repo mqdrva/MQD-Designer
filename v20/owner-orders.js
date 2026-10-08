@@ -58,7 +58,12 @@ async function startAdmin(){
 
 function downloadBlob(filename,blob){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function downloadJSON(filename,value){downloadBlob(filename,new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));}
-async function fetchBlob(url){const response=await fetch(url);if(!response.ok)throw new Error(`Download failed (${response.status})`);return await response.blob();}
+async function fetchBlob(url){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+  try{const response=await fetch(url,{signal:controller.signal});if(!response.ok)throw new Error(`Download failed (${response.status})`);return await response.blob();}
+  catch(error){if(controller.signal.aborted)throw new Error('A saved file took too long to download. Please try again.');throw error;}
+  finally{clearTimeout(timer);}
+}
 function zoneMetadata(detail){const zones=detail?.order?.design_json?.design?.zones||{};return Object.fromEntries(Object.entries(zones).map(([zone,state])=>[zone,{backgroundHex:detail.order.background_colors?.[zone]||state?.background||'#FFFFFF',layers:(state?.layers||[]).map(layer=>{const copy={...layer};delete copy.src;delete copy.image;return copy;})}]));}
 
 function renderItems(items=[]){
