@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
 import { shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
+import { garmentPriceCents, pricingEpoch, halloweenActive } from "../_shared/mqd-promotion-pricing.js";
 
 const SITE_URL = "https://mymerchnow.app/";
 const LEGACY_SITE_ORIGIN = "https://mqd-designer-vercel.vercel.app";
@@ -137,11 +138,14 @@ Deno.serve(async (req: Request) => {
     const itemsByOrder = new Map((itemRows || []).map((row: any) => [row.order_id, row]));
     if (orders.some((order: any) => !itemsByOrder.has(order.id))) return json(req, { error: "A cart item is missing its production details" }, 409);
 
+    const pricingTime = Date.now();
+    const promotionId = pricingEpoch(pricingTime);
     const lineItems: any[] = [];
     let totalQuantity = 0;
     for (const order of orders as any[]) {
       const catalog = CATALOG[order.product_id];
       if (!catalog) return json(req, { error: `Checkout is not configured for ${order.product_id}` }, 409);
+      const unitCents = garmentPriceCents(order.product_id, pricingTime);
       const item: any = itemsByOrder.get(order.id);
       if (item.product_id !== order.product_id) return json(req, { error: "A cart item failed product verification" }, 409);
       const options = normalizedOptions(item, catalog);
@@ -150,7 +154,7 @@ Deno.serve(async (req: Request) => {
         lineItems.push({
           price_data: {
             currency: "usd",
-            unit_amount: catalog.cents,
+            unit_amount: unitCents,
             product_data: {
               name: option.size ? `${catalog.name} — Size ${option.size}` : catalog.name,
               metadata: { order_number: order.order_number, product_id: order.product_id }
@@ -161,12 +165,12 @@ Deno.serve(async (req: Request) => {
       }
       stage = "update-order-price";
       const { error: canonicalError } = await supabase.from("mqd_orders")
-        .update({ product_name: catalog.name, product_price: catalog.cents / 100, stripe_payment_status: "unpaid" })
+        .update({ product_name: catalog.name, product_price: unitCents / 100, stripe_payment_status: "unpaid" })
         .eq("id", order.id);
       if (canonicalError) throw canonicalError;
       stage = "update-item-price";
       const { error: itemPriceError } = await supabase.from("mqd_order_items")
-        .update({ product_name: catalog.name, unit_price: catalog.cents / 100 })
+        .update({ product_name: catalog.name, unit_price: unitCents / 100 })
         .eq("id", item.id).eq("order_id", order.id);
       if (itemPriceError) throw itemPriceError;
     }
@@ -185,7 +189,9 @@ Deno.serve(async (req: Request) => {
       order_numbers: orderNumbers.join(","),
       checkout_token: checkoutToken,
       item_quantity: String(totalQuantity),
-      shipping_cents: String(shippingCents)
+      shipping_cents: String(shippingCents),
+        promotion_id: promotionId,
+        discount_percent: halloweenActive(pricingTime) ? "20" : "0"
     };
     if (allOwnedByUser) metadata.mqd_user_id = user.id;
 
@@ -210,7 +216,7 @@ Deno.serve(async (req: Request) => {
       payment_intent_data: { metadata },
       integration_identifier: integrationIdentifier(checkoutToken)
     }, {
-      idempotencyKey: `mqd-guest-checkout-${allOwnedByUser ? user.id : guestHash.slice(0, 20)}-${checkoutToken}`
+      idempotencyKey: `mqd-guest-checkout-${allOwnedByUser ? user.id : guestHash.slice(0, 20)}-${checkoutToken}-${promotionId}`
     });
     if (!session.url || !session.id.startsWith("cs_live_")) throw new Error("Stripe did not return a live checkout session");
 

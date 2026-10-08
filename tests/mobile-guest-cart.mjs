@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {garmentPrice,pricingEpoch} from '../v20/promotion-pricing.js';
 
 const source=readFileSync(new URL('../v20/guest-checkout.js',import.meta.url),'utf8')
-  .replace(/^import \{createClient\}.*\n/,'');
+  .replace(/^import .*\n/gm,'');
 const saved=new Map();
 const cartButton={textContent:'Cart (0)'};
 const addButton={textContent:'Add to Cart',disabled:false};
@@ -44,7 +45,7 @@ const document={
   addEventListener(){},
   readyState:'loading'
 };
-const context=vm.createContext({
+const context=vm.createContext({garmentPrice,pricingEpoch,
   createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(){}}}),
   document,
   window:{matchMedia:()=>({matches:true}),MQDDesigner:{exportDesign:()=>({product:{id:'short-sleeve-polo',name:'Short Sleeve Polo'},design:{zones:{Front:{layers:[{id:'artwork-1',type:'image',filename:'test.png',src:'data:image/png;base64,iVBORw0KGgo='}]}}}})},fetch:async()=>{throw new Error('Mobile must use XMLHttpRequest');}},

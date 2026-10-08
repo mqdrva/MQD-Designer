@@ -59,6 +59,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify Halloween pricing and all checkout paths
+        run: node tests/halloween-promotion.mjs
       - name: Verify mobile artwork upload and retry behavior
         run: node tests/mobile-guest-cart.mjs
       - name: Verify mobile artwork pinch gestures
