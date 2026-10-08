@@ -15,6 +15,7 @@ function update(){
  if(!banner){banner=document.createElement('div');banner.id='halloweenSpecial';banner.setAttribute('role','note');document.body.prepend(banner);}
  banner.hidden=!active;
  banner.textContent='Halloween Special: 20% off all 12 garments • Ends Oct 31, 2026 at 11:59 PM Eastern • Automatically applied';
+ document.documentElement.style.setProperty('--mqd-promotion-height',active?banner.getBoundingClientRect().height+'px':'0px');
  document.querySelectorAll('.link-card[href]').forEach(card=>{
   const id=productPages[card.getAttribute('href').split('/').pop()];if(!id)return;
   let price=card.querySelector('.garment-price');if(!price){price=document.createElement('p');price.className='garment-price';card.append(price);}
@@ -34,5 +35,6 @@ function showPrice(el,id,active){
  const current=document.createElement('strong');current.textContent='$'+garmentPrice(id).toFixed(2);el.append(current,active?' · 20% off':'');
 }
 window.addEventListener('focus',update);
+window.addEventListener('resize',update);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)update();});
 update();
