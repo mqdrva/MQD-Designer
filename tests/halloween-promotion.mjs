@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import * as pricing from '../v20/promotion-pricing.js';
+import * as everyday from '../supabase/functions/_shared/mqd-everyday.js';
 import {shippingCentsForQuantity} from '../v20/checkout-pricing.js';
 const {BASE_CENTS,HALLOWEEN_END,HALLOWEEN_START,garmentPriceCents,halloweenActive,pricingEpoch}=pricing;
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
@@ -37,7 +38,7 @@ async function checkout(slug,now,{badOwner=false,badSize=false}={}){
  }
  const env={SUPABASE_URL:'https://qa.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-fixture-only',MQD_STRIPE_SECRET_KEY:'sk_live_fixture',MQD_STRIPE_TEST_SECRET_KEY:'sk_test_fixture'};
  const context=vm.createContext({
-  ...pricing,shippingCentsForQuantity,Stripe,crypto,Request,Response,URL,TextEncoder,console,
+  ...pricing,...everyday,shippingCentsForQuantity,Stripe,crypto,Request,Response,URL,TextEncoder,console,
   Date:class extends Date{static now(){return now;}},
   createClient:()=>({auth:{getUser:async()=>({data:{user:{id:'qa-user',email:'qa@example.invalid',app_metadata:{role:'admin'}}},error:null})},from:table=>new Query(table),rpc:async()=>({data:test?'sk_test_fixture':'sk_live_fixture',error:null})}),
   Deno:{env:{get:name=>env[name]},serve:fn=>{handler=fn;}}

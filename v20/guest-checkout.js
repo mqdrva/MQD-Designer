@@ -282,6 +282,7 @@ async function addGuestToCart(button){
 }
 function checkoutFailureMessage(result,status){
   const detail=String(result?.error||'');
+  if(/^Everyday|^Artwork exceeds|^Choose an approved Everyday/.test(detail))return detail+' Your cart is retained.';
   const reference=detail.match(/\bReference:\s*([0-9a-f-]{36})/i)?.[1]||'';
   const pendingApproval=status===503||/Checkout failed at stripe-session/i.test(detail);
   const base=TEST_MODE

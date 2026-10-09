@@ -23,6 +23,7 @@ Deno.serve(async(req:Request)=>{
   const form=await req.formData(),raw=String(form.get('payload')||'');
   if(!raw||raw.length>2_000_000)return json({error:'Invalid design payload'},400);
   const payload=JSON.parse(raw),p=payload?.product,designId=String(payload?.designId||'');
+  if(String(p?.id||'').startsWith('everyday-'))return json({error:'Please use the Everyday designer to submit this garment.'},400);
   if(!p?.id||!p?.name||!payload?.design?.zones||!designId)return json({error:'Incomplete design'},400);
   const libraryJobs:Array<{zone:string;layer:any;asset:any;placement:any}>=[];
   for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))for(const layer of state?.layers||[]){

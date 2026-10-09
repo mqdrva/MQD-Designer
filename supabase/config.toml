@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.stripe-mqd-webhook]
 verify_jwt = false
+
+[functions.submit-mqd-everyday-design]
+verify_jwt = false

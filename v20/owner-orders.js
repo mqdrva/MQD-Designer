@@ -1,5 +1,6 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {requireAdminMfa} from './admin-security.js?v=1';
+import {isEverydayOrder,everydayProductionZip} from './everyday-production-package.js';
 
 const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
@@ -83,14 +84,15 @@ function renderSavedDesign(saved){
 function metadataButton(label,filename,data){const button=document.createElement('button');button.type='button';button.className='file-button';button.textContent=label;button.onclick=()=>downloadJSON(filename,data);return button;}
 function renderAssets(detail){
   const host=$('assetGroups');host.innerHTML='';const assets=detail.assets||[],zoneFiles=assets.filter(a=>a.layer_type==='zone'),artwork=assets.filter(a=>a.layer_type==='image'),textAssets=assets.filter(a=>a.layer_type==='text');
-  $('zoneFallback').classList.toggle('hidden',zoneFiles.length>0);
+  $('zoneFallback').classList.toggle('hidden',isEverydayOrder(detail)||zoneFiles.length>0);
   const addGroup=(title,rows)=>{if(!rows.length)return;const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent=title;const list=document.createElement('div');list.className='asset-list';for(const asset of rows){const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent=`${asset.zone_name}${asset.original_filename?' · '+asset.original_filename:''}`;row.appendChild(label);if(asset.download_url){const a=document.createElement('a');a.href=asset.download_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.appendChild(a);}else{row.appendChild(metadataButton('Download JSON',`${safePart(asset.zone_name)}-${safePart(asset.layer_id||asset.layer_type)}.json`,asset.metadata||asset));}list.appendChild(row);}group.append(h,list);host.appendChild(group);};
-  addGroup('Captured zone files',zoneFiles);addGroup('Original artwork',artwork);addGroup('Text / layer metadata',textAssets);
-  if(detail.order?.mockup_url){const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent='Mockup';const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent='Customer 3D mockup PNG';const a=document.createElement('a');a.href=detail.order.mockup_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.append(label,a);group.append(h,row);host.prepend(group);}
+  addGroup('Captured zone files',zoneFiles);addGroup('Garment previews',assets.filter(a=>a.layer_type==='mockup-view'));addGroup('Original artwork',artwork);addGroup('Text / layer metadata',textAssets);
+  if(detail.order?.mockup_url){const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent='Mockup';const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent=isEverydayOrder(detail)?'Everyday front preview PNG':'Customer 3D mockup PNG';const a=document.createElement('a');a.href=detail.order.mockup_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.append(label,a);group.append(h,row);host.prepend(group);}
 }
 function renderDetail(detail){
   currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');$('detailContent').classList.remove('loading');$('orderOverlay').classList.remove('loading');document.querySelector('.drawer')?.classList.remove('loading');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${order.is_test===true?'TEST ORDER · ':''}${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
   const img=$('mockupImage'),missing=$('mockupMissing');if(order.mockup_url){img.src=order.mockup_url;img.classList.remove('hidden');missing.classList.add('hidden');}else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
+  $('downloadColors')?.closest('.detail-section')?.classList.toggle('hidden',isEverydayOrder(detail));
   const locked=order.is_test===true;
   const status=$('detailStatus'),carrier=$('detailCarrier'),tracking=$('detailTracking'),save=$('saveOrderUpdate');
   status.value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';carrier.value=order.shipping_carrier||'';tracking.value=order.tracking_number||'';
@@ -112,8 +114,9 @@ async function saveOrderUpdate(){
   finally{button.disabled=false;button.textContent=old;}
 }
 async function downloadProductionZip(){
-  if(!currentDetail||!window.JSZip)return;const button=$('downloadProductionZip'),old=button.textContent;button.disabled=true;button.textContent='Building ZIP…';
+  if(!currentDetail||(!isEverydayOrder(currentDetail)&&!window.JSZip))return;const button=$('downloadProductionZip'),old=button.textContent;button.disabled=true;button.textContent='Building ZIP…';
   try{
+    if(isEverydayOrder(currentDetail)){const blob=await everydayProductionZip(currentDetail,fetchBlob);downloadBlob(`${safePart(currentDetail.order.order_number)}-production.zip`,blob);return;}
     const detail=currentDetail,order=detail.order,zip=new JSZip(),root=zip.folder(`${safePart(order.order_number)}-production`);root.file('design.json',JSON.stringify(order.design_json||{},null,2));root.file('background-colors.json',JSON.stringify(order.background_colors||{},null,2));root.file('order-summary.json',JSON.stringify({orderNumber:order.order_number,status:order.ui_status,customer:{name:order.customer_name,email:order.customer_email,phone:order.customer_phone},shipping:{name:order.shipping_name,address:order.shipping_address,carrier:order.shipping_carrier,trackingNumber:order.tracking_number},items:detail.items||[],createdAt:order.created_at,paidAt:order.paid_at},null,2));
     const zones=zoneMetadata(detail);for(const [zone,data] of Object.entries(zones))root.file(`zones/${safePart(zone)}.json`,JSON.stringify(data,null,2));
     if(order.mockup_url)root.file('mockup.png',new Uint8Array(await (await fetchBlob(order.mockup_url)).arrayBuffer()));
