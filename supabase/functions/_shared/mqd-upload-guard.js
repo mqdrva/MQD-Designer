@@ -4,24 +4,51 @@ export class UploadError extends Error {
 
 // Count actual streamed bytes, including requests without Content-Length.
 export async function boundedFormData(req, maxBytes = 64 * 1024 * 1024) {
-  if (Number(req.headers.get('content-length')) > maxBytes) throw new UploadError('Design upload is too large. Maximum total upload is 64 MB.');
+  const declared = Number(req.headers.get('content-length') || 0);
+  if (declared && declared > maxBytes) throw new UploadError('Design upload is too large. Maximum total upload is 64 MB.');
   if (!req.body) throw new UploadError('Missing design upload.', 400);
+
+  const contentType = req.headers.get('content-type') || '';
+  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
+    throw new UploadError('Invalid design upload format. Please refresh and try again.', 400);
+  }
+
+  // Buffer the multipart request while enforcing the hard size cap. Parsing a
+  // re-streamed multipart body can intermittently fail in the Edge runtime on
+  // Safari/iPhone uploads even when the original request is valid.
   const reader = req.body.getReader();
+  const chunks = [];
   let total = 0;
-  const stream = new ReadableStream({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) return controller.close();
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        return controller.error(new UploadError('Design upload is too large. Maximum total upload is 64 MB.'));
-      }
-      controller.enqueue(value);
-    },
-    cancel(reason) { return reader.cancel(reason); }
-  });
-  return new Response(stream, { headers: { 'content-type': req.headers.get('content-type') || '' } }).formData();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value?.byteLength) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new UploadError('Design upload is too large. Maximum total upload is 64 MB.');
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return await new Response(bytes, { headers: { 'content-type': contentType } }).formData();
+  } catch (error) {
+    console.error('Guest multipart parse failed', {
+      contentType,
+      declaredBytes: declared || null,
+      receivedBytes: total,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    throw new UploadError('Could not read the design upload. Please try again.', 400);
+  }
 }
 
 export function validateGuestFiles(form) {

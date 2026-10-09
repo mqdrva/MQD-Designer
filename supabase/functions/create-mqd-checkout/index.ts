@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
 import { shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
 import { garmentPriceCents, pricingEpoch, halloweenActive } from "../_shared/mqd-promotion-pricing.js";
+import { isEveryday, everydayCheckout, everydayPricing, EverydayError } from "../_shared/mqd-everyday.js";
 
 const SITE_URL = "https://mymerchnow.app/";
 const LEGACY_SITE_ORIGIN = "https://mqd-designer-vercel.vercel.app";
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase
       .from("mqd_orders")
-      .select("id,order_number,status,product_id,design_id,customer_email,is_test")
+      .select("id,order_number,status,product_id,design_json,design_id,customer_email,is_test")
       .eq("user_id", user.id)
       .in("order_number", orderNumbers);
     if (orderError) throw orderError;
@@ -139,15 +140,18 @@ Deno.serve(async (req) => {
     if (orders.some((order) => !itemsByOrder.has(order.id))) return json(req, { error: "A cart item is missing its production details" }, 409);
 
     const pricingTime = Date.now();
-    const promotionId = pricingEpoch(pricingTime);
+    const hasEveryday = orders.some(order => isEveryday(order.product_id));
+    const everydayConfig = hasEveryday ? everydayPricing(Deno.env.get("MQD_EVERYDAY_PRICING")) : null;
+    const promotionId = pricingEpoch(pricingTime) + (everydayConfig ? `-everyday-${everydayConfig.version}` : "");
     const lineItems = [];
     let totalQuantity = 0;
     for (const order of orders) {
-      const catalog = CATALOG[order.product_id];
-      if (!catalog) return json(req, { error: `Checkout is not configured for ${order.product_id}` }, 409);
-      const unitCents = garmentPriceCents(order.product_id, pricingTime);
       const item = itemsByOrder.get(order.id);
       if (item.product_id !== order.product_id) return json(req, { error: "A cart item failed product verification" }, 409);
+      const everyday = isEveryday(order.product_id) ? everydayCheckout(order, item, Deno.env.get("MQD_EVERYDAY_PRICING")) : null;
+      const catalog = everyday ? everyday.catalog : CATALOG[order.product_id];
+      if (!catalog) return json(req, { error: `Checkout is not configured for ${order.product_id}` }, 409);
+      const unitCents = everyday ? everyday.unitCents : garmentPriceCents(order.product_id, pricingTime);
       const options = normalizedOptions(item, catalog);
       totalQuantity += options.reduce((sum, option) => sum + option.quantity, 0);
       for (const option of options) {
@@ -211,7 +215,8 @@ Deno.serve(async (req) => {
         item_quantity: String(totalQuantity),
         shipping_cents: String(shippingCents),
         promotion_id: promotionId,
-        discount_percent: halloweenActive(pricingTime) ? "20" : "0"
+        discount_percent: halloweenActive(pricingTime) ? "20" : "0",
+        ...(everydayConfig ? { promotion_scope: "premium-only", everyday_pricing_version: everydayConfig.version } : {})
       },
       payment_intent_data: {
         metadata: {
@@ -221,7 +226,8 @@ Deno.serve(async (req) => {
           item_quantity: String(totalQuantity),
           shipping_cents: String(shippingCents),
         promotion_id: promotionId,
-        discount_percent: halloweenActive(pricingTime) ? "20" : "0"
+        discount_percent: halloweenActive(pricingTime) ? "20" : "0",
+        ...(everydayConfig ? { promotion_scope: "premium-only", everyday_pricing_version: everydayConfig.version } : {})
         }
       },
       integration_identifier: integrationIdentifier(checkoutToken)
@@ -235,6 +241,7 @@ Deno.serve(async (req) => {
     if (sessionError) throw sessionError;
     return json(req, { ok: true, sessionId: session.id, url: session.url });
   } catch (error) {
+    if (error instanceof EverydayError) return json(req, { error: error.message }, error.status);
     const code = typeof error?.code === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(error.code) ? error.code : "unknown";
     console.error(JSON.stringify({ event: "checkout-failed", diagnosticId, stage, code }));
     return json(req, { error: `Checkout failed at ${stage} (${code}). Reference: ${diagnosticId}` }, 500);

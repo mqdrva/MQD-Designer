@@ -59,6 +59,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci
+      - name: Verify Everyday pricing, production uploads and guest cart
+        run: |
+          node tests/everyday-checkout-flow.mjs
+          node tests/everyday-ui-flow.mjs
+          node tests/everyday-contract.mjs
+          node tests/everyday-render-package.mjs
       - name: Verify Halloween pricing and all checkout paths
         run: node tests/halloween-promotion.mjs
       - name: Verify mobile artwork upload and retry behavior

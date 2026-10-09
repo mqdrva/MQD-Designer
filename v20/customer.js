@@ -162,7 +162,11 @@ function migratePriceVersion(){
   syncStoredCatalogPrices();
   const current=localStorage.getItem('mqd-price-version');
   if(current!==MQD_PRICE_VERSION){
-    localStorage.removeItem('mqd-cart');
+    // Everyday quotes have their own server-validated price version.
+    let everydayItems=[];
+    try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');if(Array.isArray(items))everydayItems=items.filter(item=>item?.range==='everyday'&&['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'].includes(item.productId));}catch{}
+    if(everydayItems.length)localStorage.setItem('mqd-cart',JSON.stringify(everydayItems));
+    else localStorage.removeItem('mqd-cart');
     localStorage.setItem('mqd-price-version',MQD_PRICE_VERSION);
   }
 }
@@ -634,6 +638,7 @@ async function retryPendingCart(){
 
 function checkoutFailureMessage(result,status){
   const detail=String(result?.error||'');
+  if(/^Everyday|^Artwork exceeds|^Choose an approved Everyday/.test(detail))return detail+' Your cart is retained.';
   const reference=detail.match(/\bReference:\s*([0-9a-f-]{36})/i)?.[1]||'';
   const pendingApproval=status===503||/Checkout failed at stripe-session/i.test(detail);
   const message=pendingApproval
@@ -996,6 +1001,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('saveDraft')?.addEventListener('click',saveDraft);
   $('addToCart')?.addEventListener('click',addToCart);
   $('cartButton')?.addEventListener('click',showCart);
+  if(new URLSearchParams(location.search).get('openCart')==='1')void showCart();
   $('closeCart')?.addEventListener('click',closeCart);
   $('cartOverlay')?.addEventListener('click',event=>{if(event.target===$('cartOverlay'))closeCart();});
   $('cartList')?.addEventListener('click',event=>{const button=event.target.closest('[data-cart-remove]');if(button)removeCartItem(Number(button.dataset.cartRemove));});
