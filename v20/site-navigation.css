@@ -5,3 +5,7 @@
 .customer-help-menu.is-open{display:grid}
 .customer-help-menu a{padding:10px;border-radius:7px;text-decoration:none;color:#333;font:650 12px/1.4 Inter,Arial,sans-serif}
 .customer-help-menu a:hover,.customer-help-menu a:focus-visible{background:#fff3ea;color:#9a4a0a;outline:0}
+
+/* Keep Custom Apparel directly accessible in the mobile Menu. */
+.top-actions>.mobile-apparel-link{display:none}
+@media(max-width:850px){.mobile-studio-menu .top-actions>.mobile-apparel-link{display:flex;justify-content:center;min-height:44px;order:-1}}
