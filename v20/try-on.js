@@ -1,10 +1,14 @@
+import { installPhotoPreviewZoom } from './photo-preview-zoom.js';
 import { everydayClient } from './everyday-account.js';
 const $=id=>document.getElementById(id),canvas=$('tryCanvas'),ctx=canvas.getContext('2d');
 const ENDPOINT='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-virtual-tryon';
 let person=null,garment=null,result=null,revision=0,request=null,busy=false,accessReady=false,accessMessage='Checking your daily try-on allowance…';
+let displayedImage=null;
+const previewZoom=installPhotoPreviewZoom(canvas,()=>!!(result||person));
 const status=text=>$('status').textContent=text;
 function draw(){
   const image=result||person;
+  if(image!==displayedImage){displayedImage=image;previewZoom.reset();}
   canvas.width=image?.width||800;canvas.height=image?.height||900;
   ctx.clearRect(0,0,canvas.width,canvas.height);if(image)ctx.drawImage(image,0,0);
   $('empty').hidden=!!image;$('download').disabled=!result;$('person').disabled=busy||!accessReady;
