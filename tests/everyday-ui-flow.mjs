@@ -17,7 +17,7 @@ function element(id = '') {
 let nodes;
 function setup() {
   nodes = new Map();
-  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
+  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadPreview','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
   for (const id of ids) nodes.set(id, element(id));
   nodes.get('printMethod').value='transfer';
   const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
@@ -81,8 +81,19 @@ assert.equal(stored.product, 'everyday-hoodie'); assert.equal(stored.quantity, 3
 assert.equal(stored.size, '4XL');
 assert.equal(stored.printMethod,'dtg');
 assert.deepEqual(Buffer.from(await stored.artwork.front.file.arrayBuffer()), Buffer.from(await original.arrayBuffer()));
-await nodes.get('downloadZip').onclick();
-assert.equal(downloads.at(-1).filename, 'everyday-hoodie-draft.zip'); assert(downloads.at(-1).blob.size > original.size);
+const { drawPreview } = await import('../v20/everyday-preview-renderer.js');
+for (const [i, selectedView] of ['front','back','left','right'].entries()) {
+  nodes.get('views').children[i].onclick(); await wait();
+  const exporting = nodes.get('downloadPreview').onclick();
+  nodes.get('views').children[(i + 1) % 4].onclick();
+  await exporting;
+  const exported = downloads.at(-1);
+  assert.equal(exported.filename, `everyday-hoodie-white-${selectedView}.png`);
+  assert.equal(exported.blob.type, 'image/png');
+  const expected = createCanvas(800,900); await drawPreview(expected, stored, selectedView);
+  assert.deepEqual(Buffer.from(await exported.blob.arrayBuffer()), expected.toBuffer('image/png'), 'Export captures clicked view with its artwork and no editing guides');
+  assert.equal(nodes.get('downloadPreview').disabled, false);
+}
 setup(); await import('../v20/everyday.js?test=restore'); await wait();
 assert.equal(nodes.get('product').value, 'everyday-hoodie'); assert.equal(nodes.get('quantity').value, 3);
 assert.equal(nodes.get('size').value,'4XL','A saved 4XL device draft restores its size');
@@ -100,7 +111,9 @@ const c = nodes.get('preview'), event = (x,y) => ({clientX:x,clientY:y,pointerId
 c.onpointerdown(event(guide.x+(textBefore.x+textBefore.width)*guide.scale,guide.y+(textBefore.y+textBefore.height)*guide.scale));
 c.onpointermove(event(guide.x+(textBefore.x+textBefore.width*.6)*guide.scale,guide.y+(textBefore.y+textBefore.height*.6)*guide.scale)); c.onpointerup();
 await wait(); await nodes.get('saveDraft').onclick(); assert(stored.artwork.front.texts[0].placement.width < textBefore.width,'Corner handles resize text');
-await nodes.get('downloadZip').onclick(); assert.equal(downloads.at(-1).filename,'everyday-hoodie-draft.zip');
+await nodes.get('downloadPreview').onclick(); assert.equal(downloads.at(-1).filename,'everyday-hoodie-white-front.png');
+const textExport = createCanvas(800,900); await drawPreview(textExport, stored, 'front');
+assert.deepEqual(Buffer.from(await downloads.at(-1).blob.arrayBuffer()), textExport.toBuffer('image/png'), 'PNG preserves text and image layers');
 nodes.get('remove').onclick(); await wait(); await nodes.get('saveDraft').onclick();
 assert.equal(stored.artwork.front.texts.length,0); assert(stored.artwork.front.file,'Removing selected text preserves image');
 const navigation = fs.readFileSync(new URL('v20/everyday-entry.js', root), 'utf8');
@@ -118,5 +131,5 @@ const filters=[];const query={select(){return this;},eq(key,value){filters.push(
 assert.equal((await customerOrders({from:()=>query},{id:'customer-id'}))[0].order_number,'MQD-OWNED');assert.deepEqual(filters,[['user_id','customer-id'],['is_test',false]]);
 await assert.rejects(customerOrders({from:()=>query},{is_anonymous:true,id:'guest'}),/Sign in/);
 URL.createObjectURL = realCreate; URL.revokeObjectURL = realRevoke;
-console.log('PASS: actual editor upload, bounds, product switching, quantity validation, original-file storage, ZIP download, draft restoration, and shared navigation.');
+console.log('PASS: actual editor upload, bounds, product switching, quantity validation, original-file storage, current-view PNG download, draft restoration, and shared navigation.');
 process.exit(0);

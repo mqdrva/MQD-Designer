@@ -1,8 +1,7 @@
-import { artworkLayers, artworkBounds, TEXT_FONTS, printArtwork } from './everyday-layers.js';
+import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
 import { connectEverydayAccount } from './everyday-account.js';
-import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork, orderSheet } from './everyday-contract.js';
+import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork } from './everyday-contract.js';
 import { PRODUCTS, zoneFor, guideFor, photoKey, bitmap, drawPreview } from './everyday-preview-renderer.js';
-import { makeZip, safeArtworkName } from './everyday-zip.js';
 import { connectEverydayCheckout } from './everyday-checkout.js';
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
@@ -198,34 +197,19 @@ canvas.onkeydown = event => {
   const delta = { ArrowLeft:[-.05,0], ArrowRight:[.05,0], ArrowUp:[0,-.05], ArrowDown:[0,.05] }[event.key]; if (!delta) return;
   event.preventDefault(); const p = layer.data.placement; layer.data.placement = constrainPlacement({ ...p, x:p.x+delta[0], y:p.y+delta[1] }, zoneFor(draft,view)); render();
 };
-$('downloadSheet').onclick = () => {
+$('downloadPreview').onclick = async () => {
+  const button = $('downloadPreview'), snapshot = structuredClone(draft), selectedView = view;
+  button.disabled = true;
   try {
-    selection(); const blob = new Blob([JSON.stringify(orderSheet(draft), null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = 'everyday-draft-measurements.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (error) { status(error.message); }
-};
-$('downloadZip').onclick = async () => {
-  const button = $('downloadZip'); button.disabled = true;
-  try {
-    selection(); const snapshot = structuredClone(draft), entries = [], sheet = orderSheet(snapshot);
-    sheet.proposedBlank = PRODUCTS[snapshot.product].proposedBlank;
-    sheet.previewSource = 'Existing premium garment geometry; approximate blank color and fit';
-    sheet.placementApproval = 'Development guides; confirm against actual blank sizes before production';
-    for (const v of VIEWS) {
-      sheet.locations[v].zone = zoneFor(snapshot, v).label;
-      status(`Building ${ZONES[v].label.toLowerCase()} preview…`);
-      const frame = document.createElement('canvas'); frame.width = 800; frame.height = 900;
-      await drawPreview(frame, snapshot, v, { draftLabel: true });
-      const preview = await new Promise((resolve, reject) => frame.toBlob(blob => blob ? resolve(blob) : reject(new Error('Preview export failed.')), 'image/png'));
-      entries.push({ name: `previews/${v}.png`, data: preview });
-      const art = snapshot.artwork[v];
-      if (art) { const file = await printArtwork(art, v), name = `${art.texts?.length ? 'prints' : 'originals'}/${v}-${safeArtworkName(file.name || art.name)}`; entries.push({ name, data:file }); sheet.locations[v].originalFile = name; if (art.texts?.length && art.file) entries.push({ name:`originals/${v}-${safeArtworkName(art.name)}`, data:art.file }); }
-    }
-    entries.push({ name: 'order-sheet.json', data: JSON.stringify(sheet, null, 2) });
-    entries.push({ name: 'READ-ME.txt', data: 'DEVELOPMENT PACKAGE — not a paid order.\nFour previews and untouched original uploads. Text zones include a transparent print PNG at 300 pixels per inch with dimensions in order-sheet.json.\nPrint measurements are in inches from the top-left of each permitted zone.\nGarment shape, color and print guide placement require approval against actual blanks.\nOriginal uploads may require production preparation.\n' });
-    const zip = await makeZip(entries), url = URL.createObjectURL(zip), a = document.createElement('a'); a.href = url; a.download = `${snapshot.product}-draft.zip`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
-    status('Draft ZIP downloaded with four previews, original uploads and measurements.');
-  } catch (error) { status(`ZIP was not downloaded: ${error.message}`); }
+    const frame = document.createElement('canvas'); frame.width = 800; frame.height = 900;
+    await drawPreview(frame, snapshot, selectedView);
+    const blob = await new Promise((resolve, reject) => frame.toBlob(value => value ? resolve(value) : reject(new Error('Preview export failed.')), 'image/png'));
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url;
+    link.download = `${snapshot.product}-${snapshot.color.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedView}.png`;
+    link.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+    status(`${zoneFor(snapshot, selectedView).label} PNG downloaded.`);
+  } catch (error) { status(`PNG was not downloaded: ${error.message}`); }
   finally { button.disabled = false; }
 };
 // Avoid edits while restoring so asynchronous storage cannot overwrite new uploads.
