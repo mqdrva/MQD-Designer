@@ -22,9 +22,11 @@ function controls() {
   const art = draft.artwork[view], zone = zoneFor(draft, view);
   $('zoneLabel').textContent = `${zone.label} · Maximum ${zone.width} × ${zone.height} inches`;
   $('artName').textContent = art?.name || 'No print';
+  $('artworkHeading').textContent = `${zone.label} artwork`;
   for (const key of ['width', 'x', 'y']) { $(key).disabled = !art; $(key).value = art ? art.placement[key].toFixed(2) : ''; }
   $('width').max = zone.width;
   $('remove').disabled = !art;
+  $('remove').textContent = `Remove from ${zone.label.toLowerCase()}`;
   $('dimensions').textContent = art ? `${art.placement.width.toFixed(2)} × ${art.placement.height.toFixed(2)} inches` : '';
   $('review').replaceChildren(...VIEWS.map(v => { const li = document.createElement('li'), a = draft.artwork[v]; li.textContent = `${zoneFor(draft, v).label}: ${a ? `${a.name} (${a.placement.width.toFixed(2)} × ${a.placement.height.toFixed(2)} in)` : 'No print'}`; return li; }));
   for (const button of $('views').children) { button.textContent = zoneFor(draft, button.dataset.view).label; button.setAttribute('aria-pressed', String(button.dataset.view === view)); }
@@ -109,7 +111,7 @@ for (const key of ['width', 'x', 'y']) $(key).onchange = () => {
     art.placement = key === 'width' ? resizeArtwork(art.placement, value, zoneFor(draft, view)) : constrainPlacement({ ...art.placement, [key]: value }, zoneFor(draft, view)); render();
   } catch (error) { status(error.message); controls(); }
 };
-$('remove').onclick = () => { delete draft.artwork[view]; render(); };
+$('remove').onclick = () => { delete draft.artwork[view]; status(`Artwork removed from ${zoneFor(draft, view).label.toLowerCase()}. Other zones are unchanged.`); render(); };
 function point(event) { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * 800 / rect.width, y: (event.clientY - rect.top) * 900 / rect.height }; }
 canvas.onpointerdown = event => {
   const art = draft.artwork[view]; if (!art || busy) return;
