@@ -55,10 +55,10 @@ nodes.get('quantity').value = '99'; nodes.get('quantity').onchange(); nodes.get(
 nodes.get('quantity').value = '1'; nodes.get('quantity').onchange();
 nodes.get('colorChoices').children.find(button => button.dataset.value === 'White').onclick(); await wait();
 nodes.get('productChoices').children.find(button => button.dataset.value === 'everyday-polo').onclick(); await wait();
-assert(nodes.get('color').children.some(option => option.value === 'Dark Heather'));
-assert(!nodes.get('color').children.some(option => option.value === 'Charcoal'));
-assert(nodes.get('colorChoices').children.some(button => button.dataset.value === 'Dark Heather'));
-assert(!nodes.get('colorChoices').children.some(button => button.dataset.value === 'Charcoal'));
+assert(nodes.get('color').children.some(option => option.value === 'Light Blue'));
+assert(nodes.get('color').children.some(option => option.value === 'Charcoal'));
+assert(nodes.get('colorChoices').children.some(button => button.dataset.value === 'Light Blue'));
+assert(nodes.get('colorChoices').children.some(button => button.dataset.value === 'Charcoal'));
 assert(nodes.get('zoneLabel').textContent.includes('Left chest · Maximum 3 × 3'));
 assert.equal(nodes.get('views').children[0].textContent, 'Left chest');
 const logo = createCanvas(200, 100); logo.getContext('2d').fillStyle = '#ffffff'; logo.getContext('2d').fillRect(0, 0, 200, 100);

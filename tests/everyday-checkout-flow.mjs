@@ -8,7 +8,7 @@ import * as everyday from '../supabase/functions/_shared/mqd-everyday.js';
 import * as promotion from '../supabase/functions/_shared/mqd-promotion-pricing.js';
 import * as shipping from '../supabase/functions/_shared/mqd-shipping.js';
 import { everydayProductionZip } from '../v20/everyday-production-package.js';
-import { SIZES, colorsForProduct } from '../v20/everyday-contract.js';
+import { SIZES, colorsForProduct, sizesForProduct } from '../v20/everyday-contract.js';
 import { zoneFor } from '../v20/everyday-preview-renderer.js';
 const { createCanvas, loadImage } = await import(process.env.EVERYDAY_CANVAS_MODULE || '@napi-rs/canvas');
 const root = new URL('../', import.meta.url), read = path => fs.readFileSync(new URL(path, root), 'utf8');
@@ -23,10 +23,10 @@ const guestToken = 'd6098f67-c597-4335-9043-eef71dcdcc64';
 const guestHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(guestToken))).toString('hex');
 function draft(product = 'everyday-tshirt',size = '4XL') { return { product, color: 'Royal', size, quantity: 3, photos: {}, artwork: Object.fromEntries(everyday.EVERYDAY_VIEWS.map(view => [view, { name: original.name, file: original, placement: { x: .25, y: .5, width: 2, height: 2 } }])) }; }
 // Verify the owner-approved per-garment method fees and method-specific back fee.
-for (const product of Object.keys(everyday.EVERYDAY_CATALOG)) for (const size of SIZES) {
+for (const product of Object.keys(everyday.EVERYDAY_CATALOG)) for (const size of sizesForProduct(product, 'Royal')) {
   for (const [printMethod, methodFee, backFee] of [['transfer',0,1000],['dtf',500,500],['dtg',1000,500]]) {
     const sample = { ...draft(product,size), printMethod };
-    const extraSize = ['2XL','3XL','4XL'].includes(size) ? 500 : 0;
+    const extraSize = ['2XL','3XL','4XL','5XL','6XL'].includes(size) ? 500 : 0;
     const expected = pricing.baseCents[product] + extraSize + methodFee + backFee + 500;
     const clientQuote = draftQuote(sample,pricing);
     assert.equal(clientQuote.unitCents,expected);
@@ -40,7 +40,7 @@ for (const product of Object.keys(everyday.EVERYDAY_CATALOG)) for (const size of
   }
 }
 for(const [id,catalog] of Object.entries(everyday.EVERYDAY_CATALOG)) {
-  assert.deepEqual(catalog.sizes,SIZES);
+  assert.deepEqual(catalog.sizes, sizesForProduct(id, 'Royal'));
   assert.deepEqual(catalog.colors,colorsForProduct(id));
   for(const size of ['S','M','L','XL']) {
     assert.equal(draftQuote(draft(id,size),pricing).sizeCents,0);
@@ -59,7 +59,7 @@ for(const [id,catalog] of Object.entries(everyday.EVERYDAY_CATALOG)) {
     }
   }
 }
-await assert.rejects(()=>buildEverydaySubmission(draft('everyday-tshirt','5XL'),pricing),/approved Everyday size/);
+await assert.rejects(()=>buildEverydaySubmission(draft('everyday-polo','5XL'),pricing),/approved Everyday size/);
 for (const [id, cents] of [['everyday-tshirt',4000],['everyday-long-sleeve',5000],['everyday-hoodie',6000],['everyday-polo',5000]]) assert.equal(draftQuote(draft(id), pricing).unitCents,cents);
 const oneSleeve = draft(); delete oneSleeve.artwork.right;
 assert.equal(draftQuote(oneSleeve,pricing).unitCents,draftQuote(draft(),pricing).unitCents,'Sleeve bundle charges once');
@@ -90,23 +90,23 @@ const firstForm = await formFor(), replayForm = new FormData(); for(const [key,v
 const response = await submit(request(firstForm)); assert.equal(response.status,200,await response.clone().text());
 const result = await response.json(), saved = db.mqd_orders[0];
 assert.equal(saved.design_json.productionReady,true); assert.equal(saved.product_price,40); assert.deepEqual(saved.background_colors,{}); assert.equal(saved.guest_checkout_token_hash,guestHash);
-assert.equal(saved.design_json.everyday.blankStyle,'Gildan 5000');assert.equal(saved.design_json.everyday.size,'4XL');assert.equal(db.mqd_order_items[0].order_options[0].size,'4XL');
+assert.equal(saved.design_json.everyday.blankStyle,'Gildan 3000');assert.equal(saved.design_json.everyday.size,'4XL');assert.equal(db.mqd_order_items[0].order_options[0].size,'4XL');
 assert.equal(saved.design_json.quote.sizeCents,500);
 assert.equal(db.mqd_order_assets.length,8); assert.equal(blobs.size,8);
 const replay = await submit(request(replayForm)); assert.equal(replay.status,200);assert.equal((await replay.json()).orderNumber,result.orderNumber);assert.equal(db.mqd_orders.length,1);assert.equal(db.mqd_order_assets.length,8);
 const stalePrice = await submit(request(await formFor(draft(),p=>{p.quote.version='everyday-v1';p.quote.unitCents-=500;})));
 assert.equal(stalePrice.status,409,'A stale price cannot skip the size surcharge');
 for(const asset of db.mqd_order_assets.filter(a => a.metadata.kind === 'original-source')) assert.deepEqual(Buffer.from(await blobs.get(asset.storage_path).arrayBuffer()),Buffer.from(await original.arrayBuffer()));
-for(const mutate of [p=>p.everyday.locations.front.width=30,p=>p.everyday.color='Unlisted',p=>{p.everyday.size='5XL';p.orderOptions[0].size='5XL';},p=>p.quote.unitCents=1,p=>p.totalQuantity=1000,p=>p.everyday.locations.left.x=3]) { const before = db.mqd_orders.length; const bad = await submit(request(await formFor(draft(),mutate))); assert.equal(bad.status,mutate.toString().includes('unitCents')?409:400); assert.equal(db.mqd_orders.length,before); }
+for(const mutate of [p=>p.everyday.locations.front.width=30,p=>p.everyday.color='Unlisted',p=>{p.everyday.size='7XL';p.orderOptions[0].size='7XL';},p=>p.quote.unitCents=1,p=>p.totalQuantity=1000,p=>p.everyday.locations.left.x=3]) { const before = db.mqd_orders.length; const bad = await submit(request(await formFor(draft(),mutate))); assert.equal(bad.status,mutate.toString().includes('unitCents')?409:400); assert.equal(db.mqd_orders.length,before); }
 const missing = await formFor(); const assets = missing.getAll('asset'),meta = missing.getAll('assetMeta'); missing.delete('asset');missing.delete('assetMeta'); for(let i=1;i<assets.length;i++){missing.append('asset',assets[i]);missing.append('assetMeta',meta[i]);} assert.equal((await submit(request(missing))).status,400);
 const partial = structuredClone(saved); partial.design_json.productionReady=false; assert.throws(()=>everyday.everydayCheckout(partial,db.mqd_order_items[0],JSON.stringify(pricing)),/not ready/);
 failedUpload=true; assert.equal((await submit(request(await formFor()))).status,500); assert.equal(db.mqd_orders.at(-1).status,'cancelled'); assert.equal(db.mqd_orders.at(-1).design_json.productionReady,false); failedUpload=false;
 assert.equal((await submit(request(await formFor(),true))).status,401,'Invalid account session cannot fall through to guest');
 actor={id:'account-fixture',email:'fixture@example.invalid',app_metadata:{provider:'google',providers:['google']}};
 assert.equal((await submit(request(await formFor(draft('everyday-polo')),true))).status,200); assert.equal(db.mqd_orders.at(-1).user_id,actor.id);
-assert.equal(db.mqd_orders.at(-1).design_json.everyday.blankStyle,'Gildan 8800');
-const heatherPolo=draft('everyday-polo');heatherPolo.color='Dark Heather';assert.equal((await submit(request(await formFor(heatherPolo),true))).status,200);
-assert.equal((await submit(request(await formFor(draft('everyday-polo'),p=>p.everyday.color='Charcoal'),true))).status,400);
+assert.equal(db.mqd_orders.at(-1).design_json.everyday.blankStyle,'Gildan 64800');
+const heatherPolo=draft('everyday-polo');heatherPolo.color='Charcoal';assert.equal((await submit(request(await formFor(heatherPolo),true))).status,200);
+assert.equal((await submit(request(await formFor(draft('everyday-polo'),p=>p.everyday.color='Dark Heather'),true))).status,400);
 const signedOrder=structuredClone(db.mqd_orders.at(-1)), signedItem=structuredClone(db.mqd_order_items.at(-1));
 const legacyOrder=structuredClone(saved);
 delete legacyOrder.design_json.everyday.printMethod; delete legacyOrder.design_json.everyday.printMethodLabel;

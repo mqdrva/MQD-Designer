@@ -1,25 +1,24 @@
+import { SIZES, COLORS, PRODUCT_OPTIONS, sizesForProduct, isExtendedSize } from './mqd-everyday-catalog.js';
 export const EVERYDAY_VIEWS = ['front', 'back', 'left', 'right'];
-export const EVERYDAY_COLORS = ['White', 'Black', 'Navy', 'Royal', 'Red', 'Sport Grey', 'Charcoal', 'Forest Green', 'Purple', 'Gold'];
-export const EVERYDAY_SIZES = Object.freeze(['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL']);
+export const EVERYDAY_COLORS = COLORS;
+export const EVERYDAY_SIZES = SIZES;
 export const EVERYDAY_PRINT_METHODS = Object.freeze({ transfer: 'Standard transfer', dtf: 'DTF', dtg: 'DTG' });
 export function everydayPrintMethod(value) {
   const method = value === undefined ? 'transfer' : value;
   if (!Object.hasOwn(EVERYDAY_PRINT_METHODS, method)) throw new EverydayError('Choose an approved print method.');
   return method;
 }
-export const EVERYDAY_CATALOG = Object.freeze({
-  'everyday-tshirt': { name: 'Everyday Cotton T-shirt', blankStyle: 'Gildan 5000', colors: EVERYDAY_COLORS, sizes: EVERYDAY_SIZES },
-  'everyday-long-sleeve': { name: 'Everyday Cotton Long Sleeve', blankStyle: 'Gildan 2400', colors: EVERYDAY_COLORS, sizes: EVERYDAY_SIZES },
-  'everyday-hoodie': { name: 'Everyday Hoodie', blankStyle: 'Gildan 18500', colors: EVERYDAY_COLORS, sizes: EVERYDAY_SIZES },
-  'everyday-polo': { name: 'Everyday Polo', blankStyle: 'Gildan 8800', colors: EVERYDAY_COLORS.map(color => color === 'Charcoal' ? 'Dark Heather' : color), sizes: EVERYDAY_SIZES },
-});
+// Supplier identifiers are retained only in internal production records.
+const blankStyles = { 'everyday-tshirt': 'Gildan 3000', 'everyday-long-sleeve': 'Gildan 2400', 'everyday-hoodie': 'Gildan 18500', 'everyday-polo': 'Gildan 64800' };
+const names = { 'everyday-tshirt': 'Everyday Cotton T-shirt', 'everyday-long-sleeve': 'Everyday Cotton Long Sleeve', 'everyday-hoodie': 'Everyday Hoodie', 'everyday-polo': 'Everyday Polo' };
+export const EVERYDAY_CATALOG = Object.freeze(Object.fromEntries(Object.entries(PRODUCT_OPTIONS).map(([id, options]) => [id, { ...options, name: names[id], blankStyle: blankStyles[id] }])));
 export const isEveryday = id => Object.hasOwn(EVERYDAY_CATALOG, id);
 export class EverydayError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
 export function everydayZone(product, size, view) {
   if ((product === 'everyday-polo' && view === 'front') || view === 'left' || view === 'right') return { width: 3, height: 3 };
-  return size === 'S' ? { width: 10, height: 12 } : { width: 12, height: 15 };
+  return ['XS', 'S'].includes(size) ? { width: 10, height: 12 } : { width: 12, height: 15 };
 }
 // No default retail amounts: the owner must configure approved USD cent amounts.
 export function everydayPricing(raw) {
@@ -39,7 +38,7 @@ export function everydayPricing(raw) {
 export function validateEveryday(payload) {
   const product = payload?.product?.id, sheet = payload?.everyday;
   if (!isEveryday(product) || payload?.range !== 'everyday' || sheet?.schemaVersion !== 1 || sheet?.product !== product || sheet?.range !== 'everyday' || sheet?.units !== 'inches') throw new EverydayError('Invalid Everyday garment details.');
-  if (!EVERYDAY_CATALOG[product].colors.includes(sheet.color) || !EVERYDAY_CATALOG[product].sizes.includes(sheet.size)) throw new EverydayError('Choose an approved Everyday color and size.');
+  if (!EVERYDAY_CATALOG[product].colors.includes(sheet.color) || !sizesForProduct(product, sheet.color).includes(sheet.size)) throw new EverydayError('Choose an approved Everyday color and size.');
   everydayPrintMethod(sheet.printMethod);
   if (!Number.isInteger(sheet.quantity) || sheet.quantity < 1 || sheet.quantity > 99) throw new EverydayError('Each Everyday quantity must be between 1 and 99.');
   const options = payload.orderOptions;
@@ -59,7 +58,7 @@ export function validateEveryday(payload) {
 }
 export function everydayQuote(payload, config) {
   const sheet = validateEveryday(payload), baseCents = config.baseCents[sheet.product];
-  const sizeCents = ['2XL', '3XL', '4XL'].includes(sheet.size) ? config.sizeSurchargeCents : 0;
+  const sizeCents = isExtendedSize(sheet.size) ? config.sizeSurchargeCents : 0;
   const printMethod = everydayPrintMethod(sheet.printMethod), methodCents = config.methodCents[printMethod];
   const prints = EVERYDAY_VIEWS.filter(v => sheet.locations[v].status !== 'No print');
   const printCents = prints.reduce((total, v) => total + (v === 'back' ? config.methodBackCents[printMethod] : config.printCents[v]), 0) + (prints.some(v => v === 'left' || v === 'right') ? config.sleeveCents : 0), unitCents = baseCents + sizeCents + printCents + methodCents;

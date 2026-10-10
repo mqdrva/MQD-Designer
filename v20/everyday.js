@@ -1,3 +1,4 @@
+import { PRODUCT_OPTIONS, sizesForProduct } from './everyday-catalog.js';
 import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
 import { connectEverydayAccount } from './everyday-account.js';
 import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork } from './everyday-contract.js';
@@ -36,8 +37,10 @@ function syncChoices(id, choices, value, nativeId, swatches = false) {
 function syncOptions() {
   syncChoices('productChoices', Object.entries(PRODUCTS).map(([id, p]) => [id, p.name]), draft.product, 'product');
   syncChoices('colorChoices', colorsForProduct(draft.product).map(color => [color, color]), draft.color, 'color', true);
-  syncChoices('sizeChoices', SIZES.map(size => [size, size]), draft.size, 'size');
+  syncChoices('sizeChoices', sizesForProduct(draft.product, draft.color).map(size => [size, size]), draft.size, 'size');
   $('colorName').textContent = draft.color;
+  if ($('productDescription')) $('productDescription').textContent = PRODUCT_OPTIONS[draft.product].description;
+  if ($('sizeAvailability')) { const sizes = sizesForProduct(draft.product, draft.color); $('sizeAvailability').textContent = `${sizes[0]}–${sizes.at(-1)} in ${draft.color}. Sizes vary by garment and color.`; }
   $('quantityMinus').disabled = busy || Number($('quantity').value) <= 1;
   $('quantityPlus').disabled = busy || Number($('quantity').value) >= 99;
 }
@@ -103,7 +106,7 @@ function selection() {
   draft.color = $('color').value; draft.size = $('size').value;
   draft.printMethod = $('printMethod')?.value || draft.printMethod || 'transfer';
   if (!Object.hasOwn(PRINT_METHODS, draft.printMethod)) throw new Error('Choose an approved print method.');
-  if (!SIZES.includes(draft.size)) throw new Error('Choose an approved Everyday size.');
+  if (!sizesForProduct(draft.product, draft.color).includes(draft.size)) throw new Error('Choose an approved Everyday size.');
   const quantity = Number($('quantity').value);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error('Quantity must be a whole number from 1 to 99.');
   draft.quantity = quantity;
@@ -118,16 +121,23 @@ for (const v of VIEWS) {
 }
 function updateColors() {
   const colors = colorsForProduct(draft.product);
-  if (!colors.includes(draft.color)) draft.color = draft.color === 'Charcoal' ? 'Dark Heather' : draft.color === 'Dark Heather' ? 'Charcoal' : 'White';
+  if (!colors.includes(draft.color)) draft.color = draft.color === 'Dark Heather' ? 'Charcoal' : draft.color === 'Forest' ? 'Forest Green' : draft.color === 'Forest Green' ? 'Forest' : 'White';
   $('color').replaceChildren();
   for (const color of colors) $('color').add(new Option(color, color));
   $('color').value = draft.color;
 }
-updateColors();
+function updateSizes() {
+  const sizes = sizesForProduct(draft.product, draft.color);
+  if (!sizes.includes(draft.size)) draft.size = 'L';
+  $('size').replaceChildren();
+  for (const size of sizes) $('size').add(new Option(size, size));
+  $('size').value = draft.size;
+}
+updateColors(); updateSizes();
 for (const [id, product] of Object.entries(PRODUCTS)) $('product').add(new Option(product.name, id));
 function applyLimits() { for (const v of VIEWS) for (const layer of artworkLayers(draft.artwork[v])) layer.data.placement = constrainPlacement(layer.data.placement, zoneFor(draft, v)); }
-$('product').onchange = () => { draft.product = $('product').value; updateColors(); applyLimits(); drag = null; status('Garment changed. Artwork fitted to its proposed print limits; review dimensions.'); render(); };
-$('color').onchange = () => { draft.color = $('color').value; drag = null; render(); };
+$('product').onchange = () => { draft.product = $('product').value; updateColors(); updateSizes(); applyLimits(); drag = null; status('Garment changed. Artwork fitted to its proposed print limits; review dimensions.'); render(); };
+$('color').onchange = () => { draft.color = $('color').value; updateSizes(); applyLimits(); drag = null; render(); };
 $('size').onchange = () => { draft.size = $('size').value; applyLimits(); status('Size changed. Review artwork dimensions against the proposed limits.'); render(); };
 $('quantity').onchange = () => { try { selection(); checkout.refresh(); } catch (error) { status(error.message); } syncOptions(); };
 for (const [id, delta] of [['quantityMinus', -1], ['quantityPlus', 1]]) $(id).onclick = () => {
@@ -234,13 +244,13 @@ $('downloadPreview').onclick = async () => {
 const inputs = [...document.querySelectorAll('button,input,select,textarea')]; inputs.forEach(input => input.disabled = true);
 try {
   const saved = await databaseTask();
-  if (saved?.schemaVersion === 1 && PRODUCTS[saved.product] && [...COLORS, 'Dark Heather'].includes(saved.color) && saved.artwork && saved.photos && SIZES.includes(saved.size) && Number.isInteger(saved.quantity) && saved.quantity > 0 && saved.quantity <= 999) {
+  if (saved?.schemaVersion === 1 && PRODUCTS[saved.product] && [...COLORS, 'Dark Heather', 'Forest', 'Light Blue', 'Sand'].includes(saved.color) && saved.artwork && saved.photos && SIZES.includes(saved.size) && Number.isInteger(saved.quantity) && saved.quantity > 0 && saved.quantity <= 999) {
     saved.quantity = Math.min(99, saved.quantity);
     saved.printMethod = Object.hasOwn(PRINT_METHODS, saved.printMethod) ? saved.printMethod : 'transfer';
     for (const v of VIEWS) for (const layer of artworkLayers(saved.artwork[v])) layer.data.placement = constrainPlacement(layer.data.placement, zoneFor(saved, v));
     // Preserve early pilot photo uploads under the product-specific key format.
     for (const [key, photo] of Object.entries(saved.photos)) if (key.split(':').length === 2) saved.photos[`${saved.product}:${key}`] = photo;
-    draft = saved; $('product').value = draft.product; updateColors(); $('size').value = draft.size; $('quantity').value = draft.quantity; if ($('printMethod')) $('printMethod').value = draft.printMethod; status('Saved device draft restored.');
+    draft = saved; $('product').value = draft.product; updateColors(); updateSizes(); $('size').value = draft.size; $('quantity').value = draft.quantity; if ($('printMethod')) $('printMethod').value = draft.printMethod; status('Saved device draft restored.');
   }
 } catch { status('Device draft storage is unavailable. You can still preview, but saving may fail.'); }
 finally {

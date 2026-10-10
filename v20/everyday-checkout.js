@@ -12,7 +12,7 @@ const money = cents => '$' + (cents / 100).toFixed(2);
 export function draftQuote(draft, pricing) {
   const locations = VIEWS.filter(v => draft.artwork[v]);
   const baseCents = pricing.baseCents[draft.product];
-  const sizeCents = ['2XL', '3XL', '4XL'].includes(draft.size) ? pricing.sizeSurchargeCents : 0;
+  const sizeCents = ['2XL', '3XL', '4XL', '5XL', '6XL'].includes(draft.size) ? pricing.sizeSurchargeCents : 0;
   const printMethod = draft.printMethod === undefined ? 'transfer' : draft.printMethod;
   if (!Object.hasOwn(PRINT_METHODS, printMethod)) throw new Error('Choose an approved print method.');
   const methodCents = pricing.methodCents?.[printMethod] ?? (printMethod === 'transfer' ? 0 : undefined);
