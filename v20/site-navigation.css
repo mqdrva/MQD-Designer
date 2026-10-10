@@ -9,3 +9,10 @@
 /* Keep Custom Apparel directly accessible in the mobile Menu. */
 .top-actions>.mobile-apparel-link{display:none}
 @media(max-width:850px){.mobile-studio-menu .top-actions>.mobile-apparel-link{display:flex;justify-content:center;min-height:44px;order:-1}}
+
+/* Make the Everyday range easy to find beside the premium designer controls. */
+#everydayEntry{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 14px;background:#ff7900;color:#171717;border:2px solid #dd6500;font-weight:800;text-decoration:none;white-space:nowrap;box-shadow:0 3px 10px #ff790029}
+#everydayEntry::after{content:'FROM $20';padding:4px 6px;background:#171717;color:#fff;border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.035em;line-height:1.2}
+#everydayEntry:hover{background:#ff922e;border-color:#bf5500;box-shadow:0 4px 12px #ff790042}
+#everydayEntry:focus-visible{outline:3px solid #171717;outline-offset:3px}
+@media(max-width:850px){.mobile-studio-menu .top-actions>#everydayEntry{order:-2;width:100%;box-sizing:border-box}}

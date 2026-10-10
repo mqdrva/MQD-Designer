@@ -6,7 +6,22 @@
     "everyday-hoodie": 4000,
     "everyday-polo": 3000
   },
-  "printCents": { "front": 0, "back": 1000, "left": 0, "right": 0 },
+  "printCents": {
+    "front": 0,
+    "back": 1000,
+    "left": 0,
+    "right": 0
+  },
   "sleeveCents": 500,
-  "sizeSurchargeCents": 500
+  "sizeSurchargeCents": 500,
+  "methodCents": {
+    "transfer": 0,
+    "dtf": 500,
+    "dtg": 1000
+  },
+  "methodBackCents": {
+    "transfer": 1000,
+    "dtf": 500,
+    "dtg": 500
+  }
 }
