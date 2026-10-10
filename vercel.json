@@ -1,32 +1,22 @@
 {
-  "headers": [
+  "routes": [
     {
-      "source": "/",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
+      "src": "/(?:index\\.html)?",
+      "headers": {
+        "Cache-Control": "no-store, max-age=0"
+      },
+      "continue": true
     },
     {
-      "source": "/index.html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/.well-known/openai-apps-challenge",
-      "destination": "/api/openai-apps-challenge"
+      "src": "/",
+      "dest": "/custom-apparel.html"
     },
     {
-      "source": "/",
-      "destination": "/custom-apparel.html"
+      "src": "/.well-known/openai-apps-challenge",
+      "dest": "/api/openai-apps-challenge"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }

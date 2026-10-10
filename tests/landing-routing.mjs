@@ -12,7 +12,7 @@ for(const [search,hash,expected] of [
  assert.equal(target,expected?'/index.html'+search+hash:null);
 }
 const config=JSON.parse(fs.readFileSync('vercel.json','utf8'));
-assert(config.rewrites.some(r=>r.source==='/'&&r.destination==='/custom-apparel.html'));
+assert(config.routes.some(r=>r.src==='/'&&r.dest==='/custom-apparel.html'));
 const landing=fs.readFileSync('custom-apparel.html','utf8');
 assert(landing.includes('href="/index.html">Start Designing</a>'));
 assert(landing.includes('No account needed to start'));

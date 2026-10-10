@@ -25,7 +25,7 @@ for(const asset of ['/v20/editor.css','/v20/editor.js','/v20/upload-optimizer.js
   assert(reference&&new URL(reference,'https://mymerchnow.app').searchParams.get('v'),`${asset} must have a cache-busting version`);
 }
 assert(index.includes('no-cache, no-store, must-revalidate'),'designer HTML must tell mobile browsers not to reuse a stale page');
-assert(vercel.headers.some(rule=>rule.source==='/'&&rule.headers.some(header=>header.key==='Cache-Control'&&header.value.includes('no-store'))),'production designer route must not be cached');
+assert(vercel.routes.some(rule=>rule.headers?.['Cache-Control']?.includes('no-store')),'production designer route must not be cached');
 assert(css.includes('.preview-pane.mobile-active')&&css.includes('.control-pane.mobile-active'),'mobile preview and controls must be reachable');
 assert(css.includes('html{color-scheme:light}')&&css.includes('cursor:grab;background:#fff'),'mobile browsers must keep the 2D canvas readable in dark mode');
 assert(mobile.includes("window.dispatchEvent(new Event('resize'))"),'3D renderer must resize when its mobile tab opens');
