@@ -1,0 +1,5 @@
+.landing-page .hero{margin-top:28px}
+.landing-page h1{font-size:clamp(36px,4.6vw,58px);line-height:1.06}
+.landing-page .landing-trust{font-size:14px;line-height:1.6;color:#505050;margin:18px 0 0}
+.landing-page .landing-trust a{color:#814000;text-underline-offset:3px}
+@media(max-width:620px){.landing-page .hero{margin-top:16px}.landing-page .lead{font-size:17px;line-height:1.45}.landing-page .hero-actions{margin-top:18px}.landing-page .landing-trust{font-size:13px}.landing-page .hero-copy{padding:22px 18px}}
