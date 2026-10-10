@@ -1,4 +1,12 @@
-# MQD Instagram homepage feed
+# MQD customer gallery
+
+The homepage now displays six owner-selected customer photos from `MQD top 6 photos.zip` as static HTML in `custom-apparel.html`, with optimized WebP files in `assets/customer-gallery/`. The full images are preserved using `object-fit: contain`. The responsive grid uses three columns on desktop and two on mobile. The CTA links only to https://www.instagram.com/mqdllc/.
+
+This gallery has no Instagram login, subscription, external image request, or automatic refresh. To replace photos, optimize the new assets and update the six HTML figures. View rankings have not been independently verified; the photos were selected and supplied by the owner.
+
+The previously prepared automatic-feed API and browser script remain available for a future connection, but the homepage no longer loads that script or calls the API. Historical setup instructions follow.
+
+## Previously prepared automatic feed
 
 The homepage section lives in `custom-apparel.html`. Its browser script waits until the section is near the viewport before requesting `GET /api/instagram-feed`. The server verifies the connected account is **mqdllc**, reads the latest six media entries, and returns only public display fields. Photos and carousel covers appear as images; videos use their thumbnail with a link to watch on Instagram. No access token is sent to visitors.
 
