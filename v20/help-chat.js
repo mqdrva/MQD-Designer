@@ -1,3 +1,4 @@
+import {validateDesignRequest} from './design-request-contract.js';
 const CHAT_STORAGE_KEY='mqd-help-chat-v1';
 const state={open:false,busy:false,messages:[]};
 
@@ -92,11 +93,57 @@ function buildChat(){
     el('input',{id:'mqdHelpInput',type:'text',maxlength:'1200',placeholder:'Ask a question…',autocomplete:'off','aria-label':'Ask MQD Help'}),
     el('button',{id:'mqdHelpSend',type:'submit',text:'Send'})
   ]);
-  panel.append(header,messages,chips,form);
+  const tabs=el('div',{class:'mqd-help-tabs'},[
+    el('button',{type:'button',text:'Ask a question',id:'mqdChatTab'}),
+    el('button',{type:'button',text:'Request a design',id:'mqdRequestTab'})
+  ]);
+  const request=el('form',{class:'mqd-design-request',hidden:'',id:'mqdDesignRequest'});
+  request.innerHTML=`<p>Let MQD help design your shirts. We'll email you to confirm options and pricing before creating your mockup.</p>
+    <label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
+    <label>Email<input name="email" type="email" required maxlength="254" autocomplete="email"></label>
+    <div class="mqd-request-product"><label>Garment<input name="garment" required maxlength="160" placeholder="e.g. Premium short sleeve or Everyday cotton"></label>
+    <label>Quantity<input name="quantity" type="number" required min="1" max="9999" value="5"></label></div>
+    <label>Design details<textarea name="brief" required minlength="10" maxlength="2000" rows="3" placeholder="Business name, colors, design ideas, and when you need them"></textarea></label>
+    <label class="mqd-request-honeypot" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+    <p class="mqd-request-note">No payment or order is placed. Send your logo when MQD replies. <a href="/privacy.html">Privacy</a></p>
+    <button type="submit">Send design request</button><p role="status" aria-live="polite" id="mqdRequestStatus"></p>`;
+  const setMode=design=>{
+    messages.hidden=chips.hidden=form.hidden=design;request.hidden=!design;
+    panel.classList.toggle('design-mode',design);
+    tabs.querySelector('#mqdChatTab').setAttribute('aria-pressed',String(!design));
+    tabs.querySelector('#mqdRequestTab').setAttribute('aria-pressed',String(design));
+  };
+  tabs.querySelector('#mqdChatTab').onclick=()=>setMode(false);
+  tabs.querySelector('#mqdRequestTab').onclick=()=>{setMode(true);request.elements.name.focus();};
+  let requestId=crypto.randomUUID(), fingerprint='';
+  request.addEventListener('submit',async event=>{
+    event.preventDefault();const button=request.querySelector('button[type="submit"]'),status=request.querySelector('#mqdRequestStatus');
+    const values=Object.fromEntries(new FormData(request));values.page=location.pathname;
+    const next=JSON.stringify(values);if(next!==fingerprint){requestId=crypto.randomUUID();fingerprint=next;}
+    values.requestId=requestId;
+    try{
+      validateDesignRequest(values);button.disabled=true;status.textContent='Sending your request…';
+      const response=await fetch('https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-design-request',{method:'POST',headers:{'Content-Type':'application/json',apikey:'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4'},body:JSON.stringify(values),signal:AbortSignal.timeout(18000)});
+      const result=await response.json();if(!response.ok||!result.received)throw new Error(result.error||'Could not send your request. Please try again.');
+      request.reset();requestId=crypto.randomUUID();fingerprint='';status.textContent='Your request has been sent to MQD. We’ll reply to the email you provided.';
+    }catch(error){status.textContent=error.name==='TimeoutError'?'Sending took too long. Please try again; we will avoid sending duplicates.':error.message||'Could not connect. Please try again or email mqdrva@gmail.com.';}
+    finally{button.disabled=false;}
+  });
+  panel.append(header,tabs,messages,chips,form,request);
+  setMode(false);
   document.body.append(launcher,panel);
   const close=header.querySelector('.mqd-help-close');
-  const setOpen=open=>{state.open=open;panel.classList.toggle('open',open);launcher.classList.toggle('hidden',open);if(open)setTimeout(()=>document.querySelector('#mqdHelpInput')?.focus(),60);};
-  launcher.onclick=()=>setOpen(true);close.onclick=()=>setOpen(false);
+  const setOpen=open=>{state.open=open;panel.classList.toggle('open',open);launcher.classList.toggle('hidden',open);if(open&&!panel.classList.contains('design-mode'))setTimeout(()=>document.querySelector('#mqdHelpInput')?.focus(),60);};
+  launcher.onclick=()=>setOpen(true);close.onclick=()=>{setOpen(false);launcher.focus();};
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.open){setOpen(false);launcher.focus();}});
+  document.addEventListener('click',event=>{
+    if(!event.target.closest('[data-mqd-design-request]'))return;
+    event.preventDefault();setMode(true);setOpen(true);
+    const selected=document.querySelector('#productSelect option:checked')?.textContent||document.querySelector('#product option:checked')?.textContent;
+    if(selected)request.elements.garment.value=selected;
+    setTimeout(()=>request.elements.name.focus(),80);
+  });
+  if(location.hash==='#request-design'){setMode(true);setOpen(true);}
   form.addEventListener('submit',e=>{e.preventDefault();const input=document.querySelector('#mqdHelpInput');const value=input.value;input.value='';sendMessage(value);});
   renderMessages();
 }
