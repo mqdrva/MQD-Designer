@@ -29,7 +29,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Amatic+SC&family=Archivo+Black&family=Baloo+2&family=Bangers&family=Berkshire+Swash&family=Black+Ops+One&family=Boogaloo&family=Bowlby+One+SC&family=Bungee&family=Bungee+Inline&family=Bungee+Shade&family=Changa+One&family=Chewy&family=Comfortaa&family=Concert+One&family=Cookie&family=Courgette&family=Creepster&family=Fredoka&family=Fugaz+One&family=Graduate&family=Gravitas+One&family=Great+Vibes&family=Indie+Flower&family=Kaushan+Script&family=Lilita+One&family=Luckiest+Guy&family=Marck+Script&family=Mochiy+Pop+One&family=Monoton&family=Orbitron&family=Passion+One&family=Paytone+One&family=Press+Start+2P&family=Righteous&family=Rock+Salt&family=Russo+One&family=Sacramento&family=Saira+Condensed&family=Satisfy&family=Shadows+Into+Light&family=Sigmar&family=Special+Elite&family=Staatliches&family=Teko&family=Ultra&family=Yellowtail&family=Zeyada&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/v20/editor.css?v=20261003-designer-usability">
 <link rel="stylesheet" href="/v20/flat-mockup.css?v=2">
-<link rel="stylesheet" href="/v20/help-chat.css?v=20260919a">
+<link rel="stylesheet" href="/v20/help-chat.css?v=20261010-request">
 <link rel="stylesheet" href="/v20/ai-designer.css?v=20260929-upload-clarity">
 <link rel="stylesheet" href="/v20/sidebar-ux-preview.css?v=20260930c">
 <link rel="stylesheet" href="/v20/newcomer-help-preview.css?v=20260930c">
@@ -42,7 +42,7 @@
 <body>
 <header>
   <div class="brand"><img src="/assets/brand-logo.png" alt="Morales Quality Designs"><select id="productSelect" class="product-select"></select></div>
-  <div class="top-actions"><a class="btn site-apparel-link mobile-apparel-link" href="/custom-apparel.html">Custom Apparel</a><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="accountButton" class="btn">Sign In</button><button id="customerHelpToggle" class="btn" type="button" popovertarget="customerHelpMenu" aria-controls="customerHelpMenu" aria-expanded="false">Help &amp; Policies</button><nav id="customerHelpMenu" class="customer-help-menu" popover="auto" aria-label="Customer help"><a href="/custom-apparel.html">Custom Apparel</a><a href="/contact.html">Contact</a><a href="/shipping.html">Shipping</a><a href="/returns.html">Returns &amp; refunds</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></nav><a class="btn owner-only" href="/owner-orders.html">Owner Orders</a><a class="btn owner-only" href="/library-admin.html">Artwork Library Admin</a><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
+  <div class="top-actions"><button class="mqd-design-request-button" type="button" data-mqd-design-request>Need MQD to design it?</button><a class="btn site-apparel-link mobile-apparel-link" href="/custom-apparel.html">Custom Apparel</a><button id="saveDraft" class="btn">Save Design</button><button id="downloadMockup" class="btn">Download Mockup PNG</button><button id="addToCart" class="btn orange">Add to Cart</button><button id="cartButton" class="btn">Cart (0)</button><button id="accountButton" class="btn">Sign In</button><button id="customerHelpToggle" class="btn" type="button" popovertarget="customerHelpMenu" aria-controls="customerHelpMenu" aria-expanded="false">Help &amp; Policies</button><nav id="customerHelpMenu" class="customer-help-menu" popover="auto" aria-label="Customer help"><a href="/custom-apparel.html">Custom Apparel</a><a href="/contact.html">Contact</a><a href="/shipping.html">Shipping</a><a href="/returns.html">Returns &amp; refunds</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></nav><a class="btn owner-only" href="/owner-orders.html">Owner Orders</a><a class="btn owner-only" href="/library-admin.html">Artwork Library Admin</a><button id="openAdmin" class="btn owner-only">Product Admin</button><button id="loadDesign" class="btn owner-only">Load Design</button><button id="saveDesign" class="btn owner-only">Export Design JSON</button><button id="downloadPack" class="btn primary owner-only">Download Production ZIP</button></div>
 </header>
 <nav class="mobile-workspace-tabs" aria-label="Designer workspace" role="tablist">
   <button type="button" role="tab" aria-controls="previewPane" aria-selected="false" data-mobile-pane="preview">3D Preview</button>
@@ -146,7 +146,7 @@ await import('/v20/chat-background.js?v=20260929-background-prefill');
 </script>
 <script type="module" src="/v20/sidebar-ux-preview.js?v=20261003-designer-usability"></script>
 <script type="module" src="/v20/newcomer-help-preview.js?v=20260930c"></script>
-<script type="module" src="/v20/help-chat.js?v=20260919a"></script>
+<script type="module" src="/v20/help-chat.js?v=20261010-request"></script>
 <script type="module" src="/v20/everyday-entry.js?v=20261008-preview"></script>
 </body>
 </html>
