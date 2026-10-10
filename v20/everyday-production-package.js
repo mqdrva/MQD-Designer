@@ -1,10 +1,11 @@
-import { VIEWS } from './everyday-contract.js';
+import { VIEWS, PRINT_METHODS } from './everyday-contract.js';
 import { makeZip, safeArtworkName } from './everyday-zip.js';
 export const isEverydayOrder = detail => detail?.order?.design_json?.range === 'everyday';
 export async function everydayProductionZip(detail, fetchBlob) {
   const order = detail.order, design = order.design_json;
   if (!isEverydayOrder(detail) || design.productionReady !== true) throw new Error('Everyday production files are incomplete.');
   const sheet = structuredClone(design.everyday), entries = [], assets = detail.assets || [];
+  sheet.printMethod ??= 'transfer'; sheet.printMethodLabel = PRINT_METHODS[sheet.printMethod];
   sheet.orderNumber = order.order_number; sheet.productName = order.product_name;
   sheet.orderOptions = detail.items?.[0]?.order_options || design.orderOptions;
   sheet.pricing = design.quote;
@@ -22,6 +23,6 @@ export async function everydayProductionZip(detail, fetchBlob) {
   }
   entries.push({ name: 'order-sheet.json', data: JSON.stringify(sheet, null, 2) });
   entries.push({ name: 'order-summary.json', data: JSON.stringify({ orderNumber: order.order_number, status: sheet.status, customer: { name: order.customer_name, email: order.customer_email, phone: order.customer_phone }, shipping: { name: order.shipping_name, address: order.shipping_address }, items: detail.items || [], paidAt: order.paid_at, createdAt: order.created_at }, null, 2) });
-  entries.push({ name: 'READ-ME.txt', data: `${sheet.status.toUpperCase()}\nFour garment previews and untouched original uploaded files.\nPrint measurements are inches from the top-left of each allowed print area.\nThe garment color is a manufacturer color name. No whole-garment color printing is required.\nConfirm blank fit and placement against the actual garment before production.\n` });
+  entries.push({ name: 'READ-ME.txt', data: `${sheet.status.toUpperCase()}\nPrint method: ${sheet.printMethodLabel}\nFour garment previews and untouched original uploaded files.\nPrint measurements are inches from the top-left of each allowed print area.\nThe garment color is a manufacturer color name. No whole-garment color printing is required.\nConfirm blank fit and placement against the actual garment before production.\n` });
   return makeZip(entries);
 }

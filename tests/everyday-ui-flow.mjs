@@ -17,8 +17,9 @@ function element(id = '') {
 let nodes;
 function setup() {
   nodes = new Map();
-  const ids = ['product','color','size','quantity','saveDraft','views','zoneLabel','emptyPhoto','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip'];
+  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip'];
   for (const id of ids) nodes.set(id, element(id));
+  nodes.get('printMethod').value='transfer';
   const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
   globalThis.document = { getElementById: id => nodes.get(id), querySelectorAll: () => [...nodes.values()], createElement: tag => {
     if (tag !== 'canvas') return element();
@@ -61,14 +62,17 @@ assert(nodes.get('zoneLabel').textContent.includes('12 × 15'), 'Hoodie uses the
 nodes.get('size').value='4XL';nodes.get('size').onchange();await wait();
 nodes.get('quantity').value = '1.5'; await nodes.get('saveDraft').onclick(); assert.equal(stored, undefined);
 nodes.get('quantity').value = '3'; await nodes.get('saveDraft').onclick();
+nodes.get('printMethod').value='dtg';nodes.get('printMethod').onchange();await nodes.get('saveDraft').onclick();
 assert.equal(stored.product, 'everyday-hoodie'); assert.equal(stored.quantity, 3);
 assert.equal(stored.size, '4XL');
+assert.equal(stored.printMethod,'dtg');
 assert.deepEqual(Buffer.from(await stored.artwork.front.file.arrayBuffer()), Buffer.from(await original.arrayBuffer()));
 await nodes.get('downloadZip').onclick();
 assert.equal(downloads.at(-1).filename, 'everyday-hoodie-draft.zip'); assert(downloads.at(-1).blob.size > original.size);
 setup(); await import('../v20/everyday.js?test=restore'); await wait();
 assert.equal(nodes.get('product').value, 'everyday-hoodie'); assert.equal(nodes.get('quantity').value, 3);
 assert.equal(nodes.get('size').value,'4XL','A saved 4XL device draft restores its size');
+assert.equal(nodes.get('printMethod').value,'dtg','The chosen print method restores with the original artwork');
 assert.equal(nodes.get('artName').textContent, 'customer-logo.png');
 const navigation = fs.readFileSync(new URL('v20/everyday-entry.js', root), 'utf8');
 const actions = element(), navigationDocument = { querySelector: () => actions, getElementById: () => null, createElement: () => element() };

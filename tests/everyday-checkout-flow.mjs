@@ -22,6 +22,23 @@ const original = new File([image.toBuffer('image/png')], 'untouched-customer-log
 const guestToken = 'd6098f67-c597-4335-9043-eef71dcdcc64';
 const guestHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(guestToken))).toString('hex');
 function draft(product = 'everyday-tshirt',size = '4XL') { return { product, color: 'Royal', size, quantity: 3, photos: {}, artwork: Object.fromEntries(everyday.EVERYDAY_VIEWS.map(view => [view, { name: original.name, file: original, placement: { x: .25, y: .5, width: 2, height: 2 } }])) }; }
+// Verify the owner-approved per-garment method fees and method-specific back fee.
+for (const product of Object.keys(everyday.EVERYDAY_CATALOG)) for (const size of SIZES) {
+  for (const [printMethod, methodFee, backFee] of [['transfer',0,1000],['dtf',500,500],['dtg',1000,500]]) {
+    const sample = { ...draft(product,size), printMethod };
+    const extraSize = ['2XL','3XL','4XL'].includes(size) ? 500 : 0;
+    const expected = pricing.baseCents[product] + extraSize + methodFee + backFee + 500;
+    const clientQuote = draftQuote(sample,pricing);
+    assert.equal(clientQuote.unitCents,expected);
+    assert.equal(clientQuote.unitCents * sample.quantity,expected * 3,'Method fee is per garment, not per order');
+    const sheet = (await import('../v20/everyday-contract.js')).orderSheet(sample);
+    const serverQuote = everyday.everydayQuote({range:'everyday',product:{id:product},everyday:sheet,orderOptions:[{size,quantity:3}],totalQuantity:3},pricing);
+    assert.equal(serverQuote.unitCents,expected);
+    assert.equal(serverQuote.printMethod,printMethod);
+    delete sample.artwork.right;
+    assert.equal(draftQuote(sample,pricing).unitCents,expected,'One or both sleeves cost $5 total');
+  }
+}
 for(const [id,catalog] of Object.entries(everyday.EVERYDAY_CATALOG)) {
   assert.deepEqual(catalog.sizes,SIZES);
   assert.deepEqual(catalog.colors,colorsForProduct(id));
@@ -91,6 +108,10 @@ assert.equal(db.mqd_orders.at(-1).design_json.everyday.blankStyle,'Gildan 8800')
 const heatherPolo=draft('everyday-polo');heatherPolo.color='Dark Heather';assert.equal((await submit(request(await formFor(heatherPolo),true))).status,200);
 assert.equal((await submit(request(await formFor(draft('everyday-polo'),p=>p.everyday.color='Charcoal'),true))).status,400);
 const signedOrder=structuredClone(db.mqd_orders.at(-1)), signedItem=structuredClone(db.mqd_order_items.at(-1));
+const legacyOrder=structuredClone(saved);
+delete legacyOrder.design_json.everyday.printMethod; delete legacyOrder.design_json.everyday.printMethodLabel;
+delete legacyOrder.design_json.quote.methodCents; delete legacyOrder.design_json.quote.printMethod; delete legacyOrder.design_json.quote.printMethodLabel;
+assert.equal(everyday.everydayCheckout(legacyOrder,db.mqd_order_items[0],JSON.stringify(pricing)).unitCents,4000,'Existing standard transfer carts keep their original amount');
 actor={id:'admin-fixture',app_metadata:{role:'admin'}};
 assert.equal((await submit(request(await formFor(draft(),null,true),true))).status,200); assert.equal(db.mqd_orders.at(-1).is_test,true); assert.equal(db.mqd_orders.at(-1).user_id,null);
 let captured;
@@ -116,6 +137,26 @@ for(const slug of ['create-mqd-checkout','create-mqd-guest-checkout','create-mqd
   const unconfigured=await checkout(slug,order,item,{missingPricing:true});assert.equal(unconfigured.response.status,503);assert.equal(unconfigured.captured,null);
   if(slug!=='create-mqd-checkout'){const bad=await checkout(slug,order,item,{badOwner:true});assert.equal(bad.response.status,403);}
 }
+for (const [printMethod, expected] of [['dtf',4000],['dtg',4500]]) {
+  actor={id:'account-fixture',email:'fixture@example.invalid',app_metadata:{provider:'google'}};
+  const sample={...draft(),printMethod};
+  const response=await submit(request(await formFor(sample),true)); assert.equal(response.status,200,await response.clone().text());
+  const order=structuredClone(db.mqd_orders.at(-1)), item=structuredClone(db.mqd_order_items.at(-1));
+  assert.equal(order.design_json.everyday.printMethod,printMethod);
+  assert.equal(order.design_json.quote.methodCents,printMethod==='dtf'?500:1000);
+  for (const slug of ['create-mqd-checkout','create-mqd-guest-checkout','create-mqd-test-checkout']) {
+    const checkoutOrder=slug==='create-mqd-checkout'?order:{...order,user_id:null};
+    const check=await checkout(slug,checkoutOrder,item); assert.equal(check.response.status,200,await check.response.clone().text());
+    assert.equal(check.captured.params.line_items[0].price_data.unit_amount,expected);
+    assert.match(check.captured.params.line_items[0].price_data.product_data.name,new RegExp(printMethod.toUpperCase()));
+  }
+  const assets=db.mqd_order_assets.filter(a=>a.order_id===order.id).map(a=>({...a,download_url:a.storage_path}));
+  const zip=await everydayProductionZip({order,items:[item],assets},path=>blobs.get(path));
+  assert(Buffer.from(await zip.arrayBuffer()).includes(Buffer.from(`"printMethod": "${printMethod}"`)),'Production ZIP identifies the selected method');
+  const bad=await submit(request(await formFor(sample,p=>p.quote.unitCents-=500),true)); assert.equal(bad.status,409,'A method fee cannot be removed by client pricing');
+}
+assert.equal((await submit(request(await formFor(draft(),p=>p.everyday.printMethod='unsupported'),true))).status,400);
+actor={id:'admin-fixture',app_metadata:{role:'admin'}};
 let cartValue=JSON.stringify([{productId:'tshirt',orderNumber:'MQD-PREMIUM01',price:50,totalQuantity:2}]);
 const migrationSource=read('v20/customer.js').match(/function migratePriceVersion\(\)\{[\s\S]*?\n\}/)[0];
 for(const initialEpoch of [null,'old-premium-version']) {

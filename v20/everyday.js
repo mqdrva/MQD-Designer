@@ -1,10 +1,10 @@
-import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, fitArtwork, constrainPlacement, resizeArtwork, orderSheet } from './everyday-contract.js';
+import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork, orderSheet } from './everyday-contract.js';
 import { PRODUCTS, zoneFor, guideFor, photoKey, bitmap, drawPreview } from './everyday-preview-renderer.js';
 import { makeZip, safeArtworkName } from './everyday-zip.js';
 import { connectEverydayCheckout } from './everyday-checkout.js';
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
-let draft = { schemaVersion: 1, product: 'everyday-tshirt', color: 'White', size: 'L', quantity: 1, artwork: {}, photos: {} };
+let draft = { schemaVersion: 1, product: 'everyday-tshirt', color: 'White', size: 'L', quantity: 1, printMethod: 'transfer', artwork: {}, photos: {} };
 let view = 'front', drag = null, revision = 0, busy = true;
 let checkout = { refresh() {} };
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -58,6 +58,8 @@ async function databaseTask(write = false) {
 }
 function selection() {
   draft.color = $('color').value; draft.size = $('size').value;
+  draft.printMethod = $('printMethod')?.value || draft.printMethod || 'transfer';
+  if (!Object.hasOwn(PRINT_METHODS, draft.printMethod)) throw new Error('Choose an approved print method.');
   if (!SIZES.includes(draft.size)) throw new Error('Choose an approved Everyday size.');
   const quantity = Number($('quantity').value);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error('Quantity must be a whole number from 1 to 99.');
@@ -85,6 +87,7 @@ $('product').onchange = () => { draft.product = $('product').value; updateColors
 $('color').onchange = () => { draft.color = $('color').value; drag = null; render(); };
 $('size').onchange = () => { draft.size = $('size').value; applyLimits(); status('Size changed. Review artwork dimensions against the proposed limits.'); render(); };
 $('quantity').onchange = () => { try { selection(); checkout.refresh(); } catch (error) { status(error.message); } };
+if ($('printMethod')) $('printMethod').onchange = () => { try { selection(); checkout.refresh(); status(`${PRINT_METHODS[draft.printMethod]} selected. Review your updated price.`); } catch (error) { status(error.message); } };
 $('saveDraft').onclick = save;
 if ($('resetPhotos')) $('resetPhotos').onclick = () => { draft.photos = {}; status('Standard garment previews restored.'); render(); };
 for (const [id, photoMode] of [['upload', false], ['photo', true]]) $(id).onchange = async event => {
@@ -156,10 +159,11 @@ try {
   const saved = await databaseTask();
   if (saved?.schemaVersion === 1 && PRODUCTS[saved.product] && [...COLORS, 'Dark Heather'].includes(saved.color) && saved.artwork && saved.photos && SIZES.includes(saved.size) && Number.isInteger(saved.quantity) && saved.quantity > 0 && saved.quantity <= 999) {
     saved.quantity = Math.min(99, saved.quantity);
+    saved.printMethod = Object.hasOwn(PRINT_METHODS, saved.printMethod) ? saved.printMethod : 'transfer';
     for (const v of VIEWS) if (saved.artwork[v]) saved.artwork[v].placement = constrainPlacement(saved.artwork[v].placement, zoneFor(saved, v));
     // Preserve early pilot photo uploads under the product-specific key format.
     for (const [key, photo] of Object.entries(saved.photos)) if (key.split(':').length === 2) saved.photos[`${saved.product}:${key}`] = photo;
-    draft = saved; $('product').value = draft.product; updateColors(); $('size').value = draft.size; $('quantity').value = draft.quantity; status('Saved device draft restored.');
+    draft = saved; $('product').value = draft.product; updateColors(); $('size').value = draft.size; $('quantity').value = draft.quantity; if ($('printMethod')) $('printMethod').value = draft.printMethod; status('Saved device draft restored.');
   }
 } catch { status('Device draft storage is unavailable. You can still preview, but saving may fail.'); }
 finally {

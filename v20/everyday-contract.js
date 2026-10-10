@@ -1,5 +1,6 @@
 export const VIEWS = ['front', 'back', 'left', 'right'];
 export const SIZES = Object.freeze(['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL']);
+export const PRINT_METHODS = Object.freeze({ transfer: 'Standard transfer', dtf: 'DTF', dtg: 'DTG' });
 export const ZONES = {
   front: { label: 'Front', width: 12, height: 15 },
   back: { label: 'Back', width: 12, height: 15 },
@@ -25,7 +26,10 @@ export function resizeArtwork(placement, width, zone) {
 }
 export function orderSheet(draft) {
   if (!SIZES.includes(draft.size)) throw new Error('Choose an approved Everyday size.');
+  const printMethod = draft.printMethod === undefined ? 'transfer' : draft.printMethod;
+  if (!Object.hasOwn(PRINT_METHODS, printMethod)) throw new Error('Choose an approved print method.');
   return { schemaVersion: 1, range: 'everyday', product: draft.product, color: draft.color, size: draft.size, quantity: draft.quantity,
+    printMethod, printMethodLabel: PRINT_METHODS[printMethod],
     units: 'inches', status: 'development-draft', locations: Object.fromEntries(VIEWS.map(view => [view, draft.artwork[view]
       ? { filename: draft.artwork[view].name, ...draft.artwork[view].placement }
       : { status: 'No print' }])) };

@@ -1,4 +1,4 @@
-import { VIEWS, orderSheet } from './everyday-contract.js';
+import { VIEWS, PRINT_METHODS, orderSheet } from './everyday-contract.js';
 import { PRODUCTS, drawPreview } from './everyday-preview-renderer.js';
 import { EVERYDAY_RUNTIME } from './everyday-runtime.js';
 
@@ -11,8 +11,13 @@ export function draftQuote(draft, pricing) {
   const locations = VIEWS.filter(v => draft.artwork[v]);
   const baseCents = pricing.baseCents[draft.product];
   const sizeCents = ['2XL', '3XL', '4XL'].includes(draft.size) ? pricing.sizeSurchargeCents : 0;
-  const printCents = locations.reduce((total, v) => total + pricing.printCents[v], 0) + (locations.some(v => v === 'left' || v === 'right') ? pricing.sleeveCents : 0);
-  return { baseCents, sizeCents, printCents, unitCents: baseCents + sizeCents + printCents, version: pricing.version, currency: 'usd', locations };
+  const printMethod = draft.printMethod === undefined ? 'transfer' : draft.printMethod;
+  if (!Object.hasOwn(PRINT_METHODS, printMethod)) throw new Error('Choose an approved print method.');
+  const methodCents = pricing.methodCents?.[printMethod] ?? (printMethod === 'transfer' ? 0 : undefined);
+  const backCents = pricing.methodBackCents?.[printMethod] ?? (printMethod === 'transfer' ? pricing.printCents.back : undefined);
+  if (!Number.isSafeInteger(methodCents) || !Number.isSafeInteger(backCents)) throw new Error('Print method prices are awaiting setup.');
+  const printCents = locations.reduce((total, v) => total + (v === 'back' ? backCents : pricing.printCents[v]), 0) + (locations.some(v => v === 'left' || v === 'right') ? pricing.sleeveCents : 0);
+  return { baseCents, sizeCents, printCents, methodCents, printMethod, printMethodLabel: PRINT_METHODS[printMethod], unitCents: baseCents + sizeCents + printCents + methodCents, version: pricing.version, currency: 'usd', locations };
 }
 export function cartDestination(test = false) { return '/?everydayPreview=1&openCart=1' + (test ? '&mqdStripeTest=1' : ''); }
 export async function buildEverydaySubmission(draft, pricing, { makeCanvas = () => document.createElement('canvas'), render = drawPreview, test = false, submissionToken = crypto.randomUUID() } = {}) {
@@ -81,7 +86,9 @@ export function connectEverydayCheckout({ getDraft, saveDraft, status }, depende
     if (pricing) {
       try {
         const draft = getDraft(), quote = draftQuote(draft, pricing);
-        price.textContent = `${money(quote.unitCents)} each · ${money(quote.unitCents * draft.quantity)} before shipping${quote.sizeCents ? ` · Includes ${money(quote.sizeCents)} size charge per garment` : ''}`;
+        price.textContent = `${money(quote.unitCents)} each · ${money(quote.unitCents * draft.quantity)} before shipping · ${quote.printMethodLabel}${quote.methodCents ? ` (+${money(quote.methodCents)} per garment)` : ''}${quote.sizeCents ? ` · Includes ${money(quote.sizeCents)} size charge per garment` : ''}`;
+        const summary = document.getElementById('everydayPrintSummary');
+        if (summary) summary.textContent = `Everyday Custom · ${quote.printMethodLabel} · Front print included in shown price · Back +${money(pricing.methodBackCents?.[quote.printMethod] ?? pricing.printCents.back)} · One or both sleeves +${money(pricing.sleeveCents)} total`;
         button.disabled = adding || !quote.locations.length;
       } catch { button.disabled = true; price.textContent = 'Enter a valid quantity to see your total.'; }
     }
