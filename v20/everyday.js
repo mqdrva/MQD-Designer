@@ -1,3 +1,4 @@
+import { installTryOn } from './try-on-entry.js?v=20261010-live';
 import { PRODUCT_OPTIONS, sizesForProduct } from './everyday-catalog.js';
 import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
 import { connectEverydayAccount } from './everyday-account.js';
@@ -259,3 +260,13 @@ finally {
   connectEverydayAccount({ saveDraft: async () => { selection(); await databaseTask(true); }, status });
   render();
 }
+
+installTryOn(async () => {
+  const snapshot = structuredClone(draft), frame = document.createElement('canvas'); frame.width=800;frame.height=900;
+  await drawPreview(frame, snapshot, 'front');
+  if (!snapshot.photos[photoKey(snapshot,'front')]) {
+    const mask=await createImageBitmap(await (await fetch('/assets/everyday/models/'+PRODUCTS[snapshot.product].model+'-front.png')).blob());
+    const ctx=frame.getContext('2d');ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,0,0);mask.close();
+  }
+  return new Promise(resolve=>frame.toBlob(resolve,'image/png'));
+}, document.querySelector?.('.canvas-tools'));
