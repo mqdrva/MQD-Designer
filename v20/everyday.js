@@ -1,3 +1,4 @@
+import { installArtworkPinch } from './artwork-pinch.js';
 import { installTryOn } from './try-on-entry.js?v=20261010-live';
 import { PRODUCT_OPTIONS, sizesForProduct } from './everyday-catalog.js';
 import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
@@ -220,6 +221,12 @@ canvas.onpointermove = event => {
   render();
 };
 canvas.onpointerup = canvas.onpointercancel = canvas.onlostpointercapture = () => { drag = null; };
+installArtworkPinch(canvas, {
+  selection: () => { const layer=selected(); return !busy && !$('upload').disabled && layer ? {key:[draft.product,draft.color,view,layer.id].join(':'),placement:layer.data.placement,zone:zoneFor(draft,view)} : null; },
+  apply: (placement,key) => { const layer=selected(); if(layer && key===[draft.product,draft.color,view,layer.id].join(':')){layer.data.placement=placement;render();} },
+  cancelDrag: () => { drag=null; }
+});
+
 canvas.onkeydown = event => {
   const layer = selected(); if (!layer) return;
   if (['+','=','-'].includes(event.key)) { event.preventDefault(); scaleSelected(event.key === '-' ? .9 : 1.1); return; }

@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {pinchPlacement,installArtworkPinch} from '../v20/artwork-pinch.js';
+const zone={width:12,height:15}, original={width:4,height:2,x:4,y:3};
+assert.deepEqual(pinchPlacement(original,2,zone),{width:8,height:4,x:2,y:2});
+assert.deepEqual(pinchPlacement(original,100,zone),{width:12,height:6,x:0,y:1});
+const sleeve=pinchPlacement(original,100,{width:3,height:3});assert.equal(sleeve.width,3);assert.equal(sleeve.height,1.5);
+const small=pinchPlacement(original,.001,zone);assert.equal(small.width,.1);assert.equal(small.height,.05);
+const listeners={};let current={key:'front:image',placement:{...original},zone},cancelled=0;
+const canvas={addEventListener:(t,h)=>listeners[t]=h,setPointerCapture(){}};
+installArtworkPinch(canvas,{selection:()=>current,apply:(p)=>current.placement=p,cancelDrag:()=>cancelled++});
+const event=(type,id,x,y)=>{let stopped=false;listeners[type]({type,pointerType:'touch',pointerId:id,clientX:x,clientY:y,preventDefault(){},stopImmediatePropagation(){stopped=true;}});return stopped;};
+assert.equal(event('pointerdown',1,100,100),false);event('pointerdown',2,200,100);event('pointermove',2,300,100);
+assert.equal(current.placement.width,8);assert.equal(current.placement.height,4);
+const saved=JSON.parse(JSON.stringify({artwork:{front:current.placement}}));assert.equal(saved.artwork.front.width,8);
+event('pointerup',2,300,100);assert.equal(event('pointermove',1,150,100),true,'Remaining finger cannot jump or drag artwork after pinch');event('pointerup',1,150,100);
+assert.equal(event('pointerdown',1,100,100),false,'Normal drag resumes next gesture');event('pointerdown',2,200,100);current={...current,key:'back:image'};event('pointermove',2,300,100);assert.equal(current.placement.width,8,'Switching zones invalidates pinch');event('pointercancel',1,100,100);event('pointerup',2,300,100);
+assert(cancelled>0);console.log('Artwork pinch resize, aspect ratio, physical bounds, saved inches, cancellation and zone switching passed.');
