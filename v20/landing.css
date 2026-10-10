@@ -8,3 +8,10 @@
 @media(prefers-reduced-motion:reduce){.instagram-post{transition:none}.instagram-post:hover,.instagram-post:focus-visible{transform:none}}
 
 .customer-photo{margin:0}.customer-photo:hover{transform:none;border-color:#e7e7e7}.customer-photo .instagram-post-media{background:#f0f0f0}.customer-photo .instagram-post-media img{object-fit:contain}.customer-photo figcaption{padding:12px 14px;font-size:14px;font-weight:700;color:#303030}.customer-gallery-action{margin-top:24px;text-align:center}.customer-gallery-action .btn{max-width:100%;white-space:normal;text-align:center}.customer-gallery-action p{margin:12px 0 0;font-size:14px;color:#505050}
+
+.landing-page .hero-card{position:relative;isolation:isolate;overflow:hidden;background:#18232d;color:#fff;border-color:#34424e}
+.landing-page .hero-card::before{content:"";position:absolute;inset:-6px;z-index:-2;background:url('/assets/designer-tools-background.webp') center 66%/cover no-repeat;filter:blur(2px)}
+.landing-page .hero-card::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(135deg,rgba(7,17,28,.76),rgba(7,17,28,.67))}
+.landing-page .hero-card h2,.landing-page .hero-card strong{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.landing-page .hero-card .eyebrow{color:#ffd2ac}
+.landing-page .hero-card li{color:#f6f6f6;border-bottom-color:rgba(255,255,255,.24);text-shadow:0 1px 2px rgba(0,0,0,.45)}
