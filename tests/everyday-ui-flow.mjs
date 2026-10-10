@@ -17,7 +17,7 @@ function element(id = '') {
 let nodes;
 function setup() {
   nodes = new Map();
-  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip'];
+  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip'];
   for (const id of ids) nodes.set(id, element(id));
   nodes.get('printMethod').value='transfer';
   const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
@@ -54,6 +54,20 @@ const original = new Blob([logo.toBuffer('image/png')], { type: 'image/png' }); 
 for (const button of nodes.get('views').children) {
   button.onclick(); nodes.get('upload').files = [original]; await nodes.get('upload').onchange({ target: nodes.get('upload') });
 }
+// Removal belongs to the selected zone, including after switching views.
+nodes.get('views').children[2].onclick(); await wait();
+assert.equal(nodes.get('artworkHeading').textContent, 'Left sleeve artwork');
+assert.equal(nodes.get('remove').textContent, 'Remove from left sleeve');
+nodes.get('remove').onclick(); await wait();
+assert.equal(nodes.get('artName').textContent, 'No print');
+assert.equal(nodes.get('remove').disabled, true);
+await nodes.get('saveDraft').onclick();
+assert.equal(stored.artwork.left, undefined);
+for (const v of ['front', 'back', 'right']) assert(stored.artwork[v], 'Removing a sleeve preserves other zones');
+assert.match(nodes.get('review').children[2].textContent, /No print/);
+nodes.get('upload').files = [original]; await nodes.get('upload').onchange({ target: nodes.get('upload') });
+stored = undefined;
+nodes.get('views').children[3].onclick(); await wait();
 nodes.get('width').value = '1000'; nodes.get('width').onchange();
 assert.equal(Number(nodes.get('width').value), 3, 'Sleeve resize is capped');
 nodes.get('product').value = 'everyday-hoodie'; nodes.get('product').onchange();

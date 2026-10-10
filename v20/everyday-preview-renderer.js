@@ -17,10 +17,10 @@ export function guideFor(draft, view) {
   // Wearer's left is on the viewer's right in the front view.
   if (draft.product === 'everyday-polo' && view === 'front') return { x: 444, y: 235, scale: 26, width: 78, height: 78 };
   const calibration = {
-    'everyday-tshirt': { bodyY: 180, bodyScale: 18, sleeveY: 250, sleeveScale: 26, sleeveLeftCenter: 380 },
-    'everyday-long-sleeve': { bodyY: 210, bodyScale: 18, sleeveY: 270, sleeveScale: 24, sleeveLeftCenter: 420 },
+    'everyday-tshirt': { bodyY: 180, bodyScale: 18, sleeveY: 225, sleeveScale: 26, sleeveLeftCenter: 425 },
+    'everyday-long-sleeve': { bodyY: 210, bodyScale: 18, sleeveY: 270, sleeveScale: 24, sleeveLeftCenter: 440 },
     'everyday-hoodie': { bodyY: view === 'front' ? 210 : 240, bodyScale: 18, sleeveY: 280, sleeveScale: 24, sleeveLeftCenter: 400 },
-    'everyday-polo': { bodyY: 200, bodyScale: 18, sleeveY: 250, sleeveScale: 26, sleeveLeftCenter: 380 },
+    'everyday-polo': { bodyY: 200, bodyScale: 18, sleeveY: 235, sleeveScale: 26, sleeveLeftCenter: 415 },
   }[draft.product];
   const scale = sleeve ? calibration.sleeveScale : calibration.bodyScale;
   const center = sleeve ? (view === 'left' ? calibration.sleeveLeftCenter : 800 - calibration.sleeveLeftCenter) : 400;
