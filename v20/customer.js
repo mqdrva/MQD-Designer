@@ -1,3 +1,4 @@
+import { takeEverydayReturn } from './everyday-account.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {shippingCentsForQuantity} from './checkout-pricing.js';
 import {garmentPrice,halloweenActive,BASE_CENTS,pricingEpoch} from './promotion-pricing.js';
@@ -877,6 +878,8 @@ async function openCustomerAccount(){
 async function completeAuth(session){
   currentSession=session;updateAccountButton();
   if(!session)return;
+  const everydayReturn=takeEverydayReturn(sessionStorage);
+  if(everydayReturn){window.location.assign(everydayReturn);return;}
   $('authOverlay').classList.add('hidden');
   const action=pendingAfterAuth;pendingAfterAuth=null;
   if(action)setTimeout(()=>action(),0);

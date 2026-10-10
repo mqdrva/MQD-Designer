@@ -18,11 +18,17 @@ export async function everydayProductionZip(detail, fetchBlob) {
     if (sheet.locations[view].status === 'No print') continue;
     const originals = assets.filter(a => a.zone_name === view && a.metadata?.kind === 'original-source');
     if (originals.length !== 1 || !originals[0].download_url) throw new Error(`Original artwork for ${view} is missing.`);
-    const name = `originals/${view}-${safeArtworkName(originals[0].original_filename)}`;
+    const name = `${sheet.locations[view].texts?.length ? 'prints' : 'originals'}/${view}-${safeArtworkName(originals[0].original_filename)}`;
     entries.push({ name, data: await fetchBlob(originals[0].download_url) }); sheet.locations[view].originalFile = name;
+    if (sheet.locations[view].sourceFilename) {
+      const uploads = assets.filter(a => a.zone_name === view && a.metadata?.kind === 'upload-source');
+      if (uploads.length !== 1 || !uploads[0].download_url) throw new Error(`Untouched upload for ${view} is missing.`);
+      const uploadName = `originals/${view}-${safeArtworkName(uploads[0].original_filename)}`;
+      entries.push({ name:uploadName, data:await fetchBlob(uploads[0].download_url) }); sheet.locations[view].uploadedFile = uploadName;
+    }
   }
   entries.push({ name: 'order-sheet.json', data: JSON.stringify(sheet, null, 2) });
   entries.push({ name: 'order-summary.json', data: JSON.stringify({ orderNumber: order.order_number, status: sheet.status, customer: { name: order.customer_name, email: order.customer_email, phone: order.customer_phone }, shipping: { name: order.shipping_name, address: order.shipping_address }, items: detail.items || [], paidAt: order.paid_at, createdAt: order.created_at }, null, 2) });
-  entries.push({ name: 'READ-ME.txt', data: `${sheet.status.toUpperCase()}\nPrint method: ${sheet.printMethodLabel}\nFour garment previews and untouched original uploaded files.\nPrint measurements are inches from the top-left of each allowed print area.\nThe garment color is a manufacturer color name. No whole-garment color printing is required.\nConfirm blank fit and placement against the actual garment before production.\n` });
+  entries.push({ name: 'READ-ME.txt', data: `${sheet.status.toUpperCase()}\nPrint method: ${sheet.printMethodLabel}\nFour garment previews and untouched original uploaded files. Text zones include transparent print PNGs at 300 pixels per inch; order-sheet.json gives physical dimensions and editable text settings.\nPrint measurements are inches from the top-left of each allowed print area.\nThe garment color is a manufacturer color name. No whole-garment color printing is required.\nConfirm blank fit and placement against the actual garment before production.\n` });
   return makeZip(entries);
 }

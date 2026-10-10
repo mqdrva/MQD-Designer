@@ -17,7 +17,7 @@ function element(id = '') {
 let nodes;
 function setup() {
   nodes = new Map();
-  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip'];
+  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadSheet','downloadZip','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
   for (const id of ids) nodes.set(id, element(id));
   nodes.get('printMethod').value='transfer';
   const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
@@ -88,10 +88,35 @@ assert.equal(nodes.get('product').value, 'everyday-hoodie'); assert.equal(nodes.
 assert.equal(nodes.get('size').value,'4XL','A saved 4XL device draft restores its size');
 assert.equal(nodes.get('printMethod').value,'dtg','The chosen print method restores with the original artwork');
 assert.equal(nodes.get('artName').textContent, 'customer-logo.png');
+// Actual text/image selection, corner resizing and independent deletion.
+nodes.get('addText').onclick(); await wait();
+nodes.get('textContent').value = 'MY TEAM'; nodes.get('textContent').oninput(); await wait();
+nodes.get('smaller').onclick(); await wait(); await nodes.get('saveDraft').onclick();
+assert.equal(stored.artwork.front.texts[0].text,'MY TEAM');
+assert(stored.artwork.front.file,'Text preserves the uploaded image');
+const textBefore = {...stored.artwork.front.texts[0].placement};
+const {guideFor} = await import('../v20/everyday-preview-renderer.js'); const guide = guideFor(stored,'front');
+const c = nodes.get('preview'), event = (x,y) => ({clientX:x,clientY:y,pointerId:1});
+c.onpointerdown(event(guide.x+(textBefore.x+textBefore.width)*guide.scale,guide.y+(textBefore.y+textBefore.height)*guide.scale));
+c.onpointermove(event(guide.x+(textBefore.x+textBefore.width*.6)*guide.scale,guide.y+(textBefore.y+textBefore.height*.6)*guide.scale)); c.onpointerup();
+await wait(); await nodes.get('saveDraft').onclick(); assert(stored.artwork.front.texts[0].placement.width < textBefore.width,'Corner handles resize text');
+await nodes.get('downloadZip').onclick(); assert.equal(downloads.at(-1).filename,'everyday-hoodie-draft.zip');
+nodes.get('remove').onclick(); await wait(); await nodes.get('saveDraft').onclick();
+assert.equal(stored.artwork.front.texts.length,0); assert(stored.artwork.front.file,'Removing selected text preserves image');
 const navigation = fs.readFileSync(new URL('v20/everyday-entry.js', root), 'utf8');
 const actions = element(), navigationDocument = { querySelector: () => actions, getElementById: () => null, createElement: () => element() };
 vm.runInNewContext(navigation, { URLSearchParams, location: { search: '' }, document: navigationDocument }); assert.equal(actions.children.length, 1); assert.equal(actions.children[0].href, '/everyday.html');
 vm.runInNewContext(navigation, { URLSearchParams, location: { search: '?everydayPreview=1' }, document: navigationDocument }); assert.equal(actions.children[0].textContent, 'Everyday Custom');
+// Shared Google sign-in saves the design before navigation; return paths are allowlisted.
+const { everydayGoogleSignIn, takeEverydayReturn, customerOrders } = await import('../v20/everyday-account.js');
+const memory=new Map(),authStorage={getItem:key=>memory.get(key),setItem:(key,value)=>memory.set(key,value),removeItem:key=>memory.delete(key)};
+let savedBeforeAuth=false,options;
+await everydayGoogleSignIn({auth:{signInWithOAuth:async input=>{assert(savedBeforeAuth);options=input;return {error:null};}}},async()=>{savedBeforeAuth=true;},authStorage,'https://mymerchnow.app',false);
+assert.equal(options.provider,'google');assert.equal(options.options.redirectTo,'https://mymerchnow.app/');assert.equal(takeEverydayReturn(authStorage),'/everyday.html');assert.equal(takeEverydayReturn(authStorage),null);
+memory.set('mqd-everyday-auth-return','https://evil.invalid');assert.equal(takeEverydayReturn(authStorage),null);
+const filters=[];const query={select(){return this;},eq(key,value){filters.push([key,value]);return this;},order(){return this;},limit:async()=>({data:[{order_number:'MQD-OWNED'}],error:null})};
+assert.equal((await customerOrders({from:()=>query},{id:'customer-id'}))[0].order_number,'MQD-OWNED');assert.deepEqual(filters,[['user_id','customer-id'],['is_test',false]]);
+await assert.rejects(customerOrders({from:()=>query},{is_anonymous:true,id:'guest'}),/Sign in/);
 URL.createObjectURL = realCreate; URL.revokeObjectURL = realRevoke;
 console.log('PASS: actual editor upload, bounds, product switching, quantity validation, original-file storage, ZIP download, draft restoration, and shared navigation.');
 process.exit(0);
