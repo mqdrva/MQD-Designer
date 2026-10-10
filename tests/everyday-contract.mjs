@@ -29,3 +29,27 @@ assert.deepEqual(sheet.locations.back, { status: 'No print' });
 assert.equal(draft.artwork.front.file, original);
 assert.equal(await draft.artwork.front.file.text(), 'original bytes');
 console.log('PASS: Everyday print bounds, aspect ratio, dimensions and source-file separation.');
+
+const { colorsForProduct, sizesForProduct, PRODUCT_OPTIONS } = await import('../v20/everyday-catalog.js');
+const backend = await import('../supabase/functions/_shared/mqd-everyday.js');
+const fs = await import('node:fs');
+assert.equal(fs.readFileSync(new URL('../v20/everyday-catalog.js', import.meta.url), 'utf8'), fs.readFileSync(new URL('../supabase/functions/_shared/mqd-everyday-catalog.js', import.meta.url), 'utf8'));
+const config = backend.everydayPricing(fs.readFileSync(new URL('../config/everyday-pricing.example.json', import.meta.url), 'utf8'));
+const { draftQuote } = await import('../v20/everyday-checkout.js');
+for (const product of Object.keys(PRODUCT_OPTIONS)) {
+  assert.equal(colorsForProduct(product).length, 10);
+  for (const color of colorsForProduct(product)) for (const size of sizesForProduct(product, color)) {
+    const sample = { ...draft, product, color, size, quantity: 1, artwork: { front: { name: 'logo.png', file: original, placement: { x: 0, y: 0, width: 2, height: 2 } } } };
+    const sheet = orderSheet(sample);
+    const payload = { range: 'everyday', product: { id: product }, everyday: sheet, orderOptions: [{ size, quantity: 1 }], totalQuantity: 1 };
+    assert.equal(backend.everydayQuote(payload, config).unitCents, draftQuote(sample, config).unitCents);
+  }
+}
+assert(sizesForProduct('everyday-tshirt', 'Black').includes('6XL'));
+assert(!sizesForProduct('everyday-tshirt', 'Gold').includes('6XL'));
+assert(sizesForProduct('everyday-hoodie', 'White').includes('XS'));
+assert(!sizesForProduct('everyday-hoodie', 'Charcoal').includes('XS'));
+assert(!sizesForProduct('everyday-hoodie', 'White').includes('6XL'));
+assert(!sizesForProduct('everyday-polo', 'White').includes('5XL'));
+for (const [product,color,size] of [['everyday-tshirt','Gold','6XL'],['everyday-hoodie','Forest','XS'],['everyday-polo','Purple','L']]) assert.throws(()=>orderSheet({...draft,product,color,size}),/approved Everyday size/);
+console.log('PASS: all garment/color/size combinations, exact frontend/backend catalog parity, invalid variants and extended-size pricing.');

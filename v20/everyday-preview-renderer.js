@@ -1,16 +1,16 @@
 import { artworkLayers, drawText, loadTextFonts } from './everyday-layers.js';
 import { ZONES } from './everyday-contract.js';
 export const PRODUCTS = {
-  'everyday-tshirt': { name: 'Cotton T-shirt', model: 'tshirt', proposedBlank: 'Gildan 5000' },
-  'everyday-long-sleeve': { name: 'Cotton long sleeve', model: 'long-sleeve', proposedBlank: 'Gildan 2400' },
-  'everyday-hoodie': { name: 'Hoodie', model: 'hoodie', proposedBlank: 'Gildan 18500' },
-  'everyday-polo': { name: 'Polo', model: 'polo', proposedBlank: 'Gildan 8800' },
+  'everyday-tshirt': { name: 'Cotton T-shirt', model: 'tshirt' },
+  'everyday-long-sleeve': { name: 'Cotton long sleeve', model: 'long-sleeve' },
+  'everyday-hoodie': { name: 'Hoodie', model: 'hoodie' },
+  'everyday-polo': { name: 'Polo', model: 'polo' },
 };
 // Display approximations only. Orders identify blanks by manufacturer color name.
-export const COLOR_PREVIEW = { White: '#ffffff', Black: '#252525', Navy: '#26364c', Royal: '#2559ac', Red: '#c42a37', 'Sport Grey': '#b6b6b6', Charcoal: '#56565a', 'Dark Heather': '#606065', 'Forest Green': '#284b3b', Purple: '#563576', Gold: '#efb431' };
+export const COLOR_PREVIEW = { White: '#ffffff', Black: '#252525', Navy: '#26364c', Royal: '#2559ac', Red: '#c42a37', 'Sport Grey': '#b6b6b6', Charcoal: '#56565a', 'Dark Heather': '#606065', 'Forest Green': '#284b3b', Forest: '#284b3b', 'Light Blue': '#a8c8df', Sand: '#d2c4ad', Purple: '#563576', Gold: '#efb431' };
 export function zoneFor(draft, view) {
   if (draft.product === 'everyday-polo' && view === 'front') return { label: 'Left chest', width: 3, height: 3 };
-  if (draft.size === 'S' && (view === 'front' || view === 'back')) return { ...ZONES[view], width: 10, height: 12 };
+  if (['XS', 'S'].includes(draft.size) && (view === 'front' || view === 'back')) return { ...ZONES[view], width: 10, height: 12 };
   return ZONES[view];
 }
 export function guideFor(draft, view) {
