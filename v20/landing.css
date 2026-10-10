@@ -19,3 +19,14 @@
 .garment-list{list-style:none;margin:20px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:28px}.garment-list li{min-width:0;border-bottom:1px solid #e7e7e7}.garment-list a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:12px 2px;color:#242424;text-decoration:none;font-size:15px;font-weight:650;line-height:1.4}.garment-list a:hover,.garment-list a:focus-visible{color:#a64200;background:#fff7f0}.garment-list a>span:last-child{flex:none;color:#a64200}@media(max-width:700px){.garment-list{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px}.garment-list a{font-size:14px}}@media(max-width:440px){.garment-list{grid-template-columns:1fr}}
 
 .customer-video-section{margin-bottom:0}.customer-videos{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,340px));justify-content:center;gap:20px}.customer-video{margin:0;overflow:hidden;border:1px solid #e7e7e7;border-radius:18px;background:#171717;box-shadow:0 8px 28px rgba(0,0,0,.08)}.customer-video-player{display:block;width:100%;height:auto;aspect-ratio:9/16;object-fit:contain;background:#171717}@media(max-width:440px){.customer-videos{grid-template-columns:minmax(0,1fr)}.customer-video{max-width:340px;width:100%;justify-self:center}}
+
+/* Both apparel ranges remain available outside the mobile menu. */
+.landing-page .everyday-home-link{background:#171717;color:#fff;border-color:#171717}
+.landing-page .everyday-home-link:hover,.landing-page .everyday-home-link:focus-visible{background:#343434;color:#fff}
+.landing-page .site-header nav .everyday-home-link{display:inline-flex;align-items:center;justify-content:center}
+.business-guide-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+.business-guide-list li{min-width:0;border-bottom:1px solid #e7e7e7}
+.business-guide-list a{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding:14px 0;text-decoration:none}
+.business-guide-list strong{font-size:15px}.business-guide-list a>span:not(.business-guide-arrow){grid-column:1;font-size:14px;color:#555;line-height:1.4}
+.business-guide-arrow{grid-column:2;grid-row:1/3;color:#a64200}.business-guide-list a:hover strong{color:#a64200}
+@media(max-width:620px){.landing-page .site-header{flex-wrap:wrap;gap:10px}.landing-page .site-header nav{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}.landing-page .site-header nav a{padding:11px 8px;text-align:center}.landing-page .hero-actions>.everyday-home-link{width:100%}.business-guide-list{grid-template-columns:1fr}}
