@@ -1,7 +1,7 @@
 import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
 import { connectEverydayAccount } from './everyday-account.js';
 import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork } from './everyday-contract.js';
-import { PRODUCTS, zoneFor, guideFor, photoKey, bitmap, drawPreview } from './everyday-preview-renderer.js';
+import { PRODUCTS, zoneFor, guideFor, photoKey, bitmap, drawPreview, COLOR_PREVIEW } from './everyday-preview-renderer.js';
 import { connectEverydayCheckout } from './everyday-checkout.js';
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
@@ -20,6 +20,27 @@ async function readImage(file) {
   if (image.width * image.height > 40000000) throw new Error('Choose an image under 40 megapixels.');
   return image;
 }
+function syncChoices(id, choices, value, nativeId, swatches = false) {
+  const group = $(id);
+  if (group.children.length !== choices.length || choices.some(([key], i) => group.children[i].dataset.value !== key)) {
+    group.replaceChildren(...choices.map(([key, label]) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn choice-button'; button.dataset.value = key;
+      if (swatches) { button.className += ' color-swatch'; button.style.setProperty('--swatch', COLOR_PREVIEW[key]); button.setAttribute('aria-label', label); button.title = label; }
+      else button.textContent = label;
+      button.onclick = () => { if (busy) return; $(nativeId).value = key; $(nativeId).onchange(); };
+      return button;
+    }));
+  }
+  for (const button of group.children) { button.setAttribute('aria-pressed', String(button.dataset.value === value)); button.disabled = busy; }
+}
+function syncOptions() {
+  syncChoices('productChoices', Object.entries(PRODUCTS).map(([id, p]) => [id, p.name]), draft.product, 'product');
+  syncChoices('colorChoices', colorsForProduct(draft.product).map(color => [color, color]), draft.color, 'color', true);
+  syncChoices('sizeChoices', SIZES.map(size => [size, size]), draft.size, 'size');
+  $('colorName').textContent = draft.color;
+  $('quantityMinus').disabled = busy || Number($('quantity').value) <= 1;
+  $('quantityPlus').disabled = busy || Number($('quantity').value) >= 99;
+}
 function selected() {
   const layers = artworkLayers(draft.artwork[view]);
   let layer = layers.find(item => item.id === selectedLayer);
@@ -27,16 +48,14 @@ function selected() {
   return layer;
 }
 function controls() {
+  syncOptions();
   const art = draft.artwork[view], zone = zoneFor(draft, view), layer = selected(), item = layer?.data;
   $('zoneLabel').textContent = `${zone.label} · Maximum ${zone.width} × ${zone.height} inches`;
   $('artName').textContent = layer ? `${layer.kind === 'text' ? 'Text: ' : ''}${layer.name}` : 'No print';
   $('artworkHeading').textContent = `${zone.label} artwork`;
   $('layers').replaceChildren(...artworkLayers(art).map(entry => { const button = document.createElement('button'); button.type = 'button'; button.className = 'btn'; button.textContent = `${entry.kind === 'image' ? 'Image' : 'Text'}: ${entry.name}`; button.setAttribute('aria-pressed', String(entry.id === selectedLayer)); button.onclick = () => { selectedLayer = entry.id; render(); }; return button; }));
-  for (const key of ['width', 'x', 'y']) { $(key).disabled = !item; $(key).value = item ? item.placement[key].toFixed(2) : ''; }
-  $('width').max = zone.width;
   for (const id of ['remove','smaller','larger','centerArtwork']) $(id).disabled = !item;
   $('remove').textContent = layer?.kind === 'text' ? `Remove text from ${zone.label.toLowerCase()}` : `Remove from ${zone.label.toLowerCase()}`;
-  $('dimensions').textContent = item ? `${item.placement.width.toFixed(2)} × ${item.placement.height.toFixed(2)} inches` : '';
   $('textTools').hidden = layer?.kind !== 'text';
   if (layer?.kind === 'text') {
     const fields = { textContent: 'text', textFont: 'font', textColor: 'color', textOutline: 'outline', textOutlineColor: 'outlineColor', textAlign: 'align' };
@@ -110,7 +129,14 @@ function applyLimits() { for (const v of VIEWS) for (const layer of artworkLayer
 $('product').onchange = () => { draft.product = $('product').value; updateColors(); applyLimits(); drag = null; status('Garment changed. Artwork fitted to its proposed print limits; review dimensions.'); render(); };
 $('color').onchange = () => { draft.color = $('color').value; drag = null; render(); };
 $('size').onchange = () => { draft.size = $('size').value; applyLimits(); status('Size changed. Review artwork dimensions against the proposed limits.'); render(); };
-$('quantity').onchange = () => { try { selection(); checkout.refresh(); } catch (error) { status(error.message); } };
+$('quantity').onchange = () => { try { selection(); checkout.refresh(); } catch (error) { status(error.message); } syncOptions(); };
+for (const [id, delta] of [['quantityMinus', -1], ['quantityPlus', 1]]) $(id).onclick = () => {
+  if (busy) return;
+  const current = Number($('quantity').value);
+  $('quantity').value = Math.min(99, Math.max(1, (Number.isInteger(current) ? current : draft.quantity) + delta));
+  $('quantity').onchange();
+};
+$('uploadArtwork').onclick = () => { if (!busy) $('upload').click(); };
 if ($('printMethod')) $('printMethod').onchange = () => { try { selection(); checkout.refresh(); status(`${PRINT_METHODS[draft.printMethod]} selected. Review your updated price.`); } catch (error) { status(error.message); } };
 $('saveDraft').onclick = save;
 if ($('resetPhotos')) $('resetPhotos').onclick = () => { draft.photos = {}; status('Standard garment previews restored.'); render(); };
@@ -124,14 +150,6 @@ for (const [id, photoMode] of [['upload', false], ['photo', true]]) $(id).onchan
     status(photoMode ? 'Photo added. Guide calibration remains provisional.' : 'Original artwork retained. Adjust its print size and position.'); render();
   } catch (error) { status(error.message); }
   finally { event.target.value = ''; }
-};
-for (const key of ['width', 'x', 'y']) $(key).onchange = () => {
-  const art = selected()?.data; if (!art) return;
-  try {
-    const value = Number($(key).value);
-    if (!Number.isFinite(value) || (key === 'width' && value < .1)) throw new Error('Enter a valid measurement.');
-    art.placement = key === 'width' ? resizeArtwork(art.placement, value, zoneFor(draft, view)) : constrainPlacement({ ...art.placement, [key]: value }, zoneFor(draft, view)); render();
-  } catch (error) { status(error.message); controls(); }
 };
 function removeSelected() {
   const layer = selected(), art = draft.artwork[view]; if (!layer) return;

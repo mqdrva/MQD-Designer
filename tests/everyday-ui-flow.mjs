@@ -9,7 +9,7 @@ let stored, latestDownload;
 const downloads = [];
 const wait = () => new Promise(resolve => setTimeout(resolve, 20));
 function element(id = '') {
-  return { id, value: id === 'quantity' ? '1' : id === 'size' ? 'L' : '', disabled: false, children: [], dataset: {}, attributes: {}, textContent: '',
+  return { id, value: id === 'quantity' ? '1' : id === 'size' ? 'L' : '', disabled: false, children: [], dataset: {}, attributes: {}, textContent: '', style: { setProperty() {} },
     setAttribute(key, value) { this.attributes[key] = value; }, append(child) { this.children.push(child); }, prepend(child) { this.children.unshift(child); },
     replaceChildren(...children) { this.children = children; }, add(option) { this.children.push(option); if (!this.value) this.value = option.value; },
     click() { downloads.push({ filename: this.download, blob: latestDownload }); } };
@@ -17,7 +17,7 @@ function element(id = '') {
 let nodes;
 function setup() {
   nodes = new Map();
-  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','width','x','y','dimensions','remove','review','upload','photo','status','downloadPreview','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
+  const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','remove','review','upload','photo','status','downloadPreview','productChoices','colorChoices','sizeChoices','colorName','quantityMinus','quantityPlus','uploadArtwork','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
   for (const id of ids) nodes.set(id, element(id));
   nodes.get('printMethod').value='transfer';
   const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
@@ -44,9 +44,21 @@ URL.createObjectURL = blob => { latestDownload = blob; return 'blob:development-
 setup();
 await import('../v20/everyday.js?test=first'); await wait();
 assert.equal(nodes.get('product').children.length, 4); assert.equal(nodes.get('color').children.length, 10);
-nodes.get('product').value = 'everyday-polo'; nodes.get('product').onchange(); await wait();
+assert.equal(nodes.get('productChoices').children.length, 4);
+assert.equal(nodes.get('colorChoices').children.length, 10);
+nodes.get('colorChoices').children.find(button => button.dataset.value === 'Royal').onclick(); await wait();
+assert.equal(nodes.get('colorName').textContent, 'Royal');
+assert.equal(nodes.get('colorChoices').children.find(button => button.dataset.value === 'Royal').attributes['aria-pressed'], 'true');
+nodes.get('quantityMinus').onclick(); assert.equal(Number(nodes.get('quantity').value), 1);
+nodes.get('quantityPlus').onclick(); assert.equal(Number(nodes.get('quantity').value), 2);
+nodes.get('quantity').value = '99'; nodes.get('quantity').onchange(); nodes.get('quantityPlus').onclick(); assert.equal(Number(nodes.get('quantity').value), 99);
+nodes.get('quantity').value = '1'; nodes.get('quantity').onchange();
+nodes.get('colorChoices').children.find(button => button.dataset.value === 'White').onclick(); await wait();
+nodes.get('productChoices').children.find(button => button.dataset.value === 'everyday-polo').onclick(); await wait();
 assert(nodes.get('color').children.some(option => option.value === 'Dark Heather'));
 assert(!nodes.get('color').children.some(option => option.value === 'Charcoal'));
+assert(nodes.get('colorChoices').children.some(button => button.dataset.value === 'Dark Heather'));
+assert(!nodes.get('colorChoices').children.some(button => button.dataset.value === 'Charcoal'));
 assert(nodes.get('zoneLabel').textContent.includes('Left chest · Maximum 3 × 3'));
 assert.equal(nodes.get('views').children[0].textContent, 'Left chest');
 const logo = createCanvas(200, 100); logo.getContext('2d').fillStyle = '#ffffff'; logo.getContext('2d').fillRect(0, 0, 200, 100);
@@ -68,12 +80,13 @@ assert.match(nodes.get('review').children[2].textContent, /No print/);
 nodes.get('upload').files = [original]; await nodes.get('upload').onchange({ target: nodes.get('upload') });
 stored = undefined;
 nodes.get('views').children[3].onclick(); await wait();
-nodes.get('width').value = '1000'; nodes.get('width').onchange();
-assert.equal(Number(nodes.get('width').value), 3, 'Sleeve resize is capped');
+nodes.get('larger').onclick(); await nodes.get('saveDraft').onclick();
+assert.equal(stored.artwork.right.placement.width, 3, 'Button resizing is capped to the sleeve print area');
+stored = undefined;
 nodes.get('product').value = 'everyday-hoodie'; nodes.get('product').onchange();
 nodes.get('views').children[0].onclick(); await wait();
 assert(nodes.get('zoneLabel').textContent.includes('12 × 15'), 'Hoodie uses the same body print dimensions as the shirts');
-nodes.get('size').value='4XL';nodes.get('size').onchange();await wait();
+nodes.get('sizeChoices').children.find(button => button.dataset.value === '4XL').onclick();await wait();
 nodes.get('quantity').value = '1.5'; await nodes.get('saveDraft').onclick(); assert.equal(stored, undefined);
 nodes.get('quantity').value = '3'; await nodes.get('saveDraft').onclick();
 nodes.get('printMethod').value='dtg';nodes.get('printMethod').onchange();await nodes.get('saveDraft').onclick();
@@ -130,6 +143,11 @@ memory.set('mqd-everyday-auth-return','https://evil.invalid');assert.equal(takeE
 const filters=[];const query={select(){return this;},eq(key,value){filters.push([key,value]);return this;},order(){return this;},limit:async()=>({data:[{order_number:'MQD-OWNED'}],error:null})};
 assert.equal((await customerOrders({from:()=>query},{id:'customer-id'}))[0].order_number,'MQD-OWNED');assert.deepEqual(filters,[['user_id','customer-id'],['is_test',false]]);
 await assert.rejects(customerOrders({from:()=>query},{is_anonymous:true,id:'guest'}),/Sign in/);
+for (const page of ['everyday.html', 'everyday-preview.html']) {
+  const html = fs.readFileSync(new URL(page, root), 'utf8');
+  assert(!html.includes('Print width in inches') && !html.includes('Left offset') && !html.includes('Top offset'));
+  assert(html.includes('id="uploadArtwork"') && html.includes('id="colorChoices"'));
+}
 URL.createObjectURL = realCreate; URL.revokeObjectURL = realRevoke;
 console.log('PASS: actual editor upload, bounds, product switching, quantity validation, original-file storage, current-view PNG download, draft restoration, and shared navigation.');
 process.exit(0);
