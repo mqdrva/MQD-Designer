@@ -80,3 +80,5 @@ header{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:
   .workarea{width:calc(100% - 78px);height:calc(100% - 106px);margin-left:58px}
   .zone-icon{min-height:44px}
 }
+
+.premium-range-note{margin:0 0 12px;padding:10px 12px;border:1px solid #f0d4bd;border-radius:9px;background:#fff7f0;color:#6b350b;font-size:11px;line-height:1.6}.premium-range-note strong{font-size:12px;color:#422308}
