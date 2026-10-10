@@ -227,4 +227,33 @@ for(const id of Object.keys(everyday.EVERYDAY_CATALOG)) for(const size of ['2XL'
   const production=await everydayProductionZip({order,items:[item],assets:savedAssets},path=>blobs.get(path));
   if(process.env.EVERYDAY_EXTENDED_ZIPS)fs.writeFileSync(process.env.EVERYDAY_EXTENDED_ZIPS+'/'+id+'-'+size+'.zip',Buffer.from(await production.arrayBuffer()));
 }
-console.log('PASS: real four-view exports, original bytes, server pricing and bounds, upload failure isolation, account/guest/sandbox ownership, mixed cart checkout through all three handlers, tampering rejection, existing shipping, and Everyday production ZIP.');
+// Text-only and image-plus-text orders preserve both print layout and source bytes.
+const textLayer = placement => ({ id:crypto.randomUUID(), text:'MY TEAM', font:'Inter', color:'#111111', outline:0, outlineColor:'#ffffff', bold:true, italic:false, align:'center', placement });
+const layered = draft(); for (const art of Object.values(layered.artwork)) art.texts = [textLayer({x:.5,y:1,width:1.5,height:.5})];
+const beforePrice = draftQuote(draft(),pricing).unitCents;
+assert.equal(draftQuote(layered,pricing).unitCents,beforePrice,'Multiple layers in a printed zone do not add a location fee');
+actor={id:'account-fixture',email:'fixture@example.invalid',app_metadata:{provider:'google'}};
+const layeredForm = await formFor(layered), layeredReplay = new FormData(); for(const [key,value] of layeredForm)layeredReplay.append(key,value);
+assert.equal(layeredForm.getAll('asset').length,12);
+const layeredResponse=await submit(request(layeredForm,true)); assert.equal(layeredResponse.status,200,await layeredResponse.clone().text());
+assert.equal((await submit(request(layeredReplay,true))).status,200,'Layered submissions are idempotent');
+const layeredOrder=structuredClone(db.mqd_orders.at(-1)),layeredItem=structuredClone(db.mqd_order_items.at(-1));
+const layeredAssets=db.mqd_order_assets.filter(a=>a.order_id===layeredOrder.id).map(a=>({...a,download_url:a.storage_path}));
+assert.equal(layeredAssets.length,12); assert.equal(layeredOrder.user_id,'account-fixture');
+for(const asset of layeredAssets.filter(a=>a.metadata.kind==='upload-source')) assert.deepEqual(Buffer.from(await blobs.get(asset.storage_path).arrayBuffer()),Buffer.from(await original.arrayBuffer()));
+assert.equal(layeredOrder.design_json.everyday.locations.front.texts[0].text,'MY TEAM');
+const compoundZip = await everydayProductionZip({order:layeredOrder,items:[layeredItem],assets:layeredAssets},path=>blobs.get(path));
+assert(Buffer.from(await compoundZip.arrayBuffer()).includes(Buffer.from('prints/front-front-print.png')));
+await assert.rejects(everydayProductionZip({order:layeredOrder,assets:layeredAssets.filter(a=>a.metadata.kind!=='upload-source')},path=>blobs.get(path)),/Untouched upload/);
+assert.equal((await checkout('create-mqd-checkout',layeredOrder,layeredItem)).response.status,200);
+const onlyText={...draft('everyday-polo','L'),artwork:{front:{texts:[textLayer({x:.25,y:.25,width:2.5,height:1})]}}};
+const textForm=await formFor(onlyText); assert.equal(textForm.getAll('asset').length,5);
+const print = textForm.getAll('asset').find(file=>file.name==='front-print.png'), printImage=await loadImage(Buffer.from(await print.arrayBuffer()));
+assert.equal(printImage.width,750); assert.equal(printImage.height,300);
+const printCanvas=createCanvas(750,300);printCanvas.getContext('2d').drawImage(printImage,0,0);
+const rgba=printCanvas.getContext('2d').getImageData(0,0,750,300).data;
+assert.equal(rgba[3],0,'Production text PNG has a transparent background'); assert(rgba.some((value,index)=>index%4===3 && value>0),'Export contains the text glyphs');
+assert.equal((await submit(request(textForm,true))).status,200);
+for(const mutate of [p=>p.everyday.locations.front.texts[0].placement.x=99,p=>p.everyday.locations.front.texts[0].font='unsupported',p=>p.everyday.locations.front.texts[0].text='',p=>p.everyday.locations.front.printRasterDpi=72]) assert.equal((await submit(request(await formFor(onlyText,mutate),true))).status,400);
+const missingUpload=await formFor(layered);const all=missingUpload.getAll('asset'),metas=missingUpload.getAll('assetMeta');missingUpload.delete('asset');missingUpload.delete('assetMeta');for(let i=0;i<all.length;i++)if(JSON.parse(metas[i]).kind!=='upload-source'){missingUpload.append('asset',all[i]);missingUpload.append('assetMeta',metas[i]);}assert.equal((await submit(request(missingUpload,true))).status,400);
+console.log('PASS: layered text and image prints at 300 pixels per inch, transparent production PNGs, preserved uploads, text-only account orders, unchanged pricing, idempotency, validation and all existing checkout paths.');

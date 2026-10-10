@@ -1,3 +1,5 @@
+import { printArtwork } from './everyday-layers.js';
+import { everydayClient } from './everyday-account.js';
 import { VIEWS, PRINT_METHODS, orderSheet } from './everyday-contract.js';
 import { PRODUCTS, drawPreview } from './everyday-preview-renderer.js';
 import { EVERYDAY_RUNTIME } from './everyday-runtime.js';
@@ -33,14 +35,14 @@ export async function buildEverydaySubmission(draft, pricing, { makeCanvas = () 
     const blob = await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('A garment preview could not export.')), 'image/png'));
     form.append('asset', blob, `${view}.png`); form.append('assetMeta', JSON.stringify({ zone: view, kind: 'mockup-view' }));
     const art = draft.artwork[view];
-    if (art) { form.append('asset', art.file, art.name); form.append('assetMeta', JSON.stringify({ zone: view, kind: 'original-source' })); }
+    if (art) { const file = await printArtwork(art, view, { makeCanvas }); form.append('asset', file, file.name || art.name); form.append('assetMeta', JSON.stringify({ zone: view, kind: 'original-source' })); if (art.texts?.length && art.file) { form.append('asset', art.file, art.name); form.append('assetMeta', JSON.stringify({ zone: view, kind: 'upload-source' })); } }
   }
   return { form, payload };
 }
 export async function submissionFingerprint(draft, pricing, test = false) {
   const hex = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(x => x.toString(16).padStart(2,'0')).join('');
   const hashes = [];
-  for (const view of VIEWS) if (draft.artwork[view]) hashes.push([view, await hex(await draft.artwork[view].file.arrayBuffer())]);
+  for (const view of VIEWS) if (draft.artwork[view]?.file) hashes.push([view, await hex(await draft.artwork[view].file.arrayBuffer())]);
   return hex(new TextEncoder().encode(JSON.stringify([orderSheet(draft), draftQuote(draft,pricing), test, hashes])));
 }
 export function appendEverydayCart(storage, draft, result, test = false) {
@@ -59,7 +61,7 @@ export function connectEverydayCheckout({ getDraft, saveDraft, status }, depende
   const message = document.getElementById('everydayCheckoutMessage'), signIn = document.getElementById('everydayTestSignIn'), headerCart = document.getElementById('everydayHeaderCart');
   const request = dependencies.fetch || fetch, storage = dependencies.storage || localStorage;
   const navigate = dependencies.navigate || (url => location.assign(url));
-  const loadClient = dependencies.loadClient || (() => import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm').then(({ createClient }) => createClient(SUPABASE_URL, PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })));
+  const loadClient = dependencies.loadClient || everydayClient;
   let pricing = null, adding = false, sdk;
   function feedback(text, error = false) {
     status(text);
@@ -103,7 +105,7 @@ export function connectEverydayCheckout({ getDraft, saveDraft, status }, depende
   button.onclick = async () => {
     if (adding || !pricing) return;
     adding = true; refresh();
-    const controls = [...document.querySelectorAll('button,input,select')].filter(node => node !== button), states = controls.map(node => node.disabled);
+    const controls = [...document.querySelectorAll('button,input,select,textarea')].filter(node => node !== button), states = controls.map(node => node.disabled);
     controls.forEach(node => node.disabled = true);
     try {
       const snapshot = structuredClone(getDraft()), test = TEST_MODE();

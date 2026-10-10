@@ -1,3 +1,4 @@
+import { artworkBounds } from './everyday-layers.js';
 export const VIEWS = ['front', 'back', 'left', 'right'];
 export const SIZES = Object.freeze(['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL']);
 export const PRINT_METHODS = Object.freeze({ transfer: 'Standard transfer', dtf: 'DTF', dtg: 'DTG' });
@@ -31,6 +32,6 @@ export function orderSheet(draft) {
   return { schemaVersion: 1, range: 'everyday', product: draft.product, color: draft.color, size: draft.size, quantity: draft.quantity,
     printMethod, printMethodLabel: PRINT_METHODS[printMethod],
     units: 'inches', status: 'development-draft', locations: Object.fromEntries(VIEWS.map(view => [view, draft.artwork[view]
-      ? { filename: draft.artwork[view].name, ...draft.artwork[view].placement }
+      ? { filename: draft.artwork[view].texts?.length ? `${view}-print.png` : draft.artwork[view].name, ...artworkBounds(draft.artwork[view]), ...(draft.artwork[view].texts?.length ? { texts: structuredClone(draft.artwork[view].texts), printRasterDpi: 300, ...(draft.artwork[view].file ? { sourceFilename: draft.artwork[view].name } : {}) } : {}) }
       : { status: 'No print' }])) };
 }

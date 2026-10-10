@@ -1,3 +1,4 @@
+import { artworkLayers, drawText, loadTextFonts } from './everyday-layers.js';
 import { ZONES } from './everyday-contract.js';
 export const PRODUCTS = {
   'everyday-tshirt': { name: 'Cotton T-shirt', model: 'tshirt', proposedBlank: 'Gildan 5000' },
@@ -37,7 +38,7 @@ async function modelImage(product, view) {
 export async function drawPreview(canvas, draft, view, { guides = false, draftLabel = false } = {}) {
   const ctx = canvas.getContext('2d'), customPhoto = draft.photos[photoKey(draft, view)];
   const background = customPhoto ? await bitmap(customPhoto) : await modelImage(draft.product, view);
-  const art = draft.artwork[view], artwork = art ? await bitmap(art.file) : null, box = guideFor(draft, view);
+  const art = draft.artwork[view], artwork = art?.file ? await bitmap(art.file) : null, box = guideFor(draft, view);
   ctx.clearRect(0, 0, 800, 900); ctx.fillStyle = '#f7f7f7'; ctx.fillRect(0, 0, 800, 900);
   let shading;
   if (customPhoto) {
@@ -50,15 +51,20 @@ export async function drawPreview(canvas, draft, view, { guides = false, draftLa
     layer.globalCompositeOperation = 'destination-in'; layer.drawImage(background, 0, 0);
     ctx.save(); ctx.shadowColor = '#00000020'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 10; ctx.drawImage(shading, 0, 0); ctx.restore();
   }
-  if (artwork) {
-    const p = art.placement, x = box.x + p.x * box.scale, y = box.y + p.y * box.scale, w = p.width * box.scale, h = p.height * box.scale;
+  if (artworkLayers(art).length) {
+    await loadTextFonts(art);
     const overlay = document.createElement('canvas'); overlay.width = 800; overlay.height = 900;
-    const layer = overlay.getContext('2d'); layer.drawImage(artwork, x, y, w, h);
+    const layer = overlay.getContext('2d');
+    for (const item of artworkLayers(art)) {
+      const p = item.data.placement, target = { x: box.x + p.x * box.scale, y: box.y + p.y * box.scale, width: p.width * box.scale, height: p.height * box.scale };
+      if (item.kind === 'image') layer.drawImage(artwork, target.x, target.y, target.width, target.height);
+      else drawText(layer, item.data, target);
+    }
     if (!customPhoto) {
-      // Geometry luminance adds folds without blending with the blank's dark color.
+      const mask = document.createElement('canvas'); mask.width = 800; mask.height = 900; mask.getContext('2d').drawImage(overlay, 0, 0);
       layer.globalCompositeOperation = 'multiply'; layer.drawImage(background, 0, 0);
-      layer.globalCompositeOperation = 'destination-in'; layer.drawImage(artwork, x, y, w, h);
-      layer.globalCompositeOperation = 'destination-in'; layer.drawImage(background, 0, 0);
+      layer.globalCompositeOperation = 'destination-in'; layer.drawImage(mask, 0, 0);
+      layer.drawImage(background, 0, 0);
     }
     ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y, box.width, box.height); ctx.clip(); ctx.drawImage(overlay, 0, 0); ctx.restore();
   }
