@@ -7,8 +7,15 @@ const hash = async value => Array.from(new Uint8Array(await crypto.subtle.digest
 const check = result => { if (result.error) throw Object.assign(new Error(result.error.message), { code: result.error.code }); return result.data; };
 function textMetadata(sheet, view) {
   const location = sheet.locations[view];
-  if (location.status === 'No print') { if (location.texts || location.sourceFilename) throw new EverydayError('Empty print areas cannot contain text.'); return {}; }
-  if (location.texts === undefined) { if (location.sourceFilename || location.printRasterDpi) throw new EverydayError('Print file metadata is incomplete.'); return {}; }
+  if (location.status === 'No print') { if (location.texts || location.sourceFilename || location.clipped || location.printRasterDpi) throw new EverydayError('Empty print areas cannot contain text.'); return {}; }
+  if (location.clipped !== undefined && location.clipped !== true) throw new EverydayError('Invalid crop metadata.');
+  if (location.texts === undefined) {
+    if (location.clipped === true) {
+      if (location.filename !== `${view}-print.png` || location.printRasterDpi !== 300 || typeof location.sourceFilename !== 'string' || !location.sourceFilename || location.sourceFilename.length > 240) throw new EverydayError('Crop print file metadata is incomplete.');
+      return {clipped:true,printRasterDpi:300,sourceFilename:location.sourceFilename};
+    }
+    if (location.sourceFilename || location.printRasterDpi) throw new EverydayError('Print file metadata is incomplete.'); return {};
+  }
   if (!Array.isArray(location.texts) || !location.texts.length || location.texts.length > 5 || location.printRasterDpi !== 300 || location.filename !== `${view}-print.png`) throw new EverydayError('Invalid text print file.');
   const ids = new Set(), zone = everydayZone(sheet.product, sheet.size, view);
   const texts = location.texts.map(text => {
@@ -18,7 +25,7 @@ function textMetadata(sheet, view) {
     return { id:text.id, text:text.text, font:text.font, color:text.color, outline:text.outline, outlineColor:text.outlineColor, bold:text.bold, italic:text.italic, align:text.align, placement:{ x:p.x,y:p.y,width:p.width,height:p.height } };
   });
   if (location.sourceFilename !== undefined && (typeof location.sourceFilename !== 'string' || !location.sourceFilename || location.sourceFilename.length > 240)) throw new EverydayError('Invalid original upload name.');
-  return { texts, printRasterDpi:300, ...(location.sourceFilename ? { sourceFilename:location.sourceFilename } : {}) };
+  return { texts, printRasterDpi:300, ...(location.clipped ? {clipped:true} : {}), ...(location.sourceFilename ? { sourceFilename:location.sourceFilename } : {}) };
 }
 export async function validateEverydayFiles(form, sheet) {
   const bytes = validateGuestFiles(form), files = form.getAll('asset'), metadata = form.getAll('assetMeta').map(raw => JSON.parse(String(raw)));
@@ -32,7 +39,7 @@ export async function validateEverydayFiles(form, sheet) {
     if (meta.kind === 'mockup-view' && file.type !== 'image/png') throw new EverydayError('Everyday previews must be PNG images.');
     if (meta.kind === 'original-source' && (sheet.locations[meta.zone].status === 'No print' || sheet.locations[meta.zone].filename !== file.name)) throw new EverydayError('Original artwork does not match its print area.');
     if (meta.kind === 'upload-source' && sheet.locations[meta.zone].sourceFilename !== file.name) throw new EverydayError('Uploaded original does not match its print area.');
-    if (meta.kind === 'original-source' && sheet.locations[meta.zone].texts && file.type !== 'image/png') throw new EverydayError('Text print files must be PNG images.');
+    if (meta.kind === 'original-source' && (sheet.locations[meta.zone].texts || sheet.locations[meta.zone].clipped) && file.type !== 'image/png') throw new EverydayError('Text print files must be PNG images.');
     const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
     const valid = file.type === 'image/png' ? [137,80,78,71,13,10,26,10].every((v,j) => header[j] === v)
       : file.type === 'image/jpeg' ? header[0] === 255 && header[1] === 216 && header[2] === 255

@@ -3,7 +3,7 @@ import { installTryOn } from './try-on-entry.js?v=20261010-live';
 import { PRODUCT_OPTIONS, sizesForProduct } from './everyday-catalog.js';
 import { artworkLayers, artworkBounds, TEXT_FONTS } from './everyday-layers.js';
 import { connectEverydayAccount } from './everyday-account.js';
-import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork } from './everyday-contract.js';
+import { VIEWS, ZONES, COLORS, colorsForProduct, SIZES, PRINT_METHODS, fitArtwork, constrainPlacement, resizeArtwork, constrainImagePlacement, resizeImageArtwork } from './everyday-contract.js';
 import { PRODUCTS, zoneFor, guideFor, photoKey, bitmap, drawPreview, COLOR_PREVIEW } from './everyday-preview-renderer.js';
 import { connectEverydayCheckout } from './everyday-checkout.js';
 const $ = id => document.getElementById(id);
@@ -137,7 +137,7 @@ function updateSizes() {
 }
 updateColors(); updateSizes();
 for (const [id, product] of Object.entries(PRODUCTS)) $('product').add(new Option(product.name, id));
-function applyLimits() { for (const v of VIEWS) for (const layer of artworkLayers(draft.artwork[v])) layer.data.placement = constrainPlacement(layer.data.placement, zoneFor(draft, v)); }
+function applyLimits() { for (const v of VIEWS) for (const layer of artworkLayers(draft.artwork[v])) layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)(layer.data.placement, zoneFor(draft, v)); }
 $('product').onchange = () => { draft.product = $('product').value; updateColors(); updateSizes(); applyLimits(); drag = null; status('Garment changed. Artwork fitted to its proposed print limits; review dimensions.'); render(); };
 $('color').onchange = () => { draft.color = $('color').value; updateSizes(); applyLimits(); drag = null; render(); };
 $('size').onchange = () => { draft.size = $('size').value; applyLimits(); status('Size changed. Review artwork dimensions against the proposed limits.'); render(); };
@@ -187,7 +187,7 @@ for (const [id,key] of Object.entries({ textContent:'text', textFont:'font', tex
   if (key === 'outline' && (!Number.isFinite(value) || value < 0 || value > 10)) return;
   item.data[key] = value; render();
 };
-function scaleSelected(factor) { const layer = selected(); if (!layer) return; layer.data.placement = resizeArtwork(layer.data.placement, Math.max(.1, layer.data.placement.width * factor), zoneFor(draft, view)); render(); }
+function scaleSelected(factor) { const layer = selected(); if (!layer) return; layer.data.placement = (layer.kind === 'image' ? resizeImageArtwork : resizeArtwork)(layer.data.placement, Math.max(.1, layer.data.placement.width * factor), zoneFor(draft, view)); render(); }
 $('smaller').onclick = () => scaleSelected(.9); $('larger').onclick = () => scaleSelected(1.1);
 $('centerArtwork').onclick = () => { const layer = selected(); if (!layer) return; const p = layer.data.placement, zone = zoneFor(draft, view); layer.data.placement = { ...p, x:(zone.width-p.width)/2, y:(zone.height-p.height)/2 }; render(); };
 function point(event) { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * 800 / rect.width, y: (event.clientY - rect.top) * 900 / rect.height }; }
@@ -210,19 +210,19 @@ canvas.onpointermove = event => {
   if (!drag || drag.view !== view) return;
   const layer = artworkLayers(draft.artwork[view]).find(item => item.id === drag.id); if (!layer) return;
   const p = point(event), box = guide(), zone = zoneFor(draft, view), x = (p.x-box.x)/box.scale, y = (p.y-box.y)/box.scale;
-  if (drag.mode === 'move') layer.data.placement = constrainPlacement({ ...layer.data.placement, x:x-drag.x, y:y-drag.y }, zone);
+  if (drag.mode === 'move') layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)({ ...layer.data.placement, x:x-drag.x, y:y-drag.y }, zone);
   else {
     const a = drag.original, anchorX = a.x+(drag.right?0:a.width), anchorY = a.y+(drag.bottom?0:a.height), ratio = a.height/a.width;
     const wanted = Math.max(.1, Math.max((x-anchorX)*(drag.right?1:-1), (y-anchorY)*(drag.bottom?1:-1)/ratio));
-    const width = Math.min(wanted, drag.right ? zone.width-anchorX : anchorX, (drag.bottom ? zone.height-anchorY : anchorY)/ratio), height = width*ratio;
-    if (width > 0) layer.data.placement = { x:drag.right?anchorX:anchorX-width, y:drag.bottom?anchorY:anchorY-height, width, height };
+    const width = layer.kind === 'image' ? Math.min(wanted,zone.width*8,zone.height*8/ratio) : Math.min(wanted, drag.right ? zone.width-anchorX : anchorX, (drag.bottom ? zone.height-anchorY : anchorY)/ratio), height = width*ratio;
+    if (width > 0) { const next = {x:drag.right?anchorX:anchorX-width,y:drag.bottom?anchorY:anchorY-height,width,height}; layer.data.placement = layer.kind === 'image' ? constrainImagePlacement(next,zone) : next; }
   }
   connectEverydayAccount({ saveDraft: async () => { selection(); await databaseTask(true); }, status });
   render();
 };
 canvas.onpointerup = canvas.onpointercancel = canvas.onlostpointercapture = () => { drag = null; };
 installArtworkPinch(canvas, {
-  selection: () => { const layer=selected(); return !busy && !$('upload').disabled && layer ? {key:[draft.product,draft.color,view,layer.id].join(':'),placement:layer.data.placement,zone:zoneFor(draft,view)} : null; },
+  selection: () => { const layer=selected(); return !busy && !$('upload').disabled && layer ? {key:[draft.product,draft.color,view,layer.id].join(':'),placement:layer.data.placement,zone:zoneFor(draft,view),allowOverflow:layer.kind==='image'} : null; },
   apply: (placement,key) => { const layer=selected(); if(layer && key===[draft.product,draft.color,view,layer.id].join(':')){layer.data.placement=placement;render();} },
   cancelDrag: () => { drag=null; }
 });
@@ -231,7 +231,7 @@ canvas.onkeydown = event => {
   const layer = selected(); if (!layer) return;
   if (['+','=','-'].includes(event.key)) { event.preventDefault(); scaleSelected(event.key === '-' ? .9 : 1.1); return; }
   const delta = { ArrowLeft:[-.05,0], ArrowRight:[.05,0], ArrowUp:[0,-.05], ArrowDown:[0,.05] }[event.key]; if (!delta) return;
-  event.preventDefault(); const p = layer.data.placement; layer.data.placement = constrainPlacement({ ...p, x:p.x+delta[0], y:p.y+delta[1] }, zoneFor(draft,view)); render();
+  event.preventDefault(); const p = layer.data.placement; layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)({ ...p, x:p.x+delta[0], y:p.y+delta[1] }, zoneFor(draft,view)); render();
 };
 $('downloadPreview').onclick = async () => {
   const button = $('downloadPreview'), snapshot = structuredClone(draft), selectedView = view;
@@ -255,7 +255,7 @@ try {
   if (saved?.schemaVersion === 1 && PRODUCTS[saved.product] && [...COLORS, 'Dark Heather', 'Forest', 'Light Blue', 'Sand'].includes(saved.color) && saved.artwork && saved.photos && SIZES.includes(saved.size) && Number.isInteger(saved.quantity) && saved.quantity > 0 && saved.quantity <= 999) {
     saved.quantity = Math.min(99, saved.quantity);
     saved.printMethod = Object.hasOwn(PRINT_METHODS, saved.printMethod) ? saved.printMethod : 'transfer';
-    for (const v of VIEWS) for (const layer of artworkLayers(saved.artwork[v])) layer.data.placement = constrainPlacement(layer.data.placement, zoneFor(saved, v));
+    for (const v of VIEWS) for (const layer of artworkLayers(saved.artwork[v])) layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)(layer.data.placement, zoneFor(saved, v));
     // Preserve early pilot photo uploads under the product-specific key format.
     for (const [key, photo] of Object.entries(saved.photos)) if (key.split(':').length === 2) saved.photos[`${saved.product}:${key}`] = photo;
     draft = saved; $('product').value = draft.product; updateColors(); updateSizes(); $('size').value = draft.size; $('quantity').value = draft.quantity; if ($('printMethod')) $('printMethod').value = draft.printMethod; status('Saved device draft restored.');

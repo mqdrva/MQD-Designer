@@ -1,5 +1,7 @@
+import { resizeImageArtwork } from './everyday-contract.js';
 // Resizes the selected design layer in inches, preserving aspect ratio and center.
-export function pinchPlacement(original, factor, zone) {
+export function pinchPlacement(original, factor, zone, allowOverflow = false) {
+  if (allowOverflow) return resizeImageArtwork(original, Math.max(.1, original.width*factor), zone);
   const ratio=original.height/original.width;
   const width=Math.min(Math.max(.1,original.width*factor),zone.width,zone.height/ratio), height=width*ratio;
   return {width,height,x:Math.max(0,Math.min(zone.width-width,original.x+(original.width-width)/2)),y:Math.max(0,Math.min(zone.height-height,original.y+(original.height-height)/2))};
@@ -21,7 +23,7 @@ export function installArtworkPinch(canvas, {selection, apply, cancelDrag}) {
     points.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(points.size>=2||finishing){
       consume(event);
-      if(gesture&&points.size===2){const current=selection();if(current?.key===gesture.key)apply(pinchPlacement(gesture.placement,distance()/gesture.distance,current.zone),gesture.key);else {gesture=null;finishing=true;}}
+      if(gesture&&points.size===2){const current=selection();if(current?.key===gesture.key)apply(pinchPlacement(gesture.placement,distance()/gesture.distance,current.zone,current.allowOverflow),gesture.key);else {gesture=null;finishing=true;}}
     }
   },true);
   function end(event){
