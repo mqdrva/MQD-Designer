@@ -3,11 +3,22 @@ export const TEXT_FONTS = ['Inter','Montserrat','Oswald','Bebas Neue','Anton','L
 export function artworkLayers(art) {
   return art ? [...(art.file ? [{ id: 'image', kind: 'image', name: art.name, data: art }] : []), ...(art.texts || []).map(text => ({ id: text.id, kind: 'text', name: text.text, data: text }))] : [];
 }
-export function artworkBounds(art) {
+export function artworkBounds(art, zone) {
   const boxes = artworkLayers(art).map(layer => layer.data.placement);
   if (!boxes.length) return null;
-  const x = Math.min(...boxes.map(p => p.x)), y = Math.min(...boxes.map(p => p.y));
-  return { x, y, width: Math.max(...boxes.map(p => p.x + p.width)) - x, height: Math.max(...boxes.map(p => p.y + p.height)) - y };
+  const x = Math.max(zone ? 0 : -Infinity, Math.min(...boxes.map(p => p.x))), y = Math.max(zone ? 0 : -Infinity, Math.min(...boxes.map(p => p.y)));
+  return { x, y, width: Math.max(0, Math.min(zone?.width ?? Infinity, Math.max(...boxes.map(p => p.x + p.width))) - x), height: Math.max(0, Math.min(zone?.height ?? Infinity, Math.max(...boxes.map(p => p.y + p.height))) - y) };
+}
+export function imageClipped(art, zone) {
+  const p = art?.file && art.placement;
+  return !!(zone && p && (p.x < 0 || p.y < 0 || p.x+p.width > zone.width || p.y+p.height > zone.height));
+}
+export function printMetadata(art, view, zone) {
+  const clipped = imageClipped(art, zone), raster = clipped || !!art.texts?.length;
+  return {filename:raster ? `${view}-print.png` : art.name, ...artworkBounds(art, zone),
+    ...(art.texts?.length ? {texts:structuredClone(art.texts)} : {}),
+    ...(clipped ? {clipped:true} : {}),
+    ...(raster ? {printRasterDpi:300, ...(art.file ? {sourceFilename:art.name} : {})} : {})};
 }
 export function drawText(ctx, text, p) {
   const lines = text.text.split('\n'), font = `${text.italic ? 'italic ' : ''}${text.bold ? '700' : '400'} 100px "${text.font}", sans-serif`;
@@ -23,15 +34,15 @@ export async function loadTextFonts(art) {
   if (!document.fonts?.load) return;
   await Promise.all((art?.texts || []).map(text => document.fonts.load(`${text.italic ? 'italic ' : ''}${text.bold ? '700' : '400'} 100px "${text.font}"`)));
 }
-export async function printArtwork(art, view, { makeCanvas = () => document.createElement('canvas'), bitmap = createImageBitmap } = {}) {
-  if (!art.texts?.length) return art.file;
+export async function printArtwork(art, view, { makeCanvas = () => document.createElement('canvas'), bitmap = createImageBitmap, zone } = {}) {
+  if (!art.texts?.length && !imageClipped(art, zone)) return art.file;
   await loadTextFonts(art);
-  const bounds = artworkBounds(art), canvas = makeCanvas(), dpi = 300;
+  const bounds = artworkBounds(art, zone), canvas = makeCanvas(), dpi = 300;
   canvas.width = Math.ceil(bounds.width * dpi); canvas.height = Math.ceil(bounds.height * dpi);
   const ctx = canvas.getContext('2d');
   for (const layer of artworkLayers(art)) {
     const p = layer.data.placement, target = { x: (p.x - bounds.x) * dpi, y: (p.y - bounds.y) * dpi, width: p.width * dpi, height: p.height * dpi };
-    if (layer.kind === 'image') ctx.drawImage(await bitmap(layer.data.file), target.x, target.y, target.width, target.height);
+    if (layer.kind === 'image') { const image = await bitmap(layer.data.file); ctx.drawImage(image, target.x, target.y, target.width, target.height); image.close?.(); }
     else drawText(ctx, layer.data, target);
   }
   const file = await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(new File([blob], `${view}-print.png`, { type: 'image/png' })) : reject(new Error('Print file could not export.')), 'image/png'));

@@ -81,7 +81,8 @@ nodes.get('upload').files = [original]; await nodes.get('upload').onchange({ tar
 stored = undefined;
 nodes.get('views').children[3].onclick(); await wait();
 nodes.get('larger').onclick(); await nodes.get('saveDraft').onclick();
-assert.equal(stored.artwork.right.placement.width, 3, 'Button resizing is capped to the sleeve print area');
+assert(stored.artwork.right.placement.width > 3, 'Image enlarges beyond the sleeve zone');
+assert(stored.artwork.right.placement.x < 0, 'Image enlargement preserves its center for cropping');
 stored = undefined;
 nodes.get('product').value = 'everyday-hoodie'; nodes.get('product').onchange();
 nodes.get('views').children[0].onclick(); await wait();
@@ -112,6 +113,8 @@ assert.equal(nodes.get('product').value, 'everyday-hoodie'); assert.equal(nodes.
 assert.equal(nodes.get('size').value,'4XL','A saved 4XL device draft restores its size');
 assert.equal(nodes.get('printMethod').value,'dtg','The chosen print method restores with the original artwork');
 assert.equal(nodes.get('artName').textContent, 'customer-logo.png');
+await nodes.get('saveDraft').onclick();
+assert(stored.artwork.right.placement.width > 3, 'Draft restoration preserves the oversize crop');
 // Actual text/image selection, corner resizing and independent deletion.
 nodes.get('addText').onclick(); await wait();
 nodes.get('textContent').value = 'MY TEAM'; nodes.get('textContent').oninput(); await wait();
