@@ -1,0 +1,206 @@
+{
+  "schema": "mqd-business-setup-v1",
+  "status": "pending-review",
+  "plan": "2d",
+  "owner": {
+    "requestEmail": "brenda@example.com",
+    "phone": "+1 (202) 555-0101"
+  },
+  "shop": {
+    "garments": {
+      "everyday-tshirt": {
+        "brand": "Gildan",
+        "style": "TEST STYLE",
+        "sizes": [
+          "L",
+          "XL"
+        ],
+        "colors": [
+          "White",
+          "Red"
+        ],
+        "printZones": {
+          "front": {
+            "width": 12,
+            "height": 15
+          },
+          "back": {
+            "width": 12,
+            "height": 15
+          },
+          "left": {
+            "width": 3,
+            "height": 3
+          },
+          "right": {
+            "width": 3,
+            "height": 3
+          }
+        },
+        "additionalColorsRequested": ""
+      },
+      "everyday-long-sleeve": {
+        "brand": "Gildan",
+        "style": "LONG TEST",
+        "sizes": [
+          "S",
+          "M",
+          "L",
+          "XL",
+          "2XL"
+        ],
+        "colors": [
+          "White",
+          "Black"
+        ],
+        "printZones": {
+          "front": {
+            "width": 10,
+            "height": 14
+          },
+          "back": {
+            "width": 12,
+            "height": 15
+          },
+          "left": {
+            "width": 3,
+            "height": 3
+          },
+          "right": {
+            "width": 3,
+            "height": 3
+          }
+        },
+        "additionalColorsRequested": ""
+      },
+      "everyday-polo": {
+        "brand": "Hanes",
+        "style": "POLO TEST",
+        "sizes": [
+          "S",
+          "M",
+          "L",
+          "XL",
+          "2XL"
+        ],
+        "colors": [
+          "White",
+          "Black"
+        ],
+        "printZones": {
+          "front": {
+            "width": 3,
+            "height": 3
+          }
+        },
+        "additionalColorsRequested": ""
+      },
+      "everyday-hoodie": {
+        "brand": "Hanes",
+        "style": "HOOD TEST",
+        "sizes": [
+          "S",
+          "M",
+          "L",
+          "XL",
+          "2XL"
+        ],
+        "colors": [
+          "White",
+          "Black"
+        ],
+        "printZones": {
+          "front": {
+            "width": 8,
+            "height": 10
+          },
+          "back": {
+            "width": 12,
+            "height": 15
+          },
+          "left": {
+            "width": 3,
+            "height": 3
+          },
+          "right": {
+            "width": 3,
+            "height": 3
+          }
+        },
+        "additionalColorsRequested": ""
+      }
+    },
+    "slug": "brendas-designs",
+    "name": "Brenda\u2019s Designs",
+    "logo": "/assets/brand-logo.png",
+    "tagline": "Design your shirt. Send your request. We\u2019ll confirm your order.",
+    "requirements": "Shop confirms suitable garments and artwork before production.",
+    "pilot": false,
+    "engines": [
+      "2d"
+    ],
+    "printMethods": {
+      "htv": "HTV (Heat Transfer Vinyl)"
+    },
+    "printMethods3d": {},
+    "pricing": {
+      "version": "setup-1791657840473",
+      "currency": "usd",
+      "baseCents": {
+        "everyday-tshirt": 2000,
+        "everyday-long-sleeve": 0,
+        "everyday-polo": 0,
+        "everyday-hoodie": 0
+      },
+      "premiumCents": {},
+      "sizeCents": 500,
+      "methodCents": {},
+      "methodBackCents": {},
+      "sleeveCents": 0,
+      "printRules": {
+        "2d": {
+          "htv": {
+            "mode": "calculated",
+            "setupCents": 1000,
+            "minimumQuantity": 2,
+            "tiers": [
+              {
+                "fromQuantity": 1,
+                "frontCents": 600,
+                "backCents": 400,
+                "sleevesCents": 300
+              },
+              {
+                "fromQuantity": 12,
+                "frontCents": 500,
+                "backCents": 300,
+                "sleevesCents": 200
+              }
+            ]
+          }
+        },
+        "3d": {
+          "htv": {
+            "mode": "calculated",
+            "setupCents": 1000,
+            "minimumQuantity": 2,
+            "tiers": [
+              {
+                "fromQuantity": 1,
+                "frontCents": 600,
+                "backCents": 400,
+                "sleevesCents": 300
+              },
+              {
+                "fromQuantity": 12,
+                "frontCents": 500,
+                "backCents": 300,
+                "sleevesCents": 200
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

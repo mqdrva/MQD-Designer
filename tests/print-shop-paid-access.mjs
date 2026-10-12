@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {hasShopAccess} from '../supabase/functions/mqd-print-shop-pilot/access.js';
+const now=Date.now(),future=new Date(now+86400000).toISOString(),past=new Date(now-1000).toISOString();
+const shop={status:'active',billing_status:'active',approved_at:future,email_verified_at:future};
+const account={status:'active',period_end:future,cancel_at_period_end:true};
+assert(hasShopAccess(shop,account,now),'scheduled cancellation retains access through the paid month');
+assert(!hasShopAccess(shop,{...account,period_end:past},now),'expired access fails without waiting for another webhook');
+for(const status of ['past_due','unpaid','payment_pending','canceled','incomplete','trialing'])assert(!hasShopAccess(shop,{...account,status},now),status);
+for(const status of ['suspended','closed','pending_review'])assert(!hasShopAccess({...shop,status},account,now),status);
+assert(!hasShopAccess(shop,null,now),'business active flag alone never grants access');
+assert(!hasShopAccess({...shop,approved_at:null},account,now));
+assert(!hasShopAccess({...shop,email_verified_at:null},account,now));
+assert(hasShopAccess({...shop,status:'pilot_active',pilot_expires_at:future},null,now),'unpaid pilot stays independent of billing');
+assert(!hasShopAccess({...shop,status:'pilot_active',pilot_expires_at:past},account,now));
+console.log('Paid access checks passed: paid-through dates, failed renewals, scheduled cancellation, suspension, approval and independent pilot access.');

@@ -1,13 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import {hasShopAccess} from './access.js';
 import JSZip from 'npm:jszip@3.10.1';
 import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone } from './contract.js';
 
 const PUBLIC_KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
+const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
 const RECIPIENTS: Record<string,string> = { pilot:'mqdrva@gmail.com' };
 const json = (body:unknown,status=200,headers:Record<string,string>={}) => new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...headers}});
 async function hash(bytes:Uint8Array){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
-async function activeShop(db:any,slug:string){if(slug==='pilot')return {shop:PILOT_SHOP,recipient:RECIPIENTS.pilot};if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))return null;const {data,error}=await db.from('mqd_print_shop_businesses').select('shop_config,owner_email,status,pilot_expires_at,billing_status').eq('preferred_slug',slug).in('status',['pilot_active','active']).maybeSingle();if(error||!data||data.status==='pilot_active'&&(!data.pilot_expires_at||new Date(data.pilot_expires_at).getTime()<=Date.now())||data.status==='active'&&data.billing_status!=='active')return null;return {shop:data.shop_config,recipient:data.owner_email};}
+async function activeShop(db:any,slug:string){
+ if(slug==='pilot')return {shop:PILOT_SHOP,recipient:RECIPIENTS.pilot};
+ if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))return null;
+ const {data,error}=await db.from('mqd_print_shop_businesses').select('id,shop_config,owner_email,status,pilot_expires_at,billing_status,approved_at,email_verified_at').eq('preferred_slug',slug).in('status',['pilot_active','active']).maybeSingle();
+ if(error||!data)return null;
+ let account=null;
+ if(data.status==='active'){const result=await db.from('mqd_print_shop_subscription_accounts').select('status,period_end').eq('business_id',data.id).maybeSingle();if(result.error)return null;account=result.data;}
+ if(!hasShopAccess(data,account))return null;
+ return {shop:data.shop_config,recipient:data.owner_email};
+}
 async function secret(db:any,name:string){const {data,error}=await db.rpc('mqd_get_vault_secret',{secret_name:name});return error?'':String(data||'');}
 Deno.serve(async req=>{
  const origin=req.headers.get('origin')||'',cors:Record<string,string>={'Vary':'Origin'};

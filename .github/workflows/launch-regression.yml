@@ -77,3 +77,13 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/checkout-session-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261001220545_allow_multiple_orders_per_checkout_session.sql
           psql -v ON_ERROR_STOP=1 -f tests/checkout-session-sharing.sql
+
+      - name: Verify isolated print-shop subscriptions and onboarding
+        run: |
+          node tests/print-shop-subscription.mjs
+          node tests/print-shop-subscription-webhook.mjs
+          node tests/print-shop-paid-access.mjs
+          node tests/print-shop-onboarding.mjs
+          node tests/print-shop-admin-auth.mjs
+          node tests/print-shop-billing.mjs
+          node tests/print-shop-billing-webhook.mjs

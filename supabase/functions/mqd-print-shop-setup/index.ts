@@ -2,7 +2,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {validateSetup} from './validation.js';
 import {hasAdminMfa} from './admin-security.js';
 const KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://127.0.0.1:8765','http://localhost:8765']);
+const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://127.0.0.1:8765','http://localhost:8765']);
 const TABLE='mqd_print_shop_businesses';
 const encode=(bytes:Uint8Array)=>{let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(binary);};
 const decode=(v:string)=>Uint8Array.from(atob(v),c=>c.charCodeAt(0));
@@ -39,7 +39,7 @@ Deno.serve(async(req:Request)=>{
  try{
   const body=await rawBody(req),db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const site=ALLOWED.has(origin)?origin:'https://mymerchnow.app';
-  if(['admin-list','admin-review'].includes(body.action)){
+  if(['admin-list','admin-review','admin-recover'].includes(body.action)){
    const jwt=req.headers.get('authorization')?.replace(/^Bearer /,'')||'';const {data,error:authError}=await db.auth.getUser(jwt);
    if(authError||data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,jwt))return json({error:'Owner administrator access required.'},403);
    if(body.action==='admin-list'){const {data:rows,error}=await db.from(TABLE).select('id,preferred_slug,plan,owner_email,owner_phone,shop_config,pending_config,pending_plan,status,email_verified_at,billing_status,revision,created_at,pilot_expires_at').order('created_at',{ascending:false}).limit(100);if(error)throw new Error('Setup list could not load.');return json({businesses:rows});}
@@ -47,8 +47,25 @@ Deno.serve(async(req:Request)=>{
    if(row.status==='closed')return json({error:'Closed shops cannot be reactivated through pilot review.'},409);
    if(!row.email_verified_at)return json({error:'The business must verify its email before activation.'},409);
    if(body.revision!==row.revision)return json({error:'Setup changed. Reload before reviewing.'},409);
-   if(!['approve-pilot','suspend'].includes(body.decision))throw new Error('Choose a valid review action.');
-   if(body.decision==='approve-pilot'&&row.status==='active')return json({error:'Paid subscriptions must be managed through billing.'},409);
+   if(body.action==='admin-recover'){
+    let token:string;
+    if(new Date(row.token_expires_at).getTime()<=Date.now()){
+     token=hex(crypto.getRandomValues(new Uint8Array(32)).buffer);
+     const {data:updated,error}=await db.from(TABLE).update({token_hash:await hash(token),token_cipher:await encrypt(token),token_expires_at:new Date(Date.now()+30*86400000).toISOString(),revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',row.id).eq('revision',row.revision).select('id').maybeSingle();
+     if(error||!updated)return json({error:'Owner access changed. Reload and try again.'},409);
+    }else token=await decrypt(row.token_cipher);
+    const link='https://mymerchnow.app/print-shop-setup.html?setupId='+row.id+'#manage='+token;
+    try{await mail(db,{to:[row.owner_email],subject:'Your MYMERCHNOW print-shop owner access',text:`Use this private link to review your setup and manage subscription billing:\n\n${link}\n\nKeep this link private. It has limited validity; contact MYMERCHNOW if it expires. Customer garment payments are handled by your business.`},'shop-recovery-'+row.id+'-'+row.revision);}catch{return json({error:'Owner link could not be emailed. Retry or contact support.'},502);}
+    return json({status:row.status,notificationAccepted:true,message:'Private owner link sent to the verified business email.'});
+   }
+   if(!['approve-pilot','approve-settings','suspend'].includes(body.decision))throw new Error('Choose a valid review action.');
+   if(body.decision==='approve-pilot'&&(row.status==='active'||row.billing_status!=='not_configured'))return json({error:'Paid subscriptions must be managed through billing.'},409);
+   if(body.decision==='approve-settings'){
+    if(row.status!=='active'||!row.pending_config||(row.pending_plan&&row.pending_plan!==row.plan))return json({error:'Only settings for the current paid plan can be approved here.'},409);
+    const {data:updated,error}=await db.from(TABLE).update({shop_config:row.pending_config,pending_config:null,pending_plan:null,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',row.id).eq('revision',row.revision).eq('status','active').select('id').maybeSingle();
+    if(error||!updated)return json({error:'Review changed. Reload and try again.'},409);
+    return json({status:'active',notificationAccepted:false,warning:'Shop settings approved. Share the updated shop link with the owner.',link:row.mail_origin+'/shops/'+row.preferred_slug});
+   }
    const status=body.decision==='suspend'?'suspended':'pilot_active',expires=new Date(Date.now()+7*86400000).toISOString();
    const update:any={status,updated_at:new Date().toISOString(),revision:row.revision+1};
    if(status==='pilot_active')Object.assign(update,{approved_at:new Date().toISOString(),pilot_expires_at:expires,shop_config:row.pending_config||row.shop_config,plan:row.pending_plan||row.plan,pending_config:null,pending_plan:null});
@@ -64,7 +81,7 @@ Deno.serve(async(req:Request)=>{
    if(row.status==='closed')return json({error:'This shop is closed. Contact MYMERCHNOW for help.'},409);
    const packet=validateSetup(body.setup);if(packet.owner.requestEmail!==row.owner_email||packet.shop.slug!==row.preferred_slug)return json({error:'Contact MYMERCHNOW to change your verified email or shop link.'},409);
    if(body.revision!==row.revision)return json({error:'Your setup changed. Reopen your private link before updating.'},409);
-   if(row.status==='active'&&packet.plan!==row.plan)return json({error:'Plan changes must be made through subscription billing.'},409);
+   if(row.status==='active'&&packet.plan!==row.plan)return json({error:'Contact MYMERCHNOW support to request a subscription plan change.'},409);
    const {data:changed,error:updateError}=await db.from(TABLE).update({pending_config:packet.shop,pending_plan:packet.plan,owner_phone:packet.owner.phone,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',row.id).eq('revision',row.revision).select('id').maybeSingle();if(updateError||!changed)return json({error:'Setup changed. Reload before updating.'},409);
    let notificationAccepted=true;try{await mail(db,{to:['mqdrva@gmail.com'],reply_to:row.owner_email,subject:'[Print Shops] Owner update awaiting review',text:`${packet.shop.name} submitted updated settings.\nShop: ${row.preferred_slug}\nReference: ${row.id}\nReview in ${site}/print-shop-admin.html\nCurrent live settings remain unchanged until approval.`},'shop-update-'+row.id+'-'+(row.revision+1));}catch{notificationAccepted=false;}
    return json({status:'pending_review',revision:row.revision+1,notificationAccepted,message:notificationAccepted?'Changes saved for review. Your current live settings remain unchanged.':'Changes saved for review, but the notification email could not be confirmed. Contact MYMERCHNOW; your current live settings remain unchanged.'});
