@@ -171,6 +171,7 @@ function mount() {
   $('shopSwitch').hidden=!shop.engines.includes(engine==='2d'?'3d':'2d');
   document.querySelector('.shop-intro > strong').textContent=shop.pilot?'Print-shop pilot · sample prices · no checkout':'Shop order requests · final quote confirmed by the business';
   $('shopDescription').textContent=[shop.tagline,shop.requirements].filter(Boolean).join(' · ');
+  const info=document.createElement('a');info.href='/print-shop-info.html';info.textContent='Request information and pilot details';const infoLine=document.createElement('p');infoLine.className='shop-download-note';infoLine.append(info);document.querySelector('.shop-intro').append(infoLine);
   if(setupPreview){
     $('shopSwitch').href+='?setupPreview=1';
     const note=document.createElement('p');note.textContent='BUSINESS SETUP PREVIEW · Not a live shop. Customer requests and payments are disabled.';note.className='setup-note';
