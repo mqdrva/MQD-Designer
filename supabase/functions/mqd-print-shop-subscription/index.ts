@@ -2,7 +2,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import Stripe from 'npm:stripe@22.6.0';
 import {POLICY_VERSION,ACCOUNT_TABLE,configuration,save,synchronize} from './billing.js';
 const KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app']);
+const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app']);
 const sha=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function limitedBody(req:Request,max:number){const reader=req.body?.getReader();if(!reader)throw new Error('Body missing');let count=0;const chunks:Uint8Array[]=[];while(true){const part=await reader.read();if(part.done)break;count+=part.value.length;if(count>max){await reader.cancel();throw new Error('Body too large');}chunks.push(part.value);}const bytes=new Uint8Array(count);let i=0;for(const c of chunks){bytes.set(c,i);i+=c.length;}return new TextDecoder().decode(bytes);}
 Deno.serve(async(req:Request)=>{
@@ -25,7 +25,7 @@ Deno.serve(async(req:Request)=>{
   if(body.action==='checkout'&&body.policyVersion!==POLICY_VERSION)return json({error:'Review and accept the current subscription terms before continuing.'},409);
   const stripe=new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
   lease=crypto.randomUUID();businessId=shop.id;const claim=await db.rpc('mqd_claim_print_shop_subscription',{p_business:shop.id,p_lease:lease});if(claim.error)return json({error:'Billing is already opening. Try again shortly.'},409);
-  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app',returnUrl=base+'/print-shop-setup.html?setupId='+shop.id;
+  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app',returnUrl=base+'/print-shop-setup.html?setupId='+shop.id;
   if(body.action==='portal'){
    if(!record.stripe_customer_id)throw new Error('Start a subscription before opening billing management.');
    const session=await stripe.billingPortal.sessions.create({customer:record.stripe_customer_id,configuration:config.portal,return_url:returnUrl});return json({mode:'live',url:session.url});

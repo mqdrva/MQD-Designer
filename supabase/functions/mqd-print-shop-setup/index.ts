@@ -2,7 +2,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {validateSetup} from './validation.js';
 import {hasAdminMfa} from './admin-security.js';
 const KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://127.0.0.1:8765','http://localhost:8765']);
+const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://127.0.0.1:8765','http://localhost:8765']);
 const TABLE='mqd_print_shop_businesses';
 const encode=(bytes:Uint8Array)=>{let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(binary);};
 const decode=(v:string)=>Uint8Array.from(atob(v),c=>c.charCodeAt(0));

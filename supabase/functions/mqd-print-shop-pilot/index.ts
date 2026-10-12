@@ -4,7 +4,7 @@ import JSZip from 'npm:jszip@3.10.1';
 import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone } from './contract.js';
 
 const PUBLIC_KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
+const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
 const RECIPIENTS: Record<string,string> = { pilot:'mqdrva@gmail.com' };
 const json = (body:unknown,status=200,headers:Record<string,string>={}) => new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...headers}});
 async function hash(bytes:Uint8Array){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
