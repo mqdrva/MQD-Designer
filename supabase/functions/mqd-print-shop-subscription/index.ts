@@ -25,7 +25,7 @@ Deno.serve(async(req:Request)=>{
   if(body.action==='checkout'&&body.policyVersion!==POLICY_VERSION)return json({error:'Review and accept the current subscription terms before continuing.'},409);
   const stripe=new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
   lease=crypto.randomUUID();businessId=shop.id;const claim=await db.rpc('mqd_claim_print_shop_subscription',{p_business:shop.id,p_lease:lease});if(claim.error)return json({error:'Billing is already opening. Try again shortly.'},409);
-  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app',returnUrl=base+'/print-shop-setup.html?setupId='+shop.id;
+  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app',returnUrl=base+'/print-shop-setup.html?setupId='+shop.id;
   if(body.action==='portal'){
    if(!record.stripe_customer_id)throw new Error('Start a subscription before opening billing management.');
    const session=await stripe.billingPortal.sessions.create({customer:record.stripe_customer_id,configuration:config.portal,return_url:returnUrl});return json({mode:'live',url:session.url});
