@@ -33,5 +33,10 @@ const updated=structuredClone(fixture);updated.shop.name='Updated business';fail
 res=await call({action:'update',id,token,revision:2,setup:updated});assert.equal(res.status,200);assert.equal(res.data.notificationAccepted,false);assert.equal(rows.get(id).shop_config.name,fixture.shop.name);assert.equal(rows.get(id).pending_config.name,'Updated business');
 res=await call({action:'update',id,token,revision:2,setup:updated});assert.equal(res.status,409,'stale updates must not overwrite');
 res=await call({action:'admin-review',id,revision:3,decision:'approve-pilot'},'admin-mfa');assert.equal(res.status,200);assert.equal(res.data.notificationAccepted,false);assert.equal(rows.get(id).shop_config.name,'Updated business');
-res=await call({action:'admin-review',id,revision:4,decision:'suspend'},'admin-mfa');assert.equal(res.status,200);assert.equal(rows.get(id).status,'suspended');
+rows.get(id).status='active';rows.get(id).billing_status='active';
+const paidUpdate=structuredClone(updated);paidUpdate.shop.name='Paid business update';
+res=await call({action:'update',id,token,revision:4,setup:paidUpdate});assert.equal(res.status,200);
+res=await call({action:'admin-review',id,revision:5,decision:'approve-settings'},'admin-mfa');assert.equal(res.status,200);assert.equal(rows.get(id).status,'active');assert.equal(rows.get(id).billing_status,'active');assert.equal(rows.get(id).shop_config.name,'Paid business update');assert.equal(rows.get(id).pending_config,null);
+res=await call({action:'admin-review',id,revision:6,decision:'approve-pilot'},'admin-mfa');assert.equal(res.status,409,'paid settings cannot reset the unpaid pilot');
+res=await call({action:'admin-review',id,revision:6,decision:'suspend'},'admin-mfa');assert.equal(res.status,200);assert.equal(rows.get(id).status,'suspended');
 console.log('Onboarding passed: private confirmation, idempotency, admin authorization, review, owner updates, stale revisions, and saved-state email failure handling.');

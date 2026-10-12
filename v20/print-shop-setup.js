@@ -6,6 +6,8 @@ const premiums={tshirt:'3D T-shirt','long-sleeve-tshirt':'3D long sleeve','short
 const initial={'everyday-tshirt':20,'everyday-long-sleeve':30,'everyday-polo':30,'everyday-hoodie':40,tshirt:40,'long-sleeve-tshirt':50,'short-sleeve-polo':50,'fleece-hoodie':75};
 const SETUP_API='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-print-shop-setup';
 const SETUP_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+const sandboxBilling=['http://127.0.0.1:8765','http://localhost:8765'].includes(location.origin);
+let billingPolicyVersion='';
 let ownerAccess=null,setupRevision=null,submitting=false;
 const startedAt=Date.now();
 let logo='';
@@ -51,6 +53,20 @@ async function initOwner(){const id=new URLSearchParams(location.search).get('se
 try{if(!await initOwner()){const prior=sessionStorage.getItem('mqd-business-setup-preview-v1');if(prior)await load(new File([prior],'setup.json',{type:'application/json'}));}}catch(error){$('setupStatus').textContent=error.message;if(ownerAccess){$('submitSetup').disabled=true;ownerAccess=null;}}
 planChanged();
 
-async function billingCall(action){if(!ownerAccess)throw new Error('Open your private business setup link.');const response=await fetch(SETUP_API.replace('mqd-print-shop-setup','mqd-print-shop-billing'),{method:'POST',headers:{apikey:SETUP_KEY,'Content-Type':'application/json'},body:JSON.stringify({action,...ownerAccess})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Billing testing could not complete.');return result;}
-async function refreshBilling(){if(!ownerAccess)return;if(!['http://127.0.0.1:8765','http://localhost:8765'].includes(location.origin)){$('ownerBilling').hidden=true;return;}$('ownerBilling').hidden=false;try{const result=await billingCall('status');$('billingStatus').textContent=result.message+' Status: '+result.status.replaceAll('_',' ')+(result.cancelAtPeriodEnd?' · Cancellation is scheduled at the end of the test billing period.':'');$('billingCheckout').disabled=!result.enabled||!result.approved||['active','past_due','payment_pending','incomplete'].includes(result.status);$('billingPortal').disabled=!result.enabled||!result.hasCustomer;}catch(error){$('billingStatus').textContent=error.message;$('billingCheckout').disabled=true;$('billingPortal').disabled=true;}}
-$('billingRefresh').onclick=()=>refreshBilling();for(const [id,action] of [['billingCheckout','checkout'],['billingPortal','portal']])$(id).onclick=async()=>{$(id).disabled=true;try{const result=await billingCall(action);const url=new URL(result.url);if(url.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(url.hostname))throw new Error('Billing link is unavailable.');location.assign(url.href);}catch(error){await refreshBilling();$('billingStatus').textContent=error.message;}};
+async function billingCall(action){if(!ownerAccess)throw new Error('Open your private business setup link.');const response=await fetch(SETUP_API.replace('mqd-print-shop-setup',sandboxBilling?'mqd-print-shop-billing':'mqd-print-shop-subscription'),{method:'POST',headers:{apikey:SETUP_KEY,'Content-Type':'application/json'},body:JSON.stringify({action,...ownerAccess,...(!sandboxBilling&&action==='checkout'?{policyVersion:billingPolicyVersion}:{})})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Billing testing could not complete.');return result;}
+async function refreshBilling(){
+ if(!ownerAccess)return;
+ try{
+  const result=await billingCall('status');billingPolicyVersion=result.policyVersion||'';
+  $('ownerBilling').hidden=!sandboxBilling&&!result.enabled&&!result.hasCustomer;
+  $('billingHeading').textContent=sandboxBilling?'Subscription testing':'Your monthly subscription';
+  $('billingDetails').textContent=sandboxBilling?'This pilot uses Stripe test payments only. Completing a test payment does not charge real money or activate a paid public shop.':'Your approved plan costs '+(result.plan==='3d'?'$99':'$49')+' USD per month and renews until canceled. Cancellation takes effect after the paid month. Refund requests are reviewed individually.';
+  $('billingTerms').hidden=sandboxBilling;
+  $('billingCheckout').textContent=sandboxBilling?'Test monthly subscription':'Start monthly subscription';
+  $('billingPortal').textContent=sandboxBilling?'Manage test billing':'Manage billing';
+  $('billingStatus').textContent=result.message+' Status: '+result.status.replaceAll('_',' ')+(result.cancelAtPeriodEnd?' · Cancellation is scheduled at the end of the paid billing period.':'');
+  $('billingCheckout').disabled=!result.enabled||!result.approved||['active','past_due','payment_pending','incomplete'].includes(result.status);
+  $('billingPortal').disabled=!result.hasCustomer;
+ }catch(error){$('ownerBilling').hidden=!sandboxBilling;$('billingStatus').textContent=error.message;$('billingCheckout').disabled=true;$('billingPortal').disabled=true;}
+}
+$('billingRefresh').onclick=()=>refreshBilling();for(const [id,action] of [['billingCheckout','checkout'],['billingPortal','portal']])$(id).onclick=async()=>{$(id).disabled=true;try{if(!sandboxBilling&&action==='checkout'&&!$('billingConsent').checked)throw new Error('Please read and accept the subscription terms first.');const result=await billingCall(action);const url=new URL(result.url);if(url.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(url.hostname))throw new Error('Billing link is unavailable.');location.assign(url.href);}catch(error){await refreshBilling();$('billingStatus').textContent=error.message;}};
