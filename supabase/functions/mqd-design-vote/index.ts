@@ -21,7 +21,7 @@ Deno.serve(async req=>{
     const salt=key(),network=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||req.headers.get('cf-connecting-ip')||'unknown';
     recorded=await call('mqd_poll_vote',{p_poll:b.pollId,p_option:b.optionId,p_voter:await hash(salt+b.pollId+b.voterToken),p_network:await hash(salt+network)});
    }
-   const p=await call('mqd_poll_public',{p_poll:b.pollId});if(!p)return json({error:'Voting page not found'},404);
+   const p=await call(b.resultsOnly?'mqd_poll_results':'mqd_poll_public',{p_poll:b.pollId});if(!p)return json({error:'Voting page not found'},404);
    return json({...p,recorded});
   }
   // Permanent-account creation/listing is authenticated here, including JWT validity.
