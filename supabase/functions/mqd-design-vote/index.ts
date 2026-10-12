@@ -28,6 +28,13 @@ Deno.serve(async req=>{
   const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';
   const {data:{user},error:authError}=await admin.auth.getUser(token);
   if(authError||!user||user.is_anonymous)return json({error:'Sign in with Google or Email to manage voting pages.'},401);
+  if(b.action==='open'){
+   if(!validId(b.pollId)||!validId(b.designId))throw new Error('Invalid design.');
+   const {data:p,error:pe}=await admin.from('mqd_polls').select('id').eq('id',b.pollId).eq('user_id',user.id).maybeSingle();if(pe||!p)throw new Error('Voting page not found.');
+   const {data:o,error:oe}=await admin.from('mqd_poll_options').select('design_snapshot,design_id').eq('poll_id',p.id).eq('design_id',b.designId).maybeSingle();if(oe||!o)throw new Error('Voting design not found.');
+   const {data:d,error:de}=await admin.from('customer_designs').select('design_json').eq('id',o.design_id).eq('user_id',user.id).maybeSingle();if(de||!d)throw new Error('The saved design is no longer available.');
+   return json({payload:{...d.design_json,design:o.design_snapshot}});
+  }
   if(b.action==='mine'){
    const {data:polls,error}=await admin.from('mqd_polls').select('id,title,closes_at,created_at').eq('user_id',user.id).order('created_at',{ascending:false});if(error)throw error;
    const unlocked=!polls?.length||!!await call('mqd_poll_unlock',{p_user:user.id,p_poll:polls[0].id});

@@ -19,7 +19,7 @@ async function openVotes(){
    const link=node('a','View vote','btn');link.href=url.href;link.target='_blank';link.rel='noopener';
    const copy=node('button','Copy share link','btn');copy.type='button';copy.onclick=async()=>{try{await navigator.clipboard.writeText(url.href);status.textContent='Link copied. Share it on Facebook, Messenger, or anywhere else.';}catch{status.textContent=url.href;}};
    card.append(link,copy);
-   for(const choice of p.choices||[]){if(!choice.design_id)continue;const open=node('button','Open design: '+choice.label,'btn');open.type='button';open.onclick=async()=>{try{await window.MQDVotingAccount.open(choice.design_id);dialog.close();}catch(e){status.textContent=e.message;}};card.append(open);}
+   for(const choice of p.choices||[]){if(!choice.design_id)continue;const open=node('button','Open design: '+choice.label,'btn');open.type='button';open.onclick=async()=>{try{const r=await voteRequest({action:'open',pollId:p.id,designId:choice.design_id},{authenticated:true});await window.MQDVotingAccount.openSnapshot(r.payload);dialog.close();}catch(e){status.textContent=e.message;}};card.append(open);}
    dialog.append(card);
   }
   if(!mine.canCreate)return;

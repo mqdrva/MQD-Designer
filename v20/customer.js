@@ -242,6 +242,10 @@ window.MQDVotingAccount={
   const {data,error}=await supabase.from('customer_designs').select('*').eq('id',id).single();
   if(error)throw error;
   await openCloudDesign(data,{notify:false});
+ },
+ openSnapshot:async payload=>{
+  const hydrated=await hydrateCloudPayload(payload);
+  await window.MQDDesigner.loadDesign(hydrated,{notify:false});activeCloudDesign=null;
  }
 };
 function openAuth(reason='Sign in to save designs across devices, or continue as a guest to purchase without an account.',after=null){

@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex"><title>Shirt reveal recorder test fixture</title><link rel="stylesheet" href="/v20/voting.css"><body><h1>Recorder test fixture</h1><p>This moving canvas tests recording, watermark, download, and cleanup. It is not a garment render.</p><div id="previewPane"><div class="preview-toolbar"></div></div><script type="module">
+import {installRevealButton} from '/v20/shirt-reveal.js';
+const c=document.createElement('canvas');c.width=500;c.height=600;const ctx=c.getContext('2d');
+window.MQDDesigner={beginRevealCapture:()=>({frame:a=>{ctx.clearRect(0,0,500,600);ctx.fillStyle='#f58220';ctx.fillRect(100+Math.sin(a)*30,100,300,400);ctx.fillStyle='#111';ctx.font='28px system-ui';ctx.fillText('Recorder test',140,280);return c;},restore:()=>{document.getElementById('restored').textContent='Capture restored';}})};
+installRevealButton();
+</script><p id="restored"></p></body></html>

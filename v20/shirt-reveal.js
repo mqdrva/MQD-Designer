@@ -19,6 +19,7 @@ async function openReveal(){
  dialog.append(title,info,label,el('br'),start,close,status);document.body.append(dialog);dialog.showModal();
  start.onclick=async()=>{
   if(busy)return;busy=true;cancel=false;start.disabled=true;name.disabled=true;let raf;
+  status.textContent='Preparing your video…';
   try{
    const mime=chooseVideoType();if(!mime||!HTMLCanvasElement.prototype.captureStream)throw new Error('Video recording is unavailable in this browser. Try a recent Chrome or Safari browser.');
    const logo=new Image();logo.src='/assets/brand-logo.png';await logo.decode();
