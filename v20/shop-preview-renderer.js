@@ -17,7 +17,7 @@ export function guideFor(draft, view) {
   const calibration = {
     'everyday-tshirt': { bodyY: 180, bodyScale: 18, sleeveY: 225, sleeveScale: 26, sleeveLeftCenter: 425 },
     'everyday-long-sleeve': { bodyY: 210, bodyScale: 18, sleeveY: 270, sleeveScale: 24, sleeveLeftCenter: 440 },
-    'everyday-hoodie': { bodyY: view === 'front' ? 210 : 240, bodyScale: 18, sleeveY: 280, sleeveScale: 24, sleeveLeftCenter: 400 },
+    'everyday-hoodie': { bodyY: 240, bodyScale: 18, sleeveY: 280, sleeveScale: 24, sleeveLeftCenter: 400 },
     'everyday-polo': { bodyY: 200, bodyScale: 18, sleeveY: 235, sleeveScale: 26, sleeveLeftCenter: 415 },
   }[draft.product];
   const scale = sleeve ? calibration.sleeveScale : calibration.bodyScale;
