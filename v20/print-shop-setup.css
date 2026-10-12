@@ -6,3 +6,5 @@
 .setup-backup{border-top:1px solid #ddd;padding-top:16px;color:#555}.setup-backup summary{cursor:pointer;font-size:14px}.setup-backup p{font-size:14px}
 
 .setup-honey{position:absolute!important;left:-10000px!important}
+
+.service-page [hidden]{display:none!important}
