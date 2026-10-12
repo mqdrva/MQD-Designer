@@ -9,3 +9,7 @@ verify_jwt = false
 
 [functions.submit-mqd-everyday-design]
 verify_jwt = false
+
+# Public voting is anonymous; owner actions validate getUser, admin role and MFA.
+[functions.mqd-design-contest]
+verify_jwt = false
