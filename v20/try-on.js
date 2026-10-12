@@ -23,6 +23,8 @@ async function api(body,signal){
   let authorization={};
   {
     const {data,error}=await (await everydayClient()).auth.getSession();
+    const notice=$('tryOnSignInNotice');
+    if(notice)notice.hidden=!error&&!!data.session?.access_token&&!data.session.user.is_anonymous;
     if(error||!data.session?.access_token||data.session.user.is_anonymous)throw new Error('Sign in in the Everyday or Premium designer first. Each account gets one try-on per day.');
     authorization={Authorization:`Bearer ${data.session.access_token}`};
   }
