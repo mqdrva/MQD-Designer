@@ -1,0 +1,117 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { chromium } from '/Users/uptownharlem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import JSZip from '/Users/uptownharlem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/jszip/lib/index.js';
+import { PILOT_SHOP, requestEstimate, validPhone } from '../v20/print-shop-contract.js';
+const base=process.env.PILOT_BASE_URL||'http://127.0.0.1:8765';
+const dir=new URL('../../../outputs/print-shop-pilot/',import.meta.url);await fs.mkdir(dir,{recursive:true});
+assert.equal(requestEstimate(PILOT_SHOP,{engine:'2d',productId:'everyday-tshirt',printMethod:'transfer',locations:['front'],orderOptions:[{size:'L',quantity:2}]}).totalCents,4000);
+assert.throws(()=>requestEstimate(PILOT_SHOP,{engine:'2d',productId:'everyday-tshirt',printMethod:'transfer',locations:['front'],orderOptions:[{size:'L',quantity:-1}]}));
+const limitedShop={...PILOT_SHOP,printMethods:{htv:'HTV'},printMethods3d:{htv:'HTV'}};
+for(const engine of ['2d','3d']) {
+ assert.throws(()=>requestEstimate(limitedShop,{engine,productId:engine==='2d'?'everyday-tshirt':'tshirt',printMethod:'screen',locations:['front'],orderOptions:[{size:'L',quantity:1}]}));
+ assert.equal(requestEstimate(limitedShop,{engine,productId:engine==='2d'?'everyday-tshirt':'tshirt',printMethod:'htv',locations:['front'],orderOptions:[{size:'L',quantity:1}]}).quoteRequired,false);
+}
+const pricedShop=structuredClone(limitedShop);
+pricedShop.pricing.printRules['2d'].htv={mode:'calculated',setupCents:1000,minimumQuantity:2,tiers:[{fromQuantity:2,frontCents:600,backCents:400,sleevesCents:300},{fromQuantity:12,frontCents:500,backCents:300,sleevesCents:200}]};
+const fixedSummary={engine:'2d',productId:'everyday-tshirt',printMethod:'htv',locations:['front'],orderOptions:[{size:'L',quantity:12}]};
+assert.equal(requestEstimate(pricedShop,fixedSummary).totalCents,31000);
+assert.equal(requestEstimate(pricedShop,{...fixedSummary,locations:['front','back','left','right'],orderOptions:[{size:'2XL',quantity:2}]}).totalCents,8600);
+assert.throws(()=>requestEstimate(pricedShop,{...fixedSummary,orderOptions:[{size:'L',quantity:1}]}),/at least 2/);
+assert(!validPhone(''));assert(!validPhone('123'));assert(!validPhone('call me'));assert(validPhone('+1 (202) 555-0101'));
+assert.equal(requestEstimate(pricedShop,{...fixedSummary,orderOptions:[{size:'L',quantity:2}]}).totalCents,6200);
+const brokenShop=structuredClone(pricedShop);brokenShop.pricing.printRules['2d'].htv.tiers[0].frontCents=-100;
+assert.throws(()=>requestEstimate(brokenShop,fixedSummary));
+const clientSource=await fs.readFile(new URL('../v20/print-shop.js',import.meta.url),'utf8');
+const api=clientSource.match(/const API = '([^']+)'/)[1],key=clientSource.match(/const KEY = '([^']+)'/)[1];
+const phoneProbe=new FormData();phoneProbe.append('payload',JSON.stringify({shop:'pilot',requestId:crypto.randomUUID(),website:'',startedAt:Date.now()-5000,customer:{name:'Validation only',email:'validation@example.com',phone:'',notes:''}}));phoneProbe.append('package',new Blob([new Uint8Array(22)]),'validation.zip');
+const rejected=await fetch(api,{method:'POST',headers:{apikey:key},body:phoneProbe});assert.equal(rejected.status,400);assert((await rejected.json()).error.includes('phone'));
+const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});
+const page=await context.newPage(),errors=[],requests=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
+const result={};
+try {
+ await page.goto(base+'/shops/pilot');
+ await page.waitForFunction(()=>document.body.dataset.ready==='true',{timeout:60000});
+ await page.evaluate(()=>localStorage.setItem('mqd-cart','PILOT-MUST-NOT-TOUCH'));
+ assert.equal(await page.getByRole('button',{name:'Sign in',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'Send order request'}).isEnabled(),false);
+ await page.getByRole('button',{name:'Add Text',exact:true}).click();
+ await page.locator('#textContent').fill('PILOT TEST');await page.locator('#textContent').dispatchEvent('input');
+ await page.locator('#quantity').fill('2');await page.locator('#quantity').dispatchEvent('change');
+ await page.waitForFunction(()=>!document.getElementById('shopSend').disabled);
+ assert((await page.locator('#shopEstimate').textContent()).includes('$40.00'));
+ await page.locator('.print-options summary').click();
+ for(const method of ['screen','htv','sublimation']) {
+ await page.locator('#printMethod').selectOption(method);
+ assert((await page.locator('#shopEstimate').textContent()).includes(method==='htv'?'$50.00':'Shop quote required'));
+ assert(await page.locator('#shopSend').isEnabled());
+ }
+ const downloadPromise=page.waitForEvent('download');await page.locator('#saveDraft').click();const download=await downloadPromise;
+ const zipPath=new URL('pilot-2d-design.zip',dir);await download.saveAs(zipPath.pathname);
+ const zip=await JSZip.loadAsync(await fs.readFile(zipPath));assert(zip.file('design.json'));assert(zip.file('previews/front.png'));assert(zip.file('print-references/front.png'));
+ assert.equal(JSON.parse(await zip.file('measurements.json').async('string')).printMethod,'sublimation');
+ assert.equal(JSON.parse(await zip.file('order-request.json').async('string')).estimate.totalCents,null);
+ await page.reload();await page.waitForFunction(()=>document.body.dataset.ready==='true');
+ assert.equal(await page.locator('#shopSend').isEnabled(),false);
+ await page.locator('#shopLoad').setInputFiles(zipPath.pathname);
+ await page.waitForFunction(()=>document.getElementById('shopStatus').textContent.includes('reopened'));
+ assert((await page.locator('#review').textContent()).includes('PILOT TEST'));
+ assert.equal(await page.locator('#printMethod').inputValue(),'sublimation');
+ await page.locator('#shopName').fill('MYMERCHNOW pilot verification');await page.locator('#shopEmail').fill('mqdrva@gmail.com');
+ assert.equal(await page.locator('#shopPhone').evaluate(e=>e.required&&!e.validity.valid),true);
+ await page.locator('#shopPhone').fill('+1 (202) 555-0101');
+ await page.locator('#shopNotes').fill('TEST ONLY. Please do not produce or invoice. Checking the separate print-shop request and attached design ZIP.');
+ await page.locator('#shopForm input[type=checkbox]').check();
+ await page.waitForTimeout(2100);
+ if(process.env.PILOT_SEND_EMAIL==='1') {
+ const responsePromise=page.waitForResponse(r=>r.url().includes('mqd-print-shop-pilot')&&r.request().method()==='POST');
+ await page.locator('#shopSend').click();const response=await responsePromise;const body=await response.json();result.request={status:response.status(),...body};assert.equal(response.status(),200,JSON.stringify(body));
+ await page.waitForFunction(()=>document.getElementById('shopStatus').textContent.includes('accepted'));
+ }
+ await page.screenshot({path:new URL('2d-desktop.png',dir).pathname,fullPage:true});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('mqd-cart')),'PILOT-MUST-NOT-TOUCH');
+ await page.goto(base+'/shops/pilot/3d');await page.waitForFunction(()=>document.body.dataset.ready==='true',{timeout:60000});
+ await page.waitForFunction(()=>window.MQDDesigner?.getContext().productId==='tshirt');
+ await page.waitForFunction(()=>window.MQDDesigner?.shopPreviewReady(),{timeout:60000});
+ await page.locator('#addTextBtn').click();await page.locator('#newGarmentText').fill('PILOT 3D');await page.locator('#addTextForm button[type=submit]').click();
+ await page.waitForTimeout(3000);
+ await page.locator('#shopName').fill('MYMERCHNOW pilot verification');
+ await page.locator('#shopPrintMethod').selectOption('screen');
+ assert((await page.locator('#shopEstimate').textContent()).includes('Shop quote required'));
+ const threePromise=page.waitForEvent('download');await page.locator('#saveDraft').click();const three=await threePromise;
+ const threePath=new URL('pilot-3d-design.zip',dir);await three.saveAs(threePath.pathname);
+ const threeZip=await JSZip.loadAsync(await fs.readFile(threePath));assert(threeZip.file('previews/3d.png'));
+ await page.reload();await page.waitForFunction(()=>document.body.dataset.ready==='true');await page.locator('#shopLoad').setInputFiles(threePath.pathname);
+ await page.waitForFunction(()=>document.getElementById('shopStatus').textContent.includes('reopened'));
+ assert.equal(await page.locator('#shopPrintMethod').inputValue(),'screen');
+ assert(JSON.stringify(await page.evaluate(()=>window.MQDDesigner.exportDesign())).includes('PILOT 3D'));
+ await page.waitForFunction(()=>window.MQDDesigner?.shopPreviewReady(),{timeout:60000});
+ await page.screenshot({path:new URL('3d-desktop.png',dir).pathname,fullPage:true});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('mqd-cart')),'PILOT-MUST-NOT-TOUCH');
+ result.isolatedNetwork=!requests.some(url=>/create-mqd.*checkout|submit-mqd-(everyday|guest)-design|\/auth\/v1\//.test(url));assert(result.isolatedNetwork);
+ const limitedPage=await context.newPage();
+ await limitedPage.route('**/mqd-print-shop-pilot?*',route=>route.fulfill({json:{shop:limitedShop}}));
+ for(const path of ['/shops/pilot','/shops/pilot/3d']) {
+ await limitedPage.goto(base+path);await limitedPage.waitForFunction(()=>document.body.dataset.ready==='true');
+ const methodOptions=await limitedPage.locator(path.endsWith('/3d')?'#shopPrintMethod option':'#printMethod option').allTextContents();
+ assert.deepEqual(methodOptions,['HTV']);
+ }
+ await limitedPage.unroute('**/mqd-print-shop-pilot?*');
+ await limitedPage.route('**/mqd-print-shop-pilot?*',route=>route.fulfill({json:{shop:pricedShop}}));
+ await limitedPage.goto(base+'/shops/pilot');await limitedPage.waitForFunction(()=>document.body.dataset.ready==='true');
+ assert.deepEqual(await limitedPage.locator('#printMethod option').allTextContents(),['HTV']);
+ await limitedPage.getByRole('button',{name:'Add Text',exact:true}).click();
+ await limitedPage.locator('#textContent').fill('PRICING TEST');await limitedPage.locator('#textContent').dispatchEvent('input');
+ await limitedPage.locator('#quantity').fill('12');await limitedPage.locator('#quantity').dispatchEvent('change');
+ assert((await limitedPage.locator('#shopEstimate').textContent()).includes('$310.00'));
+ await limitedPage.locator('#quantity').fill('1');await limitedPage.locator('#quantity').dispatchEvent('change');
+ assert((await limitedPage.locator('#shopEstimate').textContent()).includes('at least 2'));
+ await limitedPage.close();result.onlyOfferedPrintMethods=true;result.configuredMethodPricing=true;
+ const mobile=await context.newPage();await mobile.setViewportSize({width:390,height:844});await mobile.goto(base+'/shops/pilot');await mobile.waitForFunction(()=>document.body.dataset.ready==='true');
+ result.mobileOverflow=await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert(!result.mobileOverflow);
+ await mobile.screenshot({path:new URL('2d-mobile.png',dir).pathname,fullPage:true});
+ result.errors=errors;assert.deepEqual(errors,[]);result.printMethods=['Screen Printing','HTV','Sublimation'];result.downloadAndReopen2d=true;result.downloadAndReopen3d=true;
+ await fs.writeFile(new URL('verification.json',dir),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+}finally{await browser.close();}

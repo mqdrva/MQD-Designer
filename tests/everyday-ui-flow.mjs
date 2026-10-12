@@ -20,7 +20,7 @@ function setup() {
   const ids = ['product','color','size','quantity','printMethod','saveDraft','views','zoneLabel','emptyPhoto','artworkHeading','artName','remove','review','upload','photo','status','downloadPreview','productChoices','colorChoices','sizeChoices','colorName','quantityMinus','quantityPlus','uploadArtwork','layers','addText','textTools','textContent','textFont','textColor','textOutline','textOutlineColor','textAlign','textBold','textItalic','smaller','larger','centerArtwork'];
   for (const id of ids) nodes.set(id, element(id));
   nodes.get('printMethod').value='transfer';
-  const canvas = createCanvas(800, 900); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
+  const canvas = createCanvas(800, 900); const events = new EventTarget(); canvas.addEventListener = events.addEventListener.bind(events); canvas.removeEventListener = events.removeEventListener.bind(events); canvas.dispatchEvent = events.dispatchEvent.bind(events); canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 900 }); canvas.setPointerCapture = () => {}; nodes.set('preview', canvas);
   globalThis.document = { getElementById: id => nodes.get(id), querySelectorAll: () => [...nodes.values()], createElement: tag => {
     if (tag !== 'canvas') return element();
     const c = createCanvas(800, 900); c.toBlob = callback => callback(new Blob([c.toBuffer('image/png')], { type: 'image/png' })); return c;

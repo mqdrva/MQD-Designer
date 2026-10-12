@@ -18,5 +18,19 @@
     {
       "handle": "filesystem"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/print-shops",
+      "destination": "/print-shops.html"
+    },
+    {
+      "source": "/shops/:shop/3d",
+      "destination": "/shop-3d.html"
+    },
+    {
+      "source": "/shops/:shop",
+      "destination": "/shop-2d.html"
+    }
   ]
 }

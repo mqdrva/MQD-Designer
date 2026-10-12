@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+import {stripTypeScriptTypes} from 'node:module';
+import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
+const fixture=JSON.parse(await fs.readFile(new URL('../../../outputs/print-shop-pilot/business-setup-dimensions.json',import.meta.url)));
+const packet=validateSetup(fixture);
+assert.equal(packet.shop.pilot,false);
+assert.equal(packet.owner.requestEmail,'brenda@example.com');
+assert.throws(()=>validateSetup({...fixture,owner:{...fixture.owner,phone:''}}),/phone/);
+const bad=structuredClone(fixture);bad.shop.garments['everyday-tshirt'].printZones.front.width=20;assert.throws(()=>validateSetup(bad));
+const rows=new Map(),emails=[];let failMail=false,handler;
+const db={auth:{getUser:async jwt=>({data:{user:jwt==='admin-mfa'?{app_metadata:{role:'admin'}}:null},error:jwt!=='admin-mfa'}),getClaims:async()=>({data:{claims:{aal:'aal2'}}})},rpc:async(name,{p_row})=>{
+ if(name==='mqd_get_vault_secret')return {data:'mock-email-key'};
+ const prior=rows.get(p_row.id);if(prior)return prior.payload_hash===p_row.payload_hash?{data:[structuredClone(prior)]}:{error:{message:'Submission content changed'}};
+ const row={...p_row,status:'pending_review',revision:1,token_expires_at:new Date(Date.now()+30*86400000).toISOString(),owner_email_sent:false,admin_email_sent:false};rows.set(row.id,row);return {data:[structuredClone(row)]};
+},from:()=>{let filters=[],change=null;const q={select:()=>q,eq:(key,value)=>{filters.push([key,value]);return q;},order:()=>q,limit:async()=>({data:[...rows.values()].map(r=>structuredClone(r))}),update:value=>{change=value;return q;},single:async()=>finish(),maybeSingle:async()=>finish(),then:(resolve,reject)=>Promise.resolve(finish()).then(resolve,reject)};function finish(){const row=[...rows.values()].find(r=>filters.every(([k,v])=>r[k]===v));if(!row)return {data:null,error:{message:'not found'}};if(change)Object.assign(row,change);return {data:structuredClone(row)};}return q;}};
+let source=await fs.readFile(new URL('../supabase/functions/mqd-print-shop-setup/index.ts',import.meta.url),'utf8');source=source.replace(/^import .*;\n/gm,'');
+const context={createClient:()=>db,validateSetup,hasAdminMfa:async()=>true,crypto:globalThis.crypto,btoa,atob,TextEncoder,TextDecoder,Uint8Array,Response,Request,AbortSignal,setTimeout,Deno:{env:{get:name=>name==='SUPABASE_SERVICE_ROLE_KEY'?'mock-private-service-key':'mock'},serve:h=>{handler=h;}},fetch:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');if(failMail)return new Response('{}',{status:422});emails.push(JSON.parse(options.body));return new Response('{"id":"mock-provider-id"}',{status:200});}};
+vm.runInNewContext(stripTypeScriptTypes(source),context);
+const key='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+async function call(body,jwt){const res=await handler(new Request('https://example.test',{method:'POST',headers:{apikey:key,'Content-Type':'application/json',Origin:'http://127.0.0.1:8765',...(jwt?{Authorization:'Bearer '+jwt}:{})},body:JSON.stringify(body)}));return {status:res.status,data:await res.json()};}
+const id=crypto.randomUUID(),submit={action:'submit',requestId:id,setup:fixture,website:'',startedAt:Date.now()-3000};
+let res=await call(submit);assert.equal(res.status,200);assert.equal(emails.length,2);assert(!JSON.stringify(res).includes('manage='));
+await call(submit);assert.equal(emails.length,2,'duplicate submission must not resend emails');
+res=await call({action:'admin-list'});assert.equal(res.status,403);
+res=await call({action:'load',id,token:'f'.repeat(64)});assert.equal(res.status,401);
+res=await call({action:'admin-review',id,revision:1,decision:'approve-pilot'},'admin-mfa');assert.equal(res.status,409,'confirmation is required');
+const token=emails[0].text.match(/#manage=([a-f0-9]{64})/)[1];
+res=await call({action:'load',id,token});assert.equal(res.status,200);assert.equal(res.data.emailVerified,true);
+res=await call({action:'admin-review',id,revision:1,decision:'approve-pilot'},'admin-mfa');assert.equal(res.status,200);assert.equal(rows.get(id).status,'pilot_active');
+const updated=structuredClone(fixture);updated.shop.name='Updated business';failMail=true;
+res=await call({action:'update',id,token,revision:2,setup:updated});assert.equal(res.status,200);assert.equal(res.data.notificationAccepted,false);assert.equal(rows.get(id).shop_config.name,fixture.shop.name);assert.equal(rows.get(id).pending_config.name,'Updated business');
+res=await call({action:'update',id,token,revision:2,setup:updated});assert.equal(res.status,409,'stale updates must not overwrite');
+res=await call({action:'admin-review',id,revision:3,decision:'approve-pilot'},'admin-mfa');assert.equal(res.status,200);assert.equal(res.data.notificationAccepted,false);assert.equal(rows.get(id).shop_config.name,'Updated business');
+res=await call({action:'admin-review',id,revision:4,decision:'suspend'},'admin-mfa');assert.equal(res.status,200);assert.equal(rows.get(id).status,'suspended');
+console.log('Onboarding passed: private confirmation, idempotency, admin authorization, review, owner updates, stale revisions, and saved-state email failure handling.');

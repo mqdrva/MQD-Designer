@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+const source=(await fs.readFile('v20/print-shop-admin.js','utf8')).replace(/^import .*;\n/gm,'');
+const elements=new Map();const element=id=>{if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',value:'',replaceChildren(){}});return elements.get(id);};
+let options,oauth,mfaChecks=0,privateCalls=0;
+const client={auth:{getSession:async()=>({data:{session:null}}),signInWithOAuth:async args=>{oauth=args;return {error:null};}}};
+const context=vm.createContext({createClient:(url,key,config)=>{options=config;return client;},requireAdminMfa:async()=>{mfaChecks++;},document:{getElementById:element},location:{origin:'https://preview.example.com',pathname:'/print-shop-admin.html'},fetch:async()=>{privateCalls++;throw new Error('Unexpected private request');}});
+await new vm.Script(`(async()=>{${source}})()`).runInContext(context);
+assert.equal(options.auth.storageKey,'mqd-print-shop-admin-session');assert.equal(options.auth.detectSessionInUrl,true);assert.equal(options.auth.flowType,'pkce');
+await element('adminGoogle').onclick();assert.equal(oauth.provider,'google');assert.equal(oauth.options.redirectTo,'https://preview.example.com/print-shop-admin.html');assert.equal(oauth.options.queryParams.prompt,'select_account');assert.equal(privateCalls,0);assert.equal(mfaChecks,0);
+client.auth.signInWithOAuth=async()=>({error:new Error('Provider unavailable')});await element('adminGoogle').onclick();assert.equal(element('adminGoogle').disabled,false);assert.match(element('adminStatus').textContent,/could not open/);
+console.log('Administrator Google sign-in passed: isolated PKCE callback, exact return URL, account selection and retryable provider errors.');
