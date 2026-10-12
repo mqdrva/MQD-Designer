@@ -21,7 +21,7 @@ export function validateSetup(packet){
   if(!source||typeof source!=='object'||Array.isArray(source)||Object.keys(source).some(id=>!allow.includes(id)))throw new Error('Choose supported garments.');
   for(const [id,price] of Object.entries(source)){
    dest[id]=cents(price);const g=raw.garments?.[id];if(!g)throw new Error('Enter garment details.');
-   garments[id]={brand:text(g.brand,100,'garment brand',true),style:text(g.style,100,'garment style',true),sizes:choices(g.sizes,sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
+   garments[id]={brand:text(g.brand??'',100,'garment brand'),style:text(g.style??'',100,'garment style'),sizes:choices(g.sizes,sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
    const zones=shopPrintZones({garments},id);garments[id].printZones=Object.fromEntries(Object.entries(zones).map(([key,v])=>[key,{width:v.width,height:v.height}]));
   }
  }

@@ -7,6 +7,7 @@ import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validati
 class Element {
  constructor(tag){this.tag=tag;this.children=[];this.dataset={};this.value='';this.className='';this.checked=false;}
  append(...nodes){this.children.push(...nodes);}
+ before(node){this.previous=node;}
  addEventListener(){}
  setCustomValidity(message){this.validationMessage=message;}
  querySelectorAll(selector){const nodes=this.children.flatMap(c=>c instanceof Element?[c,...c.querySelectorAll('*')]:[]);if(selector==='*')return nodes;return nodes.filter(c=>selector==='input'?c.tag==='input':selector.startsWith('.')?c.className.split(' ').includes(selector.slice(1).replace(':checked',''))&&(!selector.endsWith(':checked')||c.checked):false);}
@@ -28,7 +29,23 @@ for(const row of elements.garmentRows.children){assert.deepEqual(row.querySelect
 assert(elements.garmentRows.children[3].querySelectorAll('.offered-color:checked').some(i=>i.value==='Forest'));
 assert.equal(elements.garmentRows.children[3].querySelector('.garment-enabled').checked,false,'disabled garments receive shared selections for later');
 const premium=elements.premiumRows.children[0];assert.equal(premium.querySelectorAll('.offered-color').length,0);assert.equal(premium.querySelectorAll('.dimension-row').length,0);assert(premium.querySelectorAll('.offered-size').length>0);
-premium.querySelector('.garment-brand').value='All-over supplier';premium.querySelector('.garment-style').value='AOP-1';
+premium.querySelector('.garment-brand').value='';premium.querySelector('.garment-style').value='';
 const collected=JSON.parse(vm.runInContext("JSON.stringify(collectGarments('premiumRows'))",context));assert(collected.tshirt.sizes.length);assert.equal(Object.keys(collected.tshirt.printZones).length,0);
 const fixture=JSON.parse(fs.readFileSync(new URL('./fixtures/print-shop-setup.json',import.meta.url)));fixture.plan='3d';fixture.shop.garments.tshirt=collected.tshirt;fixture.shop.pricing.premiumCents={tshirt:4000};const validated=validateSetup(fixture);assert(validated.shop.garments.tshirt.sizes.length);assert.equal(validated.shop.pricing.premiumCents.tshirt,4000);
+assert.equal(validated.shop.garments.tshirt.brand,'');assert.equal(validated.shop.garments.tshirt.style,'');
+vm.runInContext("sharedSetup('garmentRows');sharedSetup('premiumRows')",context);
+const common=elements.garmentRows.previous;
+common.querySelector('.shared-brand').value='Shared supplier';
+for(const input of common.querySelectorAll('.shared-size'))input.checked=['L','2XL'].includes(input.value);
+for(const input of common.querySelectorAll('.shared-color'))input.checked=input.value==='Black';
+common.querySelectorAll('*').find(e=>e.tag==='button').onclick();
+for(const row of elements.garmentRows.children){assert.equal(row.querySelector('.garment-brand').value,'Shared supplier');assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['L','2XL']);assert.deepEqual(row.querySelectorAll('.offered-color:checked').map(i=>i.value),['Black']);}
+shirt.querySelectorAll('.offered-size').find(i=>i.value==='L').checked=false;
+assert.deepEqual(shirt.querySelectorAll('.offered-size:checked').map(i=>i.value),['2XL']);
+assert.deepEqual(elements.garmentRows.children[1].querySelectorAll('.offered-size:checked').map(i=>i.value),['L','2XL']);
+const common3d=elements.premiumRows.previous;
+assert.equal(common3d.querySelectorAll('.shared-color').length,0);
+for(const input of common3d.querySelectorAll('.shared-size'))input.checked=input.value==='M';
+common3d.querySelectorAll('*').find(e=>e.tag==='button').onclick();
+for(const row of elements.premiumRows.children)assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['M']);
 console.log('Passed: link normalization, reserved names, immutable owner link, shared 2D sizes/colors, later-enabled garments, simplified 3D fields, and backend-compatible setup.');
