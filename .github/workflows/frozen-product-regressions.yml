@@ -41,4 +41,8 @@ jobs:
           node tests/tshirt-front-neckline.mjs
           node tests/tshirt-side-wrap.mjs
           node tests/tshirt-preview-contract.mjs
+          node tests/tshirt-calibration.mjs
+          node tests/tshirt-collar-frame.mjs
+          node tests/tshirt-collar-shell.mjs
+          node tests/tshirt-seam-mirror.mjs
           node tests/garment-load-lifecycle.mjs
