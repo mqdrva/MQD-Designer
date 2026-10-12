@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
-const fixture=JSON.parse(await fs.readFile(new URL('../../../outputs/print-shop-pilot/business-setup-dimensions.json',import.meta.url)));
+const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/print-shop-setup.json',import.meta.url)));
 const packet=validateSetup(fixture);
 assert.equal(packet.shop.pilot,false);
 assert.equal(packet.owner.requestEmail,'brenda@example.com');
