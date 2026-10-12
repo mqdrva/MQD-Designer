@@ -66,6 +66,8 @@ jobs:
           node tests/everyday-ui-flow.mjs
           node tests/everyday-contract.mjs
           node tests/everyday-render-package.mjs
+      - name: Verify homepage media and sale visibility
+        run: node tests/homepage-media.mjs
       - name: Verify Halloween pricing and all checkout paths
         run: node tests/halloween-promotion.mjs
       - name: Verify mobile artwork upload and retry behavior

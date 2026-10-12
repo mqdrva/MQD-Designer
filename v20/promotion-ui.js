@@ -14,6 +14,7 @@ function update(){
  let banner=document.getElementById('halloweenSpecial');
  if(!banner){banner=document.createElement('div');banner.id='halloweenSpecial';banner.setAttribute('role','note');document.body.prepend(banner);}
  banner.hidden=!active;
+ document.querySelectorAll('[data-halloween-promo]').forEach(card=>{card.hidden=!active;});
  banner.textContent='Halloween Special: 20% off all 12 garments • Ends Oct 31, 2026 at 11:59 PM Eastern • Automatically applied';
  document.documentElement.style.setProperty('--mqd-promotion-height',active?banner.getBoundingClientRect().height+'px':'0px');
  document.querySelectorAll('.link-card[href]').forEach(card=>{
