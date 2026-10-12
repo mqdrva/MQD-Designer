@@ -41,7 +41,7 @@
     "assets/templates/tshirt/sleeve.png": "0b012416466c01abe0d51cb537d21dd231e1ff6adf8a8e7dcb1dd8b7b38ef8bd"
   },
   "editorFunctions": {
-    "ensureTemplateImage": "415bd471852dab22ae5e9e3a7ee49f5c0c007ad551a4b9ad60e2017e68258465",
+    "ensureTemplateImage": "c0a8aee8ec821e84d3efbc5278e480b1fa1d5af2523bf95b1cfede29cd9b22f9",
     "buildTemplateMask": "a8f983afb47641a1d0f6111096ab76a2cc6a56c4507ec74a8d3bcf1af81d1fb5",
     "makeCleanZoneArtworkCanvas": "d64b432e2123a1eeb5096c348d82d4fc19bf01c6a0fc24d65151c212bfa709a0",
     "makeLongSleeveTshirtArtworkCanvas": "dd1f181f716bc9cf96abfde7b369422fa3459c1508cad04c8015990f66fd3f9b",
@@ -50,10 +50,10 @@
     "maxLayerScale": "6cac8584b0d3d8cbe972d09acfd784ee9665f048beb0246009b5f1a91a7e699b",
     "garmentCopyFamily": "2bd4c6bd5dcd965ec62d4d4c06cbec10be7e640818c76b780e4a6609a97bddc4",
     "zonePlacement": "90c062352b606a548662367868e4986c086820069531537eb841b8bb749d41ad",
-    "splitTshirtGeometry": "cb965c85b01b8a85ff3c450c05336d72051b34f638328cdb70f35236714e47ff",
+    "splitTshirtGeometry": "f5970adcd2342eca35d42bc14d2d7ed3998677c646894ed602496a5f8d7d383d",
     "splitFleeceHoodieGeometry": "33c57c07e61358ab64fe1e4a5110be19e2a704a4fdb3b66e28c882e6e2ddc69e",
     "rebuildFleeceHoodiePreview": "59b10d15a2827568336a01b3805caecd7a8ef69a977e75ba1079eeaaeadae245",
-    "updateTshirtZoneTextures": "42c2e2af465fecf72c4064561a50eeb088b69ea7ca169b71e0d2c13b2e9df375",
+    "updateTshirtZoneTextures": "afdbd6a2987f60f6601aaaf9e8f58b02ae6933d50851d35271d9d5870b6de606",
     "rebuildJacketPreview": "00101898fab51b19b982bf9deec8454dc9cf59de58c83eeac725ef63079b4e03",
     "rebuildHoodMaskPreview": "631ccc5d5c9c53f0f296a118db5a24b573a53b5f14e9d09e504560b71deb584a",
     "rebuildHoodedLongSleevePreview": "d80c55ae0498661be100c72d2c21ec4b40b0a9a766355b4927983106796fe13d",
@@ -61,6 +61,6 @@
     "rebuildShortsPreview": "a3be1cff9981a049772d4fefccaea635e7904d160b8076feb893c16fed3d925d",
     "rebuildMaskPreview": "a5531f9496cabc43154390a8e7352a619880ad358e0843ede6c635f10b093062",
     "rebuildGarmentPreview": "762fc38ac511308b61805e0ed0bd96201fd29ae5a8e41007bb9db0e55bd57056",
-    "loadGarment": "768d3221368a3cf3286734c8b60459891b5386250a3d97df4b4730db97752004"
+    "loadGarment": "b58c6316b0e0de8cfda4edf732727787017fb7cfe42870a05c7d242732c39915"
   }
 }

@@ -32,12 +32,7 @@ for(const id of ['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-
   assert.equal(c.updateTshirtZoneTextures(),true);
   assert.equal(calls.length,5);
   for(const {zone,options} of calls){
-    if(id==='tshirt'&&zone==='Back'){
-      assert.equal(options.offsetY,-.09,'Back retains its approved text correction');
-      assert.equal(options.imageOffsetY({type:'image'}),-.09);
-      assert.equal(options.imageOffsetY({type:'image',libraryAssetId:'locked',libraryLocked:true}),0);
-      assert.equal(options.imageOffsetY({type:'image',chatBackground:true}),0);
-    }else if(id==='long-sleeve-tshirt')assert.equal(options.longSleeve,true);
+    if(id==='long-sleeve-tshirt')assert.equal(options.longSleeve,true);
     else assert.deepEqual(Object.keys(options),[],`${id}/${zone} must not receive the legacy T-shirt body offset`);
     const material=meshes.get(zone).material;
     assert(material.map);assert.equal(material.transparent,false);assert.equal(material.opacity,1);
@@ -48,4 +43,4 @@ for(const id of ['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-
   for(const mesh of meshes.values()){assert.equal(mesh.material.map,null);assert.equal(mesh.material.color.getHexString(),'336699');}
   for(const mesh of interiors.values())assert.equal(mesh.material.color.getHexString(),'336699','removing artwork restores the zone background');
 }
-console.log('PASS: four shirt texture routes, calibrated Front, shifted Back, locked backgrounds and interior color/reset.');
+console.log('PASS: four shirt texture routes, calibrated Front and Back, locked backgrounds and interior color/reset.');

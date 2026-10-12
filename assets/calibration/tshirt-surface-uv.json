@@ -1,0 +1,24 @@
+{
+  "version": "v27-surface-uv-armhole",
+  "product": "tshirt",
+  "sourceMeshSha256": "1b3fe6aa54b84dce76a57ac66c685614b6a84aad5482021abc5d1a59824931ab",
+  "calibrationSha256": "931daeefb3bfb8bc83baf34999c969774ec5278b4ae06f3d77409fb7e5291a99",
+  "baseCommit": "419c04f0ada9f20ac878ef86ba8c3bdaeee37a1b",
+  "method": {
+    "body": "Cotangent harmonic U solve on the refined short-sleeve armhole partition, with fixed cut boundaries. Source scan surface conserved; neckline/hem V calibrated at runtime.",
+    "collar": "Periodic local cross-section PCA for V; existing U and topology retained.",
+    "encoding": "TUV1 magic, Front/Back/Collar records: uint32 vertex count, uint32 FNV-1a position fingerprint, uint16 normalized U (body) or V (collar). Little endian.",
+    "armholes": "Short-sleeve-only eased lower armhole cut, shoulder endpoints fixed. Harmonic body U recalculated for updated partition. Existing sleeve artwork bounds retained."
+  },
+  "generation": [
+    "diagnostics/dump-panels.mjs",
+    "diagnostics/harmonic.py",
+    "diagnostics/collar-uv.py",
+    "diagnostics/pack-surface.mjs"
+  ],
+  "limitations": [
+    "Preview mesh is a scanned visual approximation; physical sew-line correspondence is not certified.",
+    "Source scan unchanged; sleeve-root panel assignment refined and collar uses a separate preview shell.",
+    "Do not use the index-ordered calibration with any other mesh; runtime fingerprints reject it."
+  ]
+}

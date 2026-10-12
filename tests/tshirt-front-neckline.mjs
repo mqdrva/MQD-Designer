@@ -10,7 +10,7 @@ const mapped=bodyPatternUv(p,'Front',{width,height,data},{x:110,y:35,w:780,h:875
 assert(Math.abs(mapped[5]-(1-(198-35)/875))<1e-6,'neckline must crop the same image row as 2D');
 assert(Math.abs(mapped[1])<1e-6,'hem must remain anchored');
 const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
-assert(source.includes("const accurateTshirtFront=product.id==='tshirt'&&zone==='Front'"));
+assert(source.includes("const accurateTshirtBody=product.id==='tshirt'&&(zone==='Front'||zone==='Back')"));
 assert(source.includes('for(let i=1;i<uv.length;i+=2)uv[i]=mapped[i]'),'preserve horizontal side mapping');
-assert(source.includes("const tshirtBodyArtwork=product.id==='tshirt'&&zone==='Back'"),'no extra layer offsets on calibrated front');
+assert(!source.includes('const tshirtBodyArtwork='),'no layer offsets on either calibrated body panel');
 console.log('PASS: front neckline crop, hem anchor, unchanged horizontal UVs, and front-only scope.');
