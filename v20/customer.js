@@ -1036,6 +1036,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   updateCartButton();
   restoreAuthFromRedirect().then(({session,callbackError})=>{
     completeAuth(session);
+    if(new URLSearchParams(location.search).get('signIn')==='try-on'&&!isPermanentUser()){
+      openAuth('Sign in with Google or Email to use virtual try-on. After signing in, return to the try-on tab. Guest checkout does not unlock virtual try-on.');
+    }
     if(callbackError&&!session){
       openAuth('That email sign-in link could not be completed. Request a new link and use the newest email.');
       const message=$('authMessage');

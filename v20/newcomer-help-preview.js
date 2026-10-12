@@ -102,6 +102,7 @@ function addReplayButton(){
 
 function boot(){
   addReplayButton();
+  if(new URLSearchParams(location.search).get('signIn')==='try-on')return;
   const force=new URLSearchParams(location.search).get('tour')==='1';
   setTimeout(()=>startTour({force}),650);
 }
