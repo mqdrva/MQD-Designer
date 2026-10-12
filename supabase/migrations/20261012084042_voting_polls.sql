@@ -57,7 +57,8 @@ returns uuid language plpgsql set search_path='' as $$
 declare last_poll uuid; unlock_order uuid; new_poll uuid; opt jsonb; idx integer:=0;
 begin
  perform pg_advisory_xact_lock(hashtextextended(p_user::text,142));
- if not exists(select 1 from auth.users where id=p_user and is_anonymous is not true) then raise exception 'Sign in with Google or Email to create a vote.'; end if;
+ -- Permanent-account identity is verified by getUser in the service-only Edge endpoint.
+ if p_user is null then raise exception 'Sign in to create a vote.'; end if;
  if char_length(trim(p_title)) not between 1 and 100 or p_closes<=now() or p_closes>now()+interval '30 days' then raise exception 'Choose a title and a closing date within 30 days.'; end if;
  if jsonb_typeof(p_options)!='array' or jsonb_array_length(p_options) not between 2 and 3 then raise exception 'Choose two or three saved designs.'; end if;
  if (select count(distinct x->>'design_id') from jsonb_array_elements(p_options) x)!=jsonb_array_length(p_options) then raise exception 'Choose different designs.'; end if;

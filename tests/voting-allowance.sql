@@ -8,6 +8,7 @@ begin
  insert into public.customer_designs(id,user_id,product_id,product_name,name,status,design_json)
  values(d1,u,'tshirt','T-Shirt','Option A','draft',jsonb_build_object('design',snap)),(d2,u,'tshirt','T-Shirt','Option B','draft',jsonb_build_object('design',snap));
  options:=jsonb_build_array(jsonb_build_object('design_id',d1,'product_id','tshirt','label','A','preview','data:image/png;base64,AAAA','design_snapshot',snap),jsonb_build_object('design_id',d2,'product_id','tshirt','label','B','preview','data:image/png;base64,AAAA','design_snapshot',snap));
+ perform set_config('role','service_role',true);
  p:=public.mqd_poll_create(u,'Fixture vote',now()+interval '1 day',options);
  blocked:=false;begin perform public.mqd_poll_create(u,'Blocked',now()+interval '1 day',options);exception when others then blocked:=true;end;if not blocked then raise exception 'FAIL: second free poll';end if;
  select id into opt from public.mqd_poll_options where poll_id=p limit 1;
