@@ -2414,7 +2414,18 @@ function mobileSelection(){
  const l=activeLayer();
  return{productId:product.id,zone:activeZone,id:l?.id||null,type:l?.type||null,label:l?.label||'',text:l?.text||'',filename:l?.filename||'',visible:l?.visible!==false,locked:isLockedLibraryLayer(l)};
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+function beginRevealCapture(){
+ if(!renderer||!garment)throw new Error('Wait for the 3D garment to finish loading.');
+ const position=camera.position.clone(),target=controls.target.clone(),enabled=controls.enabled,damping=controls.enableDamping;
+ const offset=position.clone().sub(target),radius=Math.hypot(offset.x,offset.z),y=offset.y;
+ controls.enabled=false;controls.enableDamping=false;
+ let restored=false;
+ return{
+  frame(angle){if(restored)throw new Error('Reveal capture has ended.');camera.position.set(target.x+Math.sin(angle)*radius,target.y+y,target.z+Math.cos(angle)*radius);camera.lookAt(target);renderer.render(scene,camera);return renderer.domElement;},
+  restore(){if(restored)return;restored=true;camera.position.copy(position);controls.target.copy(target);controls.enabled=enabled;controls.enableDamping=damping;controls.update();renderer.render(scene,camera);}
+ };
+}
+window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,beginRevealCapture,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{

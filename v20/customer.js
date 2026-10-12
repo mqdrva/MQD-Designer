@@ -230,6 +230,20 @@ window.MQDCustomerAuth={
 };
 function isGuestUser(user=accountUser()){return !!user?.is_anonymous;}
 function isPermanentUser(user=accountUser()){return !!user&&!isGuestUser(user);}
+// Narrow account bridge for the voting dialog; artwork stays in private storage.
+window.MQDVotingAccount={
+ requireAccount:after=>requirePermanentAccount('Sign in with Google or Email to create and manage your voting page.',after),
+ designs:async()=>{
+  const {data,error}=await supabase.from('customer_designs').select('*').neq('status','archived').order('updated_at',{ascending:false}).limit(50);
+  if(error)throw error;
+  return await Promise.all((data||[]).filter(d=>d.preview_path).map(async d=>({id:d.id,name:d.name,productName:d.product_name,preview:await previewUrl(d.preview_path)})));
+ },
+ open:async id=>{
+  const {data,error}=await supabase.from('customer_designs').select('*').eq('id',id).single();
+  if(error)throw error;
+  await openCloudDesign(data,{notify:false});
+ }
+};
 function openAuth(reason='Sign in to save designs across devices, or continue as a guest to purchase without an account.',after=null){
   pendingAfterAuth=after;
   $('authReason').textContent=reason;
