@@ -168,6 +168,8 @@ function mount() {
   document.title=`${shop.name} · ${engine.toUpperCase()} shirt designer`;
   $('shopBrand').textContent=shop.name;$('shopLogo').src=shop.logo;$('shopLogo').alt=shop.name;
   $('shopSwitch').href=`/shops/${slug}${engine==='2d'?'/3d':''}`;$('shopSwitch').textContent=engine==='2d'?'Try 3D designer':'Use 2D designer';
+  $('shopSwitch').hidden=!shop.engines.includes(engine==='2d'?'3d':'2d');
+  document.querySelector('.shop-intro > strong').textContent=shop.pilot?'Print-shop pilot · sample prices · no checkout':'Shop order requests · final quote confirmed by the business';
   $('shopDescription').textContent=[shop.tagline,shop.requirements].filter(Boolean).join(' · ');
   if(setupPreview){
     $('shopSwitch').href+='?setupPreview=1';
