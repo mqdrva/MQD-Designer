@@ -4,14 +4,14 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash} from '../v20/shirt-splash-preview.js';
 const {createCanvas}=createRequire(import.meta.url)('@napi-rs/canvas');
-const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const extract=(name,next)=>source.slice(source.indexOf('function '+name+'('),source.indexOf('function '+next+'('));
 let textTransforms=[],imageTransforms=[],textStyles=[];
 const text={type:'text',text:'LNO',x:20.5768,y:17.8047,scale:.72};
 const image={type:'image',image:{width:100,height:100},x:0,y:0,scale:1};
 const ctx={document:{createElement:()=>createCanvas(1,1)},product:{id:'long-sleeve-polo'},
  zoneDesignAspect:()=>3180/1130,zoneState:()=>({layers:[text,image]}),
- shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,
+ shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,isJacketSplash5:()=>false,isCutlineBottomArtwork:()=>false,
  drawTextLayer(c,l){textTransforms.push(c.getTransform());textStyles.push(l);},drawImageLayer(c){imageTransforms.push(c.getTransform());}};
 vm.createContext(ctx);
 vm.runInContext(extract('makeCleanZoneArtworkCanvas','makeLongSleeveTshirtArtworkCanvas')+extract('makeShirtPreviewArtwork','updateTshirtZoneTextures'),ctx);

@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {createCanvas,loadImage} from '@napi-rs/canvas';
 
-const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const extract=name=>{const start=source.indexOf(`function ${name}(`),end=source.indexOf('\nfunction ',start+1);return source.slice(start,end);};
 const img=await loadImage(new URL('../assets/templates/long-sleeve/sleeve.png',import.meta.url).pathname);
-const context=vm.createContext({console,document:{createElement:()=>createCanvas(1,1)},product:{id:'long-sleeve-polo'},templateCache:new Map(),mobileDesignerMode:()=>false,drawEditor:()=>{},activeZone:'Left Sleeve'});
+const context=vm.createContext({console,document:{createElement:()=>createCanvas(1,1)},product:{id:'long-sleeve-polo'},templateCache:new Map(),zoneState:()=>({layers:[]}),mobileDesignerMode:()=>false,drawEditor:()=>{},activeZone:'Left Sleeve'});
 vm.runInContext(extract('buildTemplateMask')+'\n'+extract('ensureTemplateImage'),context);
 context.product.templates=Object.fromEntries(['Left Sleeve','Right Sleeve'].map(zone=>[zone,{path:'sleeve.png',width:2690,height:4120}]));
 context.Image=class{set src(value){this.width=img.width;this.height=img.height;this.onload();}};

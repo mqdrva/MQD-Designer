@@ -32,5 +32,7 @@
       "source": "/shops/:shop",
       "destination": "/shop-2d.html"
     }
-  ]
+  ],
+  "buildCommand": "npm run build:mappings",
+  "outputDirectory": "."
 }

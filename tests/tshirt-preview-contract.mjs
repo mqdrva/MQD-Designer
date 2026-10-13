@@ -7,7 +7,7 @@ import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from '../v20/tshirt
 
 // Exercise the actual texture dispatcher, not a second implementation of its
 // product/zone routing. The neckline regression separately checks pattern UVs.
-const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const start=source.indexOf('function updateTshirtZoneTextures(');
 const end=source.indexOf('\nfunction findLargestMesh(',start);
 const zones=['Front','Back','Left Sleeve','Right Sleeve','Collar'];
