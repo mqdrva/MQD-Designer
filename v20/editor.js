@@ -1,3 +1,5 @@
+import {applyGarmentMappings} from './garment-mapping-catalog.js';
+// @mapping-begin imports
 import {partitionTshirtBodyTriangle,tshirtSleeveArtworkBounds} from './tshirt-armhole-seams.js?v=2';
 import {refineTshirtCollar} from './tshirt-collar-shell.js';
 import {tshirtBodyPlacementFrame,matchTshirtDuplicatePlacement} from './tshirt-duplicate-placement.js';
@@ -5,12 +7,8 @@ import {tshirtSeamFrame,renderTshirtSeamMirror} from './tshirt-seam-mirror.js';
 import {createTshirtNeckInterior} from './tshirt-neck-interior.js?armhole=v2';
 import {createTshirtCollarFrame} from './tshirt-collar-frame.js';
 import {loadTshirtSurfaceUv,applyTshirtSurfaceUv} from './tshirt-surface-uv.js';
-import {installFlatMockup} from './flat-mockup.js?v=2';
-let flatMockup=null;
 import {createHoodMaskPanels} from './hood-mask-panels.js';
-let hoodMaskPanels=null;
 import {createHoodedLongSleevePanels,hoodedLongSleeveArtworkTransform} from './hooded-long-sleeve-panels.js';
-let hoodedLongSleevePanels=null;
 import {partitionLongSleeveTriangle,longSleevePanelUv} from './long-sleeve-panels.js';
 import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection,setJacketPanelUvs} from './lightweight-jacket-renderer.js?v=surface-1';
@@ -19,16 +17,10 @@ import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js?v=back-1';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js?v=3';
 import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,shirtSplashCutFrame} from './shirt-splash-preview.js?v=2';
 import {isCutlineBottomArtwork,drawFittedSplash} from './water-splash-fit.js?v=grass-1';
-let lightweightJacketZones=null;
 import {createHatZones,hatProjection} from './hat-renderer.js';
-let hatZoneMeshes=null;
 import {createShortsPanels,shortsTemplatePolygons} from './shorts-panels.js';
-let shortsPanelMeshes=null;
 import {createSweatPanels,sweatTemplate} from './sweat-pants-panels.js';
-let sweatPanels=null;
-const sweatTemplates=new Map();
 import {createMaskSurface,applyMaskTexture,MASK_MAPPING_CALIBRATION} from './mask-renderer.js';
-let maskSurface=null;
 import {partitionLongSleevePoloTriangle} from './long-sleeve-polo-panels.js';
 import {partitionFleeceHoodieTriangle,hoodiePanelNames} from './fleece-hoodie-panels.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
@@ -36,6 +28,45 @@ import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
 import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from './tshirt-artwork-calibration.js';
 import {tshirtSideWrapUv,isTshirtSleeveInterior,isTshirtCollarInterior} from './tshirt-side-wrap.js';
+// @mapping-end imports
+
+
+
+
+
+
+
+import {installFlatMockup} from './flat-mockup.js?v=2';
+let flatMockup=null;
+
+let hoodMaskPanels=null;
+
+let hoodedLongSleevePanels=null;
+
+
+
+
+
+
+
+
+let lightweightJacketZones=null;
+
+let hatZoneMeshes=null;
+
+let shortsPanelMeshes=null;
+
+let sweatPanels=null;
+const sweatTemplates=new Map();
+
+let maskSurface=null;
+
+
+
+
+
+
+
 
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -57,9 +88,12 @@ const seed=[
 {id:'hat',name:'Hat',category:'Headwear',price:34,model:'https://gsxuhpffgdffsqksrkrf.supabase.co/storage/v1/object/public/garments/hat.glb',zones:['Front Panel','Top of Bill'],templates:{'Front Panel':{path:'/assets/templates/hat/front-panel.png',width:1151,height:1050},'Top of Bill':{path:'/assets/templates/hat/top-of-bill.png',width:1169,height:941}}}
 ];
 const $=id=>document.getElementById(id);
+// Every premium garment uses the shared model and artwork frames.
+applyGarmentMappings(seed);
 const ownerMode=new URLSearchParams(location.search).get('owner')==='1';
 document.body.classList.toggle('owner-mode',ownerMode);
 let catalog=JSON.parse(localStorage.getItem('mqd-catalog')||'null')||seed;
+applyGarmentMappings(catalog);
 // Keep the approved Mask model current even when an older catalog remains in browser storage.
 const seedMaskModel=seed.find(p=>p.id==='mask')?.model;
 const catalogMask=catalog.find(p=>p.id==='mask');
@@ -75,7 +109,9 @@ const tshirtZoneMeshes=new Map();
 const tshirtInteriorMeshes=new Map();
 let fleeceHoodieZoneGroup=null;
 const fleeceHoodieZoneMeshes=new Map();
+// @mapping-begin calibration
 const MQD_TSHIRT_ZONE_CALIBRATION='v26-surface-uv-collar-strip';
+// @mapping-end calibration
 // LOCKED after renderer regression: do not alter the T-shirt GLB load/split path while adding editor UI features.
 const MQD_TSHIRT_RENDERER_LOCK='stable-v1';
 // LOCKED: 3D T-shirt zone textures must stay in the stable rectangular UV frame.
@@ -157,6 +193,7 @@ function repairImageObjects(){
   })));
 }
 
+// @mapping-begin ensureTemplateImage
 function ensureTemplateImage(zone=activeZone){
   if(product.id==='sweat-pants'&&sweatTemplates.has(zone))return sweatTemplates.get(zone);
   const t=product.templates?.[zone];
@@ -246,12 +283,18 @@ function ensureTemplateImage(zone=activeZone){
   img.src=t.path;
   return rec;
 }
+// @mapping-end ensureTemplateImage
+// @mapping-begin templateImageFor
 function templateImageFor(zone=activeZone){return ensureTemplateImage(zone)?.img||null;}
+// @mapping-end templateImageFor
+// @mapping-begin preloadTemplates
 function preloadTemplates(){
  if(mobileDesignerMode()){ensureTemplateImage(activeZone);return;}
  product.zones.forEach(z=>ensureTemplateImage(z));
 }
+// @mapping-end preloadTemplates
 
+// @mapping-begin buildTemplateMask
 function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,solidBodyTemplate=false,poloSleeve2d=false){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   const src=document.createElement('canvas');src.width=w;src.height=h;
@@ -787,8 +830,14 @@ function buildTemplateMask(img,zone=null,jacketSleeve=false,jacketBack=false,sol
     bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}
   };
 }
+// @mapping-end buildTemplateMask
+// @mapping-begin scaleBounds
 function scaleBounds(b,sw,sh,dw,dh){return{x:b.x/sw*dw,y:b.y/sh*dh,w:b.w/sw*dw,h:b.h/sh*dh};}
+// @mapping-end scaleBounds
+// @mapping-begin isFullLockedLibraryBackground
 function isFullLockedLibraryBackground(l){return !!(l?.type==='image'&&l.libraryAssetId&&l.libraryLocked&&l.libraryPreset==='full');}
+// @mapping-end isFullLockedLibraryBackground
+// @mapping-begin measureVisibleImageBounds
 function measureVisibleImageBounds(img){
   if(!img)return{left:0,top:0,right:1,bottom:1};
   const fullW=Math.max(1,img.naturalWidth||img.width),fullH=Math.max(1,img.naturalHeight||img.height),maxSide=512,ratio=Math.min(1,maxSide/Math.max(fullW,fullH));
@@ -801,12 +850,17 @@ function measureVisibleImageBounds(img){
     const pad=1;return{left:Math.max(0,(minX-pad)/w),top:Math.max(0,(minY-pad)/h),right:Math.min(1,(maxX+pad+1)/w),bottom:Math.min(1,(maxY+pad+1)/h)};
   }catch(error){console.warn('Library background padding could not be measured',error);return{left:0,top:0,right:1,bottom:1};}
 }
+// @mapping-end measureVisibleImageBounds
+// @mapping-begin normalizedLibraryContentBounds
 function normalizedLibraryContentBounds(l){
   if(!isFullLockedLibraryBackground(l))return null;
   const measured=l.libraryContentBounds||measureVisibleImageBounds(l.image),left=Math.max(0,Math.min(.98,Number(measured?.left)||0)),top=Math.max(0,Math.min(.98,Number(measured?.top)||0)),right=Math.max(.02,Math.min(1,Number(measured?.right)||1)),bottom=Math.max(.02,Math.min(1,Number(measured?.bottom)||1));
   const bounds=right>left&&bottom>top?{left,top,right,bottom}:{left:0,top:0,right:1,bottom:1};l.libraryContentBounds=bounds;return bounds;
 }
-function drawImageLayer(c,l,b){
+// @mapping-end normalizedLibraryContentBounds
+function drawImageLayer(c,l,b){return drawMappedImageLayer(c,l,b);}
+// @mapping-begin drawMappedImageLayer
+function drawMappedImageLayer(c,l,b){
   if(!l.image)return;
   const fullW=Math.max(1,l.image.naturalWidth||l.image.width),fullH=Math.max(1,l.image.naturalHeight||l.image.height),content=normalizedLibraryContentBounds(l);
   if(content){
@@ -821,6 +875,8 @@ function drawImageLayer(c,l,b){
   const dx=-iw/2+iw*left,dy=-ih/2+ih*top,dw=iw*(1-left-right),dh=ih*(1-top-bottom);
   c.scale(l.flipX?-1:1,l.flipY?-1:1);c.drawImage(l.image,sx,sy,sw,sh,dx,dy,dw,dh);
 }
+// @mapping-end drawMappedImageLayer
+// @mapping-begin drawTextLayer
 function drawTextLayer(c,l,b,zone=activeZone){
   // Keep the minimum glyph size in production units across editor and preview resolutions.
   const rec=product.id==='tshirt'?ensureTemplateImage(zone):null;
@@ -836,6 +892,8 @@ function drawTextLayer(c,l,b,zone=activeZone){
   if(stroke>0){c.strokeStyle=l.strokeColor||'#FFFFFF';c.lineWidth=Math.max(1,fs*(stroke/100));c.lineJoin='round';c.strokeText(text,0,0,maxWidth);}
   c.fillStyle=l.color||'#111111';c.fillText(text,0,0,maxWidth);
 }
+// @mapping-end drawTextLayer
+// @mapping-begin editorDesignBounds
 function editorDesignBounds(zone,r,rec=ensureTemplateImage(zone)){
   let b={...r};
   if(rec?.img&&rec?.bounds){
@@ -844,10 +902,14 @@ function editorDesignBounds(zone,r,rec=ensureTemplateImage(zone)){
   }
   return b;
 }
+// @mapping-end editorDesignBounds
+// @mapping-begin drawEditorTextOverlay
 function drawEditorTextOverlay(c,zone,r,rec){
   const b=editorDesignBounds(zone,r,rec),z=zoneState(zone);
   (z.layers||[]).forEach(l=>{if(l.visible===false||l.type!=='text')return;c.save();const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);drawTextLayer(c,l,b,zone);c.restore();});
 }
+// @mapping-end drawEditorTextOverlay
+// @mapping-begin drawSafeAreaGuide
 function drawSafeAreaGuide(c,zone,r,rec){
   const b=editorDesignBounds(zone,r,rec);
   // All-Over Print T-Shirt sleeve editor only: use a much larger safe-area frame.
@@ -857,6 +919,7 @@ function drawSafeAreaGuide(c,zone,r,rec){
   const inset=tshirtSleeve?.025:tshirtBody?.045:.075,ix=Math.max((tshirtSleeve||tshirtBody)?4:9,b.w*inset),iy=Math.max((tshirtSleeve||tshirtBody)?4:9,b.h*inset),x=b.x+ix,y=b.y+iy,w=Math.max(10,b.w-ix*2),h=Math.max(10,b.h-iy*2);
   c.save();c.strokeStyle='#FF8A00';c.lineWidth=2;c.setLineDash([9,7]);c.strokeRect(x,y,w,h);c.setLineDash([]);c.fillStyle='#B85F00';c.font='700 10px Inter, sans-serif';c.textAlign='left';c.textBaseline='top';c.fillText('SAFE AREA',x+5,y+5);c.restore();
 }
+// @mapping-end drawSafeAreaGuide
 function imageLayerEstimatedDpi(l,zone=activeZone){
   if(!l||l.type!=='image'||!l.image)return null;const t=product.templates?.[zone],rec=ensureTemplateImage(zone);let tw=t?.width||0,th=t?.height||0;
   if(rec?.bounds){tw=rec.bounds.w;th=rec.bounds.h;}if(!tw||!th)return null;
@@ -864,12 +927,15 @@ function imageLayerEstimatedDpi(l,zone=activeZone){
   const dpi=300/Math.max(.0001,base);
   return Number.isFinite(l.mirrorSourceDpi)?Math.min(dpi,l.mirrorSourceDpi/Math.max(.01,Number(l.scale)||1)):dpi;
 }
+// @mapping-begin zoneQuality
 function zoneQuality(zone=activeZone){
   const z=zoneState(zone),images=(z.layers||[]).filter(l=>l.visible!==false&&l.type==='image'&&l.image),texts=(z.layers||[]).filter(l=>l.visible!==false&&l.type==='text');
   if(!images.length){if(texts.length)return{tone:'good',label:'Text quality ✓',note:'Text is rendered at the production template resolution.'};return{tone:'neutral',label:'No image to check',note:'Add an image to see estimated print resolution.'};}
   const values=images.map(l=>imageLayerEstimatedDpi(l,zone)).filter(Number.isFinite);if(!values.length)return{tone:'neutral',label:'Resolution unavailable',note:'Source pixel dimensions could not be read.'};
   const dpi=Math.round(Math.min(...values));if(dpi>=240)return{tone:'good',label:`≈ ${dpi} DPI ✓`,note:'Good print resolution at the current design size.'};if(dpi>=150)return{tone:'warn',label:`≈ ${dpi} DPI`,note:'Usable, but increasing the image size further may soften the print.'};return{tone:'bad',label:`≈ ${dpi} DPI ⚠`,note:'Low resolution — this image may print blurry at the current size.'};
 }
+// @mapping-end zoneQuality
+// @mapping-begin activeLayerSafeAreaStatus
 function activeLayerSafeAreaStatus(){
   const l=activeLayer();
   if(!l)return{tone:'neutral',label:'No artwork selected',note:'Select a logo, image, or text layer to check its safe-area placement.'};
@@ -889,6 +955,7 @@ function activeLayerSafeAreaStatus(){
     ?{tone:'warn',label:'Artwork crosses the safe area ⚠',note:'Keep important logos and text inside the orange safe-area guide. Decorative backgrounds may extend to the red cut line.'}
     :{tone:'good',label:'Inside safe area ✓',note:'The selected artwork is inside the recommended safe area.'};
 }
+// @mapping-end activeLayerSafeAreaStatus
 function ensureCustomerUx(){
   if(!document.getElementById('mqdUxStyles')){const style=document.createElement('style');style.id='mqdUxStyles';style.textContent=`.zone-icon{position:relative}.zone-icon.complete::after{content:'✓';position:absolute;right:4px;top:4px;width:14px;height:14px;border-radius:50%;background:#18a558;color:#fff;font-size:9px;font-weight:900;display:grid;place-items:center;box-shadow:0 0 0 2px #fff}.guide-legend{font-size:9px;color:#777;text-align:center;margin-top:-2px;margin-bottom:7px}.guide-legend .cut{color:#EB232D;font-weight:800}.guide-legend .safe{color:#D66F00;font-weight:800}.quality-card{border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;padding:9px;margin-top:8px}.quality-card .q-check+.q-check{margin-top:9px;padding-top:9px;border-top:1px solid #e8e8e8}.quality-card .q-label{font-size:9px;color:#888}.quality-card .q-value{font-size:12px;font-weight:800;margin-top:3px}.quality-card .q-note{font-size:9px;color:#777;line-height:1.35;margin-top:3px}.quality-card .q-check.good .q-value{color:#157c3f}.quality-card .q-check.warn .q-value{color:#9a6100}.quality-card .q-check.bad .q-value{color:#b42318}.quality-card .q-check.neutral .q-value{color:#666}`;document.head.appendChild(style);}
   if(!document.getElementById('guideLegend')){const title=document.querySelector('.zone-title');if(title){const d=document.createElement('div');d.id='guideLegend';d.className='guide-legend';d.innerHTML='<span class="cut">Red</span> = cut / bleed edge &nbsp;·&nbsp; <span class="safe">Orange</span> = keep important text & logos inside';title.insertAdjacentElement('afterend',d);}}
@@ -902,6 +969,7 @@ function renderPrintQuality(){
   if(safe&&safeValue&&safeNote){safe.className='q-check '+s.tone;safeValue.textContent=s.label;safeNote.textContent=s.note;}
 }
 
+// @mapping-begin waterSplashCut
 function waterSplashCut(zone,rec){
   const shirt=shirtSplashCutFrame(product.id,zone);if(shirt)return shirt;
   // These masks already use the full printable frame; ignore template annotations.
@@ -914,6 +982,8 @@ function waterSplashCut(zone,rec){
   const r=rec.bounds;
   return rec.waterSplashCut=right>=left?{left:(left-r.x)/r.w,right:(right+1-r.x)/r.w,top:(top-r.y)/r.h,bottom:(bottom+1-r.y)/r.h}:{left:0,top:0,right:1,bottom:1};
 }
+// @mapping-end waterSplashCut
+// @mapping-begin drawWaterSplash2
 function drawWaterSplash2(c,zone,l,b,preview=false){
   if(!l.image)return;
   const rec=ensureTemplateImage(zone),t=product.templates?.[zone];
@@ -923,6 +993,8 @@ function drawWaterSplash2(c,zone,l,b,preview=false){
   const patternUv=product.id==='long-sleeve-tshirt'&&['Front','Back'].includes(zone);
   drawFittedSplash(c,l.image,content,waterSplashCut(zone,rec),b,flatAspect,preview&&!patternUv,!!l.flipX,!!l.flipY);
 }
+// @mapping-end drawWaterSplash2
+// @mapping-begin drawJacketSplash5Layer
 function drawJacketSplash5Layer(c,zone,l,b,preview){
   const rec=ensureTemplateImage(zone),t=product.templates?.[zone];
   if(!l.image||rec?.status!=='ready')return;
@@ -930,12 +1002,16 @@ function drawJacketSplash5Layer(c,zone,l,b,preview){
   const content=l.waterSplashContentBounds||(l.waterSplashContentBounds=measureVisibleImageBounds(l.image));
   drawJacketSplash5(c,l,content,waterSplashCut(zone,rec),b,flatAspect,preview);
 }
+// @mapping-end drawJacketSplash5Layer
+// @mapping-begin drawLayerStack
 function drawLayerStack(c,zone,b,preview=false){
   const z=zoneState(zone);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
   (z.layers||[]).forEach(l=>{if(l.visible===false)return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(c,zone,l,b,preview);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(c,zone,l,b,preview);return;}c.save();clipShirtSplash(c,product.id,zone,l,b);const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,b);}
     else if(l.type==='text'){drawTextLayer(c,l,b,zone);}c.restore();});
 }
+// @mapping-end drawLayerStack
+// @mapping-begin renderMaskedZoneCanvas
 function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   const out=document.createElement('canvas');out.width=w;out.height=h;const ox=out.getContext('2d'),rec=ensureTemplateImage(zone),t=product.templates?.[zone];
   if(product.id==='long-sleeve-tshirt'&&rec?.img&&rec?.maskCanvas&&rec?.bounds){
@@ -954,10 +1030,18 @@ function renderMaskedZoneCanvas(zone,w,h,includeGuide=false){
   if(t?.shape==='rectangle'||!t?.path){drawLayerStack(ox,zone,{x:0,y:0,w,h});return out;}
   ox.save();traceZonePath(ox,zone,w,h);ox.clip();drawLayerStack(ox,zone,{x:0,y:0,w,h});ox.restore();return out;
 }
+// @mapping-end renderMaskedZoneCanvas
+// @mapping-begin zoneDesignAspect
 function zoneDesignAspect(zone){const rec=ensureTemplateImage(zone),t=product.templates?.[zone];if(rec?.artworkAspect)return rec.artworkAspect;if(rec?.bounds)return rec.bounds.w/Math.max(1,rec.bounds.h);if(t?.width&&t?.height)return t.width/t.height;return 1;}
+// @mapping-end zoneDesignAspect
+// @mapping-begin makeCleanZoneDesignCanvas
 function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(256,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(256,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawLayerStack(x,zone,{x:0,y:0,w,h},true);return c;}
+// @mapping-end makeCleanZoneDesignCanvas
+// @mapping-begin makeCleanZoneArtworkCanvas
 function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const minimum=product.id==='tshirt'&&zone==='Collar'?32:256;const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(minimum,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(minimum,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(x,zone,l,b,textMap.flat!==true);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(x,zone,l,b,textMap.flat!==true);return;}x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='text'&&textMap.textScaleY)x.scale(1,textMap.textScaleY);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,textMap.textStyle?textMap.textStyle(l):l,b,zone);x.restore();});return c;}
+// @mapping-end makeCleanZoneArtworkCanvas
 
+// @mapping-begin makeLongSleeveTshirtArtworkCanvas
 function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600,preview=false){
   // No per-type shifts or second text pass: preserve layer order, spacing,
   // rotation and scale identically in every zone, including the Collar.
@@ -972,29 +1056,41 @@ function makeLongSleeveTshirtArtworkCanvas(zone,maxSide=1600,preview=false){
   c.clearRect(0,0,1,artwork.height);c.clearRect(artwork.width-1,0,1,artwork.height);
   return artwork;
 }
+// @mapping-end makeLongSleeveTshirtArtworkCanvas
 
+// @mapping-begin editorRect
 function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
   const t=product.templates?.[zone],padX=82,padY=68,maxW=Math.max(120,w-padX*2),maxH=Math.max(120,h-padY*2);
   const tw=t?.width||1000,th=t?.height||1000,scale=Math.min(maxW/tw,maxH/th),dw=Math.round(tw*scale),dh=Math.round(th*scale);
   return{x:Math.round((w-dw)/2),y:Math.round((h-dh)/2),w:dw,h:dh};
 }
+// @mapping-end editorRect
+// @mapping-begin drawGridLines
 function drawGridLines(c,r){
   const step=Math.max(24,Math.round(Math.min(r.w,r.h)/14));c.save();c.strokeStyle='rgba(0,0,0,.075)';c.lineWidth=1;
   for(let x=r.x;x<=r.x+r.w;x+=step){c.beginPath();c.moveTo(x,r.y);c.lineTo(x,r.y+r.h);c.stroke();}
   for(let y=r.y;y<=r.y+r.h;y+=step){c.beginPath();c.moveTo(r.x,y);c.lineTo(r.x+r.w,y);c.stroke();}c.restore();
 }
+// @mapping-end drawGridLines
+// @mapping-begin drawTemplateGuide
 function drawTemplateGuide(c,zone,r,alpha=.46){
   const img=templateImageFor(zone);if(!img)return;c.save();c.globalAlpha=alpha;c.globalCompositeOperation='multiply';c.drawImage(img,r.x,r.y,r.w,r.h);c.restore();
 }
+// @mapping-end drawTemplateGuide
+// @mapping-begin drawZoneLayersRect
 function drawZoneLayersRect(c,zone,r){
   const z=stateFor().zones[zone]||{background:'#FFFFFF',layers:[]};c.fillStyle=z.background||'#FFFFFF';c.fillRect(r.x,r.y,r.w,r.h);
   (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();const cx=r.x+r.w/2+(l.x||0)*r.w/200,cy=r.y+r.h/2+(l.y||0)*r.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,r);}
     else if(l.type==='text'){drawTextLayer(c,l,r);}c.restore();});
 }
+// @mapping-end drawZoneLayersRect
+// @mapping-begin drawProductionZone
 function drawProductionZone(c,zone,w,h){c.clearRect(0,0,w,h);const masked=renderMaskedZoneCanvas(zone,w,h,false);c.drawImage(masked,0,0,w,h);}
+// @mapping-end drawProductionZone
 
 
+// @mapping-begin traceZonePath
 function traceZonePath(c,zone,w,h){
   c.beginPath();
   if(zone==='Front'||zone==='Back'){
@@ -1022,7 +1118,11 @@ function traceZonePath(c,zone,w,h){
     c.roundRect(w*.12,h*.10,w*.76,h*.80,w*.05);
   }
 }
+// @mapping-end traceZonePath
+// @mapping-begin fitRect
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
+// @mapping-end fitRect
+// @mapping-begin drawLongSleeveWhiteGrid
 function drawLongSleeveWhiteGrid(c,zone,r,rec){
   if(product.id!=='long-sleeve-tshirt'||!showGrid||(zoneState(zone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF')return;
   const grid=document.createElement('canvas');grid.width=r.w;grid.height=r.h;
@@ -1034,6 +1134,8 @@ function drawLongSleeveWhiteGrid(c,zone,r,rec){
   g.drawImage(makeLongSleeveTshirtArtworkCanvas(zone),b.x,b.y,b.w,b.h);
   c.drawImage(grid,r.x,r.y);
 }
+// @mapping-end drawLongSleeveWhiteGrid
+// @mapping-begin drawZoneComposite
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
   targetCtx.save();
@@ -1112,6 +1214,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   }
   targetCtx.restore();
 }
+// @mapping-end drawZoneComposite
 function activeLayerScreenRect(l=activeLayer()){
   if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
   if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
@@ -1125,7 +1228,10 @@ function activeLayerScreenRect(l=activeLayer()){
   }
   const fs=Math.max(18,b.w*.10*(l.scale||1));return{x:cx-b.w*.22,y:cy-fs*.75,w:b.w*.44,h:fs*1.5,cx,cy,b};
 }
+// @mapping-begin rotateSelectionPoint
 function rotateSelectionPoint(x,y,cx,cy,a){const dx=x-cx,dy=y-cy,co=Math.cos(a),si=Math.sin(a);return{x:cx+dx*co-dy*si,y:cy+dx*si+dy*co};}
+// @mapping-end rotateSelectionPoint
+// @mapping-begin selectionGeometry
 function selectionGeometry(l,q){
   const a=(Number(l.rotation)||0)*Math.PI/180,cx=q.cx,cy=q.cy;
   const raw=[[q.x,q.y],[q.x+q.w,q.y],[q.x+q.w,q.y+q.h],[q.x,q.y+q.h]];
@@ -1143,6 +1249,8 @@ function selectionGeometry(l,q){
   ];
   return{corners,top,rotateHandle,resizeHandles:corners,cropHandles};
 }
+// @mapping-end selectionGeometry
+// @mapping-begin drawSelectionOverlay
 function drawSelectionOverlay(){
   const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q)return;ctx.save();
   if(mobileEditorView()){ctx.translate(editorCanvas.width/2,editorCanvas.height/2);ctx.scale(editorZoom,editorZoom);ctx.translate(-editorCanvas.width/2,-editorCanvas.height/2);}
@@ -1166,9 +1274,16 @@ function drawSelectionOverlay(){
   }
   ctx.restore();
 }
+// @mapping-end drawSelectionOverlay
+// @mapping-begin drawEditor
 function drawEditor(){ctx.clearRect(0,0,editorCanvas.width,editorCanvas.height);drawZoneComposite(ctx,editorCanvas.width,editorCanvas.height,true);drawSelectionOverlay();flatMockup?.update();}
+// @mapping-end drawEditor
+// @mapping-begin makeZoneTextureCanvas
 function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600);}
+// @mapping-end makeZoneTextureCanvas
+// @mapping-begin zoneHasContent
 function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
+// @mapping-end zoneHasContent
 const MQD_BACKGROUND_REMOVAL_ENABLED=true;
 const MQD_REMOVE_BACKGROUND_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-remove-background';
 const MQD_SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
@@ -1226,6 +1341,7 @@ async function restoreBackgroundActive(){
 function renderProducts(){const sel=$('productSelect');sel.innerHTML='';catalog.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — $${Number(p.price).toFixed(2)}`;sel.appendChild(o);});sel.value=product.id;}
 function zoneIconLabel(z){if(z==='Front')return'▰\nFront';if(z==='Back')return'▱\nBack';if(z.includes('Sleeve'))return'▭\n'+(z.startsWith('Left')?'L Sleeve':'R Sleeve');if(z==='Collar')return'⌒\nCollar';if(z==='Hood')return'◠\nHood';return z;}
 function renderZones(){const rail=$('zoneRail');rail.innerHTML='';product.zones.forEach(z=>{const b=document.createElement('button');b.className='zone-icon'+(z===activeZone?' active':'')+(zoneHasContent(z)?' complete':'');b.innerHTML=escapeHtml(zoneIconLabel(z)).replace('\n','<br>');b.title=zoneHasContent(z)?z+' — design added':z+' — not designed yet';b.onclick=()=>selectZone(z);rail.appendChild(b);});}
+// @mapping-begin maxLayerScale
 function maxLayerScale(layer=activeLayer()){
   // Text can be scaled to twice its previous maximum without changing
   // image sizing limits or any garment mapping/calibration.
@@ -1237,6 +1353,7 @@ function maxLayerScale(layer=activeLayer()){
   if(product.id==='lightweight-jacket')return 2.6;
   return 2.2;
 }
+// @mapping-end maxLayerScale
 function reorderLayer(id,targetId){
   const arr=zoneState().layers,from=arr.findIndex(l=>l.id===id),to=arr.findIndex(l=>l.id===targetId);
   if(from<0||to<0||from===to)return;
@@ -1417,11 +1534,13 @@ function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZo
 function renderAll(){ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();}
 
 // Copy design data only. Approved garment geometry and texture mapping stay intact.
+// @mapping-begin garmentCopyFamily
 function garmentCopyFamily(id){
   if(['shorts','sweat-pants'].includes(id))return 'bottoms';
   if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo','fleece-hoodie','lightweight-jacket','hood-mask-shirt','hooded-long-sleeve'].includes(id))return 'tops';
   return null;
 }
+// @mapping-end garmentCopyFamily
 function garmentCopyTargets(){const family=garmentCopyFamily(product.id);return family?catalog.filter(p=>p.id!==product.id&&garmentCopyFamily(p.id)===family):[];}
 function renderGarmentCopyControl(){
   let button=$('copyGarmentDesign');
@@ -1542,7 +1661,9 @@ function resize3DViewport(){
  camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);return true;
 }
 function init3D(){const canvas=$('webgl');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true,powerPreference:'default'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,mobileDesignerMode()?1.25:2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(34,1,.01,100);controls=new OrbitControls(camera,canvas);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x777777,2));const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,3,4);scene.add(key);decalGroup=new THREE.Group();scene.add(decalGroup);canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();mobilePreviewDirty=true;console.warn('MQD 3D preview context paused; waiting for browser restore.');});canvas.addEventListener('webglcontextrestored',()=>{console.info('MQD 3D preview context restored.');resize3DViewport();rebuildGarmentPreview();});addEventListener('resize',resize3DViewport);resize3DViewport();(function loop(){if(previewPaneVisible()){controls.update();renderer.render(scene,camera);}requestAnimationFrame(loop)})();}
+// @mapping-begin fitGarment
 function fitGarment(){const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),m=Math.max(size.x,size.y,size.z);garment.position.sub(center);camera.position.set(0,m*.45,m*2.15);camera.near=m/100;camera.far=m*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();}
+// @mapping-end fitGarment
 function setProductionProofView(view){
  if(!camera||!controls||!renderer||!garment)return false;
  const target=controls.target.clone(),offset=camera.position.clone().sub(target),horizontal=Math.hypot(offset.x,offset.z);
@@ -1625,7 +1746,10 @@ flatMockup=installFlatMockup({getProduct:()=>product,drawZone:zone=>{
 }});
 $('saveScreenshot')?.addEventListener('click',save3DScreenshot);
 $('shareScreenshot')?.addEventListener('click',share3DScreenshot);
+// @mapping-begin clearDecals
 function clearDecals(){while(decalGroup.children.length){const o=decalGroup.children[0];decalGroup.remove(o);o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map?.dispose();m.dispose();});}}
+// @mapping-end clearDecals
+// @mapping-begin zonePlacement
 function zonePlacement(zone){
   const box=new THREE.Box3().setFromObject(garment),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3()),p=new THREE.Vector3(),r=new THREE.Euler(),d=new THREE.Vector3();
   const torso=/tshirt|polo|hooded-long-sleeve|hood-mask-shirt/.test(product.id),bottom=/shorts|sweat-pants/.test(product.id),longSleeveTshirt=product.id==='long-sleeve-tshirt';
@@ -1641,8 +1765,12 @@ function zonePlacement(zone){
   else{p.set(c.x,c.y-size.y*(bottom?.01:.015),box.max.z+size.z*.04);d.set(size.x*bodyWidth,size.y*bodyHeight,size.z*1.35);}
   return{p,r,d};
 }
+// @mapping-end zonePlacement
 
+// @mapping-begin findPrimaryMesh
 function findPrimaryMesh(root=garment){let best=null,score=-1;root?.traverse(o=>{if(!o.isMesh||!o.geometry?.getAttribute('position'))return;const count=o.geometry.index?o.geometry.index.count:o.geometry.getAttribute('position').count;if(count>score){score=count;best=o;}});return best;}
+// @mapping-end findPrimaryMesh
+// @mapping-begin splitTshirtGeometry
 function splitTshirtGeometry(sourceMesh){
  const longSleeve=product.id==='long-sleeve-tshirt';
  const longSleevePolo=product.id==='long-sleeve-polo';
@@ -1698,7 +1826,9 @@ function splitTshirtGeometry(sourceMesh){
  if(product.id==='tshirt'){tshirtInteriorMeshes.set('Collar',refineTshirtCollar(tshirtZoneMeshes.get('Collar'),tshirtInteriorMeshes.get('Collar'),THREE,zoneState('Collar').background||'#FFFFFF',[tshirtZoneMeshes.get('Front'),tshirtZoneMeshes.get('Back')]));const oldNeck=tshirtInteriorMeshes.get('Front');if(oldNeck)oldNeck.visible=false;}
  sourceMesh.parent.add(group);tshirtZoneGroup=group;sourceMesh.visible=false;return true;
 }
+// @mapping-end splitTshirtGeometry
 
+// @mapping-begin splitFleeceHoodieGeometry
 function splitFleeceHoodieGeometry(sourceMesh){
  const geometry=sourceMesh.geometry;if(!geometry?.getAttribute('position')||!sourceMesh.parent)return false;
  if(!geometry.getAttribute('normal'))geometry.computeVertexNormals();
@@ -1728,12 +1858,16 @@ function splitFleeceHoodieGeometry(sourceMesh){
  });
  sourceMesh.parent.add(group);fleeceHoodieZoneGroup=group;sourceMesh.visible=false;garment.updateMatrixWorld(true);return true;
 }
+// @mapping-end splitFleeceHoodieGeometry
 
+// @mapping-begin updateFleeceHoodieZoneColors
 function updateFleeceHoodieZoneColors(){
  if(product.id!=='fleece-hoodie'||!fleeceHoodieZoneMeshes.size)return false;
  product.zones.forEach(zone=>{const mesh=fleeceHoodieZoneMeshes.get(zone);if(!mesh)return;if(mesh.material?.color)mesh.material.color.set(zoneState(zone).background||'#FFFFFF');mesh.material.needsUpdate=true;});
  return true;
 }
+// @mapping-end updateFleeceHoodieZoneColors
+// @mapping-begin rebuildFleeceHoodiePreview
 function rebuildFleeceHoodiePreview(){
  if(product.id!=='fleece-hoodie'||!fleeceHoodieZoneMeshes.size)return false;
  clearDecals();updateFleeceHoodieZoneColors();garment.updateMatrixWorld(true);
@@ -1764,9 +1898,13 @@ function rebuildFleeceHoodiePreview(){
  });
  return true;
 }
+// @mapping-end rebuildFleeceHoodiePreview
 
+// @mapping-begin disposeZoneTexture
 function disposeZoneTexture(mesh){const map=mesh?.material?.map;if(map){mesh.material.map=null;map.dispose();}}
+// @mapping-end disposeZoneTexture
 const opaqueImageEdgeCache=new WeakMap();
+// @mapping-begin hasOpaqueImageEdges
 function hasOpaqueImageEdges(image){
  if(!image?.complete||!(image.naturalWidth||image.width)||!(image.naturalHeight||image.height))return false;
  if(opaqueImageEdgeCache.has(image))return opaqueImageEdgeCache.get(image);
@@ -1784,6 +1922,8 @@ function hasOpaqueImageEdges(image){
  }catch(error){console.warn('Background coverage could not be checked',error);}
  opaqueImageEdgeCache.set(image,opaque);return opaque;
 }
+// @mapping-end hasOpaqueImageEdges
+// @mapping-begin makeShirtPreviewArtwork
 function makeShirtPreviewArtwork(zone,maxSide,options={}){
  // Correct the folded long-polo collar reading direction for text only.
  const longPoloCollar=product.id==='long-sleeve-polo'&&zone==='Collar';
@@ -1812,6 +1952,8 @@ function makeShirtPreviewArtwork(zone,maxSide,options={}){
  }
  return out;
 }
+// @mapping-end makeShirtPreviewArtwork
+// @mapping-begin updateTshirtZoneTextures
 function updateTshirtZoneTextures(){
  if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
  for(const [zone,mesh] of tshirtInteriorMeshes)mesh.material.color.set(zoneState(zone).background||'#FFFFFF');
@@ -1865,8 +2007,14 @@ function updateTshirtZoneTextures(){
  });
  return true;
 }
+// @mapping-end updateTshirtZoneTextures
+// @mapping-begin findLargestMesh
 function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),v=s.x*s.y*s.z;if(v>score){score=v;best=o;}});return best;}
+// @mapping-end findLargestMesh
+// @mapping-begin rebuildDecals
 function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
+// @mapping-end rebuildDecals
+// @mapping-begin rebuildJacketPreview
 function rebuildJacketPreview(){
  clearDecals();garment.updateMatrixWorld(true);
  for(const [zone,target] of lightweightJacketZones){
@@ -1897,6 +2045,8 @@ function rebuildJacketPreview(){
   }catch(e){tex.dispose();console.error('Lightweight Jacket artwork projection failed',zone,e);}
  }
 }
+// @mapping-end rebuildJacketPreview
+// @mapping-begin rebuildHoodMaskPreview
 function rebuildHoodMaskPreview(){
  clearDecals();
  for(const [zone,mesh] of hoodMaskPanels){
@@ -1909,6 +2059,8 @@ function rebuildHoodMaskPreview(){
   mesh.material.map?.dispose();mesh.material.map=texture;mesh.material.color.set('#FFFFFF');mesh.material.needsUpdate=true;
  }
 }
+// @mapping-end rebuildHoodMaskPreview
+// @mapping-begin rebuildHoodedLongSleevePreview
 function rebuildHoodedLongSleevePreview(){
  clearDecals();
  for(const [zone,mesh] of hoodedLongSleevePanels){
@@ -1940,6 +2092,8 @@ function rebuildHoodedLongSleevePreview(){
  if(strings){strings.material.transparent=true;strings.material.opacity=1;strings.material.depthTest=true;strings.material.depthWrite=false;strings.material.needsUpdate=true;strings.renderOrder=30;}
  return true;
 }
+// @mapping-end rebuildHoodedLongSleevePreview
+// @mapping-begin rebuildHatPreview
 function rebuildHatPreview(){
  if(product.id!=='hat'||!hatZoneMeshes)return false;
  clearDecals();garment.updateMatrixWorld(true);
@@ -1959,6 +2113,8 @@ function rebuildHatPreview(){
  }
  return true;
 }
+// @mapping-end rebuildHatPreview
+// @mapping-begin rebuildShortsPreview
 function rebuildShortsPreview(){
  if(product.id!=='shorts'||!shortsPanelMeshes?.size)return false;
  clearDecals();
@@ -1971,6 +2127,8 @@ function rebuildShortsPreview(){
  }
  return true;
 }
+// @mapping-end rebuildShortsPreview
+// @mapping-begin rebuildMaskPreview
 function rebuildMaskPreview(){
  if(product.id!=='mask'||!maskSurface)return false;
  clearDecals();
@@ -1979,18 +2137,23 @@ function rebuildMaskPreview(){
  texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
  return applyMaskTexture(maskSurface,texture,zoneState('Entire Mask').background,THREE);
 }
+// @mapping-end rebuildMaskPreview
+// @mapping-begin rebuildGarmentPreview
 function rebuildGarmentPreview(){
  if(!previewPaneVisible()){mobilePreviewDirty=true;return;}
  mobilePreviewDirty=false;
  if(product.id==='sweat-pants'&&sweatPanels){clearDecals();for(const [zone,mesh] of sweatPanels.panels){disposeZoneTexture(mesh);const canvas=makeCleanZoneDesignCanvas(zone,1600),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();mesh.material.map=tex;mesh.material.needsUpdate=true;}return;}if(product.id==='mask'&&maskSurface){rebuildMaskPreview();return;}if(product.id==='hood-mask-shirt'&&hoodMaskPanels){rebuildHoodMaskPreview();return;}if(product.id==='hooded-long-sleeve'&&hoodedLongSleevePanels){rebuildHoodedLongSleevePreview();return;}if(product.id==='lightweight-jacket'&&lightweightJacketZones){rebuildJacketPreview();return;}if(product.id==='hat'&&hatZoneMeshes){rebuildHatPreview();return;}if(product.id==='shorts'&&shortsPanelMeshes?.size){rebuildShortsPreview();return;}if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)&&tshirtZoneMeshes.size){clearDecals();updateTshirtZoneTextures();return;}if(product.id==='fleece-hoodie'&&fleeceHoodieZoneMeshes.size){rebuildFleeceHoodiePreview();return;}rebuildDecals();}
+// @mapping-end rebuildGarmentPreview
 
 let garmentLoadVersion=0;
+// @mapping-begin loadGarment
 function loadGarment(){const loadVersion=++garmentLoadVersion;window.dispatchEvent(new CustomEvent('mqd:garment-loading',{detail:{productId:product.id,loadVersion}}));if(!renderer)init3D();if(garment){scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});garment=null;}lightweightJacketZones=null;hoodMaskPanels=null;hoodedLongSleevePanels=null;hatZoneMeshes=null;shortsPanelMeshes=null;sweatPanels=null;maskSurface=null;tshirtZoneMeshes.clear();tshirtInteriorMeshes.clear();tshirtZoneGroup=null;fleeceHoodieZoneMeshes.clear();fleeceHoodieZoneGroup=null;clearDecals();preloadTemplates();new GLTFLoader().load(product.model,async g=>{if(product.id==='tshirt'&&loadVersion===garmentLoadVersion){try{await loadTshirtSurfaceUv();}catch(error){g.scene.traverse(o=>{o.geometry?.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];materials.filter(Boolean).forEach(m=>m.dispose?.());});if(loadVersion===garmentLoadVersion){console.error(error);window.dispatchEvent(new CustomEvent('mqd:garment-error',{detail:{productId:'tshirt',loadVersion,message:error.message}}));}return;}}if(loadVersion!==garmentLoadVersion){g.scene.traverse(o=>{o.geometry?.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];materials.filter(Boolean).forEach(m=>{m.map?.dispose?.();m.dispose?.();});});return;}garment=g.scene;scene.add(garment);fitGarment();garment.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.set('#f5f5f5');m.needsUpdate=true;});});if(['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)){const source=findPrimaryMesh(garment);if(source)try{splitTshirtGeometry(source);}catch(error){
  for(const mesh of [...tshirtZoneMeshes.values(),...tshirtInteriorMeshes.values()]){mesh.geometry?.dispose();mesh.material?.dispose();}
  tshirtZoneMeshes.clear();tshirtInteriorMeshes.clear();tshirtZoneGroup=null;
  scene.remove(garment);garment.traverse(o=>{o.geometry?.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];materials.filter(Boolean).forEach(m=>m.dispose?.());});garment=null;
  console.error(error);window.dispatchEvent(new CustomEvent('mqd:garment-error',{detail:{productId:product.id,loadVersion,message:error.message}}));return;
 }}if(product.id==='fleece-hoodie'){const source=findPrimaryMesh(garment);if(source)splitFleeceHoodieGeometry(source);}if(product.id==='mask'){const source=findPrimaryMesh(garment);if(source)maskSurface=createMaskSurface(source,THREE);}if(product.id==='hood-mask-shirt'){const source=findPrimaryMesh(garment);if(source)hoodMaskPanels=createHoodMaskPanels(source);}if(product.id==='hooded-long-sleeve'){const source=findPrimaryMesh(garment);if(source)hoodedLongSleevePanels=createHoodedLongSleevePanels(source);}if(product.id==='lightweight-jacket'){const source=findPrimaryMesh(garment);if(source)lightweightJacketZones=createJacketZones(source);}if(product.id==='hat'){const source=findPrimaryMesh(garment);if(source)hatZoneMeshes=createHatZones(source);}if(product.id==='sweat-pants'){const source=findPrimaryMesh(garment);if(source){sweatPanels=createSweatPanels(source,THREE);for(const [zone,mesh] of sweatPanels.panels)sweatTemplates.set(zone,sweatTemplate(mesh,sweatPanels.bounds));drawEditor();}}if(product.id==='shorts'){const source=findPrimaryMesh(garment);if(source)shortsPanelMeshes=createShortsPanels(source);}rebuildGarmentPreview();window.dispatchEvent(new CustomEvent('mqd:garment-ready',{detail:{productId:product.id,loadVersion}}));},undefined,error=>{console.error(error);window.dispatchEvent(new CustomEvent('mqd:garment-error',{detail:{productId:product.id,loadVersion,message:error?.message||String(error)}}));});}
+// @mapping-end loadGarment
 
 function selectProduct(id,{preview=false,reason='product-select'}={}){
   cropMode=false;
@@ -2056,6 +2219,7 @@ function applyBackgroundAll(){const c=normalizeHex($('zoneHex').value);if(!c)ret
 function requireImageLayer(){const l=activeLayer();return l&&l.type==='image'?l:null;}
 function flipActive(axis){const l=requireImageLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l[axis]=!l[axis];renderAll();}
 function alignActive(){const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;renderAll();}
+// @mapping-begin duplicateLayerIntoZone
 function duplicateLayerIntoZone(source,zone,{offset=false}={}){
   const target=zoneState(zone);
   if(target.layers.length>=MAX_ZONE_LAYERS)return false;
@@ -2074,6 +2238,7 @@ function duplicateLayerIntoZone(source,zone,{offset=false}={}){
   target.layers.push(copy);
   return copy;
 }
+// @mapping-end duplicateLayerIntoZone
 function duplicateActive(){const l=activeLayer();if(!l||l.libraryAssetId||!canAddLayer())return;snapshot();const copy=duplicateLayerIntoZone(l,activeZone,{offset:true});if(!copy)return;activeLayerId=copy.id;renderAll();}
 let seamMirrorBusy=false;
 async function mirrorActiveToBody(){

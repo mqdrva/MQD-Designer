@@ -29,7 +29,7 @@ assert.equal(collarHigh[1],1);
 // Guard the calibrated All-Over Print T-Shirt artwork mapping. The Front
 // uses production-pattern UVs at the front neckline/hem; Back text and movable
 // customer images retain the 9% correction. Locked backgrounds stay put.
-const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const editor=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 assert(editor.includes("MQD_TSHIRT_2D_FILL_LOCK='cutline-v4-approved'"));
 assert(editor.includes("MQD_TSHIRT_TEXT_MAPPING_LOCK='front-back-text-up-9pct-v2'"));
 assert(editor.includes("MQD_TSHIRT_EDITABLE_ARTWORK_MAPPING_LOCK='front-back-editable-artwork-up-9pct-v3'"));

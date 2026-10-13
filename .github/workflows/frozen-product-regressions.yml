@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - 'v20/**'
+      - 'scripts/sync-garment-mapping.mjs'
+      - 'vercel.json'
+      - 'package.json'
+      - 'index.html'
+      - 'shop-3d.html'
       - 'assets/templates/**'
       - 'tests/**'
       - '.github/workflows/frozen-product-regressions.yml'
@@ -11,6 +16,11 @@ on:
     branches: [main]
     paths:
       - 'v20/**'
+      - 'scripts/sync-garment-mapping.mjs'
+      - 'vercel.json'
+      - 'package.json'
+      - 'index.html'
+      - 'shop-3d.html'
       - 'assets/templates/**'
       - 'tests/**'
       - '.github/workflows/frozen-product-regressions.yml'
@@ -27,6 +37,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify shared mapping generation
+        run: node scripts/sync-garment-mapping.mjs --check
       - name: Verify frozen catalog and renderers
         run: node tests/frozen-product-baseline.mjs
       - name: Install locked test dependencies
@@ -34,6 +46,8 @@ jobs:
       - name: Run mapping regressions
         run: |
           node --check v20/editor.js
+          node --check v20/shop-editor.js
+          node tests/shared-garment-mapping.mjs
           node tests/fleece-hoodie-zones.mjs
           node tests/long-sleeve-pattern-uv.mjs
           node tests/mask-renderer.mjs

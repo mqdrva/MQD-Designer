@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const source=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const start=source.indexOf('function loadGarment('),end=source.indexOf('\nfunction selectProduct(',start);
 const pending=[],events=[];
 let disposed=0,fitted=0,rebuilt=0;

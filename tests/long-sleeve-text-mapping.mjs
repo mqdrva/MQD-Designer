@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {longSleevePanelUv as uv} from '../v20/long-sleeve-panels.js';
 const {createCanvas}=createRequire(import.meta.url)('@napi-rs/canvas');
-const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8');
+const editor=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const extract=(a,b)=>editor.slice(editor.indexOf('function '+a+'('),editor.indexOf('function '+b+'('));
 let layers=[];
 const image=createCanvas(100,100);image.getContext('2d').fillRect(0,0,100,100);
