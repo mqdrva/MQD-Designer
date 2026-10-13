@@ -89,3 +89,6 @@ jobs:
           node tests/print-shop-admin-auth.mjs
           node tests/print-shop-billing.mjs
           node tests/print-shop-billing-webhook.mjs
+          node tests/print-shop-management.mjs
+          node tests/print-shop-logos.mjs
+          node tests/team-service.mjs
