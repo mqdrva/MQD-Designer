@@ -66,3 +66,19 @@
  .contest-showcase .actions{gap:10px}.contest-showcase .actions button{flex:1 1 160px}
 }
 @media(prefers-reduced-motion:reduce){.contest-showcase .spark{animation:none}.contest-showcase .contest-card:hover{transform:none}}
+
+.contest-showcase .giveaway-launch{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px;padding:32px;margin:24px 0;border:1px solid #ffbf7355;border-radius:24px;background:linear-gradient(120deg,#30223e,#24192c)}
+.giveaway-launch h2{font-size:clamp(30px,5vw,48px);margin:8px 0}
+.giveaway-prize{font-size:23px;font-weight:850;color:#ffbf73;margin:8px 0}
+.giveaway-deadline{display:inline-block;border:1px solid #63e6d355;border-radius:999px;padding:7px 14px;color:#89f4e0;font-size:14px}
+.giveaway-launch ol{padding-left:22px;color:#e8deef}.giveaway-launch li{padding:8px 0}
+.giveaway-rule{border-left:3px solid #ffbf73;padding:12px 16px;background:#ffbf7310;border-radius:0 12px 12px 0}
+.giveaway-small{font-size:12px;color:#c6bed8;line-height:1.6}
+.giveaway-launch .button{display:inline-block;margin:8px 0;background:#ffbf73;min-height:48px}
+.giveaway-art{border-radius:20px;padding:30px 24px;display:flex;flex-direction:column;justify-content:center;gap:28px;text-align:center;background:radial-gradient(circle at 90% 20%,#7241be88,transparent 60%),linear-gradient(140deg,#151b36,#10434b)}
+.giveaway-art span{font-size:clamp(44px,7vw,78px);font-weight:950;line-height:.95;color:#ffbf32;letter-spacing:-3px}
+.giveaway-art b{color:#fff;font-size:22px;line-height:1.4}
+.giveaway-art i{font-style:normal;color:#103c35;font-size:15px;font-weight:900;border-radius:12px;padding:12px;background:#89f4e0}
+@media(max-width:700px){.contest-showcase .giveaway-launch{grid-template-columns:1fr;padding:24px 20px}.giveaway-art{display:none}}
+
+.contest-showcase .giveaway-launch[hidden]{display:none}
