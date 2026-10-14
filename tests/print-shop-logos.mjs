@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import vm from 'node:vm';
 import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
 import {fixedLogoLayer,assertFixedLogoPackage,garmentLogoPath,requestEstimate,shopPrintZones} from '../v20/print-shop-contract.js';
@@ -30,5 +32,5 @@ assert(source.includes('return drawMappedImageLayer(c,l,b);'));
 assert(source.includes("if(!l||l.shopFixed)return;snapshot();l.visible"));
 const polo={garments:{'everyday-polo':{logoPreset:{placement:'center'}}}};assert.equal(shopPrintZones(polo,'everyday-polo').front.placement,'center');assert.equal(shopPrintZones({garments:{}},'everyday-polo').front.placement,'left-chest');
 assert.equal((await fs.readFile(new URL('../supabase/functions/mqd-print-shop-pilot/contract.js',import.meta.url),'utf8')),(await fs.readFile(new URL('../v20/print-shop-contract.js',import.meta.url),'utf8')));
-await fs.writeFile('/private/tmp/brand-team-preview.json',JSON.stringify(fixture));
+await fs.writeFile(join(tmpdir(),'brand-team-preview.json'),JSON.stringify(fixture));
 console.log('Logo checks passed: validated setup, immutable fixed layer restoration, package tampering rejection, original asset references, and unchanged legacy polo defaults.');
