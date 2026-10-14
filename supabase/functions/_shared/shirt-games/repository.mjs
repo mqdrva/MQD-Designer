@@ -32,7 +32,7 @@ export function createGameRepository(db,{ownerMfa=async()=>false,checkout=async(
   async discardPhoto(stored){if(!stored.files.length)return;checked(await db.storage.from(BUCKET).remove(stored.files));checked(await db.from('mqd_shirt_game_assets').delete().in('path',stored.files))},
   async saveDraft(record,buyer,seat){checked(await db.from('mqd_shirt_game_drafts').insert({id:record.id,game_id:record.gameId,buyer_seat:seat,buyer_id:buyer,snapshot:record}))},
   async paidOrders(){
-   const rows=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,buyer_seat,created_at,order:mqd_orders!inner(id,order_number,status,product_id,product_name,paid_at,is_test,stripe_payment_status,customer_name,customer_email,shipping_name,shipping_address)').not('order_id','is',null).eq('mqd_orders.is_test',false).eq('mqd_orders.stripe_payment_status','paid').not('mqd_orders.paid_at','is',null).order('created_at',{ascending:false}).limit(100));
+   const rows=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,buyer_seat,created_at,order:mqd_orders!inner(id,order_number,status,product_id,product_name,paid_at,is_test,stripe_payment_status,customer_name,customer_email,shipping_name,shipping_address)').not('order_id','is',null).eq('order.is_test',false).eq('order.stripe_payment_status','paid').not('order.paid_at','is',null).order('created_at',{ascending:false}).limit(100));
    return rows.map(row=>({id:row.id,gameId:row.game_id,buyerSeat:row.buyer_seat,createdAt:row.created_at,order:row.order,manufacturingReady:false}));
   },
   async proofDrafts(){const rows=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,buyer_seat,created_at,snapshot').order('created_at',{ascending:false}).limit(30));return rows.map(r=>({id:r.id,reference:r.snapshot.reference,product:r.snapshot.product,size:r.snapshot.size,color:r.snapshot.color,gameType:r.snapshot.gameType,createdAt:r.created_at}))},
@@ -43,7 +43,7 @@ export function createGameRepository(db,{ownerMfa=async()=>false,checkout=async(
   },
   async proofDetail(id){const row=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,snapshot').eq('id',id).maybeSingle());if(!row||row.snapshot.snapshot?.status!=='revealed'||!row.snapshot.snapshot?.approved)throw new GameError('Approved game draft required',409);return this.productionRecord(row,null,true)},
   async paidDetail(id){
-   const row=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,snapshot,order:mqd_orders!inner(id,order_number,status,product_id,product_name,paid_at,is_test,stripe_payment_status,customer_name,customer_email,shipping_name,shipping_address)').eq('id',id).eq('mqd_orders.is_test',false).eq('mqd_orders.stripe_payment_status','paid').not('mqd_orders.paid_at','is',null).maybeSingle());
+   const row=checked(await db.from('mqd_shirt_game_drafts').select('id,game_id,snapshot,order:mqd_orders!inner(id,order_number,status,product_id,product_name,paid_at,is_test,stripe_payment_status,customer_name,customer_email,shipping_name,shipping_address)').eq('id',id).eq('order.is_test',false).eq('order.stripe_payment_status','paid').not('order.paid_at','is',null).maybeSingle());
    if(!row)throw new GameError('Verified paid game order required',409);
    return this.productionRecord(row,row.order,false);
   }
