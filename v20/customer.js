@@ -797,6 +797,7 @@ async function hydrateCloudPayload(payload){
   return await hydrateLibraryArtwork(copy);
 }
 async function openCloudDesign(row,{notify=true}={}){
+  if(row.design_json?.range==='shirt-games'){location.assign('/shirt-games/#game='+encodeURIComponent(row.design_json.gameId)+'&draft='+encodeURIComponent(row.id));return;}
   if(!window.MQDDesigner?.loadDesign)throw new Error('The designer is still loading. Please try again.');
   const payload=await hydrateCloudPayload(row.design_json);
   await window.MQDDesigner.loadDesign(payload,{notify:false});
@@ -805,6 +806,7 @@ async function openCloudDesign(row,{notify=true}={}){
   if(notify)alert(row.status==='purchased'?'Purchased design opened. Saving changes will create a new draft version.':'Design opened.');
 }
 async function duplicateCloudDesign(row){
+  if(row.design_json?.range==='shirt-games'){await openCloudDesign(row,{notify:false});return;}
   activeCloudDesign=row;
   const payload=await hydrateCloudPayload(row.design_json);
   const duplicate=await saveCloudDesign(payload,{forceNew:true,name:`Copy of ${row.name}`});
@@ -812,6 +814,7 @@ async function duplicateCloudDesign(row){
   alert('A new editable copy was created.');
 }
 async function buyAgain(row){
+  if(row.design_json?.range==='shirt-games'){await openCloudDesign(row,{notify:false});return;}
   await openCloudDesign(row,{notify:false});
   await addToCart();
 }

@@ -1,3 +1,4 @@
+import {makeGameProductionPackage} from '/shirt-games/production.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {requireAdminMfa} from './admin-security.js?v=1';
 import {isEverydayOrder,everydayProductionZip} from './everyday-production-package.js';
@@ -116,6 +117,9 @@ async function saveOrderUpdate(){
 async function downloadProductionZip(){
   if(!currentDetail||(!isEverydayOrder(currentDetail)&&!window.JSZip))return;const button=$('downloadProductionZip'),old=button.textContent;button.disabled=true;button.textContent='Building ZIP…';
   try{
+    if(currentDetail.order?.design_json?.range==='shirt-games'){
+      await requireAdminMfa(supabase);const {data}=await supabase.auth.getSession();const response=await fetch(SUPABASE_URL+'/functions/v1/mqd-shirt-games',{method:'POST',headers:{Authorization:'Bearer '+data.session.access_token,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({route:'owner',body:{action:'detail',orderId:currentDetail.order.design_json.gameDraftId}})});const detail=await response.json();if(!response.ok)throw Error(detail.error||'Game production access denied');const result=await makeGameProductionPackage(detail);downloadBlob(safePart(currentDetail.order.order_number)+'-manufacturing.zip',result.blob);return;
+    }
     if(isEverydayOrder(currentDetail)){const blob=await everydayProductionZip(currentDetail,fetchBlob);downloadBlob(`${safePart(currentDetail.order.order_number)}-production.zip`,blob);return;}
     const detail=currentDetail,order=detail.order,zip=new JSZip(),root=zip.folder(`${safePart(order.order_number)}-production`);root.file('design.json',JSON.stringify(order.design_json||{},null,2));root.file('background-colors.json',JSON.stringify(order.background_colors||{},null,2));root.file('order-summary.json',JSON.stringify({orderNumber:order.order_number,status:order.ui_status,customer:{name:order.customer_name,email:order.customer_email,phone:order.customer_phone},shipping:{name:order.shipping_name,address:order.shipping_address,carrier:order.shipping_carrier,trackingNumber:order.tracking_number},items:detail.items||[],createdAt:order.created_at,paidAt:order.paid_at},null,2));
     const zones=zoneMetadata(detail);for(const [zone,data] of Object.entries(zones))root.file(`zones/${safePart(zone)}.json`,JSON.stringify(data,null,2));

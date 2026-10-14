@@ -1,6 +1,13 @@
 {
   "routes": [
     {
+      "src": "/games(?:/.*)?",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
       "src": "/(?:index\\.html)?",
       "headers": {
         "Cache-Control": "no-store, max-age=0"
@@ -34,5 +41,10 @@
     }
   ],
   "buildCommand": "npm run build:mappings",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "git": {
+    "deploymentEnabled": {
+      "codex/shirt-games-private-build": false
+    }
+  }
 }

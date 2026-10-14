@@ -1,0 +1,5 @@
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+const target=new URL('../supabase/functions/_shared/shirt-games/',import.meta.url);await mkdir(target,{recursive:true});
+const files=[['../games/server/engine.mjs','engine.mjs',s=>s.replace("'../../v20/garment-mapping-catalog.js'","'./mapping.js'")],['../games/hosted/service.mjs','service.mjs',s=>s.replace("'../server/engine.mjs'","'./engine.mjs'")],['../games/hosted/repository.mjs','repository.mjs',s=>s.replace("'../server/engine.mjs'","'./engine.mjs'")],['../games/hosted/commerce.mjs','commerce.mjs',s=>s.replace("'../server/engine.mjs'","'./engine.mjs'")],['../games/hosted/layout-contract.js','layout-contract.js',s=>s],['../games/server/image-info.mjs','image-info.mjs',s=>s],['../v20/garment-mapping-catalog.js','mapping.js',s=>s]];
+for(const [source,name,convert] of files)await writeFile(new URL(name,target),convert(await readFile(new URL(source,import.meta.url),'utf8')));
+console.log('Synced hosted game engine, repository and canonical garment mapping.');
