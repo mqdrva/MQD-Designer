@@ -40,7 +40,9 @@ Deno.serve(async(req:Request)=>{
    const accounts=await checked(db.from('mqd_team_accounts').select('team_id,status,billing_status,period_start,period_end,cancel_at_period_end,name:shop_config->>name,slug:shop_config->>slug').eq('livemode',config.live).order('created_at',{ascending:false}).limit(100));
    const batches=await checked(db.from('mqd_team_batches').select('*').eq('livemode',config.live).order('created_at',{ascending:false}).limit(100));
    const orders=await checked(db.from('mqd_team_orders').select('id,team_id,batch_id,customer,summary,quantity,delivery,garment_cents,shipping_cents,payment_status,production_status,paid_at,refunded_quantity,disputed,tracking,shipping_address').eq('livemode',config.live).order('created_at',{ascending:false}).limit(200));
-   const pending=await checked(db.rpc('mqd_team_pending_metadata'));
+   const otherModeAccounts=await checked(db.from('mqd_team_accounts').select('team_id').eq('livemode',!config.live));
+   const otherModeIds=new Set(otherModeAccounts.map((a:any)=>a.team_id));
+   const pending=(await checked(db.rpc('mqd_team_pending_metadata'))).filter((p:any)=>!otherModeIds.has(p.id));
    return json({pending,accounts:accounts.map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug})),batches,orders,enabled:config.enabled,mode:config.mode});
   }
   if(body.action==='order-status'){
