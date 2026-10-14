@@ -1,3 +1,5 @@
+> Current hosted work: see [hosted integration status](docs/hosted-integration-status.md). The local-only status below describes the earlier alpha.
+
 # Shirt Games — local private alpha
 
 Local-only implementation, October 14, 2026. No production deployment, database changes, checkout connection, or paid services. All new code lives in `games/`; the existing designer and Team work remain separate.

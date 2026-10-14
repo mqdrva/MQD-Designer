@@ -1,4 +1,4 @@
-const cache=new Map();async function image(src){if(!cache.has(src)){cache.set(src,new Promise((yes,no)=>{const im=new Image();im.onload=()=>yes(im);im.onerror=no;im.src=src}))}return cache.get(src)}
+const cache=new Map();async function image(src){if(!cache.has(src)){cache.set(src,new Promise((yes,no)=>{const im=new Image();im.onload=()=>yes(im);im.onerror=no;if(/^https?:/.test(src))im.crossOrigin='anonymous';im.src=src}))}return cache.get(src)}
 const model={tshirt:'tshirt','long-sleeve-tshirt':'long-sleeve','fleece-hoodie':'hoodie'};
 let generation=0;
 function fit(ctx,img,x,y,w,h){const r=Math.min(w/img.width,h/img.height);ctx.drawImage(img,x+(w-img.width*r)/2,y+(h-img.height*r)/2,img.width*r,img.height*r)}
@@ -15,18 +15,26 @@ export function faceRepeatLayout(photos,side='front'){
  return tiles;
 }
 function featurePolygon(t){const points=[[-.34,-.17],[.34,-.17],[.34,.39],[-.34,.39]];return points.map(([x,y])=>({x:t.x+x*t.w*Math.cos(t.angle)-y*t.h*Math.sin(t.angle),y:t.y+x*t.w*Math.sin(t.angle)+y*t.h*Math.cos(t.angle)}))}
+const trimmedFaces=new Map();
+async function trimFace(photo){
+ if(!photo.cutout)return {...photo,bitmap:await image(photo.url)};
+ if(trimmedFaces.has(photo.url))return trimmedFaces.get(photo.url);
+ const img=await image(photo.url),c=document.createElement('canvas');c.width=img.width;c.height=img.height;const ctx=c.getContext('2d');ctx.drawImage(img,0,0);const data=ctx.getImageData(0,0,c.width,c.height).data;let left=c.width,right=-1,top=c.height,bottom=-1;
+ for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)if(data[(y*c.width+x)*4+3]>12){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y)}
+ if(right<left)return {...photo,bitmap:img};const out=document.createElement('canvas');out.width=right-left+1;out.height=bottom-top+1;out.getContext('2d').drawImage(c,left,top,out.width,out.height,0,0,out.width,out.height);const face={...photo,width:out.width,height:out.height,bitmap:out};trimmedFaces.set(photo.url,face);return face;
+}
 async function faceRepeat(ctx,photos,side){
- const protectedFeatures=[];
+ photos=await Promise.all(photos.map(trimFace));const protectedFeatures=[];
  for(const t of faceRepeatLayout(photos,side)){
   ctx.save();ctx.beginPath();ctx.rect(-1000,-1000,3000,3000);
   // Preserve every already-painted face's eyes and mouth when later hair overlaps.
   for(const polygon of protectedFeatures){ctx.moveTo(polygon[0].x,polygon[0].y);for(const p of polygon.slice(1))ctx.lineTo(p.x,p.y);ctx.closePath()}
-  ctx.clip('evenodd');ctx.translate(t.x,t.y);ctx.rotate(t.angle);fit(ctx,await image(t.photo.url),-t.w/2,-t.h/2,t.w,t.h);ctx.restore();
+  ctx.clip('evenodd');ctx.translate(t.x,t.y);ctx.rotate(t.angle);fit(ctx,t.photo.bitmap,-t.w/2,-t.h/2,t.w,t.h);ctx.restore();
   protectedFeatures.push(featurePolygon(t));
  }
 }
-export async function renderGame(canvas,game,{side='front',product='tshirt',color=game.color,resultIndex=0,resultText=null,draft=null}={}){
- const version=++generation;const work=document.createElement('canvas');work.width=800;work.height=900;const ctx=work.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,800,900);
+export async function renderArtwork(canvas,game,{side='front',color=game.color,resultIndex=0,resultText=null,draft=null}={}){
+ const ctx=canvas.getContext('2d');ctx.save();ctx.scale(canvas.width/800,canvas.height/900);ctx.fillStyle=color;ctx.fillRect(0,0,800,900);
  const participants=game.participants;const revealed=game.status==='revealed';
  const usable=participants.filter(p=>p.contribution&&!p.removed);
  if(revealed&&game.type==='faces'){
@@ -43,5 +51,10 @@ export async function renderGame(canvas,game,{side='front',product='tshirt',colo
    else if(!revealed){ctx.fillStyle='#e4e0db';ctx.fillRect(x,y,w,h-12);ctx.fillStyle='#625c55';lines(ctx,'Reserved— surprise inside',x+w/2,y+(h-12)/2,w-15,15);}
   }
  }
+ ctx.restore();return canvas;
+}
+export async function renderGame(canvas,game,{side='front',product='tshirt',color=game.color,resultIndex=0,resultText=null,draft=null}={}){
+ const version=++generation,work=document.createElement('canvas');work.width=800;work.height=900;
+ await renderArtwork(work,game,{side,color,resultIndex,resultText,draft});const ctx=work.getContext('2d');
  const garment=await image(`/models/${model[product]}-${side}.png`);ctx.globalCompositeOperation='destination-in';ctx.drawImage(garment,0,0,800,900);ctx.globalCompositeOperation='multiply';ctx.drawImage(garment,0,0,800,900);ctx.globalCompositeOperation='source-over';if(version!==generation)return;const out=canvas.getContext('2d');out.clearRect(0,0,800,900);out.drawImage(work,0,0);
 }

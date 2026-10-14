@@ -1,3 +1,5 @@
+> Current hosted work: see [hosted integration status](hosted-integration-status.md). The local-only status below describes the earlier alpha.
+
 # Launch readiness — local alpha only
 
 The user requested keeping this local because no separate test backend or payment sandbox exists. This build is ready for local gameplay evaluation, not public launch.

@@ -1,3 +1,5 @@
+import {imageDimensions} from './image-info.mjs';
+import {Buffer} from 'node:buffer';
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { GARMENT_MAPPING } from '../../v20/garment-mapping-catalog.js';
 export const TYPES=['pass','faces','birthday','picked'];
@@ -12,6 +14,8 @@ const matches=(value,digest)=>typeof value==='string'&&typeof digest==='string'&
 const text=(x,max=80)=>String(x??'').trim().slice(0,max);
 export function initialState(){return {games:{},orders:{},events:[],menu:TYPES.map((id,rank)=>({id,rank,visible:true})),rulesApproved:false};}
 export function participant(game,secret){const seat=game.seats.find(s=>matches(secret,s.tokenHash));check(seat,'Private game access required',401);return seat;}
+// Hosted adapter must verify the saved draft belongs to the authenticated account first.
+export function resumeParticipant(game,index){const seat=game.seats[index];check(seat?.claimed,'Participant not found',404);const secret=token();seat.tokenHash=hash(secret);game.revision++;return {id:game.id,token:secret};}
 function requireCreator(game,seat){check(seat.index===0,'Only the creator can do this',403);}
 function open(game){check(game.status==='collecting','This game is already revealed',409);}
 export function photo(input){
@@ -21,7 +25,9 @@ export function photo(input){
   const bytes=Buffer.from(m[2],'base64');check(bytes.length>12&&bytes.length<=8*1024*1024,'Photo must be no larger than 8 MB');
   check((m[1]==='png'&&bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))||(m[1]==='jpeg'&&bytes[0]===255&&bytes[1]===216)||(m[1]==='webp'&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP'),'Photo file type does not match its contents');
   check(Number.isInteger(input.width)&&input.width>0&&Number.isInteger(input.height)&&input.height>0&&input.width*input.height<=40000000,'Invalid image dimensions');
+  let actual;try{actual=imageDimensions(bytes,m[1])}catch{throw new GameError('Photo dimensions could not be verified. Choose another PNG, JPEG or WebP.')}check(actual.width>0&&actual.height>0&&actual.width*actual.height<=40000000,'Choose a photo under 40 megapixels');check((actual.width===input.width&&actual.height===input.height)||(actual.width===input.height&&actual.height===input.width),'Photo dimensions do not match its contents');
   const result={url,width:input.width,height:input.height,consent:true,cropApproved:true,cutout:input.cutout===true};
+  if(input.outlineRecipe){const r=input.outlineRecipe;check(Array.isArray(r.points)&&r.points.length>=5&&r.points.length<=100&&r.points.every(p=>Number.isFinite(p.x)&&p.x>=0&&p.x<=1&&Number.isFinite(p.y)&&p.y>=0&&p.y<=1),'Invalid face outline');check(r.frame&&Number.isFinite(r.frame.zoom)&&r.frame.zoom>=1&&r.frame.zoom<=3&&Number.isFinite(r.frame.panX)&&Math.abs(r.frame.panX)<=1&&Number.isFinite(r.frame.panY)&&Math.abs(r.frame.panY)<=1,'Invalid outline frame');check(Number.isInteger(r.sourceWidth)&&Number.isInteger(r.sourceHeight)&&r.sourceWidth>0&&r.sourceHeight>0&&r.sourceWidth*r.sourceHeight<=40000000,'Invalid outline source');result.outlineRecipe=structuredClone(r);}
   if(input.source){result.source=photo({url:input.source.url,width:input.source.width,height:input.source.height,consent:true,cropApproved:true});const crop=input.crop||{};check(Number.isFinite(crop.zoom)&&crop.zoom>=1&&crop.zoom<=3&&Number.isFinite(crop.panX)&&Math.abs(crop.panX)<=1&&Number.isFinite(crop.panY)&&Math.abs(crop.panY)<=1,'Invalid crop settings');result.crop={zoom:crop.zoom,panX:crop.panX,panY:crop.panY};}
   return result;
 }

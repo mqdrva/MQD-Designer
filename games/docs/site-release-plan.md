@@ -1,3 +1,5 @@
+> Current hosted work: see [hosted integration status](hosted-integration-status.md). The local-only status below describes the earlier alpha.
+
 # Shirt Games site release plan
 
 Status: user approved the appearance, local gameplay and phone gameplay, and requested moving to the site on October 14, 2026. This branch preserves that approved alpha. It does not provide a public launch yet.
