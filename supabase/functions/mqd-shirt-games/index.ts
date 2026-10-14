@@ -19,7 +19,7 @@ Deno.serve(async(req:Request)=>{
   const raw=await req.text();if(raw.length>12*1024*1024)return json({error:'Photo upload is too large'},413);
   let input;try{input=JSON.parse(raw)}catch{return json({error:'Invalid request'},400)}
   const route=String(input.route||'');const body=input.body||{};
-  const ip=(req.headers.get('x-forwarded-for')||req.headers.get('cf-connecting-ip')||'unknown').split(',')[0].trim();const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ip+'|'+url));const hash=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,'0')).join('');
+  const ip=(req.headers.get('x-forwarded-for')||req.headers.get('cf-connecting-ip')||'unknown').split(',')[0].trim();const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ip+'|'+url+'|'+(route==='create'?'create':'game')));const hash=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,'0')).join('');
   const rate=await db.rpc('mqd_shirt_game_rate',{p_hash:hash,p_limit:route==='create'?10:120});if(rate.error)return json({error:'Game service is temporarily unavailable'},503);if(!rate.data)return json({error:'Please wait a moment before trying again.'},429);
   const jwt=(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');let user=null;
   if(jwt){const auth=await db.auth.getUser(jwt);if(!auth.error)user=auth.data.user;}
