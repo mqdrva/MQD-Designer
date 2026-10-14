@@ -1,3 +1,4 @@
+import {garmentLogo} from './print-shop-contract.js';
 import { installArtworkPinch } from './artwork-pinch.js';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
 const PRINT_METHODS=window.MQDPrintShop.printMethods;
@@ -39,6 +40,7 @@ function syncChoices(id, choices, value, nativeId, swatches = false) {
   for (const button of group.children) { button.setAttribute('aria-pressed', String(button.dataset.value === value)); button.disabled = busy; }
 }
 function syncOptions() {
+ const preset=garmentLogo(window.MQDPrintShop,draft.product);$('addBusinessLogo').hidden=preset.mode!=='movable';$('fixedBusinessLogo').hidden=preset.mode!=='fixed';
   syncChoices('productChoices', shopProducts.map(([id, p]) => [id, garmentLabel(window.MQDPrintShop,id,p.name)]), draft.product, 'product');
   syncChoices('colorChoices', colorsForProduct(draft.product).map(color => [color, color]), draft.color, 'color', true);
   syncChoices('sizeChoices', sizesForProduct(draft.product, draft.color).map(size => [size, size]), draft.size, 'size');
@@ -60,7 +62,7 @@ function controls() {
   syncOptions();
   const art = draft.artwork[view], zone = zoneFor(draft, view), layer = selected(), item = layer?.data;
   $('zoneLabel').textContent = `${zone.label} · Maximum ${zone.width} × ${zone.height} inches`;
-  $('artName').textContent = layer ? `${layer.kind === 'text' ? 'Text: ' : ''}${layer.name}` : 'No print';
+  $('artName').textContent = layer ? `${layer.kind === 'text' ? 'Text: ' : ''}${layer.name}` : (view==='front'&&garmentLogo(window.MQDPrintShop,draft.product).mode==='fixed'?'Fixed business logo':'No print');
   $('artworkHeading').textContent = `${zone.label} artwork`;
   $('layers').replaceChildren(...artworkLayers(art).map(entry => { const button = document.createElement('button'); button.type = 'button'; button.className = 'btn'; button.textContent = `${entry.kind === 'image' ? 'Image' : 'Text'}: ${entry.name}`; button.setAttribute('aria-pressed', String(entry.id === selectedLayer)); button.onclick = () => { selectedLayer = entry.id; render(); }; return button; }));
   for (const id of ['remove','smaller','larger','centerArtwork']) $(id).disabled = !item;
@@ -153,6 +155,9 @@ for (const [id, delta] of [['quantityMinus', -1], ['quantityPlus', 1]]) $(id).on
   $('quantity').value = Math.min(99, Math.max(1, (Number.isInteger(current) ? current : draft.quantity) + delta));
   $('quantity').onchange();
 };
+const brandButton=document.createElement('button');brandButton.id='addBusinessLogo';brandButton.type='button';brandButton.className='btn';brandButton.textContent=window.MQDPrintShop.organizationType==='team'?'Add team logo':'Add business logo';brandButton.hidden=true;
+const fixedNote=document.createElement('p');fixedNote.id='fixedBusinessLogo';fixedNote.textContent=(window.MQDPrintShop.organizationType==='team'?'Team':'Business')+' logo is fixed on the front. Add your artwork around it.';fixedNote.hidden=true;$('uploadArtwork').after(brandButton,fixedNote);
+brandButton.onclick=async()=>{if(busy)return;if(draft.artwork[view]?.file&&!confirm('Replace the current image in this view with the business logo? Your text stays.'))return;try{const blob=await(await fetch(window.MQDPrintShop.garmentLogo)).blob(),image=await readImage(blob);draft.artwork[view]={...draft.artwork[view],name:'business-logo.png',file:new File([blob],'business-logo.png',{type:blob.type}),placement:fitArtwork(image.width,image.height,zoneFor(draft,view))};selectedLayer='image';render();}catch(error){status(error.message);}};
 $('uploadArtwork').onclick = () => { if (!busy) $('upload').click(); };
 if ($('printMethod')) $('printMethod').onchange = () => { try { selection(); checkout.refresh(); status(`${PRINT_METHODS[draft.printMethod]} selected. The shop will confirm pricing and production.`); } catch (error) { status(error.message); } };
 $('saveDraft').onclick = save;

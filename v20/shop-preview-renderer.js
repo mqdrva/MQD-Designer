@@ -1,4 +1,4 @@
-import {shopPrintZones} from './print-shop-contract.js';
+import {shopPrintZones,garmentLogo} from './print-shop-contract.js';
 import { artworkLayers, drawText, loadTextFonts } from './everyday-layers.js';
 import { ZONES } from './everyday-contract.js';
 export const PRODUCTS = {
@@ -13,7 +13,7 @@ export function zoneFor(draft,view){const zones=shopPrintZones(window.MQDPrintSh
 export function guideFor(draft, view) {
   const zone = zoneFor(draft, view), sleeve = view === 'left' || view === 'right';
   // Wearer's left is on the viewer's right in the front view.
-  if (draft.product === 'everyday-polo' && view === 'front') return {x:483-zone.width*26/2,y:235,scale:26,width:zone.width*26,height:zone.height*26};
+  if (draft.product === 'everyday-polo' && view === 'front') return {x:(zone.placement==='center'?400:483)-zone.width*26/2,y:235,scale:26,width:zone.width*26,height:zone.height*26};
   const calibration = {
     'everyday-tshirt': { bodyY: 180, bodyScale: 18, sleeveY: 225, sleeveScale: 26, sleeveLeftCenter: 425 },
     'everyday-long-sleeve': { bodyY: 210, bodyScale: 18, sleeveY: 270, sleeveScale: 24, sleeveLeftCenter: 440 },
@@ -64,6 +64,11 @@ export async function drawPreview(canvas, draft, view, { guides = false, draftLa
       layer.drawImage(background, 0, 0);
     }
     ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y, box.width, box.height); ctx.clip(); ctx.drawImage(overlay, 0, 0); ctx.restore();
+  }
+  const preset=garmentLogo(window.MQDPrintShop,draft.product);
+  if(view==='front'&&preset.mode==='fixed'){
+    const logo=await bitmap(await(await fetch(window.MQDPrintShop.garmentLogo)).blob()),w=preset.width*box.scale,h=preset.height*box.scale,scale=Math.min(w/logo.width,h/logo.height);
+    ctx.drawImage(logo,box.x+(box.width-logo.width*scale)/2,box.y+preset.top*box.scale+(h-logo.height*scale)/2,logo.width*scale,logo.height*scale);
   }
   if (guides) {
     ctx.save(); ctx.setLineDash([8, 6]);

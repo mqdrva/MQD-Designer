@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {hasShopAccess} from './access.js';
 import JSZip from 'npm:jszip@3.10.1';
-import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone } from './contract.js';
+import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath } from './contract.js';
 
 const PUBLIC_KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
@@ -12,7 +12,7 @@ async function activeShop(db:any,slug:string){
  if(slug==='pilot')return {shop:PILOT_SHOP,recipient:RECIPIENTS.pilot};
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))return null;
  const {data,error}=await db.from('mqd_print_shop_businesses').select('id,shop_config,owner_email,status,pilot_expires_at,billing_status,approved_at,email_verified_at').eq('preferred_slug',slug).in('status',['pilot_active','active']).maybeSingle();
- if(error||!data)return null;
+ if(error||!data||data.shop_config?.fulfillmentMode==='mymerchnow')return null;
  let account=null;
  if(data.status==='active'){const result=await db.from('mqd_print_shop_subscription_accounts').select('status,period_end').eq('business_id',data.id).maybeSingle();if(result.error)return null;account=result.data;}
  if(!hasShopAccess(data,account))return null;
@@ -58,6 +58,14 @@ Deno.serve(async req=>{
    if(!designFile||!orderFile||(designFile as any)._data.uncompressedSize>24*1024*1024||(orderFile as any)._data.uncompressedSize>20000)throw new Error('Design package details are missing.');
    const design=JSON.parse(await designFile.async('string')),packOrder=JSON.parse(await orderFile.async('string'));
    if(design.schema!=='mqd-shop-design-v1'||design.engine!==s.engine||design.shop!==payload.shop||packOrder.productId!==s.productId||packOrder.printMethod!==s.printMethod||(s.engine==='2d'&&design.draft?.printMethod!==s.printMethod)||JSON.stringify(packOrder.orderOptions)!==JSON.stringify(s.orderOptions)||(s.engine==='2d'?design.draft?.product:design.design?.product?.id)!==s.productId)throw new Error('Design package does not match the order request.');
+   const preset=garmentLogo(shop,s.productId);
+   if(preset.mode==='fixed'){
+    const manifestFile=zip.file('brand/logo-placement.json'),assetFile=zip.file(garmentLogoPath(shop));
+    if(!manifestFile||!assetFile||(manifestFile as any)._data.uncompressedSize>3000)throw new Error('The approved logo files are missing.');
+    assertFixedLogoPackage(shop,s,design,JSON.parse(await manifestFile.async('string')));
+    const expected=Uint8Array.from(atob(shop.garmentLogo.split(',')[1]),c=>c.charCodeAt(0));
+    if(await hash(await assetFile.async('uint8array'))!==await hash(expected))throw new Error('The original business logo has changed.');
+   }
    const key=Deno.env.get('MQD_RESEND_API_KEY')||await secret(db,'mqd_resend_api_key');
    const from=Deno.env.get('MQD_EMAIL_FROM')||await secret(db,'mqd_email_from')||'MYMERCHNOW Print Shops <notifications@mymerchnow.app>';
    if(!key)return json({error:'Pilot email delivery is not configured. Save your design package and contact the shop.'},503,cors);
