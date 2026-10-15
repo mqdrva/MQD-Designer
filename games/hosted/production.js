@@ -18,7 +18,7 @@ export async function renderApprovedGamePhoto(photo){
  return {url:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height,cutout:photo.cutout};
 }
 export async function makeGameProductionPackage(detail,{proof=false}={}){
- const record=detail.record;if(!record?.templateManifest||(!proof&&(detail.order?.stripe_payment_status!=='paid'||detail.manufacturingReady!==true)))throw Error('Verified paid game order required');
+ const record=detail.record;if(detail.layoutVersion&&detail.layoutVersion!==PRINT_LAYOUT_VERSION)throw Error('Printing was updated. Refresh the owner portal and rebuild this proof.');if(!record?.templateManifest||(!proof&&(detail.order?.stripe_payment_status!=='paid'||detail.manufacturingReady!==true)))throw Error('Verified paid game order required');
  if(productionBusy)throw Error('Finish the current production package first.');productionBusy=true;try{
  const game=structuredClone(record.snapshot);game.color=record.color;game.status='revealed';
  const entries=[],manifest={schema:'mqd-shirt-game-production-v1',layoutVersion:PRINT_LAYOUT_VERSION,status:proof?'owner-test-proof':'paid-order',snapshotHash:detail.snapshotHash,templateHash:detail.templateHash,orderNumber:detail.order?.order_number||record.reference,game:record.gameType,product:record.product,color:record.color,size:record.size,quantity:record.quantity,saying:record.saying||null,zones:[],sources:[]};

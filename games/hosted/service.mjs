@@ -9,6 +9,9 @@ export async function handleGameAction({route,body={},actorToken='',user=null,re
   if(user?.app_metadata?.role!=='admin')fail('Owner access required',403);
   if(!await repo.ownerMfa())fail('Verify your owner account with an authenticator code.',403);
   if(body.action==='menu'){const state=E.initialState();E.updateMenu(state,body.items);await repo.saveMenu(state.menu);return {menu:state.menu}}
+  if(body.action==='sandbox-checkout'){if(!UUID.test(String(body.orderId||'')))fail('Invalid draft');const draft=await repo.readDraft(body.orderId);if(!draft||draft.is_test||draft.snapshot.snapshot?.status!=='revealed'||!draft.snapshot.snapshot?.approved)fail('Approved game draft required',409);return repo.startSandbox(draft,user);}
+  if(body.action==='sandbox-list')return {orders:await repo.sandboxOrders(user.id)};
+  if(body.action==='sandbox-detail'){if(!UUID.test(String(body.orderId||'')))fail('Invalid sandbox draft');return repo.sandboxDetail(body.orderId,user.id);}
   if(body.action==='proof-list')return {drafts:await repo.proofDrafts()};
   if(body.action==='proof-detail'){if(!UUID.test(String(body.orderId||'')))fail('Invalid draft');return repo.proofDetail(body.orderId)}
   if(body.action==='proof'){if(!UUID.test(String(body.orderId||'')))fail('Invalid draft');const draft=await repo.readDraft(body.orderId);if(!draft)fail('Draft not found',404);validateReviewManifest(draft.snapshot,body.manifest);await repo.approveProduction(draft.id,user.id,productionReviewHash(draft.snapshot),templateHash(draft.snapshot));return {reviewed:true}}
