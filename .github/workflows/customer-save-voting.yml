@@ -1,0 +1,50 @@
+name: Customer design recovery and voting
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  recovery-and-voting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: regression
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: regression
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check recovery and poll handler
+        run: |
+          node --check v20/customer.js
+          node --check v20/vote-tools.js
+          node --check v20/vote-page.js
+          node tests/design-auth-recovery.mjs
+          node tests/customer-accounts.mjs
+          node tests/voting-feedback-handler.mjs
+      - name: Verify feedback and existing comparison polls in isolated Postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/voting-fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261012084042_voting_polls.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261012090259_voting_service_role_guard.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261012090701_voting_lightweight_results.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261014232258_single_design_feedback_votes.sql
+          psql -v ON_ERROR_STOP=1 -f tests/voting-feedback.sql
+          psql -v ON_ERROR_STOP=1 -f tests/voting-allowance.sql

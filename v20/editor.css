@@ -82,3 +82,14 @@ header{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:
 }
 
 .premium-range-note{margin:0 0 12px;padding:10px 12px;border:1px solid #f0d4bd;border-radius:9px;background:#fff7f0;color:#6b350b;font-size:11px;line-height:1.6}.premium-range-note strong{font-size:12px;color:#422308}
+/* Keep account identity and controls visible on narrow screens; only the list scrolls. */
+.customer-modal{height:min(720px,calc(100vh - 24px));max-height:calc(100vh - 24px);height:min(720px,calc(100dvh - 24px));max-height:calc(100dvh - 24px)}
+.customer-modal>.modal-head{flex-shrink:0;flex-wrap:wrap;gap:12px}
+.customer-modal>.modal-head>div:first-child{flex:1 1 240px;min-width:0}
+#customerEmail{overflow-wrap:anywhere;line-height:1.45;margin-top:4px}
+.customer-modal>.modal-head>.row{flex:0 0 auto;flex-wrap:wrap;gap:8px}
+.customer-modal>.modal-head .btn{min-height:40px;white-space:nowrap}
+.customer-modal>.account-tabs{flex-shrink:0;flex-wrap:wrap}
+.customer-modal>.modal-body{flex:1;min-height:0;overscroll-behavior:contain}
+.design-recovery-status{margin:0;padding:10px 16px;background:#e8fff4;color:#145d3c;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.design-recovery-status.error{background:#fff3e6;color:#853d00}
