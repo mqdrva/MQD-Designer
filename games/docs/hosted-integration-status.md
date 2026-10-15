@@ -1,46 +1,33 @@
-# Hosted Shirt Games integration — October 14, 2026
+# Hosted Shirt Games release — October 14, 2026
 
-The user approved moving the tested games onto the existing MyMerchNow services and public site, with no additional spending. This supersedes the earlier local-only scope; the local alpha remains under `games/` and is excluded from site deployment.
+The user approved publishing the four tested games using existing MyMerchNow services, with no additional spending. Synced project sources and active Team/pilot work were not edited. The local alpha remains excluded from website deployment.
 
-## Implemented
+## Release contents
 
-- Dedicated `/shirt-games/` page and hidden secondary homepage entry, using the approved 2D garment images. Existing garment mapping is unchanged.
-- Protected Supabase game records, private originals/crops and hashed slot invitations. Hosted mutations use version-checked commits and retry without overwriting other players.
-- Google account sign-in for creators and buyers, capability-based guest contributions, server-side hidden contributions and shared reveal. Account-owned saved game designs return to the game instead of the ordinary blank editor.
-- Browser face outline/transparent-cutout uploads, pinch/drag crop approval. The Mac-only automatic cutout helper is not used online; no paid background-removal provider is enabled.
-- Existing checkout adapter and immutable game order bridge, with checkout disabled pending verification. Existing Stripe functions are reused unchanged.
-- Owner Portal Games page protected by existing admin role and authenticator verification. Owner test proofs are separate from manufacturing packages; production download requires verified live payment and a reviewed garment template.
-- Full-size PNG panels at canonical template pixel dimensions, original photos, crop/outline metadata and order/color/size manifest in the ZIP.
+- Dedicated `/shirt-games/` page and secondary homepage Play Shirt Games card. Normal design and buying paths remain available.
+- Private Supabase game records and original/cropped photos, hashed single-use slot invitations, version-checked concurrent updates, server-side hidden turns, shared reveal and creator review.
+- Google accounts for creators and buyers; friends can contribute through their private slot links. Saved game designs reopen in the game.
+- Existing 2D garment previews and canonical short-sleeve, long-sleeve and hoodie mappings. Twelve starter colors, optional purchasing and per-person garment/size choices.
+- Crazy Faces uses a reviewed manual face/hair outline or a transparent upload online. No paid automatic background-removal provider was enabled.
+- Immutable approved order snapshots reuse existing live Stripe checkout and webhook. Manufacturing ZIP access requires verified live payment, reviewed mapping, owner/admin role and MFA. Customers receive no manufacturing download.
+- Owner Portal Games menu controls, live paid-game list and separate owner-only test proofs/sandbox orders.
 
-## Verified
+## Verification evidence
 
-48 game tests pass, covering invitation/reveal privacy, races, saved-design ownership, checkout guards, original retention, manual cutouts and panel dimensions. Existing customer account and owner-security checks pass. All 12 frozen product definitions and 66 shared garment-mapping sections remain unchanged.
+48 game tests pass, including privacy, invitations, early finish, approved voting rules, concurrent writes, account recovery, original-image retention, full-size panel rendering, stale-proof rejection and sandbox webhook boundaries. Existing customer/owner checks and all 12 frozen garment / 66 mapping-section checks passed. Current release CI must pass before merge.
 
-Four additive migrations have been applied and the dedicated game Edge Function has been deployed. Initial live smoke checks returned the four-game catalog, rejected game creation while disabled and denied untrusted origins. Gameplay was then enabled at the direct link for hosted verification; checkout and the homepage entry remain off. SQL tests for game writes, client denials and the ordinary order bridge were transactional and rolled back. No real orders or customer photos were created by those tests.
+All four hosted game journeys passed on the official domain using creator/friend tabs. The user previously tested all four games and phone access in the local alpha. A new independent-network physical-phone check of the hosted release has not been performed by the agent.
 
-## Still required before enabling customer purchases
+Owner MFA was verified. Short-sleeve, long-sleeve and hoodie ZIPs were downloaded, digitally inspected and registered with current print-v2 template hashes. All 15 panel PNG dimensions and SHA-256 checksums matched their canonical manifests. These are digital export checks, not physical sample-print or seam-fit certification. Each paid order still requires production review for placement, seams, bleed and source-photo quality.
 
-- Complete the hosted sandbox payment and production-proof walkthrough and an independent-network phone check. Owner MFA is verified; the protected menu, draft list and short-sleeve proof download work. Customer Google sign-in and all four hosted browser game flows passed.
-- Existing Stripe sandbox end-to-end payment-to-Games-order verification; no real charge should be made as a test.
-- Owner review of the actual panel PNGs for short sleeve, long sleeve and hoodie: placement, bleed, seams and photo quality. Technical pixel-dimension checks do not establish physical print suitability.
-- Final public release verification and deliberate launch-switch changes. `shirt-games/launch.json` and database `checkout_enabled` remain false. Database `enabled` is true for direct-link hosted gameplay with the initial caps.
+Actual Stripe sandbox order **MQD-F274F940FC** completed with published Stripe test-card details and fictional customer/shipping data: $40 shirt + $10 shipping, `livemode=false`, paid return page and signed webhook update. It appeared in Owner → Games under sandbox tests, remained excluded from live paid orders, queued zero notification emails and downloaded an owner-only paid sandbox proof. Five panel checksums/dimensions and customer/shipping metadata passed. The original approved draft was not converted into a test order. The sandbox detail projection was corrected to include fulfillment metadata, then downloaded and verified again.
 
-## Cost and release limits
+Six additive game migrations are applied. Dedicated game Edge Function version 6 is active with custom verified-user/capability authentication. Only the existing test webhook was updated, with scoped game sandbox session binding and email suppression; the live webhook and live checkout implementation were reused unchanged.
 
-No new service, subscription or paid background API was provisioned. Existing plan usage can still increase; zero incremental usage cost has not been guaranteed. Initial game storage is capped at 25 MiB and creation at 20 games total / five per creator daily. These are initial verification limits, not a promise of unlimited production capacity. Expired game access ends after 30 days; paid production snapshots remain private for fulfillment. A retention/cleanup operating policy and capacity review are still needed before a larger rollout.
+## Release switches and operating limits
 
-Earlier Alfreda cancellation remains unconfirmed. Local runtime photos, records and access codes must never be committed or published.
+All three print-v2 garment hashes are reviewed. Database gameplay and checkout are enabled. `shirt-games/launch.json` enables the secondary homepage entry when this release deploys. This is an initially capped launch: 20 total game sessions, five per creator daily and a 25 MiB aggregate upload reservation. Eight MiB per-image limit and 30-day game access expiry also apply. Expired access does not delete paid fulfillment snapshots. Capacity and retention need review before a larger rollout; these limits can pause new games/uploads and do not promise unlimited service.
 
-## Hosted browser evidence
+No new service, subscription or paid background API was purchased. Existing-plan usage can increase, so zero incremental cost is not guaranteed. Private owner QA downloads are excluded from Git and deployment.
 
-All four games completed on `https://mymerchnow.app/shirt-games/` using separate creator/friend tabs and the real Edge Function/private database. Pass verified hidden turns and a reveal for both participants, then saved matching short-sleeve, long-sleeve and hoodie drafts. Birthday verified explicit early finish with an unused slot and removal/restoration before creator approval. Voting verified displayed-order ties, a zero-vote self-choice and a personal saying draft. Crazy Faces verified manual outline controls and an approved transparent upload; originals/crops were stored in the private bucket and shared only at reveal. A nonpersonal authorized logo was the upload fixture; this does not validate extraction quality on real faces. No real order or charge was created.
-
-Hosted testing exposed a shared rate counter that could block creation after ordinary refreshes; creation now has a separate counter. Guest accounts retain the Google sign-in option. Production reconstruction now records contain/cover framing for manual outlines, with an edge-retention regression test and layout-version bump. Owner query filters use the selected embedded-order alias. Existing site launch, cart, frozen-product and AI-boundary CI checks passed on the merged integration.
-
-The Owner Portal is open at its existing authenticator challenge. The agent has not entered codes, completed owner MFA, downloaded hosted production proofs, run the full Stripe game-payment test, approved print layouts or enabled customer purchasing. Completion depends on the owner verification and actual panel review.
-
-## Verified owner test tools
-
-Owner MFA access was confirmed in the real portal. The owner-only short-sleeve test ZIP downloaded successfully with five full-resolution panels, color/size/quantity metadata and proof labeling. A stale open tab initially used printing v1 after the site had updated to v2; proof approval now requires the current layout version and template hash. The renderer also rejects a conflicting server version.
-
-Isolated sandbox copies are now available under Owner test tools. These preserve the original approved draft, save a clearly labeled sandbox design through the real owner account, create guest test orders for the existing Stripe sandbox adapter and remain excluded from the live paid-game list. Sandbox actions require admin + MFA; customer roles have no sandbox RPC permission. Transactional database checks for isolation and changed-design rejection pass and roll back. Game sandbox webhooks suppress notifications, bind the session to its order and preserve ordinary sandbox behavior. Customer purchasing stays off until end-to-end verification is complete.
+Earlier Alfreda cancellation remains unconfirmed. Local runtime photos, game records, participant secrets and owner QA archives must never be committed or published.
