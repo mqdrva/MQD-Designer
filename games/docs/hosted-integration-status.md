@@ -14,13 +14,13 @@ The user approved moving the tested games onto the existing MyMerchNow services 
 
 ## Verified
 
-43 game tests pass, covering invitation/reveal privacy, races, saved-design ownership, checkout guards, original retention, manual cutouts and panel dimensions. Existing customer account and owner-security checks pass. All 12 frozen product definitions and 66 shared garment-mapping sections remain unchanged.
+48 game tests pass, covering invitation/reveal privacy, races, saved-design ownership, checkout guards, original retention, manual cutouts and panel dimensions. Existing customer account and owner-security checks pass. All 12 frozen product definitions and 66 shared garment-mapping sections remain unchanged.
 
 Four additive migrations have been applied and the dedicated game Edge Function has been deployed. Initial live smoke checks returned the four-game catalog, rejected game creation while disabled and denied untrusted origins. Gameplay was then enabled at the direct link for hosted verification; checkout and the homepage entry remain off. SQL tests for game writes, client denials and the ordinary order bridge were transactional and rolled back. No real orders or customer photos were created by those tests.
 
 ## Still required before enabling customer purchases
 
-- Owner authentication/MFA completion, protected production-tool walkthrough and an independent-network phone check. Customer Google sign-in and all four hosted browser game flows passed.
+- Complete the hosted sandbox payment and production-proof walkthrough and an independent-network phone check. Owner MFA is verified; the protected menu, draft list and short-sleeve proof download work. Customer Google sign-in and all four hosted browser game flows passed.
 - Existing Stripe sandbox end-to-end payment-to-Games-order verification; no real charge should be made as a test.
 - Owner review of the actual panel PNGs for short sleeve, long sleeve and hoodie: placement, bleed, seams and photo quality. Technical pixel-dimension checks do not establish physical print suitability.
 - Final public release verification and deliberate launch-switch changes. `shirt-games/launch.json` and database `checkout_enabled` remain false. Database `enabled` is true for direct-link hosted gameplay with the initial caps.
@@ -38,3 +38,9 @@ All four games completed on `https://mymerchnow.app/shirt-games/` using separate
 Hosted testing exposed a shared rate counter that could block creation after ordinary refreshes; creation now has a separate counter. Guest accounts retain the Google sign-in option. Production reconstruction now records contain/cover framing for manual outlines, with an edge-retention regression test and layout-version bump. Owner query filters use the selected embedded-order alias. Existing site launch, cart, frozen-product and AI-boundary CI checks passed on the merged integration.
 
 The Owner Portal is open at its existing authenticator challenge. The agent has not entered codes, completed owner MFA, downloaded hosted production proofs, run the full Stripe game-payment test, approved print layouts or enabled customer purchasing. Completion depends on the owner verification and actual panel review.
+
+## Verified owner test tools
+
+Owner MFA access was confirmed in the real portal. The owner-only short-sleeve test ZIP downloaded successfully with five full-resolution panels, color/size/quantity metadata and proof labeling. A stale open tab initially used printing v1 after the site had updated to v2; proof approval now requires the current layout version and template hash. The renderer also rejects a conflicting server version.
+
+Isolated sandbox copies are now available under Owner test tools. These preserve the original approved draft, save a clearly labeled sandbox design through the real owner account, create guest test orders for the existing Stripe sandbox adapter and remain excluded from the live paid-game list. Sandbox actions require admin + MFA; customer roles have no sandbox RPC permission. Transactional database checks for isolation and changed-design rejection pass and roll back. Game sandbox webhooks suppress notifications, bind the session to its order and preserve ordinary sandbox behavior. Customer purchasing stays off until end-to-end verification is complete.

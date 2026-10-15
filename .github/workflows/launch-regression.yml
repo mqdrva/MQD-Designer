@@ -33,6 +33,9 @@ jobs:
         env:
           MQD_GLB_CACHE_DIR: .cache/mqd-glbs
 
+      - name: Verify Shirt Games privacy, proofs and sandbox boundaries
+        run: node --test games/tests/*.test.mjs
+
   cart-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 5
