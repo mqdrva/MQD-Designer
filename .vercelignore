@@ -1,2 +1,5 @@
 # Shirt Games is a local alpha until hosted privacy, payment and production checks pass.
 games/
+
+# Private owner QA downloads
+outputs/hosted-owner-proofs/

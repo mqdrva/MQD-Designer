@@ -1,2 +1,5 @@
 node_modules/
 .cache/
+
+# Private owner QA downloads
+outputs/hosted-owner-proofs/
