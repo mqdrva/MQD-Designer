@@ -7,9 +7,9 @@ const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8')
 
 for(const id of ['accountButton','authOverlay','googleSignInButton','emailSignInButton','guestSignInButton','authEmail','customerOverlay','designsList','ordersList'])assert(html.includes(`id="${id}"`),`${id} must exist`);
 for(const feature of ['signInWithOAuth','signInWithOtp','signInAnonymously','customer_designs','customer-artwork','Buy Again','duplicateCloudDesign','mqd_orders'])assert(customer.includes(feature),`${feature} must stay connected`);
-assert(customer.includes('function authRedirectUrl(){return window.location.origin+window.location.pathname;}'),'auth email links must return customers to the site they signed in from');
+assert(customer.includes('authSaveRedirectUrl(window.location,currentDesignRecoveryId())'),'auth returns to the original designer with its backup ID');
 assert(customer.includes('Authorization:`Bearer ${token}`'),'checkout submission must send the signed-in customer JWT');
-assert(customer.includes("if(!requirePermanentAccount('Continue with Google or Email to save"),'cloud saving must require a permanent account');
+assert(customer.includes('if(!isPermanentUser()){')&&customer.includes('authDesignRecovery.prepare(payload)'),'unsigned saves must make a durable backup before requesting sign-in');
 assert(customer.includes("if(!requireAccount('Sign in or continue as a guest before adding"),'the signed-in cart handler must require a session or guest continuation');
 assert(editor.includes('window.MQDDesigner={')&&editor.includes('exportDesign:designJSON')&&editor.includes('loadDesign:loadDesignPayload'),'customer library must use the canonical editor serializer and loader');
 assert(!customer.includes('service_role'),'the browser bundle must never contain the service role key');

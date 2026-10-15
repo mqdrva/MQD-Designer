@@ -1,3 +1,4 @@
+import {AUTH_SAVE_MARKER,authSaveResumeId,authSaveRedirectUrl,createAuthSaveRecovery} from './design-auth-recovery.js';
 import { takeEverydayReturn } from './everyday-account.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {shippingCentsForQuantity} from './checkout-pricing.js';
@@ -8,11 +9,14 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
 const LIBRARY_URL=SUPABASE_URL+'/functions/v1/mqd-artwork-library';
-function authRedirectUrl(){return window.location.origin+window.location.pathname;}
+function currentDesignRecoveryId(){return pendingDesignSaveId||authSaveResumeId(window.location,sessionStorage);}
+function authRedirectUrl(){return authSaveRedirectUrl(window.location,currentDesignRecoveryId());}
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
 let pendingAfterAuth=null;
+let designRecoveryJob=null;
+let pendingDesignSaveId=null;
 let currentDesignFilter='all';
 let accountDesigns=[];
 let libraryAssets=[];
@@ -257,7 +261,7 @@ function openAuth(reason='Sign in to save designs across devices, or continue as
 }
 function closeAuth(){
   $('authOverlay').classList.add('hidden');
-  if(!accountUser())pendingAfterAuth=null;
+  if(!accountUser())pendingAfterAuth=null; // Dismissing sign-in must not discard the durable Save Design intent.
 }
 function updateAccountButton(){
   const button=$('accountButton');if(!button)return;
@@ -360,10 +364,10 @@ async function prepareCloudPayload(payload,designId,userId){
   }
   return cloud;
 }
-async function saveCloudDesign(payload,{forceNew=false,name=null}={}){
+async function saveCloudDesign(payload,{forceNew=false,name=null,designId=null}={}){
   const user=accountUser();if(!user)throw new Error('Please sign in first.');
   const mayUpdate=activeCloudDesign&&activeCloudDesign.status==='draft'&&!forceNew;
-  const id=mayUpdate?activeCloudDesign.id:crypto.randomUUID();
+  const id=designId||(mayUpdate?activeCloudDesign.id:crypto.randomUUID());
   const cloudPayload=await prepareCloudPayload(payload,id,user.id);
   let previewPath=mayUpdate?activeCloudDesign.preview_path:null;
   const preview=await mockupBlob();
@@ -404,21 +408,89 @@ async function saveCartCloudDesign(payload,designId,{preview=null}={}){
 }
 
 async function saveDraft(){
-  if(!requirePermanentAccount('Continue with Google or Email to save this design and reopen it from any device.',saveDraft))return;
-  const btn=$('saveDraft');
-  const old=btn.textContent;
-  btn.disabled=true;btn.textContent='Saving…';
+  const btn=$('saveDraft'),old=btn.textContent;
+  btn.disabled=true;btn.textContent=isPermanentUser()?'Saving…':'Protecting design…';
+  let backedUp=false;
   try{
-    const payload=await captureDesignJSON();
-    await savePayloadToDrafts(payload.product?.id||'current',payload);
+    const payload=await persistentDesignSnapshot(await captureDesignJSON());
+    if(!isPermanentUser()){
+      let id=currentDesignRecoveryId();if(!id||!await authDesignRecovery.update(id,payload,accountUser()))id=await authDesignRecovery.prepare(payload);backedUp=true;
+      pendingDesignSaveId=id;try{sessionStorage.setItem(AUTH_SAVE_MARKER,id);}catch{}
+      setDesignRecoveryStatus('Your design is backed up on this browser. Sign in to save it to My Designs.');
+      openAuth('Your design is backed up. Continue with Google or Email to save it to your account.',resumePendingDesignSave);
+      return;
+    }
+    await savePayloadToDrafts(payload.product?.id||'current',payload);backedUp=true;
+    const pending=currentDesignRecoveryId();
+    if(pending){if(await authDesignRecovery.update(pending,payload,accountUser())){await resumePendingDesignSave();return;}clearDesignRecoveryMarker();}
     await saveCloudDesign(payload);
-    btn.textContent='Saved ✓';
+    btn.textContent='Saved ✓';setDesignRecoveryStatus('Design saved to My Designs.');
     setTimeout(()=>btn.textContent=old,1200);
   }catch(err){
-    console.error(err);
-    btn.textContent=old;
-    alert('The design was saved on this device, but could not be saved to your account: '+err.message);
-  }finally{btn.disabled=false;}
+    console.error(err);btn.textContent=old;
+    const message=backedUp?'Your design is backed up on this browser, but the account save did not finish. Retry Save Design.':'The local backup could not be completed. Your design is still open. Download a copy before leaving this page, then retry.';
+    setDesignRecoveryStatus(message,true);alert(message+' '+err.message);
+  }finally{btn.disabled=false;if(btn.textContent==='Protecting design…'||btn.textContent==='Saving…')btn.textContent=old;}
+}
+
+const authDesignRecovery=createAuthSaveRecovery({read:loadCartDraft,write:savePayloadToDrafts});
+function setDesignRecoveryStatus(message,error=false){
+  let status=$('designRecoveryStatus');
+  if(!status){status=document.createElement('p');status.id='designRecoveryStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');$('saveDraft')?.closest('header')?.after(status);}
+  status.textContent=message;status.className='design-recovery-status'+(error?' error':'');
+}
+function clearDesignRecoveryMarker(){
+  pendingDesignSaveId=null;
+  try{sessionStorage.removeItem(AUTH_SAVE_MARKER);}catch{}
+  const url=new URL(window.location.href);url.searchParams.delete('resumeDesign');
+  history.replaceState({},document.title,url.pathname+url.search+url.hash);
+}
+async function persistentDesignSnapshot(payload){
+  const copy=structuredClone(payload);
+  for(const state of Object.values(copy.design?.zones||{}))for(const layer of state.layers||[]){
+    if(!isPermanentUser()&&layer.type==='image'&&layer.src&&!layer.libraryAssetId){delete layer.storagePath;delete layer.originalStoragePath;}
+    if(layer.type==='image'&&layer.src?.startsWith('blob:')){
+      const blob=await dataUrlToBlob(layer.src);
+      layer.src=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);});
+    }
+  }
+  return copy;
+}
+async function restorePendingArtwork(payload){
+  const hydrated=await hydrateLibraryArtwork(payload);
+  await Promise.all(Object.values(hydrated.design?.zones||{}).flatMap(state=>(state.layers||[]).filter(layer=>layer.type==='image'&&layer.src).map(layer=>new Promise((resolve,reject)=>{
+    const image=new Image();if(layer.libraryAssetId)image.crossOrigin='anonymous';image.onload=()=>{layer.image=image;resolve();};image.onerror=()=>reject(new Error('An artwork image could not be restored. The local backup is retained.'));image.src=layer.src;
+  }))));
+  const ready=new Promise((resolve,reject)=>{
+    let timer;
+    const finish=(error)=>{clearTimeout(timer);window.removeEventListener('mqd:garment-ready',loaded);window.removeEventListener('mqd:garment-error',failed);error?reject(error):resolve();};
+    const loaded=event=>{if(event.detail?.productId===hydrated.product.id)finish();};
+    const failed=event=>{if(event.detail?.productId===hydrated.product.id)finish(new Error('The garment preview could not be restored. The local backup is retained.'));};
+    window.addEventListener('mqd:garment-ready',loaded);window.addEventListener('mqd:garment-error',failed);
+    timer=setTimeout(()=>finish(new Error('The garment is still loading. Retry Save Design; your backup is retained.')),30000);
+  });
+  // Attach the preview listeners before loading: the shared renderer owns the
+  // readiness event, so saving cannot capture a blank pre-load preview.
+  ready.catch(()=>{});
+  await window.MQDDesigner.loadDesign(hydrated,{notify:false});activeCloudDesign=null;
+  await ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+}
+function resumePendingDesignSave(){
+  if(designRecoveryJob)return designRecoveryJob;
+  const id=currentDesignRecoveryId();if(!id)return Promise.resolve(false);
+  designRecoveryJob=(async()=>{
+    const button=$('saveDraft');if(button)button.disabled=true;
+    setDesignRecoveryStatus('Restoring your design…');
+    try{
+      const result=await authDesignRecovery.resume(id,{user:accountUser(),restore:restorePendingArtwork,save:(payload,designId)=>saveCloudDesign(payload,{forceNew:true,designId})});
+      if(result.status==='saved'){clearDesignRecoveryMarker();pendingAfterAuth=null;setDesignRecoveryStatus('Your design is restored and saved to My Designs.');}
+      else if(result.status==='restored')setDesignRecoveryStatus('Your design is restored. Sign in to finish saving it to My Designs.');
+      else if(result.status==='missing'){clearDesignRecoveryMarker();setDesignRecoveryStatus('This backup is not available in this browser. Return to the browser where you created the design.',true);}
+      else if(result.status==='cancelled')clearDesignRecoveryMarker();
+      return result.status;
+    }catch(error){console.error('Design recovery failed',error);setDesignRecoveryStatus('Your local backup is retained. Retry Save Design to finish saving. '+error.message,true);return 'failed';}
+    finally{if(button){button.disabled=false;button.textContent='Save Design';}designRecoveryJob=null;}
+  })();return designRecoveryJob;
 }
 
 async function dataUrlToBlob(src){
@@ -453,16 +525,20 @@ async function originalArtworkBlob(filename){
   }
 }
 
-function mockupBlob(){
-  return new Promise(resolve=>{
-    const src=$('webgl');
-    if(!src) return resolve(null);
-    const out=document.createElement('canvas');
-    out.width=src.width;out.height=src.height;
-    const c=out.getContext('2d');
-    c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);c.drawImage(src,0,0);
-    out.toBlob(resolve,'image/png');
-  });
+async function mockupBlob(){
+  const selected=document.querySelector('[data-mobile-pane][aria-selected="true"]');
+  const preview=document.querySelector('[data-mobile-pane="preview"]');
+  const reveal=window.matchMedia('(max-width:850px)').matches&&preview&&selected!==preview;
+  if(reveal)preview.click();
+  try{
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    return await new Promise(resolve=>{
+      const src=$('webgl');if(!src)return resolve(null);
+      const out=document.createElement('canvas');out.width=src.width;out.height=src.height;
+      const c=out.getContext('2d');c.fillStyle='#F7F7F7';c.fillRect(0,0,out.width,out.height);c.drawImage(src,0,0);
+      out.toBlob(resolve,'image/png');
+    });
+  }finally{if(reveal&&selected)selected.click();}
 }
 
 function cartItems(){
@@ -897,11 +973,14 @@ async function openCustomerAccount(){
   try{await loadDesigns();}catch(err){console.error(err);$('designsList').innerHTML=`<div class="account-empty">Could not load designs: ${escapeHtml(err.message)}</div>`;}
 }
 async function completeAuth(session){
+  if(!session&&isPermanentUser())session=currentSession; // Ignore a stale signed-out startup result.
   currentSession=session;updateAccountButton();
-  if(!session)return;
+  if(!session){await resumePendingDesignSave();return;}
+  $('authOverlay').classList.add('hidden');
+  const recovered=await resumePendingDesignSave();
+  if(recovered){if(recovered==='restored'&&isPermanentUser())setTimeout(()=>{void resumePendingDesignSave();},0);return;}
   const everydayReturn=takeEverydayReturn(sessionStorage);
   if(everydayReturn){window.location.assign(everydayReturn);return;}
-  $('authOverlay').classList.add('hidden');
   const action=pendingAfterAuth;pendingAfterAuth=null;
   if(action)setTimeout(()=>action(),0);
 }
@@ -1056,7 +1135,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   });
   updateCartButton();
   restoreAuthFromRedirect().then(({session,callbackError})=>{
-    completeAuth(session);
+    void completeAuth(session).catch(console.error);
     if(new URLSearchParams(location.search).get('signIn')==='try-on'&&!isPermanentUser()){
       openAuth('Sign in with Google or Email to use virtual try-on. After signing in, return to the try-on tab. Guest checkout does not unlock virtual try-on.');
     }
@@ -1069,5 +1148,5 @@ window.addEventListener('DOMContentLoaded',()=>{
     console.error('Auth restore failed',error);
     completeAuth(null);
   });
-  supabase.auth.onAuthStateChange((_event,session)=>{currentSession=session;updateAccountButton();});
+  supabase.auth.onAuthStateChange((event,session)=>{currentSession=session;updateAccountButton();if(event==='SIGNED_IN')setTimeout(()=>{void completeAuth(session).catch(console.error);},0);});
 });
