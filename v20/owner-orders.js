@@ -126,7 +126,7 @@ function renderDetail(detail){
   status.value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';carrier.value=order.shipping_carrier||'';tracking.value=order.tracking_number||'';
   for(const control of [status,carrier,tracking,save]){control.disabled=locked;control.removeAttribute('readonly');control.setAttribute('aria-disabled',locked?'true':'false');control.style.pointerEvents=locked?'none':'auto';control.style.opacity=locked?'.55':'1';}
   if(!locked){carrier.tabIndex=0;tracking.tabIndex=0;status.tabIndex=0;save.tabIndex=0;}
-  $('testOrderNotice').classList.toggle('hidden',!locked);
+  $('testOrderNotice').classList.toggle('hidden',order.is_test!==true);
   text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);renderOwnerNotifications(detail);loadOrderComparison(order.id);
 }
 async function openOrder(id){
