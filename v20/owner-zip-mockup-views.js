@@ -4,6 +4,9 @@
   const originalGenerate=Zip.prototype.generateAsync;
   const nativeFetch=window.fetch.bind(window);
   const views=['front','left-side','back','right-side'];
+  // The long-sleeve model's saved Left Sleeve is on +X. Name its proof
+  // from the wearer's side, without changing any garment or artwork mapping.
+  const cameraViewFor=(productId,view)=>productId==='long-sleeve-tshirt'?({'left-side':'right-side','right-side':'left-side'}[view]||view):view;
   const LIBRARY_URL='https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-artwork-library';
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 
@@ -15,12 +18,6 @@
     try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);})]);}
     finally{clearTimeout(timer);}
   }
-  const nextFrames=(win,count=2)=>new Promise((resolve,reject)=>{
-    let frame;
-    const timer=setTimeout(()=>{win.cancelAnimationFrame(frame);reject(new Error('Preview rendering paused; using the saved mockup.'));},5000);
-    const tick=()=>{if(count--<=0){clearTimeout(timer);resolve();}else frame=win.requestAnimationFrame(tick);};
-    frame=win.requestAnimationFrame(tick);
-  });
   function dataUrl(blob){
     return new Promise((resolve,reject)=>{
       const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
@@ -67,61 +64,63 @@
       const candidates=names.filter(name=>name.startsWith(prefix)&&!zip.files[name]?.dir);
       for(const layer of state?.layers||[]){
         if(layer?.type!=='image')continue;
+        const basenames=[
+          String(layer.storagePath||'').split('/').pop(),
+          layer.libraryAssetId?`${safePart(layer.libraryAssetId)}.png`:null,
+          layer.backgroundRemovedFilename?`${safePart(layer.id)}-${safePart(layer.backgroundRemovedFilename)}`:null,
+          layer.filename?`${safePart(layer.id)}-${safePart(layer.filename)}`:null,
+          layer.filename?safePart(layer.filename):null
+        ].filter(Boolean);
+        let match;
+        for(const wanted of basenames){
+          match=candidates.find(name=>name.slice(prefix.length)===wanted);
+          if(match)break;
+        }
+        const file=match&&zip.file(match);
+        if(file){layer.src=await dataUrl(await file.async('blob'));continue;}
         if(layer.libraryAssetId){
           const asset=await libraryAsset(copy.product?.id,zone,layer.libraryAssetId,cache);
-          if(asset?.renderUrl)layer.src=asset.renderUrl;
-          continue;
+          if(asset?.renderUrl){layer.src=asset.renderUrl;continue;}
         }
-        const wanted=safePart(layer.filename||'').toLowerCase();
-        let match=candidates.find(name=>name.slice(prefix.length).toLowerCase()===wanted);
-        if(!match&&wanted){
-          const stem=wanted.replace(/\.[^.]+$/,'');
-          match=candidates.find(name=>name.slice(prefix.length).toLowerCase().replace(/\.[^.]+$/,'')===stem);
-        }
-        if(!match&&candidates.length===1)match=candidates[0];
-        const file=match&&zip.file(match);if(file)layer.src=await dataUrl(await file.async('blob'));
+        throw new Error(`Saved artwork is missing for ${zone}, ${layer.id||layer.filename||'image'}.`);
       }
     }
     return copy;
   }
-  async function quarterOrbit(frame,canvas){
-    const win=frame.contentWindow,rect=canvas.getBoundingClientRect(),pointerId=9188;
-    const x=rect.left+rect.width/2,y=rect.top+rect.height/2,dx=(canvas.clientHeight||rect.height||800)/4;
-    let set=false,release=false;
-    try{
-      if(typeof canvas.setPointerCapture==='function'){Object.defineProperty(canvas,'setPointerCapture',{configurable:true,value:()=>{}});set=true;}
-      if(typeof canvas.releasePointerCapture==='function'){Object.defineProperty(canvas,'releasePointerCapture',{configurable:true,value:()=>{}});release=true;}
-      const base={bubbles:true,cancelable:true,pointerId,pointerType:'mouse',isPrimary:true,button:0};
-      canvas.dispatchEvent(new win.PointerEvent('pointerdown',{...base,buttons:1,clientX:x,clientY:y}));
-      canvas.dispatchEvent(new win.PointerEvent('pointermove',{...base,buttons:1,clientX:x+dx,clientY:y}));
-      canvas.dispatchEvent(new win.PointerEvent('pointerup',{...base,buttons:0,clientX:x+dx,clientY:y}));
-      await nextFrames(win,120);
-    }finally{
-      if(set)delete canvas.setPointerCapture;
-      if(release)delete canvas.releasePointerCapture;
-    }
-  }
   async function captureViews(payload){
     const frame=document.createElement('iframe');frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;
-    Object.assign(frame.style,{position:'fixed',left:'-12000px',top:'0',width:'1200px',height:'900px',border:'0',opacity:'0',pointerEvents:'none',zIndex:'-1'});
-    frame.src=`/?mqdCapture=1&ownerProof=${Date.now()}`;document.body.appendChild(frame);
+    Object.assign(frame.style,{position:'fixed',left:'0',top:'0',width:'1200px',height:'900px',border:'0',opacity:'0',pointerEvents:'none',zIndex:'-1'});
+    frame.src=`/index.html?mqdCapture=1&ownerProof=${Date.now()}`;document.body.appendChild(frame);
     try{
       await Promise.race([new Promise((resolve,reject)=>{frame.onload=resolve;frame.onerror=()=>reject(new Error('Preview renderer could not load.'));}),sleep(15000).then(()=>{throw new Error('Preview renderer load timed out.');})]);
       const win=frame.contentWindow,doc=frame.contentDocument,started=Date.now();
       while(!win?.MQDDesigner?.loadDesign&&Date.now()-started<12000)await sleep(80);
       if(!win?.MQDDesigner?.loadDesign)throw new Error('Preview renderer is not ready.');
+      // Give the proof renderer the full frame, avoiding narrow designer-column cropping.
+      const style=doc.createElement('style');style.textContent='.preview-pane{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:9999!important}#webgl{width:100vw!important;height:100vh!important;display:block!important}';doc.head.appendChild(style);win.dispatchEvent(new win.Event('resize'));
+      // Decode every saved asset before the editor builds its garment textures.
+      await withTimeout(Promise.all(Object.values(payload?.design?.zones||{}).flatMap(state=>state.layers||[]).filter(layer=>layer.type==='image').map(layer=>new Promise((resolve,reject)=>{
+        const image=new win.Image();image.crossOrigin='anonymous';image.onload=resolve;image.onerror=()=>reject(new Error(`Saved artwork could not load: ${layer.id||layer.filename}.`));image.src=layer.src;
+      }))),15000,'Saved artwork loading timed out.');
+      const garmentReady=new Promise((resolve,reject)=>{
+        const ready=event=>{if(event.detail?.productId===payload.product?.id){cleanup();resolve();}};
+        const failed=event=>{cleanup();reject(new Error(event.detail?.message||'Garment rendering failed.'));};
+        const cleanup=()=>{win.removeEventListener('mqd:garment-ready',ready);win.removeEventListener('mqd:garment-error',failed);};
+        win.addEventListener('mqd:garment-ready',ready);win.addEventListener('mqd:garment-error',failed);
+      });
       await withTimeout(win.MQDDesigner.loadDesign(payload,{notify:false}),15000,'Saved design preview load timed out.');
+      await withTimeout(garmentReady,20000,'Saved garment rendering timed out.');
       try{await withTimeout(doc.fonts?.ready,3000,'Preview fonts timed out.');}catch{}
       const canvas=doc.getElementById('webgl');if(!canvas)throw new Error('3D preview canvas is unavailable.');
-      await waitForGarment(canvas);await sleep(900);await nextFrames(win,3);
+      await waitForGarment(canvas);await sleep(100);
       const output=[];
       for(let i=0;i<views.length;i++){
         const view=views[i];
         if(typeof win.MQDDesigner?.setProductionProofView==='function'){
-          if(!win.MQDDesigner.setProductionProofView(view))throw new Error(`Could not set exact ${view} production view.`);
-          await nextFrames(win,2);
-        }else if(i>0){
-          await quarterOrbit(frame,canvas);
+          if(!win.MQDDesigner.setProductionProofView(cameraViewFor(payload.product?.id,view)))throw new Error(`Could not set exact ${view} production view.`);
+          await sleep(50);
+        }else{
+          throw new Error('Exact production view controls are unavailable.');
         }
         output.push({view,blob:await withTimeout(canvasPng(canvas),5000,'Preview PNG timed out.')});
       }
@@ -129,43 +128,39 @@
     }finally{frame.remove();}
   }
   async function addCapturedViews(zip,root,captured){
+    if(captured.length!==views.length||!views.every(view=>captured.some(entry=>entry.view===view&&entry.blob?.size>0)))throw new Error('All four production views are required.');
     for(const entry of captured)zip.file(`${root}mockup-previews/${entry.view}.png`,new Uint8Array(await entry.blob.arrayBuffer()));
     zip.file(`${root}mockup-previews/README.txt`,'Visual production proof generated from the customer\'s saved 3D garment design.\nIncluded views: front, back, left side, and right side.\nUse these PNGs as visual references together with the production zone files and HEX colors.\n');
   }
 
   Zip.prototype.generateAsync=async function(options,...rest){
+    let proofRequired=false;
     try{
-      const names=Object.keys(this.files||{});let root='';const proofSources={};
+      const names=Object.keys(this.files||{});proofRequired=names.some(name=>/(?:^|\/)design\.json$/i.test(name)||name.includes('original-assets/__mockup__/'));let root='';const proofSources={};
       for(const name of names){
         const marker='original-assets/__mockup__/';const at=name.indexOf(marker);if(at<0)continue;
         const base=name.slice(at+marker.length).toLowerCase();
         for(const view of ['front','back','left-side','right-side'])if(base===`mockup-${view}.png`){root=name.slice(0,at);proofSources[view]=name;}
       }
-      if(['front','back','left-side','right-side'].every(view=>proofSources[view])){
+      const designName=names.find(name=>/(?:^|\/)design\.json$/i.test(name));
+      const designText=designName?await this.file(designName)?.async('string'):null;
+      const savedPayload=designText?JSON.parse(designText):null;
+      if(!savedPayload?.design&&['front','back','left-side','right-side'].every(view=>proofSources[view])){
         for(const view of ['front','back','left-side','right-side']){
-          const source=proofSources[view],file=this.file(source);if(!file)continue;
-          this.file(`${root}mockup-previews/${view}.png`,await file.async('uint8array'));this.remove(source);
+          const source=proofSources[cameraViewFor(savedPayload?.product?.id,view)],file=this.file(source);if(!file)continue;
+          const bytes=await file.async('uint8array');if(bytes.length<8||![137,80,78,71,13,10,26,10].every((value,index)=>bytes[index]===value))throw new Error(`Saved ${view} proof is not a valid PNG.`);this.file(`${root}mockup-previews/${view}.png`,bytes);this.remove(source);
         }
         this.file(`${root}mockup-previews/README.txt`,'Visual production proof generated from the customer\'s saved 3D garment design.\nIncluded views: front, back, left side, and right side.\nUse these PNGs as visual references together with the production zone files and HEX colors.\n');
       }else{
-        const designName=names.find(name=>/\/design\.json$/i.test(name));
         if(designName){
           root=designName.slice(0,designName.length-'design.json'.length);
-          const raw=await this.file(designName)?.async('string');
-          if(raw){const payload=await hydrateFromZip(this,root,JSON.parse(raw));await addCapturedViews(this,root,await captureViews(payload));}
+          if(savedPayload){const payload=await hydrateFromZip(this,root,savedPayload);await addCapturedViews(this,root,await captureViews(payload));}
         }
-        if(!Object.keys(this.files).some(name=>name.startsWith(`${root}mockup-previews/`))){
-          const legacy=names.find(name=>/\/mockup\.png$/i.test(name));
-          if(legacy){root=legacy.slice(0,legacy.length-'mockup.png'.length);const file=this.file(legacy);if(file)this.file(`${root}mockup-previews/current-view.png`,await file.async('uint8array'));}
-          this.file(`${root}mockup-previews/README.txt`,'Four-angle regeneration was unavailable for this older order. current-view.png, when present, is the original saved mockup.\n');
-        }
+        if(proofRequired&&!views.every(view=>this.file(`${root}mockup-previews/${view}.png`)))throw new Error('All four production views are required.');
       }
     }catch(error){
-      console.warn('MQD production ZIP visual proof step skipped:',error);
-      try{
-        const names=Object.keys(this.files||{}),legacy=names.find(name=>/\/mockup\.png$/i.test(name));
-        if(legacy){const root=legacy.slice(0,legacy.length-'mockup.png'.length),file=this.file(legacy);if(file)this.file(`${root}mockup-previews/current-view.png`,await file.async('uint8array'));this.file(`${root}mockup-previews/README.txt`,'Four-angle regeneration was unavailable for this older order. current-view.png is the original saved mockup.\n');}
-      }catch{}
+      if(proofRequired)throw new Error(`Production ZIP could not include all four garment views. Please retry; no incomplete ZIP was downloaded. ${error?.message||String(error)}`);
+      throw error;
     }
     return originalGenerate.call(this,options,...rest);
   };
