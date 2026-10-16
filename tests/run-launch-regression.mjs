@@ -72,6 +72,7 @@ const tests=[
   ['owner-order-comparison.mjs'],
   ['owner-order-comparison-access.mjs'],
   ['owner-paid-email-reliability.mjs'],
+  ['launch-security-guards.mjs'],
   ['checkout-security.mjs'],
   ['checkout-customer-experience.mjs'],
   ['purchase-analytics.mjs'],
