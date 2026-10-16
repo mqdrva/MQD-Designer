@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { escapeMqdEmailHtml, queueMqdEmail, retryPendingMqdEmails } from "../_shared/mqd-email.js";
 import { hasAdminMfa } from "../_shared/mqd-admin-security.js";
 
+import {ownerOrderComparison} from "../_shared/mqd-owner-order-comparison.js";
+
 const allowedOrigins=new Set(['https://mymerchnow.app','https://www.mymerchnow.app','https://mqd-designer-vercel.vercel.app']);
 function allowedOrigin(origin:string){return allowedOrigins.has(origin)||/^https:\/\/mqd-designer-vercel(?:-[a-z0-9-]+)?\.vercel\.app$/.test(origin);}
 function cors(req:Request){const origin=req.headers.get('origin')||'';return{'Access-Control-Allow-Origin':allowedOrigin(origin)?origin:'https://mymerchnow.app','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'};}
@@ -29,6 +31,11 @@ Deno.serve(async(req:Request)=>{
     if(!await hasAdminMfa(supabase,token))return json(req,{error:'Verify your owner account with an authenticator code.',code:'MFA_REQUIRED'},403);
 
     const body=await req.json().catch(()=>({})),action=String(body?.action||'list');
+
+    if(action==='compare'){
+      const id=cleanText(body?.id,64);if(!UUID.test(id))return json(req,{error:'Invalid order'},400);
+      return json(req,{comparison:await ownerOrderComparison(supabase,id)});
+    }
 
     if(action==='backup-list'){
       const bucket=String(body.bucket||''),prefix=String(body.prefix||''),offset=Number(body.offset||0);
@@ -79,7 +86,8 @@ Deno.serve(async(req:Request)=>{
       if(paths.length){const {data,error}=await supabase.storage.from('mqd-production').createSignedUrls(paths,3600);if(error)return json(req,{error:error.message},500);for(const row of data||[])if(row.path&&row.signedUrl)signed.set(row.path,row.signedUrl);}
       let savedDesign:any=null;
       if(order.design_id){const {data}=await supabase.from('customer_designs').select('id,name,status,version,preview_path,created_at,updated_at').eq('id',order.design_id).maybeSingle();savedDesign=data||null;if(savedDesign?.preview_path){const {data:preview}=await supabase.storage.from('customer-artwork').createSignedUrl(savedDesign.preview_path,3600);savedDesign.preview_url=preview?.signedUrl||null;}}
-      return json(req,{order:{...order,ui_status:UI_STATUS[order.status]||order.status,mockup_url:mockupUrl},items:items||[],assets:(assets||[]).map((a:any)=>({...a,download_url:a.storage_path?signed.get(a.storage_path)||null:null})),savedDesign});
+      const {data:ownerNotifications,error:notificationError}=await supabase.from('mqd_email_notifications').select('kind,status,recipient,attempts,last_error,sent_at,updated_at').eq('order_id',id).eq('kind','owner_paid_order');
+      return json(req,{ownerNotifications:ownerNotifications||[],ownerNotificationError:notificationError?'Notification status could not be checked.':null,order:{...order,ui_status:UI_STATUS[order.status]||order.status,mockup_url:mockupUrl},items:items||[],assets:(assets||[]).map((a:any)=>({...a,download_url:a.storage_path?signed.get(a.storage_path)||null:null})),savedDesign});
     }
 
     if(action==='update'){

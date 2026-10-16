@@ -79,6 +79,8 @@
         <article class="info-card"><h3>Order</h3><dl><div><dt>Reference</dt><dd id="orderReference">—</dd></div><div><dt>Paid</dt><dd id="orderPaid">—</dd></div><div><dt>Created</dt><dd id="orderCreated">—</dd></div></dl></article>
       </section>
 
+      <section class="detail-section" aria-live="polite"><h3>Owner email notification</h3><div id="ownerNotificationStatus">Open an order to check notification status.</div></section>
+      <section id="reorderComparison" class="detail-section" aria-live="polite"><h3>Production comparison · owner only</h3><div id="reorderComparisonBody">Open an order to compare its saved design.</div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Garments</h3><p>Product, size, quantity, and price captured with this order.</p></div></div><div id="itemList" class="item-list"></div></section>
       <section id="savedDesignSection" class="detail-section hidden"><div class="section-head"><div><h3>Customer saved design</h3><p>The account design linked to this purchase.</p></div></div><div class="saved-design-card"><div class="saved-design-preview"><img id="savedDesignPreview" alt="Saved customer design preview"><div id="savedDesignPreviewMissing" class="preview-missing hidden">No saved preview</div></div><div class="saved-design-meta"><strong id="savedDesignName">Saved design</strong><div id="savedDesignStatus" class="muted"></div><div id="savedDesignUpdated" class="muted"></div></div></div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Background HEX colors</h3><p>Production colors saved for each print zone.</p></div><button id="downloadColors" class="btn small" type="button">Download HEX JSON</button></div><div id="colorGrid" class="color-grid"></div></section>
@@ -88,6 +90,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/owner-zip-mockup-views.js?v=20261016-complete-proof"></script>
-<script type="module" src="/v20/owner-orders.js?v=20261007-zip-timeout"></script>
+<script type="module" src="/v20/owner-orders.js?v=20261016-owner-comparison"></script>
 </body>
 </html>

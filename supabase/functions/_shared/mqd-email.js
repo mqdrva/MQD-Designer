@@ -26,18 +26,32 @@ async function deliverRow(supabase,row){
     await supabase.from('mqd_email_notifications').update({last_error:'Email provider is not configured yet',updated_at:new Date().toISOString()}).eq('id',row.id);
     return{status:'pending',configured:false};
   }
+  const started=String(row.payload?.meta?.deliveryStartedAt||'');
+  if(started&&Date.now()-Date.parse(started)>23*60*60*1000){
+    const message='Automatic retry paused: the original send may have been accepted. Review the email provider record before retrying outside the idempotency window.';
+    await supabase.from('mqd_email_notifications').update({status:'failed',last_error:message,updated_at:new Date().toISOString()}).eq('id',row.id);
+    return{status:'failed',manualReview:true,error:message};
+  }
+  if(!started){
+    const payload={...row.payload,meta:{...row.payload?.meta,deliveryStartedAt:new Date().toISOString()}};
+    const {error}=await supabase.from('mqd_email_notifications').update({payload,updated_at:new Date().toISOString()}).eq('id',row.id);
+    if(error)return{status:'failed',error:'Email retry state could not be saved; no send was attempted.'};
+    row={...row,payload};
+  }
   const html=String(row.payload?.html||'');
   const text=String(row.payload?.text||'');
   try{
     const response=await fetch('https://api.resend.com/emails',{
       method:'POST',
-      headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
+      headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','Idempotency-Key':`mqd-notification-${row.id}`},
+      signal:AbortSignal.timeout(15000),
       body:JSON.stringify({from,to:[row.recipient],subject:row.subject,html:html||undefined,text:text||undefined})
     });
     const result=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(String(result?.message||result?.error||`Email provider returned ${response.status}`));
     const now=new Date().toISOString();
-    await supabase.from('mqd_email_notifications').update({status:'sent',attempts:Number(row.attempts||0)+1,provider_message_id:String(result?.id||'')||null,last_error:null,sent_at:now,updated_at:now}).eq('id',row.id);
+    const {error:sentError}=await supabase.from('mqd_email_notifications').update({status:'sent',attempts:Number(row.attempts||0)+1,provider_message_id:String(result?.id||'')||null,last_error:null,sent_at:now,updated_at:now}).eq('id',row.id);
+    if(sentError)throw new Error('Email accepted but delivery status could not be saved; retry with the same notification key.');
     return{status:'sent',id:result?.id||null};
   }catch(error){
     const now=new Date().toISOString(),message=error instanceof Error?error.message:String(error);

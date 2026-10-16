@@ -54,7 +54,7 @@ async function loadOrders(){
   catch(error){console.error(error);renderOrders([]);setOrdersMessage(error.message,true);if(/access|required|sign in/i.test(error.message))showAuth(error.message,true);}
 }
 async function startAdmin(){
-  try{await request({action:'list',status:'all',search:''});$('authCard').classList.add('hidden');$('ordersApp').classList.remove('hidden');$('signOut').classList.remove('hidden');await loadOrders();}
+  try{await request({action:'list',status:'all',search:''});$('authCard').classList.add('hidden');$('ordersApp').classList.remove('hidden');$('signOut').classList.remove('hidden');await loadOrders();const initialOrder=new URLSearchParams(location.search).get('order');if(initialOrder&&/^[0-9a-f-]{36}$/i.test(initialOrder))await openOrder(initialOrder);}
   catch(error){showAuth(error.message,true);}
 }
 
@@ -90,6 +90,32 @@ function renderAssets(detail){
   addGroup('Captured zone files',zoneFiles);addGroup('Garment previews',assets.filter(a=>a.layer_type==='mockup-view'));addGroup('Original artwork',artwork);addGroup('Text / layer metadata',textAssets);
   if(detail.order?.mockup_url){const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent='Mockup';const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent=isEverydayOrder(detail)?'Everyday front preview PNG':'Customer 3D mockup PNG';const a=document.createElement('a');a.href=detail.order.mockup_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.append(label,a);group.append(h,row);host.prepend(group);}
 }
+function renderOwnerNotifications(detail){
+  const host=$('ownerNotificationStatus');if(!host)return;host.replaceChildren();
+  if(detail.ownerNotificationError){host.textContent=detail.ownerNotificationError;return;}
+  const rows=detail.ownerNotifications||[];
+  if(!rows.length){host.textContent=detail.order?.stripe_payment_status==='paid'?'Not queued. This paid order has no owner email notification recorded.':'Owner email is created after payment.';return;}
+  for(const row of rows){const p=document.createElement('p');p.textContent=(row.status==='sent'?'Sent · accepted by email service':row.status==='failed'?'Failed · needs retry':'Pending · waiting to send')+' · '+String(row.recipient||'owner inbox')+(row.sent_at?' · '+dateTime(row.sent_at):'');host.append(p);if(row.last_error){const error=document.createElement('p');error.textContent=row.last_error;host.append(error);}}
+}
+function renderOrderComparison(result){
+  const host=$('reorderComparisonBody');if(!host)return;host.replaceChildren();
+  const title=document.createElement('strong');title.textContent=result.label||'Review needed';host.append(title);
+  const add=value=>{if(!value)return;const p=document.createElement('p');p.textContent=value;host.append(p);};
+  if(result.previousOrder){
+    const previous=result.previousOrder;
+    if(/^[0-9a-f-]{36}$/i.test(String(previous.id||''))){const link=document.createElement('a');link.href='/owner-orders.html?order='+encodeURIComponent(previous.id);link.textContent='Open previous order '+(previous.orderNumber||'');link.onclick=event=>{event.preventDefault();openOrder(previous.id);};host.append(document.createElement('br'),link);}
+  }
+  for(const [heading,rows] of [['Design changes',result.changes],['Size / quantity changes',result.orderChanges]]){
+    if(!rows?.length)continue;const h=document.createElement('h4');h.textContent=heading;const list=document.createElement('ul');for(const row of rows){const item=document.createElement('li');item.textContent=row;list.append(item);}host.append(h,list);
+  }
+  add(result.guidance);add(result.warning);add(result.historyNote);
+  if(result.previousOrder)add('The previous order provides its saved originals and production ZIP. Your separately prepared print files are not stored here.');
+}
+async function loadOrderComparison(id){
+  const host=$('reorderComparisonBody');if(!host)return;host.textContent='Checking previous paid orders and saved artwork contents…';
+  try{const result=await request({action:'compare',id});if(currentDetail?.order?.id===id)renderOrderComparison(result.comparison||{});}
+  catch(error){if(currentDetail?.order?.id===id)host.textContent='Review needed. Comparison could not be completed: '+error.message;}
+}
 function renderDetail(detail){
   currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');$('detailContent').classList.remove('loading');$('orderOverlay').classList.remove('loading');document.querySelector('.drawer')?.classList.remove('loading');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${order.is_test===true?'TEST ORDER · ':''}${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
   const img=$('mockupImage'),missing=$('mockupMissing');if(order.mockup_url){img.src=order.mockup_url;img.classList.remove('hidden');missing.classList.add('hidden');}else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
@@ -100,7 +126,7 @@ function renderDetail(detail){
   for(const control of [status,carrier,tracking,save]){control.disabled=locked;control.removeAttribute('readonly');control.setAttribute('aria-disabled',locked?'true':'false');control.style.pointerEvents=locked?'none':'auto';control.style.opacity=locked?'.55':'1';}
   if(!locked){carrier.tabIndex=0;tracking.tabIndex=0;status.tabIndex=0;save.tabIndex=0;}
   $('testOrderNotice').classList.toggle('hidden',!locked);
-  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);
+  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);renderOwnerNotifications(detail);loadOrderComparison(order.id);
 }
 async function openOrder(id){
   $('orderOverlay').classList.remove('hidden');$('detailLoading').classList.remove('hidden');$('detailContent').classList.add('hidden');text($('detailLoading'),'Loading order…');
