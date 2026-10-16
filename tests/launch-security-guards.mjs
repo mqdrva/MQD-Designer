@@ -26,7 +26,7 @@ function loadHandler(name, client, env={}) {
   const ts=readFileSync(new URL(`../supabase/functions/${name}/index.ts`,import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
   const js=stripTypeScriptTypes(ts);
   new Function('Deno','createClient','quantityFromOrderItem','shippingCentsForQuantity','escapeMqdEmailHtml','mqdOwnerEmails','queueMqdEmail', js)(
-    {serve:fn=>handler=fn,env:{get:key=>env[key]||'test'}},()=>client,quantityFromOrderItem,shippingCentsForQuantity,x=>x,async()=>[],async()=>({})
+    {serve:fn=>handler=fn,env:{get:key=>env[key]||'test'}},()=>client,quantityFromOrderItem,shippingCentsForQuantity,x=>x,async()=>['owner@example.com'],async()=>({status:'sent'})
   );
   return handler;
 }

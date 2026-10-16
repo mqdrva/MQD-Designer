@@ -56,7 +56,7 @@ function stripeId(value: any) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 8 });
+  if (req.method === "GET") return json({ ok: true, service: "stripe-mqd-webhook", version: 9 });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
     const url = Deno.env.get("SUPABASE_URL") || "";
@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
     const eventTime = Number.isFinite(Number(event.created)) ? new Date(Number(event.created) * 1000).toISOString() : new Date().toISOString();
     const ownerRecipients = paid ? await mqdOwnerEmails(supabase) : [];
 
+    const followupErrors:string[]=[];
     for (const order of orders) {
       const item: any = itemByOrder.get(order.id);
       const alreadyPaid = order.status === "paid" || order.stripe_payment_status === "paid";
@@ -154,24 +155,29 @@ Deno.serve(async (req: Request) => {
       const { error: updateError } = await supabase.from("mqd_orders").update(update).eq("id", order.id)
         .or("stripe_payment_status.is.null,stripe_payment_status.neq.paid");
       if (updateError) throw updateError;
-      if (paid && order.design_id) {
-        const { error: designError } = await supabase.from("customer_designs").update({ status: "purchased", updated_at: eventTime }).eq("id", order.design_id).eq("user_id", order.user_id);
-        if (designError) throw designError;
-      }
+
 
       if (paid && ownerRecipients.length) {
         const subject = `New paid MQD order — ${order.order_number}`;
-        const text = `A new MQD order has been paid.\n\nOrder: ${order.order_number}\nGarment: ${order.product_name || "Custom garment"}\nCustomer: ${customerName || "Customer"}\nEmail: ${customerEmail || "Not provided"}\nQuantity: ${quantity}\nOrder subtotal: $${orderSubtotal.toFixed(2)}\n\nOpen Owner Orders: https://mymerchnow.app/owner`;
-        const html = `<h2>New paid MQD order</h2><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner">Open Owner Orders</a></p>`;
+        const text = `A new MQD order has been paid.\n\nOrder: ${order.order_number}\nGarment: ${order.product_name || "Custom garment"}\nCustomer: ${customerName || "Customer"}\nEmail: ${customerEmail || "Not provided"}\nQuantity: ${quantity}\nOrder subtotal: $${orderSubtotal.toFixed(2)}\n\nOpen Owner Orders: https://mymerchnow.app/owner-orders.html?order=${order.id}`;
+        const html = `<h2>New paid MQD order</h2><p><strong>Order:</strong> ${escapeMqdEmailHtml(order.order_number)}</p><p><strong>Garment:</strong> ${escapeMqdEmailHtml(order.product_name || "Custom garment")}</p><p><strong>Customer:</strong> ${escapeMqdEmailHtml(customerName || "Customer")}</p><p><strong>Email:</strong> ${escapeMqdEmailHtml(customerEmail || "Not provided")}</p><p><strong>Quantity:</strong> ${quantity}</p><p><strong>Order subtotal:</strong> $${orderSubtotal.toFixed(2)}</p><p><a href="https://mymerchnow.app/owner-orders.html?order=${order.id}">Open Owner Orders</a></p>`;
         for (const recipient of ownerRecipients) {
           try {
-            await queueMqdEmail(supabase,{orderId:order.id,kind:"owner_paid_order",recipient,subject,html,text,meta:{orderNumber:order.order_number,eventId:String(event.id||"")}});
+            const delivery=await queueMqdEmail(supabase,{orderId:order.id,kind:"owner_paid_order",recipient,subject,html,text,meta:{orderNumber:order.order_number,eventId:String(event.id||"")}});
+            if(delivery?.status!=="sent")followupErrors.push("Owner notification requires retry: "+String(delivery?.error||delivery?.status||"unknown"));
           } catch (notifyError) {
+            followupErrors.push("Owner notification queue failed");
             console.error("MQD owner notification queue failed", notifyError instanceof Error ? notifyError.message : String(notifyError));
           }
         }
       }
+      if(paid&&!ownerRecipients.length)followupErrors.push("Owner notification recipient is not configured");
+      if (paid && order.design_id) {
+        const { error: designError } = await supabase.from("customer_designs").update({ status: "purchased", updated_at: eventTime }).eq("id", order.design_id).eq("user_id", order.user_id);
+        if (designError) followupErrors.push("Purchased design status could not be updated: "+designError.message);
+      }
     }
+    if(followupErrors.length)throw new Error("Paid order follow-up requires retry: "+followupErrors.join("; "));
     return json({ received: true, orderNumbers, status: paid ? "paid" : failed ? "failed" : String(session.payment_status || "unpaid") });
   } catch (error) {
     console.error("stripe-mqd-webhook failed", error instanceof Error ? error.message : String(error));
