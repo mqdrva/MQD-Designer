@@ -70,6 +70,7 @@ console.log(`PASS: all ${products.length} frozen product GLBs downloaded and str
 const tests=[
   ['owner-proof-regression.mjs'],
   ['owner-order-comparison.mjs'],
+  ['owner-paid-work-queue.mjs'],
   ['owner-order-comparison-access.mjs'],
   ['owner-paid-email-reliability.mjs'],
   ['launch-security-guards.mjs'],

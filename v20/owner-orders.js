@@ -8,7 +8,7 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const ORDERS_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const STATUS_LABELS={new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled',test:'Test'};
+const STATUS_LABELS={unpaid:'Unpaid',review:'Payment review','payment-review':'Review payment',new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled',test:'Test'};
 let activeStatus='all',activeSearch='',currentDetail=null,searchTimer=0;
 
 async function request(body){
@@ -50,7 +50,7 @@ function renderOrders(rows=[]){
 }
 async function loadOrders(){
   setOrdersMessage('Loading orders…');
-  try{const result=await request({action:'list',status:activeStatus,search:activeSearch});renderCounts(result.counts||{});renderOrders(result.orders||[]);setOrdersMessage(result.orders?.length?`${result.orders.length} order${result.orders.length===1?'':'s'} shown.`:'');}
+  try{const result=await request({action:'list',status:activeStatus,search:activeSearch});renderCounts(result.counts||{});renderOrders(result.orders||[]);setOrdersMessage(result.orders?.length?`${result.orders.length} ${activeStatus==='unpaid'?'unpaid submission':activeStatus==='test'?'test order':activeStatus==='review'?'order for review':'paid order'}${result.orders.length===1?'':'s'} shown.`:'');}
   catch(error){console.error(error);renderOrders([]);setOrdersMessage(error.message,true);if(/access|required|sign in/i.test(error.message))showAuth(error.message,true);}
 }
 async function startAdmin(){
@@ -120,7 +120,8 @@ function renderDetail(detail){
   currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');$('detailContent').classList.remove('loading');$('orderOverlay').classList.remove('loading');document.querySelector('.drawer')?.classList.remove('loading');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${order.is_test===true?'TEST ORDER · ':''}${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
   const img=$('mockupImage'),missing=$('mockupMissing');if(order.mockup_url){img.src=order.mockup_url;img.classList.remove('hidden');missing.classList.add('hidden');}else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
   $('downloadColors')?.closest('.detail-section')?.classList.toggle('hidden',isEverydayOrder(detail));
-  const locked=order.is_test===true;
+  const paymentLocked=order.payment_confirmed===false||!!order.payment_review_reason;const locked=order.is_test===true||paymentLocked;
+  $('paymentFulfillmentNotice')?.classList.toggle('hidden',!paymentLocked);
   const status=$('detailStatus'),carrier=$('detailCarrier'),tracking=$('detailTracking'),save=$('saveOrderUpdate');
   status.value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';carrier.value=order.shipping_carrier||'';tracking.value=order.tracking_number||'';
   for(const control of [status,carrier,tracking,save]){control.disabled=locked;control.removeAttribute('readonly');control.setAttribute('aria-disabled',locked?'true':'false');control.style.pointerEvents=locked?'none':'auto';control.style.opacity=locked?'.55':'1';}

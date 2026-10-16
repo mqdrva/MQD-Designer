@@ -25,14 +25,14 @@
 
   <div id="ordersApp" class="hidden">
     <section class="hero">
-      <div><p class="eyebrow">ORDER OPERATIONS</p><h1>Owner Orders Dashboard</h1><p>Paid orders, production status, shipping details, tracking, mockups, saved designs, and production downloads.</p></div>
+      <div><p class="eyebrow">ORDER OPERATIONS</p><h1>Owner Orders Dashboard</h1><p>Confirmed paid orders appear here for production. Unpaid Submissions and Test Orders stay separate; their files and history are preserved.</p></div>
       <button id="refreshOrders" class="btn" type="button">Refresh Orders</button>
     </section>
 
     <section class="stats" aria-label="Order status summary">
-      <button class="stat-card active" data-status="all"><span>All</span><strong id="countAll">0</strong></button>
-      <button class="stat-card" data-status="new"><span>New</span><strong id="countNew">0</strong></button>
-      <button class="stat-card" data-status="paid"><span>Paid</span><strong id="countPaid">0</strong></button>
+      <button class="stat-card active" data-status="all"><span>Paid Orders</span><strong id="countAll">0</strong></button>
+      <button class="stat-card" data-status="unpaid"><span>Unpaid Submissions</span><strong id="countNew">0</strong></button>
+      <button class="stat-card" data-status="paid"><span>Ready to Produce</span><strong id="countPaid">0</strong></button>
       <button class="stat-card" data-status="in-production"><span>In Production</span><strong id="countProduction">0</strong></button>
       <button class="stat-card" data-status="shipped"><span>Shipped</span><strong id="countShipped">0</strong></button>
       <button class="stat-card" data-status="completed"><span>Completed</span><strong id="countCompleted">0</strong></button>
@@ -42,7 +42,7 @@
     <section class="card orders-card">
       <div class="toolbar">
         <label class="search-wrap"><span class="sr-only">Search orders</span><input id="orderSearch" type="search" placeholder="Search customer, email, phone, product, or order number"></label>
-        <select id="statusFilter" aria-label="Filter by order status"><option value="all">All statuses</option><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option><option value="test">Test Orders</option></select>
+        <select id="statusFilter" aria-label="Filter by order status"><option value="all">Paid orders · all stages</option><option value="unpaid">Unpaid submissions</option><option value="review">Payment review</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option><option value="test">Test Orders</option></select>
       </div>
       <div id="ordersMessage" class="message" role="status"></div>
       <div class="table-wrap">
@@ -64,6 +64,7 @@
       <section class="detail-top">
         <div class="mockup-card"><img id="mockupImage" alt="Customer garment mockup"><div id="mockupMissing" class="preview-missing hidden">No mockup saved</div></div>
         <div class="status-panel">
+          <div id="paymentFulfillmentNotice" class="note hidden">Unpaid submissions and payment holds cannot enter production or fulfillment.</div>
           <div id="testOrderNotice" class="test-order-notice hidden">SANDBOX TEST ORDER — locked out of production and shipping.</div>
           <label>Order status<select id="detailStatus"><option value="new">New</option><option value="paid">Paid</option><option value="in-production">In Production</option><option value="shipped">Shipped</option><option value="completed">Completed</option></select></label>
           <label>Shipping carrier<input id="detailCarrier" type="text" maxlength="80" placeholder="UPS, USPS, FedEx…"></label>
@@ -90,6 +91,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/owner-zip-mockup-views.js?v=20261016-complete-proof"></script>
-<script type="module" src="/v20/owner-orders.js?v=20261016-owner-comparison"></script>
+<script type="module" src="/v20/owner-orders.js?v=20261016-owner-paid-workflow"></script>
 </body>
 </html>
