@@ -27,4 +27,6 @@ assert.match(source,/payment\.payment_review_reason\|\|/);
 assert.match(source,/!payment\.payment_confirmed/);
 assert.match(source,/Only confirmed paid orders/);
 const html=fs.readFileSync(new URL('../owner-orders.html',import.meta.url),'utf8');assert.match(html,/Unpaid Submissions/);assert.match(html,/Payment review/);assert.match(html,/Ready to Produce/);
+const ui=fs.readFileSync(new URL('../v20/owner-orders.js',import.meta.url),'utf8');
+assert.ok(ui.includes("$('testOrderNotice').classList.toggle('hidden',order.is_test!==true)"),'Only actual test orders show the sandbox notice');
 console.log('PASS paid owner queue: unpaid attempts excluded from production counts, paid fulfillment retained, refunds/cancellations held for review, legacy receipts supported, test orders separate.');
