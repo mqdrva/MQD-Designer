@@ -1,3 +1,5 @@
+import {createContestSaveInvite,showContestSaveInvite} from './contest-save-invite.js';
+import {contestRequest} from './contest-api.js';
 import {AUTH_SAVE_MARKER,authSaveResumeId,authSaveRedirectUrl,createAuthSaveRecovery} from './design-auth-recovery.js';
 import { takeEverydayReturn } from './everyday-account.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
@@ -423,7 +425,9 @@ async function saveDraft(){
     await savePayloadToDrafts(payload.product?.id||'current',payload);backedUp=true;
     const pending=currentDesignRecoveryId();
     if(pending){if(await authDesignRecovery.update(pending,payload,accountUser())){await resumePendingDesignSave();return;}clearDesignRecoveryMarker();}
-    await saveCloudDesign(payload);
+    const firstSave=!(activeCloudDesign&&activeCloudDesign.status==='draft');
+    const saved=await saveCloudDesign(payload);
+    if(firstSave)void inviteSavedDesign(saved,accountUser());
     btn.textContent='Saved ✓';setDesignRecoveryStatus('Design saved to My Designs.');
     setTimeout(()=>btn.textContent=old,1200);
   }catch(err){
@@ -434,6 +438,7 @@ async function saveDraft(){
 }
 
 const authDesignRecovery=createAuthSaveRecovery({read:loadCartDraft,write:savePayloadToDrafts});
+const inviteSavedDesign=createContestSaveInvite({read:loadCartDraft,write:savePayloadToDrafts,request:body=>contestRequest(body,currentSession?.access_token||''),show:showContestSaveInvite,currentUserId:()=>accountUser()?.id});
 function setDesignRecoveryStatus(message,error=false){
   let status=$('designRecoveryStatus');
   if(!status){status=document.createElement('p');status.id='designRecoveryStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');$('saveDraft')?.closest('header')?.after(status);}
@@ -483,7 +488,7 @@ function resumePendingDesignSave(){
     setDesignRecoveryStatus('Restoring your design…');
     try{
       const result=await authDesignRecovery.resume(id,{user:accountUser(),restore:restorePendingArtwork,save:(payload,designId)=>saveCloudDesign(payload,{forceNew:true,designId})});
-      if(result.status==='saved'){clearDesignRecoveryMarker();pendingAfterAuth=null;setDesignRecoveryStatus('Your design is restored and saved to My Designs.');}
+      if(result.status==='saved'){clearDesignRecoveryMarker();pendingAfterAuth=null;setDesignRecoveryStatus('Your design is restored and saved to My Designs.');if(result.result)void inviteSavedDesign(result.result,accountUser());}
       else if(result.status==='restored')setDesignRecoveryStatus('Your design is restored. Sign in to finish saving it to My Designs.');
       else if(result.status==='missing'){clearDesignRecoveryMarker();setDesignRecoveryStatus('This backup is not available in this browser. Return to the browser where you created the design.',true);}
       else if(result.status==='cancelled')clearDesignRecoveryMarker();
