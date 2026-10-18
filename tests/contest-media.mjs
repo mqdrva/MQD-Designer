@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {mediaAction,validPicture,validVideo} from '../supabase/functions/mqd-design-contest/media.ts';
+import {monthlyAction} from '../supabase/functions/mqd-design-contest/monthly.ts';
+const u='11111111-1111-4111-8111-111111111111',c='22222222-2222-4222-8222-222222222222',o='33333333-3333-4333-8333-333333333333';
+const user={id:u,email:'owner@example.invalid',email_confirmed_at:'yes'},json=(body,status=200)=>({body,status});
+const picture='data:image/jpeg;base64,'+btoa('\xff\xd8\xffimage');
+assert(validPicture(picture));assert(!validPicture('data:image/jpeg;base64,aA=='));assert(!validPicture('data:image/svg+xml;base64,PHN2Zz4='));
+assert(validVideo(Uint8Array.from([0,0,0,16,102,116,121,112,105,115,111,109]),'video/mp4'));assert(!validVideo(new Uint8Array(16),'video/mp4'));assert(validVideo(Uint8Array.from([26,69,223,163]),'video/webm'));
+function db(){let status='approved',eligible=true;const calls=[];return {calls,setStatus(s){status=s},setEligible(e){eligible=e},auth:{getUser:async()=>({data:{user:null},error:Error('unauthorized')})},rpc:async(name,args)=>{calls.push({name,args});return {data:o}},from(table){let fields='',filters={};const q={select(s){fields=s;return q},eq(k,v){filters[k]=v;return q},async maybeSingle(){calls.push({table,fields,filters});if(table==='mqd_contest_submissions')return {data:filters.status===status?{video_path:'private/video.mp4',option_id:o}:null};if(table==='mqd_contest_options')return {data:eligible?{id:o}:null};return {data:{path:u+'/'+c+'/video.mp4',mime_type:'video/mp4'}}}};return q},storage:{from:()=>({createSignedUrl:async()=>{calls.push({signed:true});return {data:{signedUrl:'https://example.invalid/signed'}}},createSignedUploadUrl:async()=>({data:{token:'upload-token'}}),download:async()=>({data:new Blob([Uint8Array.from([0,0,0,16,102,116,121,112,105,115,111,109])],{type:'video/mp4'})})})}};}
+let d=db();for(const status of ['pending','rejected','disqualified']){d.setStatus(status);assert.equal((await mediaAction({action:'monthly_video',optionId:o},d,json,null)).body.videoUrl,null)}assert(!d.calls.some(c=>c.signed));
+d=db();d.setEligible(false);assert.equal((await mediaAction({action:'monthly_video',optionId:o},d,json,null)).body.videoUrl,null);
+d=db();assert.equal((await mediaAction({action:'monthly_video',optionId:o},d,json,null)).body.videoUrl,'https://example.invalid/signed');
+const submit={action:'monthly_upload_submit',contestId:c,label:'A shirt',preview:picture,consent:true,email:'attacker@example.invalid'};
+d=db();await mediaAction(submit,d,json,user);assert.equal(d.calls[0].args.p_email,user.email);assert.equal(d.calls[0].args.p_user,u);
+await assert.rejects(mediaAction({...submit,videoPath:'other-user/'+c+'/video.mp4'},db(),json,user),/own uploaded/);
+await assert.rejects(mediaAction({...submit,consent:false},db(),json,user),/permission/);
+await assert.rejects(mediaAction({...submit,preview:'data:image/jpeg;base64,aA=='},db(),json,user),/valid PNG/);
+d=db();await mediaAction({...submit,videoPath:u+'/'+c+'/video.mp4'},d,json,user);assert(d.calls.some(x=>x.name==='mqd_monthly_upload_submit'&&x.args.p_video));
+await assert.rejects(mediaAction({action:'monthly_upload_ticket',contestId:c,type:'video/mp4',size:26*1024*1024},db(),json,user),/25 MB/);
+for(const action of ['monthly_upload_ticket','monthly_upload_submit'])assert.equal((await monthlyAction(new Request('https://example.invalid'),{action},db(),json)).status,401);
+console.log('PASS: picture/video validation, verified-account requirement, trusted email, consent, own-upload isolation, pending/rejected/disqualified video privacy and approved playback.');

@@ -1,3 +1,4 @@
+import {mediaAction,reviewVideo} from './media.ts';
 import {hasAdminMfa} from '../_shared/mqd-admin-security.js';
 const validId=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 const columns='id,title,description,closes_at,opens_at,announces_at,round_month';
@@ -17,9 +18,11 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
   let approved=0;if(current){const {count,error}=await db.from('mqd_contest_options').select('id',{head:true,count:'exact'}).eq('contest_id',current.id).eq('eligible',true);if(error)throw error;approved=count||0;}
   return json({current,approved,history,server_now:new Date().toISOString()});
  }
+ if(b.action==='monthly_video')return mediaAction(b,db,json,null);
  const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';
  const {data:{user},error}=await db.auth.getUser(token);
  if(error||!user||user.is_anonymous||!user.email_confirmed_at)return json({error:'Sign in with a verified account to submit your design.'},401);
+ const media=await mediaAction(b,db,json,user);if(media)return media;
  const owner=['monthly_rounds','monthly_queue','monthly_preview','monthly_review','monthly_owner_submit'].includes(b.action);
  if(owner){if(user.app_metadata?.role!=='admin')return json({error:'Owner access required.'},403);if(!await hasAdminMfa(db,token))return json({error:'Verify your owner account with your authenticator.',code:'MFA_REQUIRED'},403);}
  if(b.action==='monthly_rounds')return json({rounds:await rounds(db)});
@@ -53,7 +56,7 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
  }
  if(b.action==='monthly_preview'){
   if(!validId(b.submissionId))throw new Error('Choose an entry.');
-  const {data,error}=await db.from('mqd_contest_submissions').select('id,label,preview,contact_email,source_url,review_note,design_snapshot').eq('id',b.submissionId).maybeSingle();if(error)throw error;if(!data)throw new Error('Entry not found.');return json({entry:data});
+  const {data,error}=await db.from('mqd_contest_submissions').select('id,label,preview,contact_email,source_url,review_note,design_snapshot,video_path').eq('id',b.submissionId).maybeSingle();if(error)throw error;if(!data)throw new Error('Entry not found.');return json({entry:{...data,videoUrl:await reviewVideo(db,data),video_path:undefined}});
  }
  if(b.action==='monthly_review'){
   if(!validId(b.submissionId)||!['approve','reject','disqualify'].includes(b.decision)||typeof b.note!=='string'||b.note.length>500)throw new Error('Invalid review.');

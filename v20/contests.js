@@ -1,3 +1,4 @@
+import {attachEntryVideo} from './contest-media.js';
 import {contestRequest} from './contest-api.js';
 import {voterToken} from './voting-api.js';
 const $=id=>document.getElementById(id),id=new URL(location.href).searchParams.get('id');
@@ -16,7 +17,7 @@ function render(next){
  for(const card of [...$('contestOptions').children])if(!result.options.some(o=>'entry-'+o.id===card.id))card.remove();
  for(const o of result.options){
   let card=$('entry-'+o.id);
-  if(!card){card=node('article',null,'contest-card');card.id='entry-'+o.id;const img=node('img');img.src=o.preview;img.alt=o.label+' design';const heading=node('h2',o.label);const counts=node('p',null,'result');counts.append(node('span'),node('span'));const bar=node('div',null,'bar');bar.setAttribute('aria-hidden','true');bar.append(node('span'));const button=node('button');button.type='button';button.onclick=()=>vote(o.id);card.append(img,heading,counts,bar,button);$('contestOptions').append(card);}
+  if(!card){card=node('article',null,'contest-card');card.id='entry-'+o.id;const img=node('img');img.src=o.preview;img.alt=o.label+' design';const heading=node('h2',o.label);const counts=node('p',null,'result');counts.append(node('span'),node('span'));const bar=node('div',null,'bar');bar.setAttribute('aria-hidden','true');bar.append(node('span'));const button=node('button');button.type='button';button.onclick=()=>vote(o.id);card.append(img,heading,counts,bar,button);attachEntryVideo(card,o.id,contestRequest);$('contestOptions').append(card);}
   const maxVotes=Math.max(...result.options.map(choice=>choice.votes));
   let badge=card.querySelector('.entry-badge');if(!badge){badge=node('p',null,'entry-badge');card.prepend(badge);}
   const tied=result.options.filter(choice=>choice.votes===maxVotes).length>1;

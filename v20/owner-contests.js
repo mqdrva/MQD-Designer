@@ -1,7 +1,7 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {requireAdminMfa} from './admin-security.js?v=1';
 import {contestRequest,CONTEST_KEY} from './contest-api.js';
-import {installMonthlyOwner} from './monthly-owner.js?v=20261017-monthly';
+import {installMonthlyOwner} from './monthly-owner.js?v=20261018-media';
 const supabase=createClient('https://gsxuhpffgdffsqksrkrf.supabase.co',CONTEST_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id),node=(tag,text,cls)=>{const e=document.createElement(tag);if(text)e.textContent=text;if(cls)e.className=cls;return e;};
 async function request(body){await requireAdminMfa(supabase);const {data,error}=await supabase.auth.getSession();if(error)throw error;return contestRequest(body,data.session?.access_token||'');}

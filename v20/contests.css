@@ -106,3 +106,8 @@
 .monthly-winner-image{display:block;width:100%;max-width:420px;max-height:500px;object-fit:contain;background:#fff;border-radius:16px;margin:20px auto 0}
 @media(max-width:600px){.monthly-submit{padding:14px}.monthly-history-card{padding:14px}.monthly-showdown .actions a{width:100%;justify-content:center;text-align:center}.monthly-submit button{width:100%}.owner-form{padding:16px}#monthlyOwnerTools select{font-size:14px}.monthly-review-card{padding:12px}}
 
+
+.monthly-showdown [hidden]{display:none!important}
+#monthlyUploadFields img,#monthlyUploadFields video{display:block;width:100%;max-width:420px;max-height:360px;object-fit:contain;border-radius:12px;margin:12px 0;background:#151020}
+.monthly-submit input[type=file]{max-width:100%;font-size:16px}
+.contest-entry-actions{margin:20px 0}.contest-card video,.monthly-review-card video{display:block;width:100%;max-height:420px;object-fit:contain;margin:12px 0;border-radius:12px}
