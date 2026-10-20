@@ -9,10 +9,9 @@ const entryDesign=new URL(location.href).searchParams.get('entryDesign');
 const entryRedirect=()=>location.origin+'/contests.html'+(entryDesign?'?entryDesign='+encodeURIComponent(entryDesign)+'#monthlyEntryForm':'#monthlySubmitPanel');
 let round=null,loading=false,entered=false,savedCount=0,uploading=false,videoPath=null,videoFile=null;
 function entryMode(){
- const upload=$('monthlyEntryMethod').value==='upload';
- $('monthlySavedFields').hidden=upload;$('monthlyUploadFields').hidden=!upload;
- $('monthlySavedDesign').required=!upload;$('monthlyUploadPhoto').required=upload;
- $('monthlySubmit').disabled=uploading||!round||Date.parse(round.opens_at)>Date.now()||Date.parse(round.closes_at)<=Date.now()||entered||(!upload&&!savedCount);
+ $('monthlySavedFields').hidden=false;$('monthlyUploadFields').hidden=false;
+ $('monthlySavedDesign').required=true;$('monthlyUploadPhoto').required=false;
+ $('monthlySubmit').disabled=uploading||!round||Date.parse(round.opens_at)>Date.now()||Date.parse(round.closes_at)<=Date.now()||entered||!savedCount;
 }
 function openSubmission(){const panel=$('monthlySubmitPanel');panel.open=true;panel.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
 
@@ -51,8 +50,7 @@ if(host){
  host.hidden=!!new URL(location.href).searchParams.get('id');
  if(entryDesign||location.hash==='#monthlySubmitPanel')openSubmission();
  addEventListener('hashchange',()=>{if(location.hash==='#monthlySubmitPanel')openSubmission();});
- $('monthlyEntryMethod').value=entryDesign?'saved':'upload';entryMode();
- $('monthlyEntryMethod').onchange=entryMode;
+ entryMode();
  let photoUrl,videoUrl;
  $('monthlyUploadPhoto').onchange=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);const file=$('monthlyUploadPhoto').files[0];$('monthlyPhotoPreview').hidden=!file;if(file){photoUrl=URL.createObjectURL(file);$('monthlyPhotoPreview').src=photoUrl;}};
  $('monthlyUploadVideo').onchange=()=>{videoPath=null;videoFile=null;if(videoUrl)URL.revokeObjectURL(videoUrl);const file=$('monthlyUploadVideo').files[0];$('monthlyVideoPreview').hidden=!file;if(file){videoUrl=URL.createObjectURL(file);$('monthlyVideoPreview').src=videoUrl;}};
@@ -60,8 +58,8 @@ if(host){
  $('monthlyEmailForm').onsubmit=async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const {error}=await client.auth.signInWithOtp({email:$('monthlyEmail').value.trim(),options:{emailRedirectTo:entryRedirect()}});if(error)throw error;$('monthlyEntryStatus').textContent='Check your email for a secure sign-in link, then return to submit your entry.';}catch(error){$('monthlyEntryStatus').textContent=error.message;}finally{button.disabled=false;}};
  $('monthlyRefreshDesigns').onclick=()=>account().catch(e=>{$('monthlyEntryStatus').textContent=e.message;});
  $('monthlyEntryForm').onsubmit=async e=>{e.preventDefault();if(!round)return;const button=$('monthlySubmit');button.disabled=true;$('monthlyEntryStatus').textContent='Submitting your design for approval…';try{uploading=true;
- if($('monthlyEntryMethod').value==='upload'){
-  const preview=await picturePreview($('monthlyUploadPhoto').files[0]),file=$('monthlyUploadVideo').files[0];
+ {
+  const photo=$('monthlyUploadPhoto').files[0],preview=photo?await picturePreview(photo):null,file=$('monthlyUploadVideo').files[0];
   if(file&&(!videoPath||videoFile!==file)){
    const type=await checkVideo(file);$('monthlyEntryStatus').textContent='Uploading your turnaround video… Keep this page open.';
    const ticket=await request({action:'monthly_upload_ticket',contestId:round.id,type,size:file.size});
@@ -69,8 +67,8 @@ if(host){
    videoPath=ticket.path;videoFile=file;
   }
   $('monthlyEntryStatus').textContent='Submitting your entry for approval…';
-  await request({action:'monthly_upload_submit',contestId:round.id,preview,videoPath:file?videoPath:null,label:$('monthlyEntryTitle').value.trim(),consent:$('monthlyPublishConsent').checked});
- }else{await request({action:'monthly_submit',contestId:round.id,designId:$('monthlySavedDesign').value,label:$('monthlyEntryTitle').value.trim(),consent:$('monthlyPublishConsent').checked});}
+  await request({action:'monthly_submit',contestId:round.id,designId:$('monthlySavedDesign').value,preview,videoPath:file?videoPath:null,label:$('monthlyEntryTitle').value.trim(),consent:$('monthlyPublishConsent').checked});
+ }
  $('monthlyEntryStatus').textContent='Entry received. It stays private until MQD approves it.';await account();}catch(error){$('monthlyEntryStatus').textContent=error.message;}finally{uploading=false;entryMode();}};
  client.auth.onAuthStateChange(()=>setTimeout(()=>{if(!loading&&!host.hidden)account().catch(e=>{$('monthlyEntryStatus').textContent=e.message;});},0));
  if(!host.hidden){load();const timer=setInterval(load,60000);addEventListener('pagehide',()=>clearInterval(timer));}

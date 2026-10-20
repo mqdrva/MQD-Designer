@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mediaAction,validPicture,validVideo} from '../supabase/functions/mqd-design-contest/media.ts';
+import {mediaAction,validPicture,validVideo,entryVideo} from '../supabase/functions/mqd-design-contest/media.ts';
 import {monthlyAction} from '../supabase/functions/mqd-design-contest/monthly.ts';
 const u='11111111-1111-4111-8111-111111111111',c='22222222-2222-4222-8222-222222222222',o='33333333-3333-4333-8333-333333333333';
 const user={id:u,email:'owner@example.invalid',email_confirmed_at:'yes'},json=(body,status=200)=>({body,status});
@@ -11,11 +11,9 @@ let d=db();for(const status of ['pending','rejected','disqualified']){d.setStatu
 d=db();d.setEligible(false);assert.equal((await mediaAction({action:'monthly_video',optionId:o},d,json,null)).body.videoUrl,null);
 d=db();assert.equal((await mediaAction({action:'monthly_video',optionId:o},d,json,null)).body.videoUrl,'https://example.invalid/signed');
 const submit={action:'monthly_upload_submit',contestId:c,label:'A shirt',preview:picture,consent:true,email:'attacker@example.invalid'};
-d=db();await mediaAction(submit,d,json,user);assert.equal(d.calls[0].args.p_email,user.email);assert.equal(d.calls[0].args.p_user,u);
-await assert.rejects(mediaAction({...submit,videoPath:'other-user/'+c+'/video.mp4'},db(),json,user),/own uploaded/);
-await assert.rejects(mediaAction({...submit,consent:false},db(),json,user),/permission/);
-await assert.rejects(mediaAction({...submit,preview:'data:image/jpeg;base64,aA=='},db(),json,user),/valid PNG/);
-d=db();await mediaAction({...submit,videoPath:u+'/'+c+'/video.mp4'},d,json,user);assert(d.calls.some(x=>x.name==='mqd_monthly_upload_submit'&&x.args.p_video));
+await assert.rejects(entryVideo({...submit,videoPath:'other-user/'+c+'/video.mp4'},db(),user),/own uploaded/);
+d=db();assert.equal(await entryVideo({...submit,videoPath:u+'/'+c+'/video.mp4'},d,user),u+'/'+c+'/video.mp4');
+assert.equal(await entryVideo(submit,db(),user),null);
 await assert.rejects(mediaAction({action:'monthly_upload_ticket',contestId:c,type:'video/mp4',size:26*1024*1024},db(),json,user),/25 MB/);
 for(const action of ['monthly_upload_ticket','monthly_upload_submit'])assert.equal((await monthlyAction(new Request('https://example.invalid'),{action},db(),json)).status,401);
-console.log('PASS: picture/video validation, verified-account requirement, trusted email, consent, own-upload isolation, pending/rejected/disqualified video privacy and approved playback.');
+console.log('PASS: picture/video validation, verified-account requirement,  own-upload isolation, pending/rejected/disqualified video privacy and approved playback.');

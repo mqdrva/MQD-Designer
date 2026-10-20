@@ -1,4 +1,5 @@
-import {mediaAction,reviewVideo} from './media.ts';
+import {productionFiles} from './production.ts';
+import {mediaAction,reviewVideo,validPicture,entryVideo} from './media.ts';
 import {hasAdminMfa} from '../_shared/mqd-admin-security.js';
 const validId=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 const columns='id,title,description,closes_at,opens_at,announces_at,round_month';
@@ -22,9 +23,15 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
  const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';
  const {data:{user},error}=await db.auth.getUser(token);
  if(error||!user||user.is_anonymous||!user.email_confirmed_at)return json({error:'Sign in with a verified account to submit your design.'},401);
+ if(b.action==='monthly_upload_submit')throw new Error('Select your saved shirt on the contest page before entering.');
  const media=await mediaAction(b,db,json,user);if(media)return media;
- const owner=['monthly_rounds','monthly_queue','monthly_preview','monthly_review','monthly_owner_submit'].includes(b.action);
+ const owner=['monthly_rounds','monthly_queue','monthly_preview','monthly_review','monthly_owner_submit','monthly_production'].includes(b.action);
  if(owner){if(user.app_metadata?.role!=='admin')return json({error:'Owner access required.'},403);if(!await hasAdminMfa(db,token))return json({error:'Verify your owner account with your authenticator.',code:'MFA_REQUIRED'},403);}
+ if(b.action==='monthly_production'){
+  if(!validId(b.submissionId))throw new Error('Choose an entry.');
+  const {data:entry,error}=await db.from('mqd_contest_submissions').select('id,label,user_id,design_id,design_snapshot,preview,contact_email').eq('id',b.submissionId).maybeSingle();if(error)throw error;if(!entry)throw new Error('Entry not found.');
+  return json(await productionFiles(db,entry));
+ }
  if(b.action==='monthly_rounds')return json({rounds:await rounds(db)});
  if(b.action==='monthly_designs'){
   const {data,error}=await db.from('customer_designs').select('id,name').eq('user_id',user.id).eq('product_id','tshirt').neq('status','archived').order('updated_at',{ascending:false}).limit(100);if(error)throw error;return json({designs:data});
@@ -35,11 +42,13 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
  if(b.action==='monthly_submit'||b.action==='monthly_owner_submit'){
   if(!validId(b.contestId)||b.consent!==true)throw new Error('Choose the round and confirm permission to publish your garment preview.');
   const label=String(b.label||'').trim();if(!label||label.length>100)throw new Error('Enter a public design title of up to 100 characters.');
-  let image='',snapshot=null,design=null,email=user.email,source='';
+  let image='',snapshot=null,design=null,email=user.email,source='',video=null;
   if(b.action==='monthly_submit'){
    if(!validId(b.designId))throw new Error('Choose a saved all-over-print short-sleeve T-shirt.');
    const {data:d,error}=await db.from('customer_designs').select('id,preview_path,design_json').eq('id',b.designId).eq('user_id',user.id).eq('product_id','tshirt').neq('status','archived').maybeSingle();if(error||!d)throw new Error('Choose your saved all-over-print short-sleeve T-shirt.');
    image=await preview(db,d.preview_path,user.id);snapshot=d.design_json;design=d.id;
+   if(b.preview){if(!validPicture(b.preview))throw new Error('Choose a valid PNG or JPEG shirt picture.');image=b.preview;}
+   video=await entryVideo(b,db,user);
   }else{
    image=String(b.preview||'');email=String(b.email||'').trim().toLowerCase();source=String(b.sourceUrl||'').trim();
    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)throw new Error('Enter the entrant’s contact email.');
@@ -47,6 +56,7 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
    if(source&&(!/^https:\/\//.test(source)||source.length>1000))throw new Error('Use an HTTPS source link or leave it blank.');
   }
   const submissionId=await rpc(db,'mqd_monthly_submit',{p_contest:b.contestId,p_user:b.action==='monthly_submit'?user.id:null,p_design:design,p_label:label,p_email:email,p_preview:image,p_snapshot:snapshot,p_source:source});
+  if(video){const {error}=await db.from('mqd_contest_submissions').update({video_path:video}).eq('id',submissionId);if(error)throw new Error('Entry saved, but video could not be attached. Refresh to check your entry.');}
   return json({submissionId,status:'pending'});
  }
  if(b.action==='monthly_queue'){
@@ -56,7 +66,7 @@ export async function monthlyAction(req:Request,b:any,db:any,json:any){
  }
  if(b.action==='monthly_preview'){
   if(!validId(b.submissionId))throw new Error('Choose an entry.');
-  const {data,error}=await db.from('mqd_contest_submissions').select('id,label,preview,contact_email,source_url,review_note,design_snapshot,video_path').eq('id',b.submissionId).maybeSingle();if(error)throw error;if(!data)throw new Error('Entry not found.');return json({entry:{...data,videoUrl:await reviewVideo(db,data),video_path:undefined}});
+  const {data,error}=await db.from('mqd_contest_submissions').select('id,label,preview,contact_email,source_url,review_note,design_id,design_snapshot,video_path').eq('id',b.submissionId).maybeSingle();if(error)throw error;if(!data)throw new Error('Entry not found.');return json({entry:{...data,videoUrl:await reviewVideo(db,data),video_path:undefined}});
  }
  if(b.action==='monthly_review'){
   if(!validId(b.submissionId)||!['approve','reject','disqualify'].includes(b.decision)||typeof b.note!=='string'||b.note.length>500)throw new Error('Invalid review.');
