@@ -41,7 +41,7 @@ await assert.rejects(createAuthSaveRecovery({...io,write:async()=>{throw Error('
 const source=fs.readFileSync(new URL('../v20/customer.js',import.meta.url),'utf8');
 const handler=source.slice(source.indexOf('async function saveDraft(){'),source.indexOf('\nconst authDesignRecovery=',source.indexOf('async function saveDraft(){')));
 const events=[],button={textContent:'Save Design',disabled:false};let fail=false;
-const context={AUTH_SAVE_MARKER,$:()=>button,isPermanentUser:()=>false,captureDesignJSON:async()=>payload,persistentDesignSnapshot:async p=>p,
+const context={URLSearchParams,location:{search:''},window:{},AUTH_SAVE_MARKER,$:()=>button,isPermanentUser:()=>false,captureDesignJSON:async()=>payload,persistentDesignSnapshot:async p=>p,
  currentDesignRecoveryId:()=>null,authDesignRecovery:{prepare:async()=>{events.push('backup');if(fail)throw Error('quota');return id;}},sessionStorage:storage,pendingDesignSaveId:null,
  setDesignRecoveryStatus:()=>{},openAuth:()=>events.push('auth'),resumePendingDesignSave:()=>{},console:{error:()=>{}},alert:()=>events.push('alert'),setTimeout};
 vm.createContext(context);vm.runInContext(handler,context);await context.saveDraft();assert.deepEqual(events,['backup','auth']);assert.equal(button.disabled,false);

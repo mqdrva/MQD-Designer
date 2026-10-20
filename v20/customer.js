@@ -1,3 +1,5 @@
+import {remainingTemplateFields} from './template-contract.js';
+import {loadSelectedTemplate} from './template-designer.js';
 import {createContestSaveInvite,showContestSaveInvite} from './contest-save-invite.js';
 import {contestRequest} from './contest-api.js';
 import {AUTH_SAVE_MARKER,authSaveResumeId,authSaveRedirectUrl,createAuthSaveRecovery} from './design-auth-recovery.js';
@@ -12,7 +14,7 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const SUBMIT_URL=SUPABASE_URL+'/functions/v1/submit-mqd-design';
 const LIBRARY_URL=SUPABASE_URL+'/functions/v1/mqd-artwork-library';
 function currentDesignRecoveryId(){return pendingDesignSaveId||authSaveResumeId(window.location,sessionStorage);}
-function authRedirectUrl(){return authSaveRedirectUrl(window.location,currentDesignRecoveryId());}
+function authRedirectUrl(){if(currentDesignRecoveryId())return authSaveRedirectUrl(window.location,currentDesignRecoveryId());const url=new URL(authSaveRedirectUrl(window.location,null));for(const key of ['template','templateVersion']){const value=new URLSearchParams(location.search).get(key);if(value)url.searchParams.set(key,value);}return url.href;}
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentSession=null;
 let activeCloudDesign=null;
@@ -314,8 +316,9 @@ async function openArtworkLibrary(){
 function closeArtworkLibrary(){$('artworkLibraryOverlay')?.classList.add('hidden');}
 async function hydrateLibraryArtwork(payload){
   const copy=payload;
+  for(const state of Object.values(copy.design?.zones||{}))for(const layer of state.layers||[])if(layer.templateAssetPath)layer.src=SUPABASE_URL+'/storage/v1/object/public/mqd-template-published/'+layer.templateAssetPath;
   for(const [zone,state] of Object.entries(copy.design?.zones||{})){
-    const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId);if(!layers.length)continue;
+    const layers=(state.layers||[]).filter(layer=>layer.type==='image'&&layer.libraryAssetId&&!layer.templateAssetPath);if(!layers.length)continue;
     const assets=await libraryAssetsForZone(copy.product?.id,zone);const byId=new Map(assets.map(asset=>[asset.id,asset]));
     for(const layer of layers){const asset=byId.get(layer.libraryAssetId);if(!asset)throw new Error(`MQD library artwork is no longer available for ${zone}.`);layer.src=asset.renderUrl;layer.libraryLocked=asset.placementMode==='locked';layer.libraryPreset=asset.placementPreset||layer.libraryPreset||'full';layer.libraryStackOrder=Number(asset.stackOrder)||layer.libraryStackOrder||0;layer.libraryPlacements=asset.placements||layer.libraryPlacements||{};}
   }
@@ -338,12 +341,14 @@ function designColors(payload){
 }
 async function prepareCloudPayload(payload,designId,userId){
   const cloud=structuredClone(payload);
+  cloud.designId=designId;
   for(const [zone,state] of Object.entries(cloud.design?.zones||{})){
     for(const layer of state.layers||[]){
       delete layer.image;
       if(layer.type!=='image')continue;
+      if(layer.templateAssetPath){delete layer.src;delete layer.storagePath;continue;}
       if(layer.libraryAssetId){delete layer.src;delete layer.storagePath;continue;}
-      if(layer.storagePath){delete layer.src;continue;}
+      if(layer.storagePath){if(!cloud.design?.template||layer.storagePath.startsWith(`${userId}/designs/${designId}/`)){delete layer.src;continue;}delete layer.storagePath;delete layer.originalStoragePath;}
       if(!layer.src)continue;
       const blob=await dataUrlToBlob(layer.src);
       const baseName=safePathPart((layer.originalFilename||layer.filename||'artwork').replace(/\.[^.]+$/,''))||'artwork';
@@ -410,6 +415,7 @@ async function saveCartCloudDesign(payload,designId,{preview=null}={}){
 }
 
 async function saveDraft(){
+  if(new URLSearchParams(location.search).has('templateDemo')||window.MQDDesigner?.exportDesign?.()?.design?.template?.demo){localStorage.setItem('mqd-template-demo-save',JSON.stringify(await captureDesignJSON()));alert('Demo saved on this browser only. No account or production data changed.');return;}
   const btn=$('saveDraft'),old=btn.textContent;
   btn.disabled=true;btn.textContent=isPermanentUser()?'Saving…':'Protecting design…';
   let backedUp=false;
@@ -567,7 +573,7 @@ async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
     for(const layer of state.layers||[]){
-      if(layer.type!=='image'||layer.libraryAssetId||!layer.src) continue;
+      if(layer.type!=='image'||layer.libraryAssetId||layer.templateAssetPath||!layer.src) continue;
       const filename=layer.filename||'artwork.png';
       const baseMeta={zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false};
       if(layer.backgroundRemoved===true){
@@ -582,7 +588,7 @@ async function submitDesignToBackend(payload,{retry=false,mockup=null}={}){
           form.append('assetMeta',JSON.stringify({...baseMeta,kind:'original-source',processedFilename:processedName}));
         }
       }else{
-        const original=retry?null:await originalArtworkBlob(filename);
+        const original=retry||layer.templateReplaced?null:await originalArtworkBlob(filename);
         const blob=original||await dataUrlToBlob(layer.src);
         form.append('asset',blob,filename);
         form.append('assetMeta',JSON.stringify({...baseMeta,kind:'artwork'}));
@@ -647,6 +653,9 @@ function startCartSync(draftKey,payload){
 }
 
 async function addToCart(){
+  const templateCheck=window.MQDDesigner?.exportDesign?.();
+  const remaining=remainingTemplateFields(templateCheck);if(remaining.length){alert('Replace the sample details before checkout: '+remaining.join(', ')+'.');return;}
+  if(new URLSearchParams(location.search).has('templateDemo')||templateCheck?.design?.template?.demo||new URLSearchParams(location.search).has('templateOwnerPreview')){alert('Demo review complete. Real cart and payment are disabled for unpublished demo designs.');return;}
   if(!requireAccount('Sign in or continue as a guest before adding this custom design to the cart.',addToCart))return;
   if(orderOptionsProductId!==currentProductId())renderOrderOptions();
   const btn=$('addToCart');
@@ -865,6 +874,7 @@ async function hydrateCloudPayload(payload){
   const copy=structuredClone(payload);
   for(const state of Object.values(copy.design?.zones||{})){
     for(const layer of state.layers||[]){
+      if(layer.templateAssetPath){layer.src=SUPABASE_URL+'/storage/v1/object/public/mqd-template-published/'+layer.templateAssetPath;continue;}
       if(layer.type!=='image'||layer.libraryAssetId||!layer.storagePath)continue;
       const {data,error}=await supabase.storage.from('customer-artwork').download(layer.storagePath);
       if(error)throw new Error('Could not reopen artwork: '+error.message);
@@ -1030,11 +1040,18 @@ async function restoreAuthFromRedirect(){
 
   return {session,callbackError};
 }
+async function backupTemplateForSignIn(){
+  if(!window.MQDDesigner?.exportDesign?.()?.design?.template)return;
+  const payload=await persistentDesignSnapshot(await captureDesignJSON());
+  let id=currentDesignRecoveryId();if(!id||!await authDesignRecovery.update(id,payload,accountUser()))id=await authDesignRecovery.prepare(payload);
+  pendingDesignSaveId=id;sessionStorage.setItem(AUTH_SAVE_MARKER,pendingDesignSaveId);
+}
 async function signInWithEmail(event){
   event.preventDefault();
   const message=$('authMessage'),email=$('authEmail').value.trim();
   if(!email){message.textContent='Enter your email address.';message.className='account-message error';return;}
   message.textContent='Sending secure sign-in link…';message.className='account-message';
+  await backupTemplateForSignIn();
   const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:authRedirectUrl(),shouldCreateUser:true}});
   if(error){message.textContent=error.message;message.className='account-message error';return;}
   message.textContent='Check your email for the secure sign-in link. You can use Yahoo, Outlook, iCloud, Gmail, or another email provider.';message.className='account-message success';
@@ -1043,6 +1060,7 @@ async function signInWithGoogle(){
   const message=$('authMessage'),button=$('googleSignInButton');
   if(message){message.textContent='Opening Google sign-in…';message.className='account-message';}
   if(button)button.disabled=true;
+  await backupTemplateForSignIn();
   const {error}=await supabase.auth.signInWithOAuth({
     provider:'google',
     options:{redirectTo:authRedirectUrl()}
@@ -1139,6 +1157,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     try{let row=accountDesigns.find(x=>x.id===item.dataset.designId);if(!row){const {data,error}=await supabase.from('customer_designs').select('*').eq('id',item.dataset.designId).single();if(error)throw error;row=data;}await buyAgain(row);}catch(err){console.error(err);alert(err.message);}finally{button.disabled=false;}
   });
   updateCartButton();
+  void loadSelectedTemplate({onLoad:()=>{activeCloudDesign=null;}}).catch(error=>alert(error.message));
   restoreAuthFromRedirect().then(({session,callbackError})=>{
     void completeAuth(session).catch(console.error);
     if(new URLSearchParams(location.search).get('signIn')==='try-on'&&!isPermanentUser()){

@@ -83,6 +83,12 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261001220545_allow_multiple_orders_per_checkout_session.sql
           psql -v ON_ERROR_STOP=1 -f tests/checkout-session-sharing.sql
 
+      - name: Verify template privacy and immutable versions in isolated Postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/template-schema-fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020164602_premade_design_templates.sql
+          psql -v ON_ERROR_STOP=1 -f tests/template-schema.sql
+
       - name: Verify isolated print-shop subscriptions and onboarding
         run: |
           node tests/print-shop-subscription.mjs

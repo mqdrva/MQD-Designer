@@ -1,3 +1,4 @@
+import {prepareTemplateOrder} from '../_shared/mqd-template-orders.js';
 import { boundedFormData, validateGuestFiles, consumeBudget, UploadError } from "../_shared/mqd-upload-guard.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
@@ -58,12 +59,14 @@ Deno.serve(async (req: Request) => {
     if (String(p?.id || "").startsWith("everyday-")) return json(req, { error: "Please use the Everyday designer to submit this garment." }, 400);
     if (!p?.id || !p?.name || !payload?.design?.zones) return json(req, { error: "Incomplete design" }, 400);
 
+    let materializedBytes=uploadedBytes;
+    if(payload.design?.template||Object.values<any>(payload.design?.zones||{}).some(z=>z.layers?.some((l:any)=>l.templateLayerId||l.templateAssetPath))){await prepareTemplateOrder(supabase,payload,form);materializedBytes=validateGuestFiles(form);}
     const zones = Object.entries<any>(payload.design.zones);
     if (zones.length > 12 || zones.some(([,state]) => !Array.isArray(state?.layers ?? []) || (state?.layers?.length || 0) > 100)) return json(req, { error: "Design contains too many zones or layers" }, 400);
     await consumeBudget(supabase, 'guest-token-' + guestHash, 100);
     const libraryJobs: Array<{ zone: string; layer: any; asset: any; placement: any }> = [];
     for (const [zone, state] of Object.entries<any>(payload.design.zones || {})) for (const layer of state?.layers || []) {
-      if (layer?.type !== "image" || !layer?.libraryAssetId) continue;
+      if (layer?.type !== "image" || !layer?.libraryAssetId || layer.templateAssetPath) continue;
       const { data: asset, error: assetLookupError } = await supabase.from("mqd_library_assets")
         .select("id,name,slug,category,master_path,placement_mode,active")
         .eq("id", String(layer.libraryAssetId)).eq("active", true).maybeSingle();
@@ -85,7 +88,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Reserve the largest allowed master for each library copy before writing anything.
-    const reservedBytes = uploadedBytes + libraryJobs.length * 50 * 1024 * 1024;
+    const reservedBytes = materializedBytes + libraryJobs.length * 50 * 1024 * 1024;
     await consumeBudget(supabase, 'guest-bytes-global', 500, reservedBytes);
     await consumeBudget(supabase, 'guest-bytes-' + guestHash, 100, reservedBytes, 2 * 1024 * 1024 * 1024);
     const backgrounds: Record<string, string> = {};

@@ -1,3 +1,4 @@
+import {logoFitScale} from './template-contract.js';
 import {applyGarmentMappings} from './garment-mapping-catalog.js';
 // @mapping-begin imports
 import {partitionTshirtBodyTriangle,tshirtSleeveArtworkBounds} from './tshirt-armhole-seams.js?v=2';
@@ -161,7 +162,7 @@ function textFontFamily(font='Inter'){
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
 function activeLayer(){return zoneState().layers.find(l=>l.id===activeLayerId)||null;}
-function isLockedLibraryLayer(layer=activeLayer()){return !!(layer?.libraryAssetId&&layer.libraryLocked);}
+function isLockedLibraryLayer(layer=activeLayer()){return !!(layer?.templateRole||layer?.templateLocked||(layer?.libraryAssetId&&layer.libraryLocked));}
 function hasLibraryArtwork(){return Object.values(stateFor().zones||{}).some(z=>(z.layers||[]).some(l=>l.libraryAssetId));}
 function templateFor(zone=activeZone){return product.templates?.[zone]||null;}
 function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null;}
@@ -1356,6 +1357,7 @@ function maxLayerScale(layer=activeLayer()){
 // @mapping-end maxLayerScale
 function reorderLayer(id,targetId){
   const arr=zoneState().layers,from=arr.findIndex(l=>l.id===id),to=arr.findIndex(l=>l.id===targetId);
+  if(arr.some(l=>l.templateRole))return;
   if(from<0||to<0||from===to)return;
   snapshot();
   const [layer]=arr.splice(from,1);arr.splice(to,0,layer);
@@ -1369,7 +1371,7 @@ function renderLayerPanel(){
   panelOrder.forEach((l,index)=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title='Drag to change layer order. Top layer appears in front.';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · position locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
     const actions=document.createElement('div');actions.className='layer-order-actions';
     for(const [offset,label] of [[-1,'Move up'],[1,'Move down']]){
-      const button=document.createElement('button');button.type='button';button.textContent=offset<0?'↑':'↓';button.title=label;button.disabled=!panelOrder[index+offset];button.setAttribute('aria-label',`${label}: ${l.label}`);
+      const button=document.createElement('button');button.type='button';button.textContent=offset<0?'↑':'↓';button.title=label;button.disabled=!!l.templateRole||!panelOrder[index+offset];button.setAttribute('aria-label',`${label}: ${l.label}`);
       button.onclick=e=>{e.stopPropagation();const target=panelOrder[index+offset];if(target)reorderLayer(l.id,target.id);};actions.appendChild(button);
     }
     d.appendChild(actions);
@@ -1386,12 +1388,12 @@ function renderLayerPanel(){
       ?'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c5.5 0 9 5 9 5a17 17 0 0 1-2.4 2.9"/><path d="M6.6 6.7C4.3 8.2 3 10 3 10s3.5 5 9 5c1 0 1.9-.2 2.7-.4"/></svg>'
       :'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
     addQuick(l.visible===false?'Show layer':'Hide layer',eye,()=>{
-      snapshot();l.visible=l.visible===false;activeLayerId=l.id;renderAll();
-    },{iconOnly:true});
+      if(l.templateRole)return;snapshot();l.visible=l.visible===false;activeLayerId=l.id;renderAll();
+    },{iconOnly:true,disabled:!!l.templateRole});
     addQuick('Delete layer','<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/><path d="M10 10v7M14 10v7"/></svg>',()=>{
-      const layers=zoneState().layers,index=layers.findIndex(row=>row.id===l.id);if(index<0)return;
+      if(l.templateRole)return;const layers=zoneState().layers,index=layers.findIndex(row=>row.id===l.id);if(index<0)return;
       snapshot();layers.splice(index,1);activeLayerId=layers.at(-1)?.id||null;renderAll();
-    },{danger:true,iconOnly:true});
+    },{danger:true,iconOnly:true,disabled:!!l.templateRole});
     d.querySelector('.layer-head')?.appendChild(quick);
     d.onclick=()=>{activeLayerId=l.id;renderLayerPanel();renderPrintQuality();drawEditor();};
     d.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',l.id);d.classList.add('dragging-layer');};
@@ -1415,8 +1417,11 @@ function renderLayerPanel(){
     cloneAllButton.disabled=!!(l.libraryAssetId&&!locked);
     cloneAllButton.title=locked?'Duplicate this locked MQD artwork to every available print zone':'Duplicate the selected layer to every print zone';
   }
+  $('deleteLayer').disabled=!!l.templateRole;$('toggleLayer').disabled=!!l.templateRole;
+  $('duplicateTool').disabled=!!l.templateRole||$('duplicateTool').disabled;
+  if(cloneAllButton&&l.templateRole)cloneAllButton.disabled=true;
   $('duplicateTool').title=locked?'Duplicate this locked MQD artwork to one selected print zone':'Duplicate the selected layer';
-  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent='This MQD artwork is locked to its approved position. You can change its layer order, add it to other print zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
+  let note=$('lockedLayerNote');if(locked&&!note){note=document.createElement('div');note.id='lockedLayerNote';note.className='locked-note';controlsEl.insertBefore(note,controlsEl.querySelector('.action-row'));}if(note){note.textContent=l.templateRole?'Use the Customize your look fields to replace this logo or edit business details. Approved artwork stays locked.':'This MQD artwork is locked to its approved position. You can change its layer order, add it to other print zones, hide it, or remove it.';note.classList.toggle('hidden',!locked);}
   let lockedActions=$('lockedLibraryDuplicateActions');
   if(locked&&!lockedActions){
     lockedActions=document.createElement('div');lockedActions.id='lockedLibraryDuplicateActions';lockedActions.className='locked-duplicate-actions';
@@ -1430,7 +1435,7 @@ function renderLayerPanel(){
     row.append(select,addOne);lockedActions.append(title,row,addAll);controlsEl.insertBefore(lockedActions,controlsEl.querySelector('.action-row'));
   }
   if(lockedActions){
-    lockedActions.classList.toggle('hidden',!locked||product.zones.length<2);
+    lockedActions.classList.toggle('hidden',!!l.templateRole||!locked||product.zones.length<2);
     if(locked&&product.zones.length>1){
       const select=lockedActions.querySelector('#lockedDuplicateZone'),addOne=lockedActions.querySelector('#lockedDuplicateOne'),addAll=lockedActions.querySelector('#lockedDuplicateAll');
       const availableZones=product.zones.filter(zone=>zone!==activeZone&&!zoneState(zone).layers.some(layer=>layer.libraryAssetId===l.libraryAssetId));
@@ -1445,7 +1450,7 @@ function renderLayerPanel(){
   // Mobile customer-uploaded images: show the same zone-copy controls directly
   // under the selected image after it has been added from the device.
   let customerImageActions=$('customerImageDuplicateActions');
-  const customerImage=l.type==='image'&&!l.libraryAssetId;
+  const customerImage=l.type==='image'&&!l.libraryAssetId&&!l.templateRole;
   if(customerImage&&!customerImageActions){
     customerImageActions=document.createElement('div');
     customerImageActions.id='customerImageDuplicateActions';
@@ -1508,7 +1513,7 @@ function renderLayerPanel(){
       }
     }
   }
-  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText);$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
+  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText||!!l.templateRole);$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   let bgTools=$('backgroundRemovalTools');
   if(!bgTools&&imageQuick){
     bgTools=document.createElement('div');bgTools.id='backgroundRemovalTools';bgTools.className='background-removal-tools';
@@ -1550,7 +1555,7 @@ function renderGarmentCopyControl(){
     $('duplicateTool')?.parentElement?.appendChild(button);
   }
   button.hidden=!garmentCopyTargets().length;
-  button.disabled=false;
+  button.disabled=!!designs[product.id]?.template;
   button.title=hasLibraryArtwork()
     ?'Copy design to another garment. MQD Library artwork will use its approved destination placement.'
     :'Copy Design to Another Garment';
@@ -1609,7 +1614,7 @@ async function garmentCopyLayer(layer,targetProduct,zone){
     crop:layer.crop?{...layer.crop}:undefined
   };
 }
-function openGarmentCopy(){
+function openGarmentCopy(){if(designs[product.id]?.template){alert('This look uses its approved garment. Start from scratch to choose another garment.');return;}
   const targets=garmentCopyTargets();if(!targets.length)return;
   const source=product,dialog=document.createElement('dialog');
   dialog.setAttribute('aria-label','Copy Design to Another Garment');
@@ -2213,8 +2218,8 @@ $('addTextForm').addEventListener('submit',event=>{
 });
 function createTextLayer(text){snapshot();const l={id:'layer-'+layerSeq++,type:'text',label:nextLabel(),text,x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111',font:'Inter',strokeColor:'#FFFFFF',strokeWidth:0,letterSpacing:0,bold:true,italic:false,align:'center'};zoneState().layers.push(l);activeLayerId=l.id;renderAll();}
 function updateLayer(prop,val){const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;l[prop]=val;renderLayerPanel();renderPrintQuality();drawEditor();scheduleGarmentPreview();}
-function setBackground(hex,record=true){const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildGarmentPreview();}
-function applyBackgroundAll(){const c=normalizeHex($('zoneHex').value);if(!c)return;snapshot();product.zones.forEach(z=>{const old=activeZone;activeZone=z;zoneState().background=c;activeZone=old;});renderAll();}
+function setBackground(hex,record=true){if(designs[product.id]?.template)return;const v=normalizeHex(hex);if(!v)return;if(record)snapshot();zoneState().background=v;renderStatus();drawEditor();rebuildGarmentPreview();}
+function applyBackgroundAll(){if(designs[product.id]?.template)return;const c=normalizeHex($('zoneHex').value);if(!c)return;snapshot();product.zones.forEach(z=>{const old=activeZone;activeZone=z;zoneState().background=c;activeZone=old;});renderAll();}
 
 function requireImageLayer(){const l=activeLayer();return l&&l.type==='image'?l:null;}
 function flipActive(axis){const l=requireImageLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l[axis]=!l[axis];renderAll();}
@@ -2239,7 +2244,7 @@ function duplicateLayerIntoZone(source,zone,{offset=false}={}){
   return copy;
 }
 // @mapping-end duplicateLayerIntoZone
-function duplicateActive(){const l=activeLayer();if(!l||l.libraryAssetId||!canAddLayer())return;snapshot();const copy=duplicateLayerIntoZone(l,activeZone,{offset:true});if(!copy)return;activeLayerId=copy.id;renderAll();}
+function duplicateActive(){const l=activeLayer();if(!l||l.templateRole||l.libraryAssetId||!canAddLayer())return;snapshot();const copy=duplicateLayerIntoZone(l,activeZone,{offset:true});if(!copy)return;activeLayerId=copy.id;renderAll();}
 let seamMirrorBusy=false;
 async function mirrorActiveToBody(){
   const l=activeLayer(),fromZone=activeZone,toZone=fromZone==='Front'?'Back':'Front';
@@ -2274,7 +2279,7 @@ async function mirrorActiveToBody(){
 }
 function duplicateActiveToZone(zone){
   const l=activeLayer();
-  if(!l||!product.zones.includes(zone))return;
+  if(!l||l.templateRole||!product.zones.includes(zone))return;
   if(l.libraryAssetId){
     if(isLockedLibraryLayer(l))return duplicateLockedLibraryToZone(l,zone);
     return;
@@ -2309,6 +2314,7 @@ function makeLockedLibraryCopy(source,asset){
   return copy;
 }
 async function duplicateLockedLibraryToZones(source,zones){
+  if(source.templateRole)return[];
   const requested=[...new Set(zones)].filter(zone=>product.zones.includes(zone));
   const targets=requested.filter(zone=>!zoneState(zone).layers.some(layer=>layer.libraryAssetId===source.libraryAssetId));
   if(!targets.length){alert(requested.length===1?'This locked artwork is already on '+requested[0]+'.':'This locked artwork is already on every available print zone.');return[];}
@@ -2345,7 +2351,7 @@ function cloneActiveToAllZones(){
   renderAll();
 }
 function closeDuplicateMenu(){document.getElementById('duplicateZoneMenu')?.remove();}
-function openDuplicateMenu(){
+function openDuplicateMenu(){if(activeLayer()?.templateRole)return;
   const l=activeLayer();if(!l)return;
   const locked=isLockedLibraryLayer(l);
   if(l.libraryAssetId&&!locked){alert('Editable MQD library artwork cannot be duplicated. Choose it from the library for the destination zone instead.');return;}
@@ -2432,7 +2438,7 @@ function initTextFonts(){
   }
   syncTextFontPreview(sel.value||'Inter');
 }
-function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text')return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px ${textFontFamily(val)}`).finally(()=>renderAll());else renderAll();}else renderAll();}
+function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text'||(l.templateRole&&!(l.templateRole==='text'&&prop==='text')))return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px ${textFontFamily(val)}`).finally(()=>renderAll());else renderAll();}else renderAll();}
 $('textValue')?.addEventListener('input',e=>updateTextProp('text',e.target.value));
 $('textFont')?.addEventListener('change',e=>updateTextProp('font',e.target.value));
 $('textColor')?.addEventListener('input',e=>updateTextProp('color',e.target.value.toUpperCase()));
@@ -2446,11 +2452,11 @@ initTextFonts();
 
 $('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').onclick=()=>$('artUpload').click();$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>addImage(rd.result,f.name);rd.readAsDataURL(f);e.target.value='';};$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
 [['layerX','x',Number],['layerY','y',Number],['layerScale','scale',v=>Number(v)/100],['layerRotation','rotation',Number]].forEach(([id,p,fn])=>$(id).oninput=e=>updateLayer(p,fn(e.target.value)));
-function deleteActiveLayer(){const l=activeLayer();if(!l)return false;const arr=zoneState().layers,index=arr.findIndex(x=>x.id===l.id);if(index<0)return false;snapshot();arr.splice(index,1);activeLayerId=arr.at(-1)?.id||null;renderAll();return true;}
+function deleteActiveLayer(){const l=activeLayer();if(!l||l.templateRole)return false;const arr=zoneState().layers,index=arr.findIndex(x=>x.id===l.id);if(index<0)return false;snapshot();arr.splice(index,1);activeLayerId=arr.at(-1)?.id||null;renderAll();return true;}
 function keyboardTargetIsEditable(target){const tag=String(target?.tagName||'').toUpperCase();return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||target?.isContentEditable===true;}
 function handleLayerDeleteKey(e){if(!e||!['Delete','Backspace'].includes(e.key)||e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey)return;if(keyboardTargetIsEditable(e.target)||!activeLayer())return;e.preventDefault();deleteActiveLayer();}
 document.addEventListener('keydown',handleLayerDeleteKey);
-$('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=deleteActiveLayer;$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
+$('fillLayer').onclick=()=>{const l=activeLayer();if(!l||isLockedLibraryLayer(l))return;snapshot();l.x=0;l.y=0;l.scale=1;l.rotation=0;renderAll();};$('toggleLayer').onclick=()=>{const l=activeLayer();if(!l||l.templateRole)return;snapshot();l.visible=l.visible===false;renderAll();};$('deleteLayer').onclick=deleteActiveLayer;$('undo').onclick=undo;$('redo').onclick=redo;$('gridToggle').onclick=()=>{showGrid=!showGrid;drawEditor();};$('zoomIn').onclick=()=>{editorZoom=Math.min(1.6,editorZoom+.1);drawEditor();};$('zoomOut').onclick=()=>{editorZoom=Math.max(.6,editorZoom-.1);drawEditor();};
 
 function pointerToCanvas(e){
   const r=editorCanvas.getBoundingClientRect(),x=(e.clientX-r.left)*editorCanvas.width/r.width,y=(e.clientY-r.top)*editorCanvas.height/r.height;
@@ -2658,7 +2664,7 @@ function beginRevealCapture(){
   restore(){if(restored)return;restored=true;camera.position.copy(position);controls.target.copy(target);controls.enabled=enabled;controls.enableDamping=damping;controls.update();renderer.render(scene,camera);}
  };
 }
-window.MQDDesigner={exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,beginRevealCapture,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+window.MQDDesigner={templateFieldEdit,templateFields,exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,beginRevealCapture,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
@@ -2712,3 +2718,26 @@ function loadAdmin(id){const p=catalog.find(x=>x.id===id);if(!p)return;$('adminN
 $('openAdmin').onclick=()=>{$('adminOverlay').classList.remove('hidden');renderAdmin();loadAdmin(product.id);};$('closeAdmin').onclick=()=>$('adminOverlay').classList.add('hidden');$('adminOverlay').onclick=e=>{if(e.target===$('adminOverlay'))$('adminOverlay').classList.add('hidden');};$('saveProductAdmin').onclick=()=>{const p=catalog.find(x=>x.id===$('saveProductAdmin').dataset.id);if(!p)return;p.name=$('adminName').value.trim()||p.name;p.category=$('adminCategory').value.trim()||p.category;p.price=Number($('adminPrice').value)||p.price;localStorage.setItem('mqd-catalog',JSON.stringify(catalog));if(p.id===product.id)product=p;renderProducts();renderAdmin();alert('Product saved.');};$('addZone').onclick=()=>{const p=catalog.find(x=>x.id===$('saveProductAdmin').dataset.id);if(!p)return;const z=prompt('Zone name');if(!z)return;p.zones.push(z.trim());localStorage.setItem('mqd-catalog',JSON.stringify(catalog));loadAdmin(p.id);if(p.id===product.id){product=p;renderAll();}};
 
 renderProducts();renderAll();init3D();loadGarment();
+
+function templateFields(){
+ const ref=designs[product.id]?.template;if(!ref)return null;
+ return {...ref,fields:ref.fields.map(field=>{const l=designs[product.id].zones[field.zone]?.layers.find(l=>l.templateLayerId===field.layerId);return{...field,value:l?.text||'',replaced:!!l?.templateReplaced};})};
+}
+async function templateFieldEdit(fieldId,value){
+ const ref=designs[product.id]?.template,field=ref?.fields.find(f=>f.layerId===fieldId);if(!field)throw new Error('Choose an editable field.');
+ const l=designs[product.id].zones[field.zone]?.layers.find(l=>l.templateLayerId===fieldId);if(!l)throw new Error('This field is unavailable.');
+ if(field.role==='text'){
+   const text=String(value).trim();if(text.length>180)throw new Error('Keep business details under 180 characters.');snapshot();l.text=text;
+ }else{
+   if(!(value instanceof File)||!['image/png','image/jpeg','image/webp'].includes(value.type)||value.size>20*1024*1024)throw new Error('Choose a PNG, JPEG or WebP logo under 20 MB.');
+   const src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('Logo could not be read.'));r.readAsDataURL(value);});
+   const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Logo could not be decoded.'));img.src=src;});
+   if(!l.image?.width)throw new Error('Wait for the sample logo to load.');
+   const t=product.templates[field.zone],slot=l.templateLogoSlot||{width:l.image.width,height:l.image.height,scale:l.scale},scale=logoFitScale([slot.width,slot.height],[image.width,image.height],[t.width,t.height],slot.scale);
+   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await value.arrayBuffer()))).map(b=>b.toString(16).padStart(2,'0')).join('');
+   snapshot();l.src=src;l.image=image;l.filename=value.name;l.scale=scale;l.templateReplaced=true;l.templateReplacementHash=digest;l.templateLogoSlot=slot;
+   for(const key of ['templateAssetPath','storagePath','originalStoragePath','libraryAssetId','libraryLocked','libraryPreset','libraryContentBounds'])delete l[key];
+   l.crop={left:0,right:0,top:0,bottom:0};
+ }
+ activeZone=field.zone;activeLayerId=l.id;renderAll();
+}

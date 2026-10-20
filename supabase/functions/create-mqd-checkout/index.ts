@@ -1,3 +1,4 @@
+import {verifyTemplateOrder} from '../_shared/mqd-template-orders.js';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
@@ -128,6 +129,8 @@ Deno.serve(async (req) => {
     if (orders.some((order) => !["submitted", "draft"].includes(order.status))) {
       return json(req, { error: "One or more cart items can no longer be checked out" }, 409);
     }
+
+    for(const order of orders)if(order.design_json?.design?.template||Object.values(order.design_json?.design?.zones||{}).some(z=>z.layers?.some(l=>l.templateLayerId||l.templateAssetPath)))await verifyTemplateOrder(supabase,order.design_json);
 
     const orderIds = orders.map((order) => order.id);
     stage = "read-items";

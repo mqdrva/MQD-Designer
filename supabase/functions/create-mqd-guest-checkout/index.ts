@@ -1,3 +1,4 @@
+import {verifyTemplateOrder} from '../_shared/mqd-template-orders.js';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
@@ -129,6 +130,8 @@ Deno.serve(async (req: Request) => {
     if (!authorized) return json(req, { error: "One or more cart items could not be verified for this browser or account" }, 403);
     if (orders.some((order: any) => !["submitted", "draft"].includes(order.status))) return json(req, { error: "One or more cart items can no longer be checked out" }, 409);
     if (orders.some((order: any) => order.is_test === true)) return json(req, { error: "Stripe sandbox test orders cannot be used in live checkout" }, 409);
+
+    for(const order of orders)if(order.design_json?.design?.template||Object.values(order.design_json?.design?.zones||{}).some(z=>z.layers?.some(l=>l.templateLayerId||l.templateAssetPath)))await verifyTemplateOrder(supabase,order.design_json);
 
     const orderIds = orders.map((order: any) => order.id);
     stage = "read-items";
