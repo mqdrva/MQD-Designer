@@ -2733,7 +2733,7 @@ async function templateFieldEdit(fieldId,value){
    const src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('Logo could not be read.'));r.readAsDataURL(value);});
    const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Logo could not be decoded.'));img.src=src;});
    if(!l.image?.width)throw new Error('Wait for the sample logo to load.');
-   const t=product.templates[field.zone],slot=l.templateLogoSlot||{width:l.image.width,height:l.image.height,scale:l.scale},scale=logoFitScale([slot.width,slot.height],[image.width,image.height],[t.width,t.height],slot.scale);
+   const t=product.templates[field.zone],slot=l.templateLogoSlot||{width:l.image.width,height:l.image.height,scale:l.scale,crop:{...l.crop}},scale=logoFitScale([slot.width,slot.height],[image.width,image.height],[t.width,t.height],slot.scale,slot.crop);
    const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await value.arrayBuffer()))).map(b=>b.toString(16).padStart(2,'0')).join('');
    snapshot();l.src=src;l.image=image;l.filename=value.name;l.scale=scale;l.templateReplaced=true;l.templateReplacementHash=digest;l.templateLogoSlot=slot;
    for(const key of ['templateAssetPath','storagePath','originalStoragePath','libraryAssetId','libraryLocked','libraryPreset','libraryContentBounds'])delete l[key];

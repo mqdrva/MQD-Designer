@@ -74,9 +74,10 @@ export function assertCustomizedTemplate(payload,version){
   if(missing.length)throw new Error('Replace the sample details before checkout: '+missing.join(', ')+'.');
   return true;
 }
-export function logoFitScale(oldSize,newSize,zoneSize,oldScale=1){
+export function logoFitScale(oldSize,newSize,zoneSize,oldScale=1,crop={}){
   if([...oldSize,...newSize,...zoneSize].some(n=>!Number.isFinite(n)||n<=0))throw new Error('Logo dimensions are invalid.');
   const oldBase=Math.max(zoneSize[0]/oldSize[0],zoneSize[1]/oldSize[1])*oldScale;
   const nextBase=Math.max(zoneSize[0]/newSize[0],zoneSize[1]/newSize[1]);
-  return Math.min(oldSize[0]*oldBase/newSize[0]/nextBase,oldSize[1]*oldBase/newSize[1]/nextBase);
+  const visibleW=Math.max(.1,1-(Number(crop.left)||0)-(Number(crop.right)||0)),visibleH=Math.max(.1,1-(Number(crop.top)||0)-(Number(crop.bottom)||0));
+  return Math.min(oldSize[0]*visibleW*oldBase/newSize[0]/nextBase,oldSize[1]*visibleH*oldBase/newSize[1]/nextBase);
 }
