@@ -19,29 +19,30 @@ for(let i=0;i<definitions.length;i++){
  const template=structuredClone(GARMENT_MAPPING.tshirt),zones={};const rules=[];
  const image=(id,label,src,x,y,scale,extra={})=>({id,type:'image',label,filename:src.split('/').at(-1),src,x,y,scale,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true,...extra});
  const services={
-  'Pressure Washing':['PRESSURE WASHING','SOFT WASHING • & MORE!'],
-  'Lawn Care':['LAWN MOWING • TRIMMING • EDGING','YARD CLEANUPS • HEDGES • MAINTENANCE'],
-  HVAC:['HEATING • COOLING','REPAIRS • MAINTENANCE'],
-  'Pool Care':['POOL CLEANING • WATER CARE','MAINTENANCE • & MORE!'],
-  'General Business':['YOUR BUSINESS SERVICES','QUALITY SERVICE • & MORE!']
+  'Pressure Washing':['PRESSURE WASHING','SOFT WASHING','& MORE!'],
+  'Lawn Care':['LAWN MOWING • TRIMMING','EDGING • YARD CLEANUPS','HEDGES • MAINTENANCE'],
+  HVAC:['HEATING • COOLING','REPAIRS • MAINTENANCE','& MORE!'],
+  'Pool Care':['POOL CLEANING','WATER CARE • MAINTENANCE','& MORE!'],
+  'General Business':['YOUR BUSINESS SERVICES','QUALITY SERVICE','& MORE!']
  }[category];
- const detail=(id,label,text,y,scale)=>({id,type:'text',label,text,x:0,y,scale,rotation:0,visible:true,color:textColor,font:'Inter',strokeColor:base,strokeWidth:2,bold:true,italic:false,align:'center'});
+ const detail=(id,label,text,y,scale)=>({id,type:'text',label,text,x:0,y,scale,rotation:0,visible:true,color:textColor,font:'Impact',strokeColor:base,strokeWidth:2,bold:false,italic:false,align:'center'});
  for(const side of ['Front','Back']){
   const background=image(side+'-background','Background',`/assets/template-backgrounds/${filename}`,0,0,1,{flipX:side==='Back'});
   const logo=image(side+'-logo','Your logo',`/${dir}/blank-logo-slot.png`,0,side==='Front'?-30:-48,side==='Front'?.25:.16);
   const layers=[background,logo];
   rules.push({zone:side,layerId:background.id,role:'locked',label:side+' background'},{zone:side,layerId:logo.id,role:'logo',label:'Your logo'});
   if(side==='Back'){
-   const social=image('Back-social','Instagram • Facebook • Google',`/${dir}/social-row.png`,0,-18,.055);
-   const phone=detail('Back-phone','Phone number','888-888-8888',0,.72);
-   const line1=detail('Back-services','Services line 1',services[0],15,.46);
-   const line2=detail('Back-services-2','Services line 2',services[1],25,.42);
-   layers.push(social,phone,line1,line2);
-   rules.push({zone:side,layerId:social.id,role:'locked',label:'Social icons'},... [phone,line1,line2].map(l=>({zone:side,layerId:l.id,role:'text',label:l.label})));
+   const social=image('Back-social','Instagram • Facebook • Google',`/${dir}/social-row.png`,0,-25,.055);
+   const phone=detail('Back-phone','Phone number','888-888-8888',-13,.72);
+   const line1=detail('Back-services','Services line 1',services[0],1,.62);
+   const line2=detail('Back-services-2','Services line 2',services[1],12,.60);
+   const line3=detail('Back-services-3','Services line 3',services[2],23,.58);
+   layers.push(social,phone,line1,line2,line3);
+   rules.push({zone:side,layerId:social.id,role:'locked',label:'Social icons'},... [phone,line1,line2,line3].map(l=>({zone:side,layerId:l.id,role:'text',label:l.label})));
   }
   zones[side]={background:base,layers};
  }
- zones['Left Sleeve']={background:base,layers:[image('sleeve-flag','Sleeve flag',`/${dir}/demo-flag.png`,0,0,.35)]};rules.push({zone:'Left Sleeve',layerId:'sleeve-flag',role:'locked',label:'Sleeve flag'});zones['Right Sleeve']={background:base,layers:[]};zones.Collar={background:base,layers:[]};
+ zones['Left Sleeve']={background:base,layers:[image('sleeve-flag','Sleeve flag',`/${dir}/demo-flag.png`,0,0,.20)]};rules.push({zone:'Left Sleeve',layerId:'sleeve-flag',role:'locked',label:'Sleeve flag'});zones['Right Sleeve']={background:base,layers:[]};zones.Collar={background:base,layers:[]};
  const payload={schema:'mqd-design-v1',engine:{calibration:'v26-surface-uv-collar-strip'},product:{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',model:template.model},templates:template.templates,activeZone:'Front',design:{zones}};
  versions.push({id:versionId,template_id:id,name:'UNPUBLISHED · '+name,categories:category==='Pressure Washing'?[category,'General Business']:[category],range:'Premium · All-over print',draftStatus:definitions[i].note,backgroundSource:filename,payload,rules,previews:{Front:`/${dir}/${i+1}-front.png`,Back:`/${dir}/${i+1}-back.png`}});
 }

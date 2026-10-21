@@ -5,12 +5,17 @@ import {assertTemplateDraft,cloneTemplate,remainingTemplateFields,assertCustomiz
 const original=structuredClone(demoVersions[0]);
 for(const {layer} of templateLayers(original.payload))if(layer.type==='image'){layer.templateAssetPath=original.id+'/'+layer.id+'.png';layer.templateAssetHash='a'.repeat(64);}
 assertTemplateDraft({...original,payload:original.payload});
+// Only a prepared Back contact stack gains one live text row. Ordinary zones
+// and extra artwork still retain the existing six-layer limit.
+const overflow=structuredClone(original);overflow.payload.design.zones.Back.layers.push({...overflow.payload.design.zones.Back.layers.at(-1),id:'overflow'});overflow.rules.push({zone:'Back',layerId:'overflow',role:'text',label:'Overflow'});assert.throws(()=>assertTemplateDraft(overflow),/six layers/);
+const extraImage=structuredClone(original);extraImage.payload.design.zones.Back.layers.at(-1).type='image';extraImage.rules.at(-2).role='locked';assert.throws(()=>assertTemplateDraft(extraImage));
+const wrongZone=structuredClone(original);wrongZone.payload.design.zones.Front=structuredClone(wrongZone.payload.design.zones.Back);assert.throws(()=>assertTemplateDraft(wrongZone),/six layers/);
 const a=cloneTemplate(original),b=cloneTemplate(original);
 assert.notEqual(a.designId,b.designId);assert.notEqual(a.design.template.copyId,b.design.template.copyId);
-assert.equal(new Set([...templateLayers(a),...templateLayers(b)].map(x=>x.layer.id)).size,18);
+assert.equal(new Set([...templateLayers(a),...templateLayers(b)].map(x=>x.layer.id)).size,20);
 assert.equal(a.design.zones.Back.layers[0].flipX,true);assert.equal(a.design.zones['Left Sleeve'].layers[0].label,'Sleeve flag');
 assert.throws(()=>assertCustomizedTemplate(a,original),/sample details/);
-assert.equal(remainingTemplateFields(a).length,5);
+assert.equal(remainingTemplateFields(a).length,6);
 for(const {layer} of templateLayers(a)){if(layer.templateRole==='text')layer.text=layer.label==='Phone number'?'804-123-4567':'Soft wash · Roofs · Driveways';if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash='b'.repeat(64);layer.src='data:image/png;base64,cmVwbGFjZW1lbnQ=';}}
 assert.equal(remainingTemplateFields(a).length,0);assertCustomizedTemplate(a,original);
 assert.equal(b.design.zones.Back.layers[3].text,'888-888-8888');assert.equal(original.payload.design.zones.Back.layers[3].text,'888-888-8888');

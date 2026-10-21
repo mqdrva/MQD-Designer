@@ -89,9 +89,17 @@ HVAC text is darkened for contrast on the light abstract background. After the
 background review the owner requested an MQD-style starter layout: no printed
 placeholder logos on either side, with clear centered Front chest/upper Back
 logo slots. Back has a compact Instagram/Facebook/Google row, 888-888-8888,
-then two live editable trade-service lines. Front has background only until a
+then three live editable trade-service lines using Impact for the phone/services. Front has background only until a
 logo is uploaded. Only foreground slot/contact placements changed; background
-and sleeve placements remain protected. Social icon masters were copied from
+and sleeve placement/orientation remain protected. The owner subsequently
+requested a smaller sleeve flag: scale .35 to .20, centered with its source
+artwork and orientation unchanged. Social row y=-25, phone y=-13, services
+y=1/12/23 raise and tighten the contact stack. Pressure Washing / Soft Washing /
+& More! remain three independent text fields. A prepared Back contact layout
+may hold seven layers only with exactly two locked images, one logo and four
+text fields. All other template zones and ordinary editor add/duplicate limits
+stay at six. Font loading waits for the selected family before initial rendering;
+Impact keeps the existing Anton fallback on devices without native Impact. Social icon masters were copied from
 the approved Clear Haven reusable assets without replacing their originals.
 No proof header is printed on the garment. Sample details still use existing
 pre-checkout validation; no checkout or owner permissions were changed. No completed owner

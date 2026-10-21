@@ -10,7 +10,14 @@ export function assertTemplateDraft(draft){
   const p=draft.payload;
   if(p?.schema!=='mqd-design-v1'||!p.product?.id||!p.design?.zones?.Front||!p.design?.zones?.Back)throw new Error('Use an editable 3D shirt design with Front and Back zones.');
   if(JSON.stringify(draft).length>3_000_000)throw new Error('Template settings are too large. Save artwork first.');
-  if(Object.values(p.design.zones).some(z=>!Array.isArray(z.layers)||z.layers.length>6))throw new Error('Each zone supports up to six layers.');
+  for(const [zone,state] of Object.entries(p.design.zones)){
+    if(!Array.isArray(state.layers))throw new Error('Each zone needs a layer list.');
+    // A prepared Back contact stack may add one text row. The ordinary editor's
+    // six-layer add/duplicate limit is unchanged; no extra image slot is allowed.
+    const roles=state.layers.map(layer=>({layer,role:draft.rules?.find(r=>r.zone===zone&&r.layerId===layer.id)?.role}));
+    const contactBack=zone==='Back'&&state.layers.length===7&&roles.filter(r=>r.layer.type==='image'&&r.role==='locked').length===2&&roles.filter(r=>r.layer.type==='image'&&r.role==='logo').length===1&&roles.filter(r=>r.layer.type==='text'&&r.role==='text').length===4;
+    if(state.layers.length>6&&!contactBack)throw new Error('Use up to six layers, or a prepared Back contact layout with seven layers.');
+  }
   const rows=templateLayers(p),ids=new Set();
   if(!rows.length||rows.length>100||Object.keys(p.design.zones).length>12)throw new Error('Use 1–100 layers in supported garment zones.');
   for(const {zone,layer} of rows){

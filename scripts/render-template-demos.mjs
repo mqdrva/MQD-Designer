@@ -1,16 +1,20 @@
 // Actual editor layer and silhouette renderer, used only to build unpublished demo card images.
-import fs from 'node:fs';import vm from 'node:vm';import {createCanvas,loadImage} from '@napi-rs/canvas';
+import fs from 'node:fs';import vm from 'node:vm';import {createCanvas,loadImage,GlobalFonts} from '@napi-rs/canvas';
 import {demoVersions} from '../v20/template-demo.js';
 import {clipShirtSplash} from '../v20/shirt-splash-preview.js';
 import {isCutlineBottomArtwork} from '../v20/water-splash-fit.js';
 import {isJacketSplash5} from '../v20/jacket-splash-5.js';
 const source=fs.readFileSync('v20/editor.js','utf8');
+const impactPath='/System/Library/Fonts/Supplemental/Impact.ttf';
+if(fs.existsSync(impactPath))GlobalFonts.registerFromPath(impactPath,'Impact');
+const fontHelper=source.match(/function textFontFamily\([^]*?\n\}/)?.[0];
+if(!fontHelper)throw new Error('Missing editor font-family helper');
 function section(name){const expression=new RegExp('// @mapping-begin '+name+'\\n([\\s\\S]*?)\\n// @mapping-end '+name);const result=source.match(expression);if(!result)throw new Error('Missing renderer section '+name);return result[1];}
 for(const version of demoVersions){
  const payload=structuredClone(version.payload),records={};
- const context={console,product:payload.product,document:{createElement:()=>createCanvas(1,1)},zoneState:zone=>payload.design.zones[zone],ensureTemplateImage:zone=>records[zone],clipShirtSplash,isCutlineBottomArtwork,isJacketSplash5,textFontFamily:font=>'"'+font+'", sans-serif'};
+ const context={console,product:payload.product,document:{createElement:()=>createCanvas(1,1)},zoneState:zone=>payload.design.zones[zone],ensureTemplateImage:zone=>records[zone],clipShirtSplash,isCutlineBottomArtwork,isJacketSplash5};
  context.product.templates=payload.templates;vm.createContext(context);
- vm.runInContext(['buildTemplateMask','scaleBounds','isFullLockedLibraryBackground','normalizedLibraryContentBounds','measureVisibleImageBounds','drawMappedImageLayer','drawTextLayer','drawLayerStack','renderMaskedZoneCanvas'].map(section).join('\n')+'\n'+source.match(/function drawImageLayer\(c,l,b\)\{[^\n]+/)[0],context);
+ vm.runInContext(fontHelper+'\n'+['buildTemplateMask','scaleBounds','isFullLockedLibraryBackground','normalizedLibraryContentBounds','measureVisibleImageBounds','drawMappedImageLayer','drawTextLayer','drawLayerStack','renderMaskedZoneCanvas'].map(section).join('\n')+'\n'+source.match(/function drawImageLayer\(c,l,b\)\{[^\n]+/)[0],context);
  for(const side of ['Front','Back']){
    const img=await loadImage(payload.templates[side].path.slice(1));context.templateImage=img;
    records[side]={img,...vm.runInContext(`buildTemplateMask(templateImage,${JSON.stringify(side)})`,context)};

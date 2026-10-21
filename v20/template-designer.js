@@ -31,6 +31,9 @@ export async function loadSelectedTemplate({onLoad=()=>{}}={}){
  }else payload=(await templateRequest({action:'select',id:params.get('template'),versionId:params.get('templateVersion')})).payload;
  const started=Date.now();while(!window.MQDDesigner?.loadDesign){if(Date.now()-started>20000)throw new Error('The designer is still loading. Please refresh.');await new Promise(r=>setTimeout(r,100));}
  await Promise.all(Object.values(payload.design.zones).flatMap(state=>state.layers.filter(l=>l.type==='image'&&l.src).map(l=>new Promise((resolve,reject)=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>{l.image=img;resolve();};img.onerror=()=>reject(new Error('Template artwork could not be loaded.'));img.src=l.src;}))));
+ // Load the chosen template fonts before the first canvas/3D render, including
+ // the existing Anton fallback for platforms without a local Impact font.
+ if(document.fonts?.load){const fonts=[...new Set(Object.values(payload.design.zones).flatMap(z=>z.layers.filter(l=>l.type==='text').map(l=>(l.bold===false?400:(l.weight||800))+' 32px '+(l.font==='Impact'?'Impact, Anton, sans-serif':'"'+(l.font||'Inter')+'", sans-serif'))))];await Promise.allSettled(fonts.map(font=>document.fonts.load(font)));}
  await window.MQDDesigner.loadDesign(payload,{notify:false});onLoad();showTemplateControls();
  if(params.has('templateDemo')){const note=document.createElement('div');note.textContent='UNPUBLISHED DEMO · Saved locally only. Ordering is disabled.';note.style.cssText='padding:12px;background:#fff0c9;font:700 14px Arial;text-align:center';document.querySelector('header')?.after(note);}
 }
