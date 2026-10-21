@@ -133,3 +133,14 @@ Actual masked sleeve proof PNGs accompany the existing Front/Back previews.
 Body placement, live contact stack, models, UVs, calibration and collar unchanged.
 This does not establish physical seam matching or print approval. All five
 remain unpublished drafts; full hosted cart/checkout still requires isolated staging.
+
+CUSTOMER CONTACT CONTROLS — OWNER REVIEW ADDITION
+Only social artwork and text fields gain movement, size, rotation and editing.
+Text controls expose existing font/color/style tools; social row accepts optional
+replacement artwork. Existing social originals are canonical at checkout until
+replaced; replacement bytes require their matching hash, like customer logos.
+Empty logo slots remain in the immutable payload for Front/Back upload, without
+canvas hit rectangles/selection outlines or phantom layer rows. Uploaded logos
+retain their existing fixed placement rules. Backgrounds, flag, garment mapping,
+body/sleeve placement, template order and required fields remain protected.
+Legacy locked-social versions retain their original rules. Review-only update.

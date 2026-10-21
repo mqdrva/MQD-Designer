@@ -3,6 +3,9 @@ export const TEMPLATE_CATEGORIES=['Pressure Washing','Lawn Care','HVAC','Pool Ca
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const normalize=value=>String(value??'').trim().replace(/\s+/g,' ').toLowerCase();
 const stable=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
+// Only contact details are customer-positionable; source artwork/logo slots stay protected.
+export function isEditableTemplateLayer(layer){return ['text','artwork'].includes(layer?.templateRole);}
+export function isEmptyTemplateLogo(layer){return layer?.templateRole==='logo'&&!layer.templateReplaced;}
 export function templateLayers(payload){return Object.entries(payload?.design?.zones||{}).flatMap(([zone,state])=>(state.layers||[]).map(layer=>({zone,layer})));}
 export function assertTemplateDraft(draft){
   if(!draft||typeof draft.name!=='string'||!draft.name.trim()||draft.name.length>100)throw new Error('Enter a design name (up to 100 characters).');
@@ -15,7 +18,7 @@ export function assertTemplateDraft(draft){
     // A prepared Back contact stack may add one text row. The ordinary editor's
     // six-layer add/duplicate limit is unchanged; no extra image slot is allowed.
     const roles=state.layers.map(layer=>({layer,role:draft.rules?.find(r=>r.zone===zone&&r.layerId===layer.id)?.role}));
-    const contactBack=zone==='Back'&&state.layers.length===7&&roles.filter(r=>r.layer.type==='image'&&r.role==='locked').length===2&&roles.filter(r=>r.layer.type==='image'&&r.role==='logo').length===1&&roles.filter(r=>r.layer.type==='text'&&r.role==='text').length===4;
+    const contactBack=zone==='Back'&&state.layers.length===7&&roles.filter(r=>r.layer.type==='image'&&['locked','artwork'].includes(r.role)).length===2&&roles.filter(r=>r.layer.type==='image'&&r.role==='logo').length===1&&roles.filter(r=>r.layer.type==='text'&&r.role==='text').length===4;
     if(state.layers.length>6&&!contactBack)throw new Error('Use up to six layers, or a prepared Back contact layout with seven layers.');
   }
   const rows=templateLayers(p),ids=new Set();
@@ -24,8 +27,8 @@ export function assertTemplateDraft(draft){
     if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}$/.test(layer.id||'')||ids.has(layer.id)||!['image','text'].includes(layer.type))throw new Error('Each template layer needs a unique identifier and supported type.');
     ids.add(layer.id);
     const rule=draft.rules?.find(r=>r.zone===zone&&r.layerId===layer.id);
-    if(!rule||!['locked','logo','text'].includes(rule.role))throw new Error('Designate every layer as locked artwork, replaceable logo, or editable text.');
-    if(rule.role==='text'&&layer.type!=='text'||rule.role==='logo'&&layer.type!=='image')throw new Error('Logo slots require images; editable details require text layers.');
+    if(!rule||!['locked','logo','text','artwork'].includes(rule.role))throw new Error('Designate every layer as locked artwork, replaceable logo, editable image, or editable text.');
+    if(rule.role==='text'&&layer.type!=='text'||['logo','artwork'].includes(rule.role)&&layer.type!=='image')throw new Error('Logo slots require images; editable details require text layers.');
     if(!rule.label?.trim()||rule.label.length>100)throw new Error('Give each field a clear label.');
     if(rule.role==='text'&&!normalize(layer.text))throw new Error('Editable details need sample text.');
     for(const key of ['x','y','scale','rotation'])if(!Number.isFinite(Number(layer[key]??(key==='scale'?1:0))))throw new Error('Layer placement must contain finite numbers.');
@@ -50,6 +53,7 @@ export function remainingTemplateFields(payload){
   const ref=payload?.design?.template;if(!ref)return[];
   return(ref.fields||[]).filter(field=>{
     const row=templateLayers(payload).find(x=>x.zone===field.zone&&x.layer.templateLayerId===field.layerId);
+    if(field.role==='artwork')return false;
     return !row||row.layer.visible===false||(field.role==='text'?!normalize(row.layer.text)||normalize(row.layer.text)===normalize(field.sampleText):!row.layer.templateReplaced);
   }).map(field=>field.label+' ('+field.zone+')');
 }
@@ -66,10 +70,18 @@ export function assertCustomizedTemplate(payload,version){
     const matches=rows.filter(x=>x.layer.templateLayerId===rule.layerId);
     const target=matches[0]?.layer;
     if(matches.length!==1||matches[0].zone!==rule.zone||!target||target.visible===false)throw new Error('Keep all designated template layers in their approved zones.');
+    if(target.type!==source.type)throw new Error('Template layer types cannot be changed.');
+    if(['text','artwork'].includes(rule.role)){
+      if(['x','y','scale','rotation'].some(k=>!Number.isFinite(target[k]))||target.scale<.01||target.scale>8||Math.abs(target.x)>200||Math.abs(target.y)>200||Math.abs(target.rotation)>360)throw new Error('Keep editable details within the supported design controls.');
+    }
     if(target.templateRole!==rule.role||target.templateLocked!==(rule.role==='locked'))throw new Error('Template layer permissions cannot be changed.');
     if(rule.role==='locked'){
       const clean=layer=>Object.fromEntries(Object.entries(layer).filter(([k])=>!['id','src','image','storagePath','originalStoragePath','templateLayerId','templateRole','templateLocked','backgroundOriginalSrc'].includes(k)));
       if(stable(clean(source))!==stable(clean(target)))throw new Error('Locked template artwork cannot be changed.');
+    }else if(rule.role==='artwork'){
+      if(target.templateReplaced){
+        if(!/^[0-9a-f]{64}$/.test(target.templateReplacementHash||'')||target.templateAssetPath)throw new Error('Upload valid replacement artwork.');
+      }else if(target.templateAssetPath!==source.templateAssetPath||target.templateAssetHash!==source.templateAssetHash||(!source.templateAssetPath&&target.src!==source.src))throw new Error('Keep the original social artwork or upload a replacement.');
     }else if(rule.role==='text'){
       if(!normalize(target.text)||normalize(target.text)===normalize(source.text))missing.push(rule.label+' ('+rule.zone+')');
     }else{

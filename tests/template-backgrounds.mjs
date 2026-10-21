@@ -48,7 +48,7 @@ for(const [i,version] of demoVersions.entries()){
  const a=cloneTemplate(source),b=cloneTemplate(source);assert.notEqual(a.designId,b.designId);
  const text=a.design.zones.Back.layers.find(l=>l.templateRole==='text');text.text='804-555-0199';
  assert.equal(b.design.zones.Back.layers[3].text,'888-888-8888');assert.equal(version.payload.design.zones.Back.layers[3].text,'888-888-8888');
- assert(templateLayers(a).filter(x=>x.layer.templateRole==='locked').length===6);
+ assert(templateLayers(a).filter(x=>x.layer.templateRole==='locked').length===5);
  for(const {layer} of templateLayers(a)){
   if(layer.templateRole==='text')layer.text=layer.label==='Phone number'?'804-555-0199':'Customer services';
   if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash=receipt.sha256;layer.src='data:image/'+(receipt.format==='PNG'?'png':'jpeg')+';base64,'+bytes.toString('base64');}

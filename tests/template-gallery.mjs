@@ -19,7 +19,12 @@ assert.equal(remainingTemplateFields(a).length,6);
 for(const {layer} of templateLayers(a)){if(layer.templateRole==='text')layer.text=layer.label==='Phone number'?'804-123-4567':'Soft wash · Roofs · Driveways';if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash='b'.repeat(64);layer.src='data:image/png;base64,cmVwbGFjZW1lbnQ=';}}
 assert.equal(remainingTemplateFields(a).length,0);assertCustomizedTemplate(a,original);
 assert.equal(b.design.zones.Back.layers[3].text,'888-888-8888');assert.equal(original.payload.design.zones.Back.layers[3].text,'888-888-8888');
+// Customer contact transformations must survive validation and a saved round trip.
+for(const {layer} of templateLayers(a))if(['text','artwork'].includes(layer.templateRole)){layer.x=18;layer.y=-12;layer.scale=.8;layer.rotation=12;if(layer.type==='text'){layer.font='Impact';layer.color='#123456';}}
+assertCustomizedTemplate(a,original);
 const reopen=JSON.parse(JSON.stringify(a));assertCustomizedTemplate(reopen,original);
+for(const change of [l=>l.scale=NaN,l=>l.x=Infinity,l=>l.scale=0,l=>l.type='image']){const copy=structuredClone(a);change(copy.design.zones.Back.layers[3]);assert.throws(()=>assertCustomizedTemplate(copy,original));}
+const alteredSocial=structuredClone(a);alteredSocial.design.zones.Back.layers[2].templateAssetPath='unapproved-path';assert.throws(()=>assertCustomizedTemplate(alteredSocial,original),/social artwork/);
 for(const mutation of [p=>p.design.zones.Front.layers.shift(),p=>p.design.zones.Back.layers[0].flipX=false,p=>p.design.zones.Front.layers[0].x=9,p=>p.design.zones.Front.layers[0].templateRole='logo',p=>p.design.zones.Front.layers[0].visible=false,p=>p.design.zones.Front.layers.reverse(),p=>p.product.id='fleece-hoodie',p=>p.design.zones.Back.background='#fff',p=>p.design.zones.Front.layers[1].x=8,p=>p.design.zones['Left Sleeve'].layers.reverse(),p=>p.design.zones['Right Sleeve'].layers[0].y=0,p=>p.design.zones['Left Sleeve'].layers[1].flipX=true]){
  const copy=structuredClone(a);mutation(copy);assert.throws(()=>assertCustomizedTemplate(copy,original));
 }

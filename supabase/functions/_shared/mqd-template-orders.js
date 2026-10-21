@@ -11,14 +11,14 @@ export async function verifyTemplateOrder(supabase,payload){
 export async function prepareTemplateOrder(supabase,payload,form,customerPrefix=null){
   const version=await verifyTemplateOrder(supabase,payload);if(!version)return;
   const submittedFiles=form.getAll('asset'),submittedMeta=form.getAll('assetMeta').map(v=>JSON.parse(String(v||'{}')));
-  for(const {layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo')){
+  for(const {layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo'||x.layer.templateRole==='artwork'&&x.layer.templateReplaced)){
     const index=submittedMeta.findIndex(m=>m.layerId===layer.id&&m.kind!=='original-source');let file=index<0?null:submittedFiles[index];
     if(!file&&customerPrefix&&layer.storagePath?.startsWith(customerPrefix)&&!layer.storagePath.includes('..')){const result=await supabase.storage.from('customer-artwork').download(layer.storagePath);if(result.error)throw new Error('Could not read replacement logo.');file=result.data;}
     if(!file||typeof file==='string')throw new Error('Upload a replacement logo for every designated slot.');
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()))).map(b=>b.toString(16).padStart(2,'0')).join('');
     if(hash!==layer.templateReplacementHash)throw new Error('The replacement logo does not match the submitted artwork.');
   }
-  const locked=templateLayers(payload).filter(x=>x.layer.templateRole==='locked'&&x.layer.type==='image');
+  const locked=templateLayers(payload).filter(x=>(x.layer.templateRole==='locked'||x.layer.templateRole==='artwork'&&!x.layer.templateReplaced)&&x.layer.type==='image');
   // Ignore client files for locked artwork. Fetch the immutable approved master server-side.
   const ids=new Set(locked.map(x=>x.layer.id)),files=form.getAll('asset'),metadata=form.getAll('assetMeta');
   form.delete('asset');form.delete('assetMeta');

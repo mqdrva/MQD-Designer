@@ -36,9 +36,20 @@ for(const {zone,layer} of templateLayers(payload)){
  if(layer.templateRole==='text')layer.text=layer.label==='Phone number'?'804-123-4567':'Driveways and roofs';
  if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash=hash;delete layer.src;form.append('asset',blob,'my-logo.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
  // Malicious file with the same layer identifier must never replace locked artwork.
- if(layer.templateRole==='locked'&&layer.type==='image'){form.append('asset',new Blob(['malicious'],{type:'image/png'}),'fake.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
+ if(['locked','artwork'].includes(layer.templateRole)&&layer.type==='image'){form.append('asset',new Blob(['malicious'],{type:'image/png'}),'fake.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
 }
 await prepareTemplateOrder(db,payload,form);assert.equal(form.getAll('asset').length,8);for(const file of form.getAll('asset'))assert.notEqual(await file.text(),'malicious');
+// Movable social artwork stays canonical unless the customer explicitly replaces it.
+const social=payload.design.zones.Back.layers[2];social.x=18;social.y=-17;social.scale=.07;social.rotation=4;
+await verifyTemplateOrder(db,payload);const unchangedSocial=structuredClone(social);
+const replacement=new Blob(['customer-social-icons'],{type:'image/png'}),replacementHash=Buffer.from(await crypto.subtle.digest('SHA-256',await replacement.arrayBuffer())).toString('hex');
+social.templateReplaced=true;social.templateReplacementHash=replacementHash;delete social.templateAssetPath;delete social.src;
+const socialForm=new FormData();for(const {zone,layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo')){socialForm.append('asset',blob,'logo.png');socialForm.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
+socialForm.append('asset',replacement,'social.png');socialForm.append('assetMeta',JSON.stringify({zone:'Back',layerId:social.id}));
+await prepareTemplateOrder(db,payload,socialForm);assert.equal(socialForm.getAll('asset').length,8);assert(socialForm.getAll('asset').some(f=>f.size===replacement.size));
+const wrongSocial=new FormData();for(const [k,v] of socialForm.entries())wrongSocial.append(k,v);wrongSocial.delete('asset');wrongSocial.delete('assetMeta');for(const {zone,layer} of templateLayers(payload).filter(x=>['logo','artwork'].includes(x.layer.templateRole))){wrongSocial.append('asset',blob,'wrong.png');wrongSocial.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
+await assert.rejects(()=>prepareTemplateOrder(db,payload,wrongSocial),/does not match/);
+payload.design.zones.Back.layers[2]=unchangedSocial;
 const bad=structuredClone(payload);bad.design.zones.Front.layers[0].templateRole='logo';await assert.rejects(()=>verifyTemplateOrder(db,bad),/permissions/);
 const badForm=new FormData();for(const {zone,layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo')){badForm.append('asset',new Blob(['fake']),'fake.png');badForm.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}await assert.rejects(()=>prepareTemplateOrder(db,payload,badForm),/does not match/);
 const old=structuredClone(tables.mqd_shirt_template_versions[0].snapshot);tables.mqd_shirt_templates[0].draft.name='Second version';const v2=await call({action:'publish',id},'owner');assert.notEqual(v2.versionId,published.versionId);assert.deepEqual(tables.mqd_shirt_template_versions[0].snapshot,old);

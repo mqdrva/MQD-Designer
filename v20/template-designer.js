@@ -10,9 +10,13 @@ function showTemplateControls(){
  for(const field of fields.fields){
    const label=document.createElement('label');label.textContent=field.label+' · '+field.zone;label.style.cssText='display:block;margin:14px 0;font-size:13px;font-weight:700';
    const input=document.createElement('input');input.style.cssText='display:block;width:100%;box-sizing:border-box;padding:10px;margin-top:6px;font:inherit;border:1px solid #ccc;border-radius:8px;background:#fff';input.dataset.fieldId=field.layerId;input.setAttribute('aria-label',field.label+' · '+field.zone);
-   if(field.role==='logo'){input.type='file';input.accept='image/png,image/jpeg,image/webp';}else{input.type='text';input.maxLength=180;input.value=field.value;}
+   if(field.role==='logo'||field.role==='artwork'){input.type='file';input.accept='image/png,image/jpeg,image/webp';}else{input.type='text';input.maxLength=180;input.value=field.value;}
    const status=document.createElement('span');status.setAttribute('role','status');status.style.cssText='display:block;font-weight:400;margin-top:4px';
-   input.onchange=async()=>{try{await window.MQDDesigner.templateFieldEdit(field.layerId,field.role==='logo'?input.files?.[0]:input.value);status.textContent=field.role==='logo'?'Logo replaced ✓':'Details updated ✓';}catch(error){status.textContent=error.message;}};label.append(input,status);panel.append(label);
+   input.onchange=async()=>{try{await window.MQDDesigner.templateFieldEdit(field.layerId,field.role!=='text'?input.files?.[0]:input.value);status.textContent=field.role!=='text'?'Artwork replaced ✓':'Details updated ✓';}catch(error){status.textContent=error.message;}};label.append(input,status);
+   if(field.role==='text'||field.role==='artwork'){
+    const position=document.createElement('button');position.type='button';position.className='btn';position.textContent='Move / resize';position.setAttribute('aria-label','Move or resize '+field.label);position.style.marginTop='6px';position.onclick=()=>window.MQDDesigner.templateSelectField(field.layerId);label.append(position);
+   }
+   panel.append(label);
  }
  const review=document.createElement('button');review.textContent='Review shirt';review.className='btn orange';review.onclick=()=>{const left=remainingTemplateFields(window.MQDDesigner.exportDesign());if(left.length){alert('Still to replace: '+left.join(', '));return;}window.dispatchEvent(new CustomEvent('mqd:show-preview',{detail:{reason:'template-review'}}));};panel.append(review);
  if(params.has('templateDemo')){const reopen=document.createElement('button');reopen.className='btn';reopen.textContent='Reopen saved demo';reopen.style.marginTop='12px';reopen.onclick=()=>location.assign('/index.html?templateDemo='+encodeURIComponent(params.get('templateDemo'))+'&resumeDemo=1');panel.append(reopen);}

@@ -339,7 +339,7 @@ export const demoVersions=[
       {
         "zone": "Back",
         "layerId": "Back-social",
-        "role": "locked",
+        "role": "artwork",
         "label": "Social icons"
       },
       {
@@ -730,7 +730,7 @@ export const demoVersions=[
       {
         "zone": "Back",
         "layerId": "Back-social",
-        "role": "locked",
+        "role": "artwork",
         "label": "Social icons"
       },
       {
@@ -1121,7 +1121,7 @@ export const demoVersions=[
       {
         "zone": "Back",
         "layerId": "Back-social",
-        "role": "locked",
+        "role": "artwork",
         "label": "Social icons"
       },
       {
@@ -1512,7 +1512,7 @@ export const demoVersions=[
       {
         "zone": "Back",
         "layerId": "Back-social",
-        "role": "locked",
+        "role": "artwork",
         "label": "Social icons"
       },
       {
@@ -1903,7 +1903,7 @@ export const demoVersions=[
       {
         "zone": "Back",
         "layerId": "Back-social",
-        "role": "locked",
+        "role": "artwork",
         "label": "Social icons"
       },
       {

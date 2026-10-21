@@ -1,4 +1,4 @@
-import {logoFitScale} from './template-contract.js';
+import {logoFitScale,isEditableTemplateLayer,isEmptyTemplateLogo} from './template-contract.js';
 import {applyGarmentMappings} from './garment-mapping-catalog.js';
 // @mapping-begin imports
 import {partitionTshirtBodyTriangle,tshirtSleeveArtworkBounds} from './tshirt-armhole-seams.js?v=2';
@@ -162,7 +162,7 @@ function textFontFamily(font='Inter'){
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
 function activeLayer(){return zoneState().layers.find(l=>l.id===activeLayerId)||null;}
-function isLockedLibraryLayer(layer=activeLayer()){return !!(layer?.templateRole||layer?.templateLocked||(layer?.libraryAssetId&&layer.libraryLocked));}
+function isLockedLibraryLayer(layer=activeLayer()){if(layer?.templateRole)return !isEditableTemplateLayer(layer);return !!(layer?.templateLocked||(layer?.libraryAssetId&&layer.libraryLocked));}
 function hasLibraryArtwork(){return Object.values(stateFor().zones||{}).some(z=>(z.layers||[]).some(l=>l.libraryAssetId));}
 function templateFor(zone=activeZone){return product.templates?.[zone]||null;}
 function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null;}
@@ -1217,7 +1217,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
 }
 // @mapping-end drawZoneComposite
 function activeLayerScreenRect(l=activeLayer()){
-  if(!l)return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
+  if(!l||isEmptyTemplateLogo(l))return null;const r=editorRect(),rec=ensureTemplateImage(activeZone);let b=r;
   if(rec?.img&&rec?.bounds){const sw=rec.img.naturalWidth||rec.img.width,sh=rec.img.naturalHeight||rec.img.height,sb=scaleBounds(rec.bounds,sw,sh,r.w,r.h);b={x:r.x+sb.x,y:r.y+sb.y,w:sb.w,h:sb.h};}
   const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;
   if(l.type==='image'&&l.image){
@@ -1292,7 +1292,7 @@ function blobDataUrl(blob){return new Promise((resolve,reject)=>{const reader=ne
 function loadImageElement(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('The processed image could not be opened.'));image.src=src;});}
 function noBackgroundFilename(filename='artwork.png'){const base=String(filename||'artwork').replace(/\.[^.]+$/,'')||'artwork';return base+'-no-background.png';}
 async function removeBackgroundActive(){
- const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||!layer.src)return;
+ const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||layer.templateRole||!layer.src)return;
  const button=$('removeImageBackground'),restore=$('restoreImageBackground'),status=$('backgroundRemovalStatus');
  const old=button?.textContent||'Remove Background';
  if(button){button.disabled=true;button.textContent='Removing…';}
@@ -1331,7 +1331,7 @@ async function removeBackgroundActive(){
  }
 }
 async function restoreBackgroundActive(){
- const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||!layer.backgroundOriginalSrc)return;
+ const layer=activeLayer();if(!layer||layer.type!=='image'||layer.libraryAssetId||layer.templateRole||!layer.backgroundOriginalSrc)return;
  try{
    const image=await loadImageElement(layer.backgroundOriginalSrc);
    snapshot();layer.src=layer.backgroundOriginalSrc;layer.image=image;layer.backgroundRemoved=false;delete layer.storagePath;cropMode=false;renderAll();
@@ -1367,7 +1367,7 @@ function renderLayerPanel(){
   const wrap=$('layers'),empty=$('emptyLayers'),controlsEl=$('layerControls'),textControls=$('textControls');
   wrap.innerHTML='';const arr=zoneState().layers;empty.classList.toggle('hidden',arr.length>0);
   // The layer at the TOP of this list is also the layer visually rendered on top.
-  const panelOrder=[...arr].reverse();
+  const panelOrder=arr.filter(l=>!isEmptyTemplateLogo(l)).reverse();
   panelOrder.forEach((l,index)=>{const locked=isLockedLibraryLayer(l),d=document.createElement('div');d.className='layer'+(l.id===activeLayerId?' active':'')+(locked?' locked-library':'');d.draggable=true;d.dataset.layerId=l.id;d.title='Drag to change layer order. Top layer appears in front.';d.innerHTML=`<div class="layer-head"><div><div class="layer-name">${escapeHtml(l.label)}</div><div class="layer-meta">${escapeHtml(activeZone)} · ${l.type==='image'?'Image':'Text'}${locked?' · position locked':''}${l.visible===false?' · hidden':''}</div></div><span>${locked?'🔒':'↕'} ${l.type==='image'?'▧':'T'}</span></div>`;
     const actions=document.createElement('div');actions.className='layer-order-actions';
     for(const [offset,label] of [[-1,'Move up'],[1,'Move down']]){
@@ -1402,7 +1402,7 @@ function renderLayerPanel(){
     d.ondragleave=()=>d.classList.remove('layer-drop-target');
     d.ondrop=e=>{e.preventDefault();d.classList.remove('layer-drop-target');reorderLayer(e.dataTransfer.getData('text/plain'),l.id);};
     wrap.appendChild(d);});
-  const l=activeLayer();controlsEl.classList.toggle('hidden',!l);
+  const l=isEmptyTemplateLogo(activeLayer())?null:activeLayer();controlsEl.classList.toggle('hidden',!l);
   window.dispatchEvent(new CustomEvent('mqd:selection-changed',{detail:mobileSelection()}));
   if(!l){textControls?.classList.add('hidden');return;}
   // Lightweight Jacket 2D editor gets a little more sizing range without
@@ -1513,7 +1513,7 @@ function renderLayerPanel(){
       }
     }
   }
-  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText||!!l.templateRole);$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
+  const isText=l.type==='text',imageQuick=$('imageQuickControls');textControls?.classList.toggle('hidden',!isText||(!!l.templateRole&&!isEditableTemplateLayer(l)));$('cropHint')?.classList.toggle('hidden',!(cropMode&&l.type==='image'));$('cropTool')?.classList.toggle('active-tool',cropMode&&l.type==='image');
   let bgTools=$('backgroundRemovalTools');
   if(!bgTools&&imageQuick){
     bgTools=document.createElement('div');bgTools.id='backgroundRemovalTools';bgTools.className='background-removal-tools';
@@ -1521,7 +1521,7 @@ function renderLayerPanel(){
     imageQuick.prepend(bgTools);
     $('removeImageBackground').onclick=removeBackgroundActive;$('restoreImageBackground').onclick=restoreBackgroundActive;
   }
-  const bgEligible=MQD_BACKGROUND_REMOVAL_ENABLED&&l.type==='image'&&!l.libraryAssetId;
+  const bgEligible=MQD_BACKGROUND_REMOVAL_ENABLED&&l.type==='image'&&!l.libraryAssetId&&!l.templateRole;
   imageQuick?.classList.toggle('hidden',l.type!=='image'||(!bgEligible&&!(cropMode&&l.type==='image')));
   if(bgTools){
     bgTools.classList.toggle('hidden',!bgEligible);
@@ -2438,7 +2438,7 @@ function initTextFonts(){
   }
   syncTextFontPreview(sel.value||'Inter');
 }
-function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text'||(l.templateRole&&!(l.templateRole==='text'&&prop==='text')))return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px ${textFontFamily(val)}`).finally(()=>renderAll());else renderAll();}else renderAll();}
+function updateTextProp(prop,val){const l=activeLayer();if(!l||l.type!=='text'||(l.templateRole&&l.templateRole!=='text'))return;l[prop]=val;if(prop==='font'){syncTextFontPreview(val);if(document.fonts?.load)document.fonts.load(`32px ${textFontFamily(val)}`).finally(()=>renderAll());else renderAll();}else renderAll();}
 $('textValue')?.addEventListener('input',e=>updateTextProp('text',e.target.value));
 $('textFont')?.addEventListener('change',e=>updateTextProp('font',e.target.value));
 $('textColor')?.addEventListener('input',e=>updateTextProp('color',e.target.value.toUpperCase()));
@@ -2650,7 +2650,7 @@ function refreshMobileWorkspace(pane){
  return false;
 }
 function mobileSelection(){
- const l=activeLayer();
+ const l=isEmptyTemplateLogo(activeLayer())?null:activeLayer();
  return{productId:product.id,zone:activeZone,id:l?.id||null,type:l?.type||null,label:l?.label||'',text:l?.text||'',filename:l?.filename||'',visible:l?.visible!==false,locked:isLockedLibraryLayer(l)};
 }
 function beginRevealCapture(){
@@ -2664,7 +2664,7 @@ function beginRevealCapture(){
   restore(){if(restored)return;restored=true;camera.position.copy(position);controls.target.copy(target);controls.enabled=enabled;controls.enableDamping=damping;controls.update();renderer.render(scene,camera);}
  };
 }
-window.MQDDesigner={templateFieldEdit,templateFields,exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,beginRevealCapture,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
+window.MQDDesigner={templateSelectField,templateFieldEdit,templateFields,exportDesign:designJSON,loadDesign:loadDesignPayload,addLibraryAsset,setProductionProofView,beginRevealCapture,refreshMobileWorkspace,getSelection:mobileSelection,getContext:()=>({productId:product.id,productName:product.name,zone:activeZone})};
 $('designUpload').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
@@ -2722,6 +2722,11 @@ renderProducts();renderAll();init3D();loadGarment();
 function templateFields(){
  const ref=designs[product.id]?.template;if(!ref)return null;
  return {...ref,fields:ref.fields.map(field=>{const l=designs[product.id].zones[field.zone]?.layers.find(l=>l.templateLayerId===field.layerId);return{...field,value:l?.text||'',replaced:!!l?.templateReplaced};})};
+}
+function templateSelectField(fieldId){
+ const field=templateFields()?.fields.find(f=>f.layerId===fieldId);if(!field)return;
+ const layer=designs[product.id].zones[field.zone]?.layers.find(l=>l.templateLayerId===fieldId);if(!layer)return;
+ activeZone=field.zone;activeLayerId=layer.id;cropMode=false;renderAll();
 }
 async function templateFieldEdit(fieldId,value){
  const ref=designs[product.id]?.template,field=ref?.fields.find(f=>f.layerId===fieldId);if(!field)throw new Error('Choose an editable field.');

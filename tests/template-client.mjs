@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
-import {remainingTemplateFields,cloneTemplate,logoFitScale,templateLayers} from '../v20/template-contract.js';
+import {remainingTemplateFields,cloneTemplate,logoFitScale,templateLayers,isEditableTemplateLayer,isEmptyTemplateLogo} from '../v20/template-contract.js';
 import {demoVersions} from '../v20/template-demo.js';
 const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
 // Exercise the actual browser draft save functions, not a replacement copy implementation.
@@ -7,7 +7,7 @@ const customer=read('v20/customer.js'),slice=(start,end)=>customer.slice(custome
 const rows=[],uploads=[],userId=crypto.randomUUID(),oldDesign=crypto.randomUUID();
 const payload=cloneTemplate(demoVersions[0]);delete payload.design.template.demo;
 for(const {zone,layer} of templateLayers(payload))if(layer.type==='image'){
- if(layer.templateRole==='locked'){layer.templateAssetPath='immutable/'+layer.id;delete layer.src;}
+ if(['locked','artwork'].includes(layer.templateRole)){layer.templateAssetPath='immutable/'+layer.id;delete layer.src;}
  else{layer.src='data:image/png;base64,iVBORw0KGgo=';layer.storagePath=userId+'/designs/'+oldDesign+'/'+zone+'/old.png';layer.templateReplaced=true;layer.templateReplacementHash='a'.repeat(64);}
 }
 const context=vm.createContext({structuredClone,crypto,Date,console,accountUser:()=>({id:userId}),activeCloudDesign:{id:oldDesign,status:'draft',version:1,name:'Old design'},
@@ -27,3 +27,23 @@ let prevented=false;previewHandler({target:{closest:selector=>selector.includes(
 // Pure fit calculation used by the actual image field replacement preserves aspect ratio.
 assert(logoFitScale([600,300],[300,900],[3763,4992],.25)>0);
 console.log('PASS actual client save and guest handlers: independent design IDs and private logo assets, immutable backgrounds retained, no source mutation, sample-field interception before upload, early demo protection.');
+
+// Actual editor guards: only customer details gain controls. Empty logo slots
+// have no hit/selection rectangle; uploaded logos regain their normal outline.
+const editor=read('v20/editor.js');
+const lineFunction=name=>editor.match(new RegExp('function '+name+'\\([^\\n]+'))[0];
+let selected;const guard=vm.createContext({isEditableTemplateLayer,isEmptyTemplateLogo,activeLayer:()=>selected,renderLayerPanel(){},renderPrintQuality(){},drawEditor(){},scheduleGarmentPreview(){},renderAll(){},syncTextFontPreview(){},document:{fonts:null}});
+vm.runInContext(['isLockedLibraryLayer','updateLayer','updateTextProp'].map(lineFunction).join('\n'),guard);
+for(const role of ['text','artwork','locked','logo']){
+ selected={templateRole:role,x:0,y:0,scale:1,rotation:0,type:role==='text'?'text':'image'};
+ guard.next=role;assert.equal(vm.runInContext('isLockedLibraryLayer()',guard),!['text','artwork'].includes(role));
+ vm.runInContext("updateLayer('x',25);updateLayer('scale',.8)",guard);
+ assert.equal(selected.x,['text','artwork'].includes(role)?25:0);
+ assert.equal(selected.scale,['text','artwork'].includes(role)?.8:1);
+ if(role==='text'){vm.runInContext("updateTextProp('text','MY SERVICES');updateTextProp('color','#123456')",guard);assert.equal(selected.text,'MY SERVICES');assert.equal(selected.color,'#123456');}
+}
+selected={type:'image',libraryAssetId:'background',libraryLocked:true};assert(vm.runInContext('isLockedLibraryLayer()',guard));
+selected={type:'image'};assert.equal(vm.runInContext('isLockedLibraryLayer()',guard),false);
+const rectSource=editor.slice(editor.indexOf('function activeLayerScreenRect('),editor.indexOf('// @mapping-begin rotateSelectionPoint'));
+vm.runInContext(rectSource,guard);guard.slot={templateRole:'logo',templateReplaced:false};assert.equal(vm.runInContext('activeLayerScreenRect(slot)',guard),null);assert.equal(isEmptyTemplateLogo({...guard.slot,templateReplaced:true}),false);
+console.log('PASS actual template editor guards: contact movement/size/text styling enabled, background/flag/logo locks retained, empty logo slots excluded from selection.');

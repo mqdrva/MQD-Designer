@@ -38,7 +38,7 @@ for(let i=0;i<definitions.length;i++){
    const line2=detail('Back-services-2','Services line 2',services[1],12,.60);
    const line3=detail('Back-services-3','Services line 3',services[2],23,.58);
    layers.push(social,phone,line1,line2,line3);
-   rules.push({zone:side,layerId:social.id,role:'locked',label:'Social icons'},... [phone,line1,line2,line3].map(l=>({zone:side,layerId:l.id,role:'text',label:l.label})));
+   rules.push({zone:side,layerId:social.id,role:'artwork',label:'Social icons'},... [phone,line1,line2,line3].map(l=>({zone:side,layerId:l.id,role:'text',label:l.label})));
   }
   zones[side]={background:base,layers};
  }

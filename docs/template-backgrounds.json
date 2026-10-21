@@ -347,7 +347,8 @@
       "flipY": false,
       "note": "Owner requested a smaller flag. Source artwork, sleeve zone, center, rotation and orientation unchanged."
     },
-    "serviceStructure": "Same approved centered layout for every industry: social icons, number, two separate trade-service lines, then & MORE! on its own bottom line. All service text remains editable."
+    "serviceStructure": "Same approved centered layout for every industry: social icons, number, two separate trade-service lines, then & MORE! on its own bottom line. All service text remains editable.",
+    "customerEditing": "Owner requested movable/resizable/rotatable social icons, phone and service layers. Text styling/content editable; social image optional replacement. Backgrounds/flag locked. Empty logo slots retained for upload, excluded from canvas hit/selection and layer list until replaced."
   },
   "sleeveBackground": {
     "status": "unpublished-review",
