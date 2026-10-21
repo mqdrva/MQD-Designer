@@ -20,9 +20,9 @@ for(let i=0;i<definitions.length;i++){
  const image=(id,label,src,x,y,scale,extra={})=>({id,type:'image',label,filename:src.split('/').at(-1),src,x,y,scale,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true,...extra});
  const services={
   'Pressure Washing':['PRESSURE WASHING','SOFT WASHING','& MORE!'],
-  'Lawn Care':['LAWN MOWING • TRIMMING','EDGING • YARD CLEANUPS','HEDGES • MAINTENANCE'],
-  HVAC:['HEATING • COOLING','REPAIRS • MAINTENANCE','& MORE!'],
-  'Pool Care':['POOL CLEANING','WATER CARE • MAINTENANCE','& MORE!'],
+  'Lawn Care':['LAWN MOWING','TRIMMING','& MORE!'],
+  HVAC:['HEATING','COOLING','& MORE!'],
+  'Pool Care':['POOL CLEANING','WATER CARE','& MORE!'],
   'General Business':['YOUR BUSINESS SERVICES','QUALITY SERVICE','& MORE!']
  }[category];
  const detail=(id,label,text,y,scale)=>({id,type:'text',label,text,x:0,y,scale,rotation:0,visible:true,color:textColor,font:'Impact',strokeColor:base,strokeWidth:2,bold:false,italic:false,align:'center'});

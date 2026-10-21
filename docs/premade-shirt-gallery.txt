@@ -95,7 +95,10 @@ and sleeve placement/orientation remain protected. The owner subsequently
 requested a smaller sleeve flag: scale .35 to .20, centered with its source
 artwork and orientation unchanged. Social row y=-25, phone y=-13, services
 y=1/12/23 raise and tighten the contact stack. Pressure Washing / Soft Washing /
-& More! remain three independent text fields. A prepared Back contact layout
+& More! remain three independent text fields. Every trade now uses two distinct
+service lines followed by & MORE! on its own bottom line: Lawn Mowing/Trimming,
+Heating/Cooling, Pool Cleaning/Water Care, and the General Business placeholders.
+Approved background, social/phone/service positions and Impact styling stay fixed. A prepared Back contact layout
 may hold seven layers only with exactly two locked images, one logo and four
 text fields. All other template zones and ordinary editor add/duplicate limits
 stay at six. Font loading waits for the selected family before initial rendering;

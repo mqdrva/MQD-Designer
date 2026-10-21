@@ -30,6 +30,7 @@ for(const [i,version] of demoVersions.entries()){
  assert.equal(version.payload.design.zones.Front.layers[0].flipX,false);assert.equal(version.payload.design.zones.Back.layers[0].flipX,true);
  const flag=version.payload.design.zones['Left Sleeve'].layers[0];assert.equal(flag.flipX,false);assert.equal(flag.flipY,false);assert.equal(flag.scale,.20);
  const back=version.payload.design.zones.Back.layers;assert.equal(back[2].y,-25);assert.equal(back[3].y,-13);assert(back[3].y-back[2].y<18);assert.deepEqual(back.slice(4).map(l=>l.y),[1,12,23]);
+ assert.equal(back[6].text,'& MORE!');assert(back.slice(4).every(l=>!l.text.includes('•')&&!l.text.includes('\n')));
  if(i===0)assert.deepEqual(back.slice(4).map(l=>l.text),['PRESSURE WASHING','SOFT WASHING','& MORE!']);
  const source=structuredClone(version);
  for(const {layer} of templateLayers(source.payload))if(layer.type==='image'){layer.templateAssetPath=source.id+'/'+layer.id;layer.templateAssetHash=hash(fs.readFileSync(new URL('..'+layer.src,import.meta.url)));}
