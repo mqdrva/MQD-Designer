@@ -1,4 +1,4 @@
-// Synthetic unpublished fixtures. Never inserted into the public catalog.
+// Five unpublished review fixtures with approved background originals. Never inserted into the public catalog.
 export const demoVersions=[
   {
     "id": "10000000-0000-4000-8000-000000000001",
@@ -9,6 +9,8 @@ export const demoVersions=[
       "General Business"
     ],
     "range": "Premium · All-over print",
+    "draftStatus": "Approved background; finished shirt remains a draft.",
+    "backgroundSource": "02-pressure-washing-black-blue.jpg",
     "payload": {
       "schema": "mqd-design-v1",
       "engine": {
@@ -57,8 +59,8 @@ export const demoVersions=[
                 "id": "Front-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-1.png",
-                "src": "/assets/template-demos/background-1.png",
+                "filename": "02-pressure-washing-black-blue.jpg",
+                "src": "/assets/template-backgrounds/02-pressure-washing-black-blue.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -138,8 +140,8 @@ export const demoVersions=[
                 "id": "Back-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-1.png",
-                "src": "/assets/template-demos/background-1.png",
+                "filename": "02-pressure-washing-black-blue.jpg",
+                "src": "/assets/template-backgrounds/02-pressure-washing-black-blue.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -317,6 +319,8 @@ export const demoVersions=[
       "Lawn Care"
     ],
     "range": "Premium · All-over print",
+    "draftStatus": "Approved background; finished shirt remains a draft.",
+    "backgroundSource": "07-landscaping-fresh-lawn.png",
     "payload": {
       "schema": "mqd-design-v1",
       "engine": {
@@ -365,8 +369,8 @@ export const demoVersions=[
                 "id": "Front-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-2.png",
-                "src": "/assets/template-demos/background-2.png",
+                "filename": "07-landscaping-fresh-lawn.png",
+                "src": "/assets/template-backgrounds/07-landscaping-fresh-lawn.png",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -446,8 +450,8 @@ export const demoVersions=[
                 "id": "Back-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-2.png",
-                "src": "/assets/template-demos/background-2.png",
+                "filename": "07-landscaping-fresh-lawn.png",
+                "src": "/assets/template-backgrounds/07-landscaping-fresh-lawn.png",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -625,6 +629,8 @@ export const demoVersions=[
       "HVAC"
     ],
     "range": "Premium · All-over print",
+    "draftStatus": "Abstract review substitute; no HVAC-specific artwork supplied.",
+    "backgroundSource": "13-abstract-blue-flow.jpg",
     "payload": {
       "schema": "mqd-design-v1",
       "engine": {
@@ -673,8 +679,8 @@ export const demoVersions=[
                 "id": "Front-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-3.png",
-                "src": "/assets/template-demos/background-3.png",
+                "filename": "13-abstract-blue-flow.jpg",
+                "src": "/assets/template-backgrounds/13-abstract-blue-flow.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -719,7 +725,7 @@ export const demoVersions=[
                 "scale": 0.47,
                 "rotation": 0,
                 "visible": true,
-                "color": "#FFFFFF",
+                "color": "#10243B",
                 "font": "Inter",
                 "strokeColor": "#000000",
                 "strokeWidth": 0,
@@ -737,7 +743,7 @@ export const demoVersions=[
                 "scale": 0.35,
                 "rotation": 0,
                 "visible": true,
-                "color": "#FFFFFF",
+                "color": "#10243B",
                 "font": "Inter",
                 "strokeColor": "#000000",
                 "strokeWidth": 0,
@@ -754,8 +760,8 @@ export const demoVersions=[
                 "id": "Back-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-3.png",
-                "src": "/assets/template-demos/background-3.png",
+                "filename": "13-abstract-blue-flow.jpg",
+                "src": "/assets/template-backgrounds/13-abstract-blue-flow.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -800,7 +806,7 @@ export const demoVersions=[
                 "scale": 0.47,
                 "rotation": 0,
                 "visible": true,
-                "color": "#FFFFFF",
+                "color": "#10243B",
                 "font": "Inter",
                 "strokeColor": "#000000",
                 "strokeWidth": 0,
@@ -818,7 +824,7 @@ export const demoVersions=[
                 "scale": 0.35,
                 "rotation": 0,
                 "visible": true,
-                "color": "#FFFFFF",
+                "color": "#10243B",
                 "font": "Inter",
                 "strokeColor": "#000000",
                 "strokeWidth": 0,
@@ -933,6 +939,8 @@ export const demoVersions=[
       "Pool Care"
     ],
     "range": "Premium · All-over print",
+    "draftStatus": "Approved background; finished shirt remains a draft.",
+    "backgroundSource": "10-pool-cleaning-aqua-ripples.png",
     "payload": {
       "schema": "mqd-design-v1",
       "engine": {
@@ -981,8 +989,8 @@ export const demoVersions=[
                 "id": "Front-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-4.png",
-                "src": "/assets/template-demos/background-4.png",
+                "filename": "10-pool-cleaning-aqua-ripples.png",
+                "src": "/assets/template-backgrounds/10-pool-cleaning-aqua-ripples.png",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -1062,8 +1070,8 @@ export const demoVersions=[
                 "id": "Back-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-4.png",
-                "src": "/assets/template-demos/background-4.png",
+                "filename": "10-pool-cleaning-aqua-ripples.png",
+                "src": "/assets/template-backgrounds/10-pool-cleaning-aqua-ripples.png",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -1241,6 +1249,8 @@ export const demoVersions=[
       "General Business"
     ],
     "range": "Premium · All-over print",
+    "draftStatus": "Approved background; finished shirt remains a draft.",
+    "backgroundSource": "14-abstract-dark-waves.jpg",
     "payload": {
       "schema": "mqd-design-v1",
       "engine": {
@@ -1289,8 +1299,8 @@ export const demoVersions=[
                 "id": "Front-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-5.png",
-                "src": "/assets/template-demos/background-5.png",
+                "filename": "14-abstract-dark-waves.jpg",
+                "src": "/assets/template-backgrounds/14-abstract-dark-waves.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,
@@ -1370,8 +1380,8 @@ export const demoVersions=[
                 "id": "Back-background",
                 "type": "image",
                 "label": "Background",
-                "filename": "background-5.png",
-                "src": "/assets/template-demos/background-5.png",
+                "filename": "14-abstract-dark-waves.jpg",
+                "src": "/assets/template-backgrounds/14-abstract-dark-waves.jpg",
                 "x": 0,
                 "y": 0,
                 "scale": 1,

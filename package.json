@@ -9,7 +9,7 @@
     "test:plugin-submission": "node tests/plugin-submission-metadata.mjs",
     "build:mappings": "node scripts/sync-garment-mapping.mjs",
     "check:mappings": "node scripts/sync-garment-mapping.mjs --check",
-    "test:templates": "node tests/template-gallery.mjs && node tests/template-client.mjs && node tests/template-api.mjs",
+    "test:templates": "node tests/template-backgrounds.mjs && node tests/template-gallery.mjs && node tests/template-client.mjs && node tests/template-api.mjs",
     "build:template-demos": "node scripts/build-template-demos.mjs"
   },
   "devDependencies": {

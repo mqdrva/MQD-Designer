@@ -6,8 +6,8 @@ Read-only sources/ and unrelated dirty checkout were left intact.
 
 REVIEW
 Open /template-preview.html for a phone-width or desktop-width demo, or
-/design-gallery.html?demo=1 for the full-screen gallery. Five synthetic UNPUBLISHED
-fixtures exist only in v20/template-demo.js, never in the live catalog. Cards use
+/design-gallery.html?demo=1 for the full-screen gallery. Five UNPUBLISHED review
+fixtures using supplied original backgrounds exist only in v20/template-demo.js, never in the live catalog. Cards use
 actual front/back panel renders from the existing editor's layer/silhouette code.
 They are demonstrations, not approved editable launch designs.
 Select a card, replace Front/Back logos, change phone/services, review the shirt,
@@ -73,6 +73,23 @@ logo replacement, editable details, disabled protected actions, local save/reope
 and blocking demo ordering. Hosted database-backed owner publishing, two real
 customer accounts, hosted storage durability, real cart persistence and Stripe TEST
 session creation remain blocked on an isolated Supabase test environment.
+
+BACKGROUND RECEIPT — PR150 CONTINUATION
+17 files received and decoded/read: 15 originals at 1024 x 1536, a 1500 x 1720
+contact sheet and HTML catalog. Full filenames, dimensions, SHA256 and use status
+are in docs/template-backgrounds.json. Original attachment bytes remain unchanged.
+Five existing slots only: Pressure Wash=02, Lawn=07, HVAC=13 (abstract substitute),
+Pool=10, General Business=14. Others are reference alternatives, not extra designs.
+All five remain unpublished drafts. Card renders use exact editor functions.
+Front/Back geometry, back flipX, garment mapping/calibration and the separate
+synthetic left-sleeve flag remain unchanged from 49e02b1. Flag body variants 04-06
+are not integrated because back mirroring would reverse embedded flag artwork.
+Transparency remains in PNG masters over each existing zone base color.
+HVAC text is darkened for contrast on the light abstract background; positions
+are unchanged. Existing oversized back-logo placeholders crowd the phone text;
+that needs approved slot/layout refinement before launch. No completed owner
+saved designs or print-ready 300-DPI masters were supplied. Background approval
+does not approve these synthetic garment placements, sample logos or sleeve flag.
 
 FIVE APPROVED LAUNCH SOURCES STILL NEEDED
 For EACH of five owner-approved designs:
