@@ -1,10 +1,15 @@
 import {attachEntryVideo} from './contest-media.js';
 import {contestRequest} from './contest-api.js';
-import {voterToken} from './voting-api.js';
+import {voterToken,readBrowserMarker,writeBrowserMarker} from './voting-api.js?v=20261021-fair-voting';
 const $=id=>document.getElementById(id),id=new URL(location.href).searchParams.get('id');
 let serverOffset=0;const now=()=>Date.now()+serverOffset;
 const key='mqd-contest-vote-'+id;let selected='',result=null,busy=false,celebrated=false,timer;
-try{selected=localStorage.getItem(key)||'';}catch{}
+selected=readBrowserMarker(key);
+if(selected!=='already-voted'&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(selected))selected='';
+if(selected)writeBrowserMarker(key,selected);
+const cooldownKey=key+'-retry-at';
+const cooldownUntil=()=>Number(readBrowserMarker(cooldownKey))||0;
+const cooldownMessage=()=>`A vote was recently recorded from this internet connection. Try again in ${Math.max(1,Math.ceil((cooldownUntil()-Date.now())/1000))} seconds. People sharing Wi-Fi must wait between votes.`;
 const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text)e.textContent=text;if(cls)e.className=cls;return e;};
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<35;i++){const e=node('i',null,'confetti');e.style.setProperty('--x',Math.random()*100+'vw');e.style.setProperty('--c',['#ff8a3d','#c7a7ff','#63e6d3'][i%3]);e.style.animationDelay=Math.random()*.4+'s';document.body.append(e);setTimeout(()=>e.remove(),3500);}}
 function updateCountdown(){if(!result)return;const remaining=new Date(result.contest.closes_at)-now();if(remaining<=0){$('contestCountdown').textContent='VOTING CLOSED';if(!$('contestWinner').hidden)return;render(result);return;}const seconds=Math.floor(remaining/1000);$('contestCountdown').textContent=`${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s left to vote`;}
@@ -40,8 +45,23 @@ function render(next){
  }else $('contestWinner').hidden=true;
  updateCountdown();
 }
-async function vote(optionId){busy=true;render(result);$('contestStatus').textContent='Counting your vote…';try{const next=await contestRequest({action:'vote',contestId:id,optionId,voterToken:voterToken(),resultsOnly:true});selected=next.recorded===false?'already-voted':optionId;try{localStorage.setItem(key,selected);}catch{}busy=false;render(next);$('contestStatus').textContent=next.recorded===false?'You have already voted from this browser.':'Your vote is counted. Share the contest with your friends!';if(next.recorded)confetti();}catch(e){busy=false;render(result);$('contestStatus').textContent=e.message;}}
-async function refresh(){if(busy||document.hidden)return;try{if(!id){const {contests}=await contestRequest({action:'list'});$('contestOptions').replaceChildren();for(const c of contests.filter(c=>!c.round_month)){const card=node('article',null,'contest-card'),a=node('a','Explore contest →','button');a.setAttribute('aria-label','Explore contest: '+c.title);a.href='/contests.html?id='+encodeURIComponent(c.id);card.append(node('p',new Date(c.closes_at)>new Date()?'● OPEN FOR VOTING':'✦ FINAL RESULTS','contest-state'),node('h2',c.title),node('p',c.description),a);$('contestOptions').append(card);}$('contestStatus').textContent=contests.some(c=>!c.round_month)?'Choose a contest to view its designs.':'No contests are open yet. Check back for our next design spotlight.';return;}let next=await contestRequest({action:'public',contestId:id,resultsOnly:!!result});if(next.options.some(o=>!o.preview&&!result?.options.some(old=>old.id===o.id)))next=await contestRequest({action:'public',contestId:id});render(next);$('contestStatus').textContent=!result.options.length?'No approved designs yet. Entries appear here after MQD approves them.':now()>=Date.parse(result.contest.closes_at)?'Voting has closed. View the results below.':selected?'Your vote has been submitted.':'Choose your favorite design below.';}catch(e){$('contestStatus').textContent=e.message;}}
+async function vote(optionId){
+ if(busy)return;
+ const saved=readBrowserMarker(key);if(saved)selected=saved;
+ if(selected){render(result);$('contestStatus').textContent='You have already voted from this browser.';return;}
+ if(cooldownUntil()>Date.now()){$('contestStatus').textContent=cooldownMessage();return;}
+ busy=true;render(result);$('contestStatus').textContent='Counting your vote…';
+ try{
+  const next=await contestRequest({action:'vote',contestId:id,optionId,voterToken:voterToken(),resultsOnly:true});
+  selected=next.recorded===false?'already-voted':optionId;writeBrowserMarker(key,selected);
+  busy=false;render(next);$('contestStatus').textContent=next.recorded===false?'You have already voted from this browser.':'Your vote is counted. Share the contest with your friends!';if(next.recorded)confetti();
+ }catch(e){
+  const seconds=/Please try again in (\d+) seconds\./.exec(e.message||'');
+  if(seconds)writeBrowserMarker(cooldownKey,String(Date.now()+Math.min(300,Number(seconds[1]))*1000));
+  busy=false;render(result);$('contestStatus').textContent=e.message;
+ }
+}
+async function refresh(){if(busy||document.hidden)return;const saved=readBrowserMarker(key);if(saved)selected=saved;try{if(!id){const {contests}=await contestRequest({action:'list'});$('contestOptions').replaceChildren();for(const c of contests.filter(c=>!c.round_month)){const card=node('article',null,'contest-card'),a=node('a','Explore contest →','button');a.setAttribute('aria-label','Explore contest: '+c.title);a.href='/contests.html?id='+encodeURIComponent(c.id);card.append(node('p',new Date(c.closes_at)>new Date()?'● OPEN FOR VOTING':'✦ FINAL RESULTS','contest-state'),node('h2',c.title),node('p',c.description),a);$('contestOptions').append(card);}$('contestStatus').textContent=contests.some(c=>!c.round_month)?'Choose a contest to view its designs.':'No contests are open yet. Check back for our next design spotlight.';return;}let next=await contestRequest({action:'public',contestId:id,resultsOnly:!!result});if(next.options.some(o=>!o.preview&&!result?.options.some(old=>old.id===o.id)))next=await contestRequest({action:'public',contestId:id});render(next);$('contestStatus').textContent=!result.options.length?'No approved designs yet. Entries appear here after MQD approves them.':now()>=Date.parse(result.contest.closes_at)?'Voting has closed. View the results below.':selected?'Your vote has been submitted.':cooldownUntil()>Date.now()?cooldownMessage():'Choose your favorite design below.';}catch(e){$('contestStatus').textContent=e.message;}}
 async function share(){try{if(navigator.share){await navigator.share({title:result?.contest.title||'MyMerchNow Design Spotlight',url:location.href});return;}await navigator.clipboard.writeText(location.href);$('contestStatus').textContent='Contest link copied.';}catch(e){if(e.name!=='AbortError')$('contestStatus').textContent='Copy this page’s address to share the contest.';}}
 if(!id){$('refreshContest').hidden=true;$('allContests').hidden=true;}$('refreshContest').onclick=refresh;$('shareContest').onclick=share;refresh();timer=setInterval(refresh,30000);const clock=setInterval(updateCountdown,1000);addEventListener('pagehide',()=>{clearInterval(timer);clearInterval(clock);});
 
