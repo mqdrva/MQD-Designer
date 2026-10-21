@@ -96,13 +96,15 @@ function addReplayButton(){
   button.type='button';
   button.className='sidebar-tour-replay';
   button.textContent='? Quick design tour';
-  button.onclick=()=>startTour({force:true});
+  button.onclick=()=>{const template=document.getElementById('templateCustomize');if(template){template.scrollIntoView({behavior:'smooth',block:'start'});return;}startTour({force:true});};
   tabs.insertAdjacentElement('afterend',button);
 }
 
 function boot(){
   addReplayButton();
-  if(new URLSearchParams(location.search).get('signIn')==='try-on')return;
+  const query=new URLSearchParams(location.search);
+  if(['template','templateDemo','templateOwnerPreview'].some(key=>query.has(key))||window.MQDDesigner?.exportDesign?.()?.design?.template)return;
+  if(query.get('signIn')==='try-on')return;
   const force=new URLSearchParams(location.search).get('tour')==='1';
   setTimeout(()=>startTour({force}),650);
 }
