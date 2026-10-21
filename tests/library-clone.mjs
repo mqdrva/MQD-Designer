@@ -1,3 +1,4 @@
+import {maxZoneLayers} from '../v20/layer-capacity.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -30,7 +31,7 @@ let snapshots=0,renders=0;
 const context={
   layerSeq:1,
   product:{id:'tshirt',zones:['Front','Back']},
-  MAX_ZONE_LAYERS:6,
+  maxZoneLayers,
   zoneState:zone=>zoneStates[zone],
   snapshot:()=>{snapshots++;},
   renderAll:()=>{renders++;},

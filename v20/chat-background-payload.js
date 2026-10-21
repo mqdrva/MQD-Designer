@@ -1,3 +1,4 @@
+import {maxZoneLayers} from './layer-capacity.js';
 export function backgroundPrompt(description){
   return `Create a new flat, rectangular background image: ${description.trim()}\nFill the entire image edge to edge. Background artwork only: no shirt or garment mockup, logos, words, phone numbers, or clothing outlines.`;
 }
@@ -10,7 +11,7 @@ export function addChatBackground(current,asset,zones){
     if(!Object.hasOwn(current.templates||{},zone))throw new Error('Choose an area on the current garment.');
     const row=payload.design.zones[zone]??={background:'#FFFFFF',layers:[]};
     const layers=(row.layers||[]).filter(layer=>!layer.chatBackground&&layer.aiAssetKind!=='artwork');
-    if(layers.length>=6)throw new Error(`${zone} already has six layers. Remove one before adding a background.`);
+    if(layers.length>=maxZoneLayers(current.product,zone))throw new Error(`${zone} already has ${maxZoneLayers(current.product,zone)} layers. Remove one before adding a background.`);
     row.layers=[{id:`chat-background-${zone.replaceAll(' ','-')}`,type:'image',label:'ChatGPT Background',filename:asset.filename,src:asset.src,x:0,y:0,scale:1,rotation:0,visible:true,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},chatBackground:true},...layers];
   }
   return payload;

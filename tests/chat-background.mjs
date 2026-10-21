@@ -14,8 +14,8 @@ const replaced=addChatBackground(applied,{...asset,src:'replacement'},['Front'])
 assert.equal(replaced.design.zones.Front.layers.length,2);
 assert.equal(replaced.design.zones.Back.layers[0].src,asset.src);
 assert.deepEqual(replaced.design.zones.Front.layers[1],logo);
-const full=structuredClone(current);full.design.zones.Back.layers=Array.from({length:6},(_,id)=>({...text,id}));
-assert.throws(()=>addChatBackground(full,asset,['Front','Back']),/six layers/);
+const full=structuredClone(current);full.design.zones.Back.layers=Array.from({length:9},(_,id)=>({...text,id}));
+assert.throws(()=>addChatBackground(full,asset,['Front','Back']),/9 layers/);
 assert.equal(full.design.zones.Front.layers.length,1);
 assert.throws(()=>addChatBackground(current,asset,['Unknown']),/current garment/);
 assert.match(backgroundPrompt('blue water'),/blue water/);

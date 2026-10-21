@@ -5,11 +5,12 @@ import {assertTemplateDraft,cloneTemplate,remainingTemplateFields,assertCustomiz
 const original=structuredClone(demoVersions[0]);
 for(const {layer} of templateLayers(original.payload))if(layer.type==='image'){layer.templateAssetPath=original.id+'/'+layer.id+'.png';layer.templateAssetHash='a'.repeat(64);}
 assertTemplateDraft({...original,payload:original.payload});
-// Only a prepared Back contact stack gains one live text row. Ordinary zones
-// and extra artwork still retain the existing six-layer limit.
-const overflow=structuredClone(original);overflow.payload.design.zones.Back.layers.push({...overflow.payload.design.zones.Back.layers.at(-1),id:'overflow'});overflow.rules.push({zone:'Back',layerId:'overflow',role:'text',label:'Overflow'});assert.throws(()=>assertTemplateDraft(overflow),/six layers/);
-const extraImage=structuredClone(original);extraImage.payload.design.zones.Back.layers.at(-1).type='image';extraImage.rules.at(-2).role='locked';assert.throws(()=>assertTemplateDraft(extraImage));
-const wrongZone=structuredClone(original);wrongZone.payload.design.zones.Front=structuredClone(wrongZone.payload.design.zones.Back);assert.throws(()=>assertTemplateDraft(wrongZone),/six layers/);
+// Back layouts on tops allow nine layers; other print zones retain six.
+const overflow=structuredClone(original);
+for(let n=7;n<9;n++){const id='extra-'+n;overflow.payload.design.zones.Back.layers.push({...overflow.payload.design.zones.Back.layers.at(-1),id});overflow.rules.push({zone:'Back',layerId:id,role:'text',label:'Extra'});}
+assertTemplateDraft(overflow);
+overflow.payload.design.zones.Back.layers.push({...overflow.payload.design.zones.Back.layers.at(-1),id:'overflow'});overflow.rules.push({zone:'Back',layerId:'overflow',role:'text',label:'Overflow'});assert.throws(()=>assertTemplateDraft(overflow),/up to 9 layers/);
+const wrongZone=structuredClone(original);wrongZone.payload.design.zones.Front=structuredClone(wrongZone.payload.design.zones.Back);assert.throws(()=>assertTemplateDraft(wrongZone),/up to 6 layers/);
 const a=cloneTemplate(original),b=cloneTemplate(original);
 assert.notEqual(a.designId,b.designId);assert.notEqual(a.design.template.copyId,b.design.template.copyId);
 assert.equal(new Set([...templateLayers(a),...templateLayers(b)].map(x=>x.layer.id)).size,24);
