@@ -6,7 +6,7 @@ Read-only sources/ and unrelated dirty checkout were left intact.
 
 REVIEW
 Open /template-preview.html for a phone-width or desktop-width demo, or
-/design-gallery.html?demo=1 for the full-screen gallery. Five UNPUBLISHED review
+/design-gallery.html?demo=1 for the full-screen gallery. Fifteen UNPUBLISHED review
 fixtures using supplied original backgrounds exist only in v20/template-demo.js, never in the live catalog. Cards use
 actual front/back panel renders from the existing editor's layer/silhouette code.
 They are demonstrations, not approved editable launch designs.
@@ -110,7 +110,7 @@ saved designs or print-ready 300-DPI masters were supplied. Background approval
 does not approve these synthetic garment placements, sample logos or sleeve flag.
 
 FIVE APPROVED LAUNCH SOURCES STILL NEEDED
-For EACH of five owner-approved designs:
+For EACH owner-approved design:
 1. Owner saved editable mqd-design-v1 design ID (or save the layered source into
    the owner account), with the exact intended garment and every print zone.
 2. Original full-resolution background artwork and sleeve/flag assets, with any
@@ -144,3 +144,18 @@ canvas hit rectangles/selection outlines or phantom layer rows. Uploaded logos
 retain their existing fixed placement rules. Backgrounds, flag, garment mapping,
 body/sleeve placement, template order and required fields remain protected.
 Legacy locked-social versions retain their original rules. Review-only update.
+
+FIFTEEN-BACKGROUND EXPANSION — SUPERSEDES FIVE-ONLY REVIEW SCOPE
+Owner now requested all fifteen supplied originals before launch. Existing five
+IDs/layouts remain, with ten unique background variants appended in the same
+gallery. Six pressure-washing originals use the pressure-wash contact fields;
+three grass originals use lawn-care fields; three pool originals use pool-care
+fields. Three abstracts retain HVAC/general-business review layouts. No contact
+positions, fonts, text, logo slots or edit controls vary within an industry.
+All fifteen originals are now integrated exactly; no alternative remains unused.
+Originals04–06 embed flag artwork and are deliberately not mirrored on Back or
+Right Sleeve; otherwise flag orientation would reverse. These remain drafts
+pending seam/print signoff, like the rest. Separate small sleeve flag unchanged.
+Sixty actual body/sleeve panel previews. No public catalog publish, production
+backend change, merge or production deployment. Previous staging/print limitations
+still apply. Historical five-only/unused-art notes above describe earlier stages.

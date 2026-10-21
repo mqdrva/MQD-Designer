@@ -4,7 +4,7 @@ import {GARMENT_MAPPING} from '../v20/garment-mapping-catalog.js';
 const dir='assets/template-demos';fs.mkdirSync(dir,{recursive:true});
 const manifest=JSON.parse(fs.readFileSync('docs/template-backgrounds.json','utf8'));
 const definitions=manifest.slots;
-if(definitions.length!==5)throw new Error('The existing collection must contain exactly five starter drafts.');
+if(definitions.length!==15)throw new Error('The existing collection must contain all fifteen supplied background options.');
 function png(name,w,h,draw){const canvas=createCanvas(w,h);draw(canvas.getContext('2d'),w,h);fs.writeFileSync(dir+'/'+name,canvas.toBuffer('image/png'));return canvas;}
 // Transparent logo slots keep starter garments free of sample branding.
 png('blank-logo-slot.png',600,300,()=>{});
@@ -27,7 +27,7 @@ for(let i=0;i<definitions.length;i++){
  }[category];
  const detail=(id,label,text,y,scale)=>({id,type:'text',label,text,x:0,y,scale,rotation:0,visible:true,color:textColor,font:'Impact',strokeColor:base,strokeWidth:2,bold:false,italic:false,align:'center'});
  for(const side of ['Front','Back']){
-  const background=image(side+'-background','Background',`/assets/template-backgrounds/${filename}`,0,0,1,{flipX:side==='Back'});
+  const background=image(side+'-background','Background',`/assets/template-backgrounds/${filename}`,0,0,1,{flipX:side==='Back'&&definitions[i].mirrorPattern!==false});
   const logo=image(side+'-logo','Your logo',`/${dir}/blank-logo-slot.png`,0,side==='Front'?-30:-48,side==='Front'?.25:.16);
   const layers=[background,logo];
   rules.push({zone:side,layerId:background.id,role:'locked',label:side+' background'},{zone:side,layerId:logo.id,role:'logo',label:'Your logo'});
@@ -45,7 +45,7 @@ for(let i=0;i<definitions.length;i++){
  // Match the existing body artwork on both sleeves. Hem anchoring keeps the
  // grass/water detail visible on the wider sleeve panel without editing assets.
  for(const side of ['Left Sleeve','Right Sleeve']){
-  const background=image(side.replace(' ','-')+'-background','Sleeve background',`/assets/template-backgrounds/${filename}`,0,manifest.sleeveBackground.y,1,{flipX:side==='Right Sleeve'});
+  const background=image(side.replace(' ','-')+'-background','Sleeve background',`/assets/template-backgrounds/${filename}`,0,manifest.sleeveBackground.y,1,{flipX:side==='Right Sleeve'&&definitions[i].mirrorPattern!==false});
   zones[side]={background:base,layers:[background]};
   rules.push({zone:side,layerId:background.id,role:'locked',label:side+' background'});
  }
@@ -53,8 +53,8 @@ for(let i=0;i<definitions.length;i++){
  rules.push({zone:'Left Sleeve',layerId:'sleeve-flag',role:'locked',label:'Sleeve flag'});
  zones.Collar={background:base,layers:[]};
  const payload={schema:'mqd-design-v1',engine:{calibration:'v26-surface-uv-collar-strip'},product:{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',model:template.model},templates:template.templates,activeZone:'Front',design:{zones}};
- versions.push({id:versionId,template_id:id,name:'UNPUBLISHED · '+name,categories:category==='Pressure Washing'?[category,'General Business']:[category],range:'Premium · All-over print',draftStatus:definitions[i].note,backgroundSource:filename,payload,rules,previews:{Front:`/${dir}/${i+1}-front.png`,Back:`/${dir}/${i+1}-back.png`,'Left Sleeve':`/${dir}/${i+1}-left-sleeve.png`,'Right Sleeve':`/${dir}/${i+1}-right-sleeve.png`}});
+ versions.push({id:versionId,template_id:id,name:'UNPUBLISHED · '+name,categories:[category],range:'Premium · All-over print',draftStatus:definitions[i].note,backgroundSource:filename,payload,rules,previews:{Front:`/${dir}/${i+1}-front.png`,Back:`/${dir}/${i+1}-back.png`,'Left Sleeve':`/${dir}/${i+1}-left-sleeve.png`,'Right Sleeve':`/${dir}/${i+1}-right-sleeve.png`}});
 }
-fs.writeFileSync('v20/template-demo.js','// Five unpublished review fixtures with approved background originals. Never inserted into the public catalog.\nexport const demoVersions='+JSON.stringify(versions,null,2)+';\n');
+fs.writeFileSync('v20/template-demo.js','// Fifteen unpublished review fixtures with approved background originals. Never inserted into the public catalog.\nexport const demoVersions='+JSON.stringify(versions,null,2)+';\n');
 
 await import('./render-template-demos.mjs');

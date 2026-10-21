@@ -30,4 +30,4 @@ for(const version of demoVersions){
    fs.writeFileSync(version.previews[side].slice(1),canvas.toBuffer('image/png'));
  }
 }
-console.log('Rendered 20 body/sleeve demo previews with the actual editor layer/silhouette functions.');
+console.log(`Rendered ${demoVersions.length*4} body/sleeve demo previews with the actual editor layer/silhouette functions.`);

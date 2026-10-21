@@ -1,9 +1,9 @@
 {
   "schema": "mqd-background-review-v1",
   "sourceDirectory": "approved-template-backgrounds",
-  "totalStarterDesigns": 5,
+  "totalStarterDesigns": 15,
   "status": "unpublished-drafts",
-  "placementPolicy": "Existing body geometry, Back mirroring and small unmirrored flag placement unchanged. Added locked matching original backgrounds to both sleeves below the flag. Models, mappings, UVs, calibration and collar unchanged; all five remain drafts.",
+  "placementPolicy": "Original five layouts unchanged. Owner expanded the existing gallery to all fifteen original backgrounds using the matching industry layout, editable contact controls and locked body/sleeve backgrounds. American-themed originals remain unmirrored on Back and Right Sleeve to avoid reversing embedded flags; these three need physical seam review. Models, mappings, UVs, calibration, collar and separate small flag unchanged. All fifteen remain drafts.",
   "printReadiness": "1024x1536 originals are suitable for review, not confirmed 300-DPI production masters. Exact owner saved garment sources, approved sleeve/flag masters and seam/orientation signoff remain missing.",
   "slots": [
     {
@@ -14,7 +14,9 @@
       "base": "#083a59",
       "textColor": "#FFFFFF",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft."
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": true
     },
     {
       "slot": 2,
@@ -24,7 +26,9 @@
       "base": "#173a2b",
       "textColor": "#FFFFFF",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft."
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
     },
     {
       "slot": 3,
@@ -34,7 +38,9 @@
       "base": "#202e4c",
       "textColor": "#10243B",
       "status": "unpublished-draft",
-      "note": "Abstract review substitute; no HVAC-specific artwork supplied."
+      "note": "Abstract review substitute; no HVAC-specific artwork supplied.",
+      "layoutSlot": 3,
+      "mirrorPattern": true
     },
     {
       "slot": 4,
@@ -44,7 +50,9 @@
       "base": "#053b55",
       "textColor": "#FFFFFF",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft."
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
     },
     {
       "slot": 5,
@@ -54,7 +62,133 @@
       "base": "#282335",
       "textColor": "#FFFFFF",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft."
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 5,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 6,
+      "name": "Pressure Wash \u00b7 Ice Blue Demo",
+      "category": "Pressure Washing",
+      "filename": "01-pressure-washing-ice-blue.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft. Contact-text contrast needs review on this light background.",
+      "layoutSlot": 1,
+      "mirrorPattern": true,
+      "contrastReview": true
+    },
+    {
+      "slot": 7,
+      "name": "Pressure Wash \u00b7 Ocean Blue Demo",
+      "category": "Pressure Washing",
+      "filename": "03-pressure-washing-ocean-blue.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 8,
+      "name": "Pressure Wash \u00b7 American Classic Demo",
+      "category": "Pressure Washing",
+      "filename": "04-pressure-washing-american-classic.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft. Contact-text contrast needs review on this light background.",
+      "layoutSlot": 1,
+      "mirrorPattern": false,
+      "contrastReview": true
+    },
+    {
+      "slot": 9,
+      "name": "Pressure Wash \u00b7 American Dark Demo",
+      "category": "Pressure Washing",
+      "filename": "05-pressure-washing-american-dark.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": false
+    },
+    {
+      "slot": 10,
+      "name": "Pressure Wash \u00b7 American Bright Demo",
+      "category": "Pressure Washing",
+      "filename": "06-pressure-washing-american-bright.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft. Contact-text contrast needs review on this light background.",
+      "layoutSlot": 1,
+      "mirrorPattern": false,
+      "contrastReview": true
+    },
+    {
+      "slot": 11,
+      "name": "Lawn Crew \u00b7 Dewy Grass Demo",
+      "category": "Lawn Care",
+      "filename": "08-landscaping-dewy-grass.png",
+      "base": "#173a2b",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 12,
+      "name": "Lawn Crew \u00b7 Sunlit Clippings Demo",
+      "category": "Lawn Care",
+      "filename": "09-landscaping-sunlit-clippings.png",
+      "base": "#173a2b",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 13,
+      "name": "Pool Care \u00b7 Deep Blue Demo",
+      "category": "Pool Care",
+      "filename": "11-pool-cleaning-deep-blue.png",
+      "base": "#053b55",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 14,
+      "name": "Pool Care \u00b7 Tropical Demo",
+      "category": "Pool Care",
+      "filename": "12-pool-cleaning-tropical.png",
+      "base": "#053b55",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 15,
+      "name": "Business Crew \u00b7 Soft Gradient Demo",
+      "category": "General Business",
+      "filename": "15-abstract-soft-gradient.jpg",
+      "base": "#282335",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft. Contact-text contrast needs review on this light background.",
+      "layoutSlot": 5,
+      "mirrorPattern": true,
+      "contrastReview": true
     }
   ],
   "received": [
@@ -78,7 +212,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 6"
     },
     {
       "filename": "assets/02-pressure-washing-black-blue.jpg",
@@ -89,7 +223,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "integrated into existing draft slot 1"
+      "usage": "integrated into review draft slot 1"
     },
     {
       "filename": "assets/03-pressure-washing-ocean-blue.jpg",
@@ -100,7 +234,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 7"
     },
     {
       "filename": "assets/04-pressure-washing-american-classic.jpg",
@@ -111,7 +245,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 8"
     },
     {
       "filename": "assets/05-pressure-washing-american-dark.jpg",
@@ -122,7 +256,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 9"
     },
     {
       "filename": "assets/06-pressure-washing-american-bright.jpg",
@@ -133,7 +267,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 10"
     },
     {
       "filename": "assets/07-landscaping-fresh-lawn.png",
@@ -148,7 +282,7 @@
         0,
         254
       ],
-      "usage": "integrated into existing draft slot 2"
+      "usage": "integrated into review draft slot 2"
     },
     {
       "filename": "assets/08-landscaping-dewy-grass.png",
@@ -163,7 +297,7 @@
         0,
         254
       ],
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 11"
     },
     {
       "filename": "assets/09-landscaping-sunlit-clippings.png",
@@ -178,7 +312,7 @@
         0,
         254
       ],
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 12"
     },
     {
       "filename": "assets/10-pool-cleaning-aqua-ripples.png",
@@ -193,7 +327,7 @@
         0,
         254
       ],
-      "usage": "integrated into existing draft slot 4"
+      "usage": "integrated into review draft slot 4"
     },
     {
       "filename": "assets/11-pool-cleaning-deep-blue.png",
@@ -208,7 +342,7 @@
         0,
         254
       ],
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 13"
     },
     {
       "filename": "assets/12-pool-cleaning-tropical.png",
@@ -223,7 +357,7 @@
         0,
         254
       ],
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 14"
     },
     {
       "filename": "assets/13-abstract-blue-flow.jpg",
@@ -234,7 +368,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "integrated into existing draft slot 3"
+      "usage": "integrated into review draft slot 3"
     },
     {
       "filename": "assets/14-abstract-dark-waves.jpg",
@@ -245,7 +379,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "integrated into existing draft slot 5"
+      "usage": "integrated into review draft slot 5"
     },
     {
       "filename": "assets/15-abstract-soft-gradient.jpg",
@@ -256,7 +390,7 @@
       "height": 1536,
       "format": "JPEG",
       "mode": "RGB",
-      "usage": "received alternate; not integrated"
+      "usage": "integrated into review draft slot 15"
     },
     {
       "filename": "index.html",
@@ -362,5 +496,17 @@
     "anchor": "Bottom of source aligned with sleeve hem; preserves grass/water detail on wide sleeve panel. Derived from existing nominal 2841x1702 frame and unchanged 508x380 mask bounds x35 y1 w462 h378.",
     "layerOrder": "Locked sleeve background first; existing smaller unmirrored flag above on wearer left sleeve.",
     "approval": "Visual pattern continuity only. Physical seam, final sleeve master and flag approval remain pending."
+  },
+  "originalStarterDesigns": 5,
+  "expansion": {
+    "request": "Use all fifteen supplied backgrounds before launch. Only background varies; industry contact layout and customer controls stay the same.",
+    "grouping": {
+      "Pressure Washing": 6,
+      "Lawn Care": 3,
+      "Pool Care": 3,
+      "Abstract": 3
+    },
+    "orientationException": "Originals04\u201306 embed flag artwork. Never flip those image layers; preserve source orientation instead of claiming mirrored seam approval.",
+    "sourceMapping": "Each added slot inherits its layoutSlot from one of the original five; original IDs/versions retained, ten new IDs appended."
   }
 }

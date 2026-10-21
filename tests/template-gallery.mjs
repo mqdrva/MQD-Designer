@@ -31,6 +31,6 @@ for(const mutation of [p=>p.design.zones.Front.layers.shift(),p=>p.design.zones.
 const changed=structuredClone(original);changed.payload.design.zones.Front.layers[0].rotation=10;assert.throws(()=>assertCustomizedTemplate(a,changed));assertCustomizedTemplate(a,original);
 const fit=logoFitScale([600,300],[300,900],[3763,4992],.25);assert(fit>0);const oldBase=Math.max(3763/600,4992/300)*.25,newBase=Math.max(3763/300,4992/900)*fit;assert(300*newBase<=600*oldBase+.001);assert(900*newBase<=300*oldBase+.001);
 const croppedFit=logoFitScale([600,300],[300,900],[3763,4992],.25,{left:.2,right:.2,top:.1,bottom:.1});assert(croppedFit<=fit);
-assert.equal(demoVersions.length,5);assert(demoVersions.every(v=>v.name.startsWith('UNPUBLISHED')));
+assert.equal(demoVersions.length,15);assert(demoVersions.every(v=>v.name.startsWith('UNPUBLISHED')));
 const migration=fs.readFileSync(new URL('../supabase/migrations/20261020164602_premade_design_templates.sql',import.meta.url),'utf8');assert.match(migration,/enable row level security/g);assert.match(migration,/revoke all.*anon,authenticated/);assert.match(migration,/before update or delete/);assert(!/grant .*customer_designs/i.test(migration));
-console.log('PASS template contract: five unpublished fixtures; independent copies; mirrored back/sleeve preservation; required fields; lock/zone/order/mapping tamper rejection; save/reopen; logo aspect-ratio containment; immutable versions; private schema grants.');
+console.log('PASS template contract: fifteen unpublished variants; independent copies; mirrored back/sleeve preservation; required fields; lock/zone/order/mapping tamper rejection; save/reopen; logo aspect-ratio containment; immutable versions; private schema grants.');
