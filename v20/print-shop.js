@@ -206,7 +206,7 @@ try {
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-9f5937192316c86a');await import('./mobile-workspace.js');refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  else {await import('./shop-editor.js?v=mapping-43b4b4737bbf7cab');await import('./mobile-workspace.js');refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
   document.body.dataset.ready='true';
 } catch(error) {
   $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);

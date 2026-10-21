@@ -1,3 +1,4 @@
+import {maxZoneLayers} from './mqd-layer-capacity.js';
 // Shared browser/server contract. No credentials, network access, or mutable catalog state.
 export const TEMPLATE_CATEGORIES=['Pressure Washing','Lawn Care','HVAC','Pool Care','General Business'];
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,11 +16,7 @@ export function assertTemplateDraft(draft){
   if(JSON.stringify(draft).length>3_000_000)throw new Error('Template settings are too large. Save artwork first.');
   for(const [zone,state] of Object.entries(p.design.zones)){
     if(!Array.isArray(state.layers))throw new Error('Each zone needs a layer list.');
-    // A prepared Back contact stack may add one text row. The ordinary editor's
-    // six-layer add/duplicate limit is unchanged; no extra image slot is allowed.
-    const roles=state.layers.map(layer=>({layer,role:draft.rules?.find(r=>r.zone===zone&&r.layerId===layer.id)?.role}));
-    const contactBack=zone==='Back'&&state.layers.length===7&&roles.filter(r=>r.layer.type==='image'&&['locked','artwork'].includes(r.role)).length===2&&roles.filter(r=>r.layer.type==='image'&&r.role==='logo').length===1&&roles.filter(r=>r.layer.type==='text'&&r.role==='text').length===4;
-    if(state.layers.length>6&&!contactBack)throw new Error('Use up to six layers, or a prepared Back contact layout with seven layers.');
+    if(state.layers.length>maxZoneLayers(p.product,zone))throw new Error(`${zone} supports up to ${maxZoneLayers(p.product,zone)} layers.`);
   }
   const rows=templateLayers(p),ids=new Set();
   if(!rows.length||rows.length>100||Object.keys(p.design.zones).length>12)throw new Error('Use 1–100 layers in supported garment zones.');
@@ -61,6 +58,7 @@ export function assertCustomizedTemplate(payload,version){
   const ref=payload?.design?.template;
   if(!ref||ref.id!==version.template_id||ref.versionId!==version.id||!UUID.test(ref.copyId))throw new Error('The template reference is invalid. Choose this look again.');
   if(payload.product?.id!==version.payload.product.id||stable(payload.engine)!==stable(version.payload.engine)||stable(payload.templates)!==stable(version.payload.templates))throw new Error('Keep the approved garment and print-zone mapping for this look.');
+  for(const [zone,state] of Object.entries(payload.design.zones)){if(!Object.hasOwn(version.payload.design.zones,zone)||!Array.isArray(state.layers)||state.layers.length>maxZoneLayers(payload.product,zone))throw new Error('Keep layers within the supported print-zone limit.');}
   const rows=templateLayers(payload),seen=new Set();
   for(const row of rows){if(seen.has(row.layer.id))throw new Error('Duplicate layer identifiers.');seen.add(row.layer.id);}
   for(const [zone,state] of Object.entries(version.payload.design.zones)){const expected=(state.layers||[]).map(l=>l.id);const actual=(payload.design.zones[zone]?.layers||[]).filter(l=>l.templateLayerId).map(l=>l.templateLayerId);if(stable(actual)!==stable(expected))throw new Error('Keep the approved template layer order.');}
