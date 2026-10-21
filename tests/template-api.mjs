@@ -38,7 +38,7 @@ for(const {zone,layer} of templateLayers(payload)){
  // Malicious file with the same layer identifier must never replace locked artwork.
  if(layer.templateRole==='locked'&&layer.type==='image'){form.append('asset',new Blob(['malicious'],{type:'image/png'}),'fake.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
 }
-await prepareTemplateOrder(db,payload,form);assert.equal(form.getAll('asset').length,6);for(const file of form.getAll('asset'))assert.notEqual(await file.text(),'malicious');
+await prepareTemplateOrder(db,payload,form);assert.equal(form.getAll('asset').length,8);for(const file of form.getAll('asset'))assert.notEqual(await file.text(),'malicious');
 const bad=structuredClone(payload);bad.design.zones.Front.layers[0].templateRole='logo';await assert.rejects(()=>verifyTemplateOrder(db,bad),/permissions/);
 const badForm=new FormData();for(const {zone,layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo')){badForm.append('asset',new Blob(['fake']),'fake.png');badForm.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}await assert.rejects(()=>prepareTemplateOrder(db,payload,badForm),/does not match/);
 const old=structuredClone(tables.mqd_shirt_template_versions[0].snapshot);tables.mqd_shirt_templates[0].draft.name='Second version';const v2=await call({action:'publish',id},'owner');assert.notEqual(v2.versionId,published.versionId);assert.deepEqual(tables.mqd_shirt_template_versions[0].snapshot,old);

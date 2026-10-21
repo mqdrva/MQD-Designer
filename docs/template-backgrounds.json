@@ -3,7 +3,7 @@
   "sourceDirectory": "approved-template-backgrounds",
   "totalStarterDesigns": 5,
   "status": "unpublished-drafts",
-  "placementPolicy": "Background geometry and Back flipX unchanged; sleeve flag scale reduced at owner request with source/orientation/center unchanged. Garment mapping, models, UVs and calibration unchanged. All five remain drafts.",
+  "placementPolicy": "Existing body geometry, Back mirroring and small unmirrored flag placement unchanged. Added locked matching original backgrounds to both sleeves below the flag. Models, mappings, UVs, calibration and collar unchanged; all five remain drafts.",
   "printReadiness": "1024x1536 originals are suitable for review, not confirmed 300-DPI production masters. Exact owner saved garment sources, approved sleeve/flag masters and seam/orientation signoff remain missing.",
   "slots": [
     {
@@ -348,5 +348,18 @@
       "note": "Owner requested a smaller flag. Source artwork, sleeve zone, center, rotation and orientation unchanged."
     },
     "serviceStructure": "Same approved centered layout for every industry: social icons, number, two separate trade-service lines, then & MORE! on its own bottom line. All service text remains editable."
+  },
+  "sleeveBackground": {
+    "status": "unpublished-review",
+    "source": "Same unmodified 1024x1536 original as the body",
+    "x": 0,
+    "y": -128.91433885100443,
+    "scale": 1,
+    "leftFlipX": false,
+    "rightFlipX": true,
+    "flipY": false,
+    "anchor": "Bottom of source aligned with sleeve hem; preserves grass/water detail on wide sleeve panel. Derived from existing nominal 2841x1702 frame and unchanged 508x380 mask bounds x35 y1 w462 h378.",
+    "layerOrder": "Locked sleeve background first; existing smaller unmirrored flag above on wearer left sleeve.",
+    "approval": "Visual pattern continuity only. Physical seam, final sleeve master and flag approval remain pending."
   }
 }

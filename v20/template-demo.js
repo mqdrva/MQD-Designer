@@ -238,6 +238,26 @@ export const demoVersions=[
             "background": "#083a59",
             "layers": [
               {
+                "id": "Left-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "02-pressure-washing-black-blue.jpg",
+                "src": "/assets/template-backgrounds/02-pressure-washing-black-blue.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
                 "id": "sleeve-flag",
                 "type": "image",
                 "label": "Sleeve flag",
@@ -261,7 +281,28 @@ export const demoVersions=[
           },
           "Right Sleeve": {
             "background": "#083a59",
-            "layers": []
+            "layers": [
+              {
+                "id": "Right-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "02-pressure-washing-black-blue.jpg",
+                "src": "/assets/template-backgrounds/02-pressure-washing-black-blue.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": true,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              }
+            ]
           },
           "Collar": {
             "background": "#083a59",
@@ -327,6 +368,18 @@ export const demoVersions=[
       },
       {
         "zone": "Left Sleeve",
+        "layerId": "Left-Sleeve-background",
+        "role": "locked",
+        "label": "Left Sleeve background"
+      },
+      {
+        "zone": "Right Sleeve",
+        "layerId": "Right-Sleeve-background",
+        "role": "locked",
+        "label": "Right Sleeve background"
+      },
+      {
+        "zone": "Left Sleeve",
         "layerId": "sleeve-flag",
         "role": "locked",
         "label": "Sleeve flag"
@@ -334,7 +387,9 @@ export const demoVersions=[
     ],
     "previews": {
       "Front": "/assets/template-demos/1-front.png",
-      "Back": "/assets/template-demos/1-back.png"
+      "Back": "/assets/template-demos/1-back.png",
+      "Left Sleeve": "/assets/template-demos/1-left-sleeve.png",
+      "Right Sleeve": "/assets/template-demos/1-right-sleeve.png"
     }
   },
   {
@@ -574,6 +629,26 @@ export const demoVersions=[
             "background": "#173a2b",
             "layers": [
               {
+                "id": "Left-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "07-landscaping-fresh-lawn.png",
+                "src": "/assets/template-backgrounds/07-landscaping-fresh-lawn.png",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
                 "id": "sleeve-flag",
                 "type": "image",
                 "label": "Sleeve flag",
@@ -597,7 +672,28 @@ export const demoVersions=[
           },
           "Right Sleeve": {
             "background": "#173a2b",
-            "layers": []
+            "layers": [
+              {
+                "id": "Right-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "07-landscaping-fresh-lawn.png",
+                "src": "/assets/template-backgrounds/07-landscaping-fresh-lawn.png",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": true,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              }
+            ]
           },
           "Collar": {
             "background": "#173a2b",
@@ -663,6 +759,18 @@ export const demoVersions=[
       },
       {
         "zone": "Left Sleeve",
+        "layerId": "Left-Sleeve-background",
+        "role": "locked",
+        "label": "Left Sleeve background"
+      },
+      {
+        "zone": "Right Sleeve",
+        "layerId": "Right-Sleeve-background",
+        "role": "locked",
+        "label": "Right Sleeve background"
+      },
+      {
+        "zone": "Left Sleeve",
         "layerId": "sleeve-flag",
         "role": "locked",
         "label": "Sleeve flag"
@@ -670,7 +778,9 @@ export const demoVersions=[
     ],
     "previews": {
       "Front": "/assets/template-demos/2-front.png",
-      "Back": "/assets/template-demos/2-back.png"
+      "Back": "/assets/template-demos/2-back.png",
+      "Left Sleeve": "/assets/template-demos/2-left-sleeve.png",
+      "Right Sleeve": "/assets/template-demos/2-right-sleeve.png"
     }
   },
   {
@@ -910,6 +1020,26 @@ export const demoVersions=[
             "background": "#202e4c",
             "layers": [
               {
+                "id": "Left-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "13-abstract-blue-flow.jpg",
+                "src": "/assets/template-backgrounds/13-abstract-blue-flow.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
                 "id": "sleeve-flag",
                 "type": "image",
                 "label": "Sleeve flag",
@@ -933,7 +1063,28 @@ export const demoVersions=[
           },
           "Right Sleeve": {
             "background": "#202e4c",
-            "layers": []
+            "layers": [
+              {
+                "id": "Right-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "13-abstract-blue-flow.jpg",
+                "src": "/assets/template-backgrounds/13-abstract-blue-flow.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": true,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              }
+            ]
           },
           "Collar": {
             "background": "#202e4c",
@@ -999,6 +1150,18 @@ export const demoVersions=[
       },
       {
         "zone": "Left Sleeve",
+        "layerId": "Left-Sleeve-background",
+        "role": "locked",
+        "label": "Left Sleeve background"
+      },
+      {
+        "zone": "Right Sleeve",
+        "layerId": "Right-Sleeve-background",
+        "role": "locked",
+        "label": "Right Sleeve background"
+      },
+      {
+        "zone": "Left Sleeve",
         "layerId": "sleeve-flag",
         "role": "locked",
         "label": "Sleeve flag"
@@ -1006,7 +1169,9 @@ export const demoVersions=[
     ],
     "previews": {
       "Front": "/assets/template-demos/3-front.png",
-      "Back": "/assets/template-demos/3-back.png"
+      "Back": "/assets/template-demos/3-back.png",
+      "Left Sleeve": "/assets/template-demos/3-left-sleeve.png",
+      "Right Sleeve": "/assets/template-demos/3-right-sleeve.png"
     }
   },
   {
@@ -1246,6 +1411,26 @@ export const demoVersions=[
             "background": "#053b55",
             "layers": [
               {
+                "id": "Left-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "10-pool-cleaning-aqua-ripples.png",
+                "src": "/assets/template-backgrounds/10-pool-cleaning-aqua-ripples.png",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
                 "id": "sleeve-flag",
                 "type": "image",
                 "label": "Sleeve flag",
@@ -1269,7 +1454,28 @@ export const demoVersions=[
           },
           "Right Sleeve": {
             "background": "#053b55",
-            "layers": []
+            "layers": [
+              {
+                "id": "Right-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "10-pool-cleaning-aqua-ripples.png",
+                "src": "/assets/template-backgrounds/10-pool-cleaning-aqua-ripples.png",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": true,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              }
+            ]
           },
           "Collar": {
             "background": "#053b55",
@@ -1335,6 +1541,18 @@ export const demoVersions=[
       },
       {
         "zone": "Left Sleeve",
+        "layerId": "Left-Sleeve-background",
+        "role": "locked",
+        "label": "Left Sleeve background"
+      },
+      {
+        "zone": "Right Sleeve",
+        "layerId": "Right-Sleeve-background",
+        "role": "locked",
+        "label": "Right Sleeve background"
+      },
+      {
+        "zone": "Left Sleeve",
         "layerId": "sleeve-flag",
         "role": "locked",
         "label": "Sleeve flag"
@@ -1342,7 +1560,9 @@ export const demoVersions=[
     ],
     "previews": {
       "Front": "/assets/template-demos/4-front.png",
-      "Back": "/assets/template-demos/4-back.png"
+      "Back": "/assets/template-demos/4-back.png",
+      "Left Sleeve": "/assets/template-demos/4-left-sleeve.png",
+      "Right Sleeve": "/assets/template-demos/4-right-sleeve.png"
     }
   },
   {
@@ -1582,6 +1802,26 @@ export const demoVersions=[
             "background": "#282335",
             "layers": [
               {
+                "id": "Left-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "14-abstract-dark-waves.jpg",
+                "src": "/assets/template-backgrounds/14-abstract-dark-waves.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
                 "id": "sleeve-flag",
                 "type": "image",
                 "label": "Sleeve flag",
@@ -1605,7 +1845,28 @@ export const demoVersions=[
           },
           "Right Sleeve": {
             "background": "#282335",
-            "layers": []
+            "layers": [
+              {
+                "id": "Right-Sleeve-background",
+                "type": "image",
+                "label": "Sleeve background",
+                "filename": "14-abstract-dark-waves.jpg",
+                "src": "/assets/template-backgrounds/14-abstract-dark-waves.jpg",
+                "x": 0,
+                "y": -128.91433885100443,
+                "scale": 1,
+                "rotation": 0,
+                "flipX": true,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              }
+            ]
           },
           "Collar": {
             "background": "#282335",
@@ -1671,6 +1932,18 @@ export const demoVersions=[
       },
       {
         "zone": "Left Sleeve",
+        "layerId": "Left-Sleeve-background",
+        "role": "locked",
+        "label": "Left Sleeve background"
+      },
+      {
+        "zone": "Right Sleeve",
+        "layerId": "Right-Sleeve-background",
+        "role": "locked",
+        "label": "Right Sleeve background"
+      },
+      {
+        "zone": "Left Sleeve",
         "layerId": "sleeve-flag",
         "role": "locked",
         "label": "Sleeve flag"
@@ -1678,7 +1951,9 @@ export const demoVersions=[
     ],
     "previews": {
       "Front": "/assets/template-demos/5-front.png",
-      "Back": "/assets/template-demos/5-back.png"
+      "Back": "/assets/template-demos/5-back.png",
+      "Left Sleeve": "/assets/template-demos/5-left-sleeve.png",
+      "Right Sleeve": "/assets/template-demos/5-right-sleeve.png"
     }
   }
 ];

@@ -42,9 +42,18 @@ for(let i=0;i<definitions.length;i++){
   }
   zones[side]={background:base,layers};
  }
- zones['Left Sleeve']={background:base,layers:[image('sleeve-flag','Sleeve flag',`/${dir}/demo-flag.png`,0,0,.20)]};rules.push({zone:'Left Sleeve',layerId:'sleeve-flag',role:'locked',label:'Sleeve flag'});zones['Right Sleeve']={background:base,layers:[]};zones.Collar={background:base,layers:[]};
+ // Match the existing body artwork on both sleeves. Hem anchoring keeps the
+ // grass/water detail visible on the wider sleeve panel without editing assets.
+ for(const side of ['Left Sleeve','Right Sleeve']){
+  const background=image(side.replace(' ','-')+'-background','Sleeve background',`/assets/template-backgrounds/${filename}`,0,manifest.sleeveBackground.y,1,{flipX:side==='Right Sleeve'});
+  zones[side]={background:base,layers:[background]};
+  rules.push({zone:side,layerId:background.id,role:'locked',label:side+' background'});
+ }
+ zones['Left Sleeve'].layers.push(image('sleeve-flag','Sleeve flag',`/${dir}/demo-flag.png`,0,0,.20));
+ rules.push({zone:'Left Sleeve',layerId:'sleeve-flag',role:'locked',label:'Sleeve flag'});
+ zones.Collar={background:base,layers:[]};
  const payload={schema:'mqd-design-v1',engine:{calibration:'v26-surface-uv-collar-strip'},product:{id:'tshirt',name:'All-Over Print T-Shirt',category:'T-Shirts',model:template.model},templates:template.templates,activeZone:'Front',design:{zones}};
- versions.push({id:versionId,template_id:id,name:'UNPUBLISHED · '+name,categories:category==='Pressure Washing'?[category,'General Business']:[category],range:'Premium · All-over print',draftStatus:definitions[i].note,backgroundSource:filename,payload,rules,previews:{Front:`/${dir}/${i+1}-front.png`,Back:`/${dir}/${i+1}-back.png`}});
+ versions.push({id:versionId,template_id:id,name:'UNPUBLISHED · '+name,categories:category==='Pressure Washing'?[category,'General Business']:[category],range:'Premium · All-over print',draftStatus:definitions[i].note,backgroundSource:filename,payload,rules,previews:{Front:`/${dir}/${i+1}-front.png`,Back:`/${dir}/${i+1}-back.png`,'Left Sleeve':`/${dir}/${i+1}-left-sleeve.png`,'Right Sleeve':`/${dir}/${i+1}-right-sleeve.png`}});
 }
 fs.writeFileSync('v20/template-demo.js','// Five unpublished review fixtures with approved background originals. Never inserted into the public catalog.\nexport const demoVersions='+JSON.stringify(versions,null,2)+';\n');
 

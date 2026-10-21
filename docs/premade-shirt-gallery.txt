@@ -122,3 +122,14 @@ For EACH of five owner-approved designs:
 5. Explicit owner approval to publish that design/version. Customer orders and
    private customer designs are never treated as approved public templates.
 Flattened Tiny Boss/Torrent Crew advertising mockups are not editable launch sources.
+
+BOTH SLEEVES — OWNER REVIEW ADDITION
+All five existing drafts now reuse their exact body background original on both
+sleeves, as locked first layers. The unchanged smaller flag remains separate
+above the left sleeve background, with no flag flip or rotation. Right sleeve
+background is mirrored; no embedded-flag originals are used. Hem anchoring
+retains grass/water detail instead of cropping it out of a wide sleeve panel.
+Actual masked sleeve proof PNGs accompany the existing Front/Back previews.
+Body placement, live contact stack, models, UVs, calibration and collar unchanged.
+This does not establish physical seam matching or print approval. All five
+remain unpublished drafts; full hosted cart/checkout still requires isolated staging.
