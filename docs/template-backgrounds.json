@@ -3,7 +3,7 @@
   "sourceDirectory": "approved-template-backgrounds",
   "totalStarterDesigns": 15,
   "status": "unpublished-drafts",
-  "placementPolicy": "Original five layouts unchanged. Owner expanded the existing gallery to all fifteen original backgrounds using the matching industry layout, editable contact controls and locked body/sleeve backgrounds. American-themed originals remain unmirrored on Back and Right Sleeve to avoid reversing embedded flags; these three need physical seam review. Models, mappings, UVs, calibration, collar and separate small flag unchanged. All fifteen remain drafts.",
+  "placementPolicy": "Original five layouts unchanged. Owner expanded the existing gallery to all fifteen original backgrounds using the matching industry layout, editable contact controls and locked body/sleeve backgrounds. American-themed originals remain unmirrored on Back and Right Sleeve to avoid reversing embedded flags; owner approved these three without seam matching. Models, mappings, UVs, calibration, collar and separate small flag unchanged. All fifteen remain drafts.",
   "printReadiness": "1024x1536 originals are suitable for review, not confirmed 300-DPI production masters. Exact owner saved garment sources, approved sleeve/flag masters and seam/orientation signoff remain missing.",
   "slots": [
     {
@@ -72,12 +72,13 @@
       "category": "Pressure Washing",
       "filename": "01-pressure-washing-ice-blue.jpg",
       "base": "#083a59",
-      "textColor": "#FFFFFF",
+      "textColor": "#000000",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft. Contact-text contrast needs review on this light background.",
+      "note": "Approved background with black contact text; unpublished draft.",
       "layoutSlot": 1,
       "mirrorPattern": true,
-      "contrastReview": true
+      "contrastReview": false,
+      "blackTextApproved": true
     },
     {
       "slot": 7,
@@ -97,12 +98,15 @@
       "category": "Pressure Washing",
       "filename": "04-pressure-washing-american-classic.jpg",
       "base": "#083a59",
-      "textColor": "#FFFFFF",
+      "textColor": "#000000",
       "status": "unpublished-draft",
-      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft. Contact-text contrast needs review on this light background.",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
       "layoutSlot": 1,
       "mirrorPattern": false,
-      "contrastReview": true
+      "contrastReview": false,
+      "blackTextApproved": true,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
     },
     {
       "slot": 9,
@@ -112,9 +116,11 @@
       "base": "#083a59",
       "textColor": "#FFFFFF",
       "status": "unpublished-draft",
-      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft.",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
       "layoutSlot": 1,
-      "mirrorPattern": false
+      "mirrorPattern": false,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
     },
     {
       "slot": 10,
@@ -122,12 +128,15 @@
       "category": "Pressure Washing",
       "filename": "06-pressure-washing-american-bright.jpg",
       "base": "#083a59",
-      "textColor": "#FFFFFF",
+      "textColor": "#000000",
       "status": "unpublished-draft",
-      "note": "Flag artwork kept unmirrored; seam/print approval pending. Unpublished draft. Contact-text contrast needs review on this light background.",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
       "layoutSlot": 1,
       "mirrorPattern": false,
-      "contrastReview": true
+      "contrastReview": false,
+      "blackTextApproved": true,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
     },
     {
       "slot": 11,
@@ -183,12 +192,13 @@
       "category": "General Business",
       "filename": "15-abstract-soft-gradient.jpg",
       "base": "#282335",
-      "textColor": "#FFFFFF",
+      "textColor": "#000000",
       "status": "unpublished-draft",
-      "note": "Approved background; finished shirt remains a draft. Contact-text contrast needs review on this light background.",
+      "note": "Approved background with black contact text; unpublished draft.",
       "layoutSlot": 5,
       "mirrorPattern": true,
-      "contrastReview": true
+      "contrastReview": false,
+      "blackTextApproved": true
     }
   ],
   "received": [
@@ -434,7 +444,7 @@
         "id": "Back-social",
         "y": -25,
         "scale": 0.055,
-        "role": "locked"
+        "role": "artwork"
       },
       {
         "id": "Back-phone",
@@ -506,7 +516,8 @@
       "Pool Care": 3,
       "Abstract": 3
     },
-    "orientationException": "Originals04\u201306 embed flag artwork. Never flip those image layers; preserve source orientation instead of claiming mirrored seam approval.",
-    "sourceMapping": "Each added slot inherits its layoutSlot from one of the original five; original IDs/versions retained, ten new IDs appended."
+    "orientationException": "Owner approved originals04\u201306 unmirrored as shown, without front/back seam matching. Preserve original flag orientation; no seam-matching review required for these patriotic backgrounds.",
+    "sourceMapping": "Each added slot inherits its layoutSlot from one of the original five; original IDs/versions retained, ten new IDs appended.",
+    "contrastApproval": "Owner approved black default phone/services on the four light backgrounds: originals01/04/06/15. Font, content, positions, sizes, stroke and edit controls unchanged."
   }
 }

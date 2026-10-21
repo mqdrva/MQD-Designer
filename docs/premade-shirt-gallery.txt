@@ -159,3 +159,14 @@ pending seam/print signoff, like the rest. Separate small sleeve flag unchanged.
 Sixty actual body/sleeve panel previews. No public catalog publish, production
 backend change, merge or production deployment. Previous staging/print limitations
 still apply. Historical five-only/unused-art notes above describe earlier stages.
+
+OWNER CONTRAST / PATRIOTIC APPROVAL — SUPERSEDES REVIEW NOTES ABOVE
+Owner approved black default phone/services text on the four light variants:
+Ice Blue(slot6), American Classic(slot8), American Bright(slot10), Soft Gradient
+(slot15). Only text fill changes to #000000; all other foreground styling,
+positions, content and editing permissions stay unchanged.
+Owner also approved all three patriotic originals04–06 as shown, unmirrored,
+with no front/back seam matching requirement. Their seam-review blocker is
+cleared. This is layout approval, not a claim of a physical print test.
+All fifteen remain unpublished pending the existing separate staging/checkout
+and production-master work. No production release is authorized by this edit.
