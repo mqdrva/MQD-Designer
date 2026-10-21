@@ -38,7 +38,7 @@ for(const {zone,layer} of templateLayers(payload)){
  // Malicious file with the same layer identifier must never replace locked artwork.
  if(layer.templateRole==='locked'&&layer.type==='image'){form.append('asset',new Blob(['malicious'],{type:'image/png'}),'fake.png');form.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}
 }
-await prepareTemplateOrder(db,payload,form);assert.equal(form.getAll('asset').length,5);for(const file of form.getAll('asset'))assert.notEqual(await file.text(),'malicious');
+await prepareTemplateOrder(db,payload,form);assert.equal(form.getAll('asset').length,6);for(const file of form.getAll('asset'))assert.notEqual(await file.text(),'malicious');
 const bad=structuredClone(payload);bad.design.zones.Front.layers[0].templateRole='logo';await assert.rejects(()=>verifyTemplateOrder(db,bad),/permissions/);
 const badForm=new FormData();for(const {zone,layer} of templateLayers(payload).filter(x=>x.layer.templateRole==='logo')){badForm.append('asset',new Blob(['fake']),'fake.png');badForm.append('assetMeta',JSON.stringify({zone,layerId:layer.id}));}await assert.rejects(()=>prepareTemplateOrder(db,payload,badForm),/does not match/);
 const old=structuredClone(tables.mqd_shirt_template_versions[0].snapshot);tables.mqd_shirt_templates[0].draft.name='Second version';const v2=await call({action:'publish',id},'owner');assert.notEqual(v2.versionId,published.versionId);assert.deepEqual(tables.mqd_shirt_template_versions[0].snapshot,old);
@@ -60,7 +60,7 @@ for(const slug of ['create-mqd-checkout','create-mqd-guest-checkout']){
  vm.runInNewContext(stripTypeScriptTypes(code),{...promotion,...everyday,...shipping,Stripe,verifyTemplateOrder,createClient:()=>db,crypto,Request,Response,URL,TextEncoder,console:{error(){}},Deno:{env:{get:key=>key==='MQD_STRIPE_SECRET_KEY'?'sk_live_LOCAL_FIXTURE_ONLY':key==='SUPABASE_URL'?'https://test.supabase.co':key==='SUPABASE_SERVICE_ROLE_KEY'?'local-fixture-only':undefined},serve:fn=>checkoutHandler=fn}});
  const request=()=>new Request('https://test/checkout',{method:'POST',headers:{'Content-Type':'application/json',...(!guest?{Authorization:'Bearer owner'}:{})},body:JSON.stringify({orderNumbers:[order.order_number],checkoutToken:crypto.randomUUID(),guestToken:token})});
  let response=await checkoutHandler(request());assert.equal(response.status,200,await response.clone().text());assert.equal(stripeCalls,1);assert.equal(captured.line_items[0].quantity,3);assert.equal(captured.line_items[0].price_data.unit_amount,promotion.garmentPriceCents('tshirt'));assert.equal((await response.json()).url,'https://checkout.stripe.com/local-fixture-only');
- tables.mqd_orders[0].design_json.design.zones.Front.layers[2].text=source.design.zones.Front.layers[2].text;
+ tables.mqd_orders[0].design_json.design.zones.Back.layers[3].text=source.design.zones.Back.layers[3].text;
  response=await checkoutHandler(request());assert.notEqual(response.status,200);assert.equal(stripeCalls,1,'Unchanged sample details must never reach Stripe');
 }
 console.log('PASS actual signed and guest Checkout handlers: customized historical template order reaches existing Stripe handoff/pricing; remaining sample fields prevent Stripe calls. Stripe and DB mocked.');

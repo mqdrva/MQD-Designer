@@ -10,10 +10,10 @@ assert.notEqual(a.designId,b.designId);assert.notEqual(a.design.template.copyId,
 assert.equal(new Set([...templateLayers(a),...templateLayers(b)].map(x=>x.layer.id)).size,18);
 assert.equal(a.design.zones.Back.layers[0].flipX,true);assert.equal(a.design.zones['Left Sleeve'].layers[0].label,'Sleeve flag');
 assert.throws(()=>assertCustomizedTemplate(a,original),/sample details/);
-assert.equal(remainingTemplateFields(a).length,6);
-for(const {layer} of templateLayers(a)){if(layer.templateRole==='text')layer.text=layer.text.includes('555')?'804-123-4567':'Soft wash · Roofs · Driveways';if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash='b'.repeat(64);layer.src='data:image/png;base64,cmVwbGFjZW1lbnQ=';}}
+assert.equal(remainingTemplateFields(a).length,5);
+for(const {layer} of templateLayers(a)){if(layer.templateRole==='text')layer.text=layer.label==='Phone number'?'804-123-4567':'Soft wash · Roofs · Driveways';if(layer.templateRole==='logo'){delete layer.templateAssetPath;layer.templateReplaced=true;layer.templateReplacementHash='b'.repeat(64);layer.src='data:image/png;base64,cmVwbGFjZW1lbnQ=';}}
 assert.equal(remainingTemplateFields(a).length,0);assertCustomizedTemplate(a,original);
-assert.equal(b.design.zones.Front.layers[2].text,'(555) 010-2026');assert.equal(original.payload.design.zones.Front.layers[2].text,'(555) 010-2026');
+assert.equal(b.design.zones.Back.layers[3].text,'888-888-8888');assert.equal(original.payload.design.zones.Back.layers[3].text,'888-888-8888');
 const reopen=JSON.parse(JSON.stringify(a));assertCustomizedTemplate(reopen,original);
 for(const mutation of [p=>p.design.zones.Front.layers.shift(),p=>p.design.zones.Back.layers[0].flipX=false,p=>p.design.zones.Front.layers[0].x=9,p=>p.design.zones.Front.layers[0].templateRole='logo',p=>p.design.zones.Front.layers[0].visible=false,p=>p.design.zones.Front.layers.reverse(),p=>p.product.id='fleece-hoodie',p=>p.design.zones.Back.background='#fff',p=>p.design.zones.Front.layers[1].x=8]){
  const copy=structuredClone(a);mutation(copy);assert.throws(()=>assertCustomizedTemplate(copy,original));

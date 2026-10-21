@@ -78,11 +78,11 @@ export const demoVersions=[
               {
                 "id": "Front-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
+                "y": -30,
                 "scale": 0.25,
                 "rotation": 0,
                 "flipX": false,
@@ -94,42 +94,6 @@ export const demoVersions=[
                   "bottom": 0
                 },
                 "visible": true
-              },
-              {
-                "id": "Front-phone",
-                "type": "text",
-                "label": "Phone number",
-                "text": "(555) 010-2026",
-                "x": 0,
-                "y": 14,
-                "scale": 0.47,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
-              },
-              {
-                "id": "Front-services",
-                "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
-                "x": 0,
-                "y": 28,
-                "scale": 0.35,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
               }
             ]
           },
@@ -159,12 +123,32 @@ export const demoVersions=[
               {
                 "id": "Back-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
-                "scale": 0.38,
+                "y": -48,
+                "scale": 0.16,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
+                "id": "Back-social",
+                "type": "image",
+                "label": "Instagram • Facebook • Google",
+                "filename": "social-row.png",
+                "src": "/assets/template-demos/social-row.png",
+                "x": 0,
+                "y": -18,
+                "scale": 0.055,
                 "rotation": 0,
                 "flipX": false,
                 "flipY": false,
@@ -180,16 +164,16 @@ export const demoVersions=[
                 "id": "Back-phone",
                 "type": "text",
                 "label": "Phone number",
-                "text": "(555) 010-2026",
+                "text": "888-888-8888",
                 "x": 0,
-                "y": 12,
-                "scale": 0.47,
+                "y": 0,
+                "scale": 0.72,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#083a59",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -197,17 +181,35 @@ export const demoVersions=[
               {
                 "id": "Back-services",
                 "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
+                "label": "Services line 1",
+                "text": "PRESSURE WASHING",
                 "x": 0,
-                "y": 28,
-                "scale": 0.35,
+                "y": 15,
+                "scale": 0.46,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#083a59",
+                "strokeWidth": 2,
+                "bold": true,
+                "italic": false,
+                "align": "center"
+              },
+              {
+                "id": "Back-services-2",
+                "type": "text",
+                "label": "Services line 2",
+                "text": "SOFT WASHING • & MORE!",
+                "x": 0,
+                "y": 25,
+                "scale": 0.42,
+                "rotation": 0,
+                "visible": true,
+                "color": "#FFFFFF",
+                "font": "Inter",
+                "strokeColor": "#083a59",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -264,18 +266,6 @@ export const demoVersions=[
         "label": "Your logo"
       },
       {
-        "zone": "Front",
-        "layerId": "Front-phone",
-        "role": "text",
-        "label": "Phone number"
-      },
-      {
-        "zone": "Front",
-        "layerId": "Front-services",
-        "role": "text",
-        "label": "Services"
-      },
-      {
         "zone": "Back",
         "layerId": "Back-background",
         "role": "locked",
@@ -289,6 +279,12 @@ export const demoVersions=[
       },
       {
         "zone": "Back",
+        "layerId": "Back-social",
+        "role": "locked",
+        "label": "Social icons"
+      },
+      {
+        "zone": "Back",
         "layerId": "Back-phone",
         "role": "text",
         "label": "Phone number"
@@ -297,7 +293,13 @@ export const demoVersions=[
         "zone": "Back",
         "layerId": "Back-services",
         "role": "text",
-        "label": "Services"
+        "label": "Services line 1"
+      },
+      {
+        "zone": "Back",
+        "layerId": "Back-services-2",
+        "role": "text",
+        "label": "Services line 2"
       },
       {
         "zone": "Left Sleeve",
@@ -388,11 +390,11 @@ export const demoVersions=[
               {
                 "id": "Front-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
+                "y": -30,
                 "scale": 0.25,
                 "rotation": 0,
                 "flipX": false,
@@ -404,42 +406,6 @@ export const demoVersions=[
                   "bottom": 0
                 },
                 "visible": true
-              },
-              {
-                "id": "Front-phone",
-                "type": "text",
-                "label": "Phone number",
-                "text": "(555) 010-2026",
-                "x": 0,
-                "y": 14,
-                "scale": 0.47,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
-              },
-              {
-                "id": "Front-services",
-                "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
-                "x": 0,
-                "y": 28,
-                "scale": 0.35,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
               }
             ]
           },
@@ -469,12 +435,32 @@ export const demoVersions=[
               {
                 "id": "Back-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
-                "scale": 0.38,
+                "y": -48,
+                "scale": 0.16,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
+                "id": "Back-social",
+                "type": "image",
+                "label": "Instagram • Facebook • Google",
+                "filename": "social-row.png",
+                "src": "/assets/template-demos/social-row.png",
+                "x": 0,
+                "y": -18,
+                "scale": 0.055,
                 "rotation": 0,
                 "flipX": false,
                 "flipY": false,
@@ -490,16 +476,16 @@ export const demoVersions=[
                 "id": "Back-phone",
                 "type": "text",
                 "label": "Phone number",
-                "text": "(555) 010-2026",
+                "text": "888-888-8888",
                 "x": 0,
-                "y": 12,
-                "scale": 0.47,
+                "y": 0,
+                "scale": 0.72,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#173a2b",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -507,17 +493,35 @@ export const demoVersions=[
               {
                 "id": "Back-services",
                 "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
+                "label": "Services line 1",
+                "text": "LAWN MOWING • TRIMMING • EDGING",
                 "x": 0,
-                "y": 28,
-                "scale": 0.35,
+                "y": 15,
+                "scale": 0.46,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#173a2b",
+                "strokeWidth": 2,
+                "bold": true,
+                "italic": false,
+                "align": "center"
+              },
+              {
+                "id": "Back-services-2",
+                "type": "text",
+                "label": "Services line 2",
+                "text": "YARD CLEANUPS • HEDGES • MAINTENANCE",
+                "x": 0,
+                "y": 25,
+                "scale": 0.42,
+                "rotation": 0,
+                "visible": true,
+                "color": "#FFFFFF",
+                "font": "Inter",
+                "strokeColor": "#173a2b",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -574,18 +578,6 @@ export const demoVersions=[
         "label": "Your logo"
       },
       {
-        "zone": "Front",
-        "layerId": "Front-phone",
-        "role": "text",
-        "label": "Phone number"
-      },
-      {
-        "zone": "Front",
-        "layerId": "Front-services",
-        "role": "text",
-        "label": "Services"
-      },
-      {
         "zone": "Back",
         "layerId": "Back-background",
         "role": "locked",
@@ -599,6 +591,12 @@ export const demoVersions=[
       },
       {
         "zone": "Back",
+        "layerId": "Back-social",
+        "role": "locked",
+        "label": "Social icons"
+      },
+      {
+        "zone": "Back",
         "layerId": "Back-phone",
         "role": "text",
         "label": "Phone number"
@@ -607,7 +605,13 @@ export const demoVersions=[
         "zone": "Back",
         "layerId": "Back-services",
         "role": "text",
-        "label": "Services"
+        "label": "Services line 1"
+      },
+      {
+        "zone": "Back",
+        "layerId": "Back-services-2",
+        "role": "text",
+        "label": "Services line 2"
       },
       {
         "zone": "Left Sleeve",
@@ -698,11 +702,11 @@ export const demoVersions=[
               {
                 "id": "Front-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
+                "y": -30,
                 "scale": 0.25,
                 "rotation": 0,
                 "flipX": false,
@@ -714,42 +718,6 @@ export const demoVersions=[
                   "bottom": 0
                 },
                 "visible": true
-              },
-              {
-                "id": "Front-phone",
-                "type": "text",
-                "label": "Phone number",
-                "text": "(555) 010-2026",
-                "x": 0,
-                "y": 14,
-                "scale": 0.47,
-                "rotation": 0,
-                "visible": true,
-                "color": "#10243B",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
-              },
-              {
-                "id": "Front-services",
-                "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
-                "x": 0,
-                "y": 28,
-                "scale": 0.35,
-                "rotation": 0,
-                "visible": true,
-                "color": "#10243B",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
               }
             ]
           },
@@ -779,12 +747,32 @@ export const demoVersions=[
               {
                 "id": "Back-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
-                "scale": 0.38,
+                "y": -48,
+                "scale": 0.16,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
+                "id": "Back-social",
+                "type": "image",
+                "label": "Instagram • Facebook • Google",
+                "filename": "social-row.png",
+                "src": "/assets/template-demos/social-row.png",
+                "x": 0,
+                "y": -18,
+                "scale": 0.055,
                 "rotation": 0,
                 "flipX": false,
                 "flipY": false,
@@ -800,16 +788,16 @@ export const demoVersions=[
                 "id": "Back-phone",
                 "type": "text",
                 "label": "Phone number",
-                "text": "(555) 010-2026",
+                "text": "888-888-8888",
                 "x": 0,
-                "y": 12,
-                "scale": 0.47,
+                "y": 0,
+                "scale": 0.72,
                 "rotation": 0,
                 "visible": true,
                 "color": "#10243B",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#202e4c",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -817,17 +805,35 @@ export const demoVersions=[
               {
                 "id": "Back-services",
                 "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
+                "label": "Services line 1",
+                "text": "HEATING • COOLING",
                 "x": 0,
-                "y": 28,
-                "scale": 0.35,
+                "y": 15,
+                "scale": 0.46,
                 "rotation": 0,
                 "visible": true,
                 "color": "#10243B",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#202e4c",
+                "strokeWidth": 2,
+                "bold": true,
+                "italic": false,
+                "align": "center"
+              },
+              {
+                "id": "Back-services-2",
+                "type": "text",
+                "label": "Services line 2",
+                "text": "REPAIRS • MAINTENANCE",
+                "x": 0,
+                "y": 25,
+                "scale": 0.42,
+                "rotation": 0,
+                "visible": true,
+                "color": "#10243B",
+                "font": "Inter",
+                "strokeColor": "#202e4c",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -884,18 +890,6 @@ export const demoVersions=[
         "label": "Your logo"
       },
       {
-        "zone": "Front",
-        "layerId": "Front-phone",
-        "role": "text",
-        "label": "Phone number"
-      },
-      {
-        "zone": "Front",
-        "layerId": "Front-services",
-        "role": "text",
-        "label": "Services"
-      },
-      {
         "zone": "Back",
         "layerId": "Back-background",
         "role": "locked",
@@ -909,6 +903,12 @@ export const demoVersions=[
       },
       {
         "zone": "Back",
+        "layerId": "Back-social",
+        "role": "locked",
+        "label": "Social icons"
+      },
+      {
+        "zone": "Back",
         "layerId": "Back-phone",
         "role": "text",
         "label": "Phone number"
@@ -917,7 +917,13 @@ export const demoVersions=[
         "zone": "Back",
         "layerId": "Back-services",
         "role": "text",
-        "label": "Services"
+        "label": "Services line 1"
+      },
+      {
+        "zone": "Back",
+        "layerId": "Back-services-2",
+        "role": "text",
+        "label": "Services line 2"
       },
       {
         "zone": "Left Sleeve",
@@ -1008,11 +1014,11 @@ export const demoVersions=[
               {
                 "id": "Front-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
+                "y": -30,
                 "scale": 0.25,
                 "rotation": 0,
                 "flipX": false,
@@ -1024,42 +1030,6 @@ export const demoVersions=[
                   "bottom": 0
                 },
                 "visible": true
-              },
-              {
-                "id": "Front-phone",
-                "type": "text",
-                "label": "Phone number",
-                "text": "(555) 010-2026",
-                "x": 0,
-                "y": 14,
-                "scale": 0.47,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
-              },
-              {
-                "id": "Front-services",
-                "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
-                "x": 0,
-                "y": 28,
-                "scale": 0.35,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
               }
             ]
           },
@@ -1089,12 +1059,32 @@ export const demoVersions=[
               {
                 "id": "Back-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
-                "scale": 0.38,
+                "y": -48,
+                "scale": 0.16,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
+                "id": "Back-social",
+                "type": "image",
+                "label": "Instagram • Facebook • Google",
+                "filename": "social-row.png",
+                "src": "/assets/template-demos/social-row.png",
+                "x": 0,
+                "y": -18,
+                "scale": 0.055,
                 "rotation": 0,
                 "flipX": false,
                 "flipY": false,
@@ -1110,16 +1100,16 @@ export const demoVersions=[
                 "id": "Back-phone",
                 "type": "text",
                 "label": "Phone number",
-                "text": "(555) 010-2026",
+                "text": "888-888-8888",
                 "x": 0,
-                "y": 12,
-                "scale": 0.47,
+                "y": 0,
+                "scale": 0.72,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#053b55",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -1127,17 +1117,35 @@ export const demoVersions=[
               {
                 "id": "Back-services",
                 "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
+                "label": "Services line 1",
+                "text": "POOL CLEANING • WATER CARE",
                 "x": 0,
-                "y": 28,
-                "scale": 0.35,
+                "y": 15,
+                "scale": 0.46,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#053b55",
+                "strokeWidth": 2,
+                "bold": true,
+                "italic": false,
+                "align": "center"
+              },
+              {
+                "id": "Back-services-2",
+                "type": "text",
+                "label": "Services line 2",
+                "text": "MAINTENANCE • & MORE!",
+                "x": 0,
+                "y": 25,
+                "scale": 0.42,
+                "rotation": 0,
+                "visible": true,
+                "color": "#FFFFFF",
+                "font": "Inter",
+                "strokeColor": "#053b55",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -1194,18 +1202,6 @@ export const demoVersions=[
         "label": "Your logo"
       },
       {
-        "zone": "Front",
-        "layerId": "Front-phone",
-        "role": "text",
-        "label": "Phone number"
-      },
-      {
-        "zone": "Front",
-        "layerId": "Front-services",
-        "role": "text",
-        "label": "Services"
-      },
-      {
         "zone": "Back",
         "layerId": "Back-background",
         "role": "locked",
@@ -1219,6 +1215,12 @@ export const demoVersions=[
       },
       {
         "zone": "Back",
+        "layerId": "Back-social",
+        "role": "locked",
+        "label": "Social icons"
+      },
+      {
+        "zone": "Back",
         "layerId": "Back-phone",
         "role": "text",
         "label": "Phone number"
@@ -1227,7 +1229,13 @@ export const demoVersions=[
         "zone": "Back",
         "layerId": "Back-services",
         "role": "text",
-        "label": "Services"
+        "label": "Services line 1"
+      },
+      {
+        "zone": "Back",
+        "layerId": "Back-services-2",
+        "role": "text",
+        "label": "Services line 2"
       },
       {
         "zone": "Left Sleeve",
@@ -1318,11 +1326,11 @@ export const demoVersions=[
               {
                 "id": "Front-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
+                "y": -30,
                 "scale": 0.25,
                 "rotation": 0,
                 "flipX": false,
@@ -1334,42 +1342,6 @@ export const demoVersions=[
                   "bottom": 0
                 },
                 "visible": true
-              },
-              {
-                "id": "Front-phone",
-                "type": "text",
-                "label": "Phone number",
-                "text": "(555) 010-2026",
-                "x": 0,
-                "y": 14,
-                "scale": 0.47,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
-              },
-              {
-                "id": "Front-services",
-                "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
-                "x": 0,
-                "y": 28,
-                "scale": 0.35,
-                "rotation": 0,
-                "visible": true,
-                "color": "#FFFFFF",
-                "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
-                "bold": true,
-                "italic": false,
-                "align": "center"
               }
             ]
           },
@@ -1399,12 +1371,32 @@ export const demoVersions=[
               {
                 "id": "Back-logo",
                 "type": "image",
-                "label": "Sample logo",
-                "filename": "sample-logo.png",
-                "src": "/assets/template-demos/sample-logo.png",
+                "label": "Your logo",
+                "filename": "blank-logo-slot.png",
+                "src": "/assets/template-demos/blank-logo-slot.png",
                 "x": 0,
-                "y": -20,
-                "scale": 0.38,
+                "y": -48,
+                "scale": 0.16,
+                "rotation": 0,
+                "flipX": false,
+                "flipY": false,
+                "crop": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0
+                },
+                "visible": true
+              },
+              {
+                "id": "Back-social",
+                "type": "image",
+                "label": "Instagram • Facebook • Google",
+                "filename": "social-row.png",
+                "src": "/assets/template-demos/social-row.png",
+                "x": 0,
+                "y": -18,
+                "scale": 0.055,
                 "rotation": 0,
                 "flipX": false,
                 "flipY": false,
@@ -1420,16 +1412,16 @@ export const demoVersions=[
                 "id": "Back-phone",
                 "type": "text",
                 "label": "Phone number",
-                "text": "(555) 010-2026",
+                "text": "888-888-8888",
                 "x": 0,
-                "y": 12,
-                "scale": 0.47,
+                "y": 0,
+                "scale": 0.72,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#282335",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -1437,17 +1429,35 @@ export const demoVersions=[
               {
                 "id": "Back-services",
                 "type": "text",
-                "label": "Services",
-                "text": "YOUR SERVICES HERE",
+                "label": "Services line 1",
+                "text": "YOUR BUSINESS SERVICES",
                 "x": 0,
-                "y": 28,
-                "scale": 0.35,
+                "y": 15,
+                "scale": 0.46,
                 "rotation": 0,
                 "visible": true,
                 "color": "#FFFFFF",
                 "font": "Inter",
-                "strokeColor": "#000000",
-                "strokeWidth": 0,
+                "strokeColor": "#282335",
+                "strokeWidth": 2,
+                "bold": true,
+                "italic": false,
+                "align": "center"
+              },
+              {
+                "id": "Back-services-2",
+                "type": "text",
+                "label": "Services line 2",
+                "text": "QUALITY SERVICE • & MORE!",
+                "x": 0,
+                "y": 25,
+                "scale": 0.42,
+                "rotation": 0,
+                "visible": true,
+                "color": "#FFFFFF",
+                "font": "Inter",
+                "strokeColor": "#282335",
+                "strokeWidth": 2,
                 "bold": true,
                 "italic": false,
                 "align": "center"
@@ -1504,18 +1514,6 @@ export const demoVersions=[
         "label": "Your logo"
       },
       {
-        "zone": "Front",
-        "layerId": "Front-phone",
-        "role": "text",
-        "label": "Phone number"
-      },
-      {
-        "zone": "Front",
-        "layerId": "Front-services",
-        "role": "text",
-        "label": "Services"
-      },
-      {
         "zone": "Back",
         "layerId": "Back-background",
         "role": "locked",
@@ -1529,6 +1527,12 @@ export const demoVersions=[
       },
       {
         "zone": "Back",
+        "layerId": "Back-social",
+        "role": "locked",
+        "label": "Social icons"
+      },
+      {
+        "zone": "Back",
         "layerId": "Back-phone",
         "role": "text",
         "label": "Phone number"
@@ -1537,7 +1541,13 @@ export const demoVersions=[
         "zone": "Back",
         "layerId": "Back-services",
         "role": "text",
-        "label": "Services"
+        "label": "Services line 1"
+      },
+      {
+        "zone": "Back",
+        "layerId": "Back-services-2",
+        "role": "text",
+        "label": "Services line 2"
       },
       {
         "zone": "Left Sleeve",

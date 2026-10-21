@@ -10,7 +10,7 @@ Open /template-preview.html for a phone-width or desktop-width demo, or
 fixtures using supplied original backgrounds exist only in v20/template-demo.js, never in the live catalog. Cards use
 actual front/back panel renders from the existing editor's layer/silhouette code.
 They are demonstrations, not approved editable launch designs.
-Select a card, replace Front/Back logos, change phone/services, review the shirt,
+Select a card, add Front/Back logos, edit the prefilled Back phone/services, review the shirt,
 and use Save Design / Reopen saved demo for a browser-local round trip. Ordering,
 account actions, sharing and processing actions are blocked in demo mode before
 competing guest handlers can run. No real payment or order should be attempted.
@@ -81,13 +81,20 @@ are in docs/template-backgrounds.json. Original attachment bytes remain unchange
 Five existing slots only: Pressure Wash=02, Lawn=07, HVAC=13 (abstract substitute),
 Pool=10, General Business=14. Others are reference alternatives, not extra designs.
 All five remain unpublished drafts. Card renders use exact editor functions.
-Front/Back geometry, back flipX, garment mapping/calibration and the separate
-synthetic left-sleeve flag remain unchanged from 49e02b1. Flag body variants 04-06
+Background Front/Back geometry, back flipX, garment mapping/calibration and the
+separate synthetic left-sleeve flag remain unchanged from 49e02b1. Flag body variants 04-06
 are not integrated because back mirroring would reverse embedded flag artwork.
 Transparency remains in PNG masters over each existing zone base color.
-HVAC text is darkened for contrast on the light abstract background; positions
-are unchanged. Existing oversized back-logo placeholders crowd the phone text;
-that needs approved slot/layout refinement before launch. No completed owner
+HVAC text is darkened for contrast on the light abstract background. After the
+background review the owner requested an MQD-style starter layout: no printed
+placeholder logos on either side, with clear centered Front chest/upper Back
+logo slots. Back has a compact Instagram/Facebook/Google row, 888-888-8888,
+then two live editable trade-service lines. Front has background only until a
+logo is uploaded. Only foreground slot/contact placements changed; background
+and sleeve placements remain protected. Social icon masters were copied from
+the approved Clear Haven reusable assets without replacing their originals.
+No proof header is printed on the garment. Sample details still use existing
+pre-checkout validation; no checkout or owner permissions were changed. No completed owner
 saved designs or print-ready 300-DPI masters were supplied. Background approval
 does not approve these synthetic garment placements, sample logos or sleeve flag.
 

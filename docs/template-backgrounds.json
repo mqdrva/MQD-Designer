@@ -3,7 +3,7 @@
   "sourceDirectory": "approved-template-backgrounds",
   "totalStarterDesigns": 5,
   "status": "unpublished-drafts",
-  "placementPolicy": "Existing Front/Back x/y/scale/rotation/crop, Back flipX and sleeve flag are unchanged. American-flag body variants 04-06 are references only. No model, UV, calibration or garment mapping changes.",
+  "placementPolicy": "Background geometry, Back flipX, sleeve flag/orientation, garment mapping and calibration unchanged. Only foreground logo slots and Back social/phone/services layout revised at owner request. All five remain drafts.",
   "printReadiness": "1024x1536 originals are suitable for review, not confirmed 300-DPI production masters. Exact owner saved garment sources, approved sleeve/flag masters and seam/orientation signoff remain missing.",
   "slots": [
     {
@@ -274,5 +274,59 @@
     "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
     "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
     "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53"
-  ]
+  ],
+  "protectedPlacementHashes": [
+    "10e0be3551ab05d50092fa7e0c2ca5ecfac8eed25170fb87c08cba6b4d1353f8",
+    "2588ed35f968ae9998f1875611f7e90da00927b69b24345ec3b8385cb3eb053e",
+    "8ae9ffa3795c05c86fcae6d4e74bca0608a2b5e5577031ee2a87303d00797ecc",
+    "e0f0179d7f88866bc9e60c9197a55bae673a508a254e2c87ba3bbb86f1f48ff1",
+    "5b265b70afe69f2d2aaf2cadf4bcb4ee299e1bf1d463617a27d0ee728c4f8fad"
+  ],
+  "layoutRevision": {
+    "status": "review-only",
+    "request": "No printed sample logos. Background-only Front; Back social row, generic 888-888-8888, trade services; editable customer details.",
+    "frontLogoSlot": {
+      "x": 0,
+      "y": -30,
+      "scale": 0.25
+    },
+    "backLogoSlot": {
+      "x": 0,
+      "y": -48,
+      "scale": 0.16
+    },
+    "backRows": [
+      {
+        "id": "Back-social",
+        "y": -18,
+        "scale": 0.055,
+        "role": "locked"
+      },
+      {
+        "id": "Back-phone",
+        "y": 0,
+        "scale": 0.72,
+        "role": "text"
+      },
+      {
+        "id": "Back-services",
+        "y": 15,
+        "scale": 0.46,
+        "role": "text"
+      },
+      {
+        "id": "Back-services-2",
+        "y": 25,
+        "scale": 0.42,
+        "role": "text"
+      }
+    ],
+    "socialOrder": [
+      "Instagram",
+      "Facebook",
+      "Google"
+    ],
+    "socialSource": "Approved Clear Haven reusable icon masters; copied unchanged.",
+    "note": "Foreground layout revision explicitly requested after background review. Original complete placement hashes retained as historical evidence; protected background/garment/sleeve hashes remain enforced."
+  }
 }
