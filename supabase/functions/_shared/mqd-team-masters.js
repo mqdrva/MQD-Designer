@@ -41,7 +41,9 @@ export function assertTeamMemberCopy(payload,version,{complete=true}={}){
  const expected=cloneTeamMaster(version,()=>ref.copyId),actual=structuredClone(payload);
  // Copy identifiers and save/view state are local; every production property is protected.
  for(const p of [expected,actual]){delete p.designId;delete p.savedAt;delete p.activeZone;delete p.orderOptions;delete p.totalQuantity;delete p.design.teamMaster;p.product={id:p.product.id,model:p.product.model};}
- const a=templateLayers(actual),e=templateLayers(expected);
+ // PostgreSQL jsonb reorders zone keys; only layer order within a zone is meaningful.
+ const byZone=(left,right)=>left.zone.localeCompare(right.zone);
+ const a=templateLayers(actual).sort(byZone),e=templateLayers(expected).sort(byZone);
  for(let i=0;i<e.length;i++){
   if(!a[i]||a[i].zone!==e[i].zone||a[i].layer.templateLayerId!==e[i].layer.templateLayerId)fail('Master layers and order cannot change.');
   const rule=version.rules.find(r=>r.layerId===e[i].layer.templateLayerId&&r.zone===e[i].zone);

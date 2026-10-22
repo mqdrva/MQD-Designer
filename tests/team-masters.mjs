@@ -10,3 +10,8 @@ a.design.zones.Front.layers[1].text='Taylor';a.design.zones.Back.layers[0].text=
 for(const mutate of [p=>p.design.zones.Front.layers[0].src='data:image/png;base64,Yg==',p=>p.design.zones.Front.layers[1].font='Other',p=>p.design.zones.Front.layers[1].x=3,p=>p.design.zones.Back.layers[0].text='99',p=>p.design.zones.Front.layers.reverse(),p=>p.design.zones.Front.layers.push(layer('extra','text',{text:'extra'})),p=>p.product.id='hat',p=>p.design.teamMaster.teamId=id(),p=>p.design.teamMaster.versionId=id()]){const tamper=structuredClone(a);mutate(tamper);assert.throws(()=>assertTeamMemberCopy(tamper,master));}
 const reopened=JSON.parse(JSON.stringify(a));assertTeamMemberCopy(reopened,master);const newer={...structuredClone(master),id:id()};newer.payload.design.zones.Front.background='#ff0000';assertTeamMemberCopy(a,master);assert.throws(()=>assertTeamMemberCopy(a,newer));
 console.log('PASS team master contract: independent copies, save/reopen, exact historical version, allowed fields/choices and artwork/style/placement/team tamper denial.');
+
+const databaseVersion=JSON.parse(JSON.stringify(master,(_,value)=>value&&typeof value==='object'&&!Array.isArray(value)?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b))):value));
+const roundTripCopy=cloneTeamMaster(master);
+assertTeamMemberCopy(roundTripCopy,databaseVersion);
+console.log('PASS PostgreSQL jsonb zone-key reordering preserves valid member copies');
