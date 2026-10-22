@@ -62,7 +62,7 @@ export function createSupportHandler({createDb,env,fetcher=fetch}){
    let conversation;
    if(body.action!=='list'){
     conversation=await checked(db.from('mqd_support_conversations').select('*').eq('id',body.id).maybeSingle());
-    if(conversation&&(!owner&&conversation.token_hash!==hash||Date.parse(conversation.expires_at)<=Date.now()))throw fail('Conversation unavailable.',404);
+    if(conversation&&(!owner&&conversation.token_hash!==hash||!owner&&Date.parse(conversation.expires_at)<=Date.now()))throw fail('Conversation unavailable.',404);
     if(!conversation&&body.action!=='create')throw fail('Conversation unavailable.',404);
    }
    if(body.action==='list'){

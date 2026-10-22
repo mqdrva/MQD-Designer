@@ -47,10 +47,10 @@ begin
   insert into public.mqd_support_conversations(id,token_hash) values(p_id,p_hash) on conflict do nothing;
  end if;
  select * into c from public.mqd_support_conversations where id=p_id for update;
- if c.id is null or c.expires_at<=now() or (not p_owner and c.token_hash is distinct from p_hash) then raise exception 'unavailable'; end if;
+ if c.id is null or (not p_owner and c.expires_at<=now()) or (not p_owner and c.token_hash is distinct from p_hash) then raise exception 'unavailable'; end if;
  select * into m from public.mqd_support_messages where conversation_id=p_id and request_id=p_request;
  if m.seq is not null then
-  if m.body<>p_body or m.sender<>case when p_owner then 'owner' else 'customer' end then raise exception 'conflict'; end if;
+  if m.body<>p_body or m.sender<>(case when p_owner then 'owner' else 'customer' end) then raise exception 'conflict'; end if;
   return to_jsonb(m);
  end if;
  if (select count(*) from public.mqd_support_messages where conversation_id=p_id)>=500 then raise exception 'conversation limit'; end if;
