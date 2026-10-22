@@ -74,7 +74,7 @@ Deno.serve(async(req:Request)=>{
       if(prior){const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed').eq('team_id',a.team_id));const reward=nextMonthReward(orders,prior.period_start,prior.period_end);
        if(reward.creditCents){
         await checked(db.from('mqd_team_rewards').upsert({invoice_id:invoice.id,team_id:a.team_id,period_start:prior.period_start,period_end:prior.period_end,quantity:reward.garments,credit_cents:2000},{onConflict:'invoice_id',ignoreDuplicates:true}));
-        const item=await stripe.invoiceItems.create({customer:a.stripe_customer_id,invoice:invoice.id,amount:-2000,currency:'usd',description:'Team reward: 30 paid garments in the previous subscription month',metadata:{service:'mqd-teams',team:a.team_id}},{idempotencyKey:'team-reward-'+invoice.id});
+        const item=await stripe.invoiceItems.create({customer:a.stripe_customer_id,invoice:invoice.id,amount:-2000,currency:'usd',description:'Team reward: 10 paid garments in the previous subscription month',metadata:{service:'mqd-teams',team:a.team_id}},{idempotencyKey:'team-reward-'+invoice.id});
         await checked(db.from('mqd_team_rewards').update({invoice_item_id:item.id,status:'applied'}).eq('invoice_id',invoice.id));
        }
       }

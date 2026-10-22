@@ -1,5 +1,5 @@
-export const TEAM_POLICY_VERSION='2026-10-13';
-export const TEAM_FEE_CENTS=2000,TEAM_REWARD_QUANTITY=30,TEAM_BATCH_SHIPPING_CENTS=2500;
+export const TEAM_POLICY_VERSION='2026-10-22';
+export const TEAM_FEE_CENTS=2000,TEAM_REWARD_QUANTITY=10,TEAM_BATCH_SHIPPING_CENTS=2500;
 export const DAY_MS=86400000;
 export function batchWindow(opensAt,cutoffAt){
  const start=Date.parse(opensAt),end=Date.parse(cutoffAt),days=(end-start)/DAY_MS;

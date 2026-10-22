@@ -48,7 +48,7 @@ console.log('Team checks passed: approved prices, 7–14 day cutoff, paid-only r
 const apiTables={mqd_print_shop_businesses:[{id:teamId,preferred_slug:'fixture-team',shop_config:{organizationType:'team'},token_hash:await runtime.hash('a'.repeat(64)),token_expires_at:new Date(Date.now()+DAY_MS).toISOString(),email_verified_at:'confirmed'}],mqd_team_accounts:[{...account,shop_config:{name:'Fixture Team',slug:'fixture-team'}}],mqd_team_batches:[],mqd_team_orders:[]};
 let mfa=true,role='admin',apiHandler,apiLive=false;
 const apiDb={auth:{getUser:async()=>({data:{user:{id:'operator',app_metadata:{role},user_metadata:{role:'admin'}}}})},from(table){const filters=[];const q={select(){return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},order(){return q;},limit(){return q;},maybeSingle(){return run(true);},single(){return run(true);},then(a,b){return run(false).then(a,b);}};async function run(single){const rows=(apiTables[table]||[]).filter(r=>filters.every(f=>f(r)));return{data:single?rows[0]||null:rows,error:null};}return q;},rpc:async(name)=>({data:name==='mqd_team_pending_metadata'?[{id:teamId,hasPending:false},{id:'new-team',hasPending:true}]:0,error:null})};
-const apiContext={...context,createClient:()=>apiDb,config:{},PUBLIC_KEY:runtime.PUBLIC_KEY,hash:runtime.hash,teamConfig:async()=>({ready:false,enabled:false,live:apiLive,mode:apiLive?'live':'sandbox'}),canonicalTeamShop:runtime.canonicalTeamShop,teamPriceCatalog:runtime.teamPriceCatalog,teamQuote:runtime.teamQuote,safeAccount:runtime.safeAccount,checked:runtime.checked,hasAdminMfa:async(_db,jwt)=>mfa&&jwt==='operator',batchDraft,batchWindow,TEAM_POLICY_VERSION:'2026-10-13',Deno:{env:{get:()=>''},serve:h=>apiHandler=h}};
+const apiContext={...context,createClient:()=>apiDb,config:{},PUBLIC_KEY:runtime.PUBLIC_KEY,hash:runtime.hash,teamConfig:async()=>({ready:false,enabled:false,live:apiLive,mode:apiLive?'live':'sandbox'}),canonicalTeamShop:runtime.canonicalTeamShop,teamPriceCatalog:runtime.teamPriceCatalog,teamQuote:runtime.teamQuote,safeAccount:runtime.safeAccount,checked:runtime.checked,hasAdminMfa:async(_db,jwt)=>mfa&&jwt==='operator',batchDraft,batchWindow,TEAM_POLICY_VERSION:'2026-10-22',TEAM_REWARD_QUANTITY:10,Deno:{env:{get:()=>''},serve:h=>apiHandler=h}};
 const apiSource=(await fs.readFile(new URL('../supabase/functions/mqd-team-service/index.ts',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');vm.runInNewContext(stripTypeScriptTypes(apiSource),apiContext);
 async function api(body,{jwt='',origin='http://127.0.0.1:8776',key=runtime.PUBLIC_KEY}={}){const response=await apiHandler(new Request('https://example.invalid',{method:'POST',headers:{apikey:key,origin,'Content-Type':'application/json',...(jwt?{authorization:'Bearer '+jwt}:{})},body:JSON.stringify(body)}));return{status:response.status,data:await response.json()};}
 assert.equal((await api({action:'admin-list'})).status,403);mfa=false;assert.equal((await api({action:'admin-list'},{jwt:'operator'})).status,403);mfa=true;role='customer';assert.equal((await api({action:'admin-list'},{jwt:'operator'})).status,403);role='admin';
@@ -82,3 +82,13 @@ const noMailDb={rpc(){throw new Error('Sandbox mail must not access secrets');}}
 assert.equal(await runtime.teamMail(noMailDb,'test','synthetic@example.invalid','Test','Test'),false);
 assert.equal(await runtime.teamMail(noMailDb,'test','synthetic@example.invalid','Test','Test',false),false);
 console.log('PASS sandbox Teams notification suppression');
+
+for(const quantity of [9,10,11]){
+ const reward=nextMonthReward([{...paid,quantity}],start,end);
+ assert.equal(reward.target,10);assert.equal(reward.creditCents,quantity>=10?2000:0);
+ assert.equal(reward.remaining,Math.max(0,10-quantity));
+}
+assert.equal(nextMonthReward([{...paid,quantity:10,refunded_quantity:1}],start,end).creditCents,0);
+assert.equal(nextMonthReward([{...paid,quantity:10,disputed:true}],start,end).creditCents,0);
+assert.equal(nextMonthReward([{...paid,quantity:10,payment_status:'pending'}],start,end).creditCents,0);
+console.log('PASS approved ten-garment renewal reward: 9/10/11 boundary, refund, dispute, pending payment');

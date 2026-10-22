@@ -38,8 +38,8 @@ Real Stripe test-mode checkout handoff/settlement with notifications suppressed,
 The existing Teams service uses one live-enabled setting for new organizer subscriptions, garment checkout and combined shipping. Enabling it exposes the following existing behavior:
 
 - An approved organizer explicitly accepts terms and completes $20/month Stripe subscription checkout to activate the team.
-- 30 qualifying net-paid garments in a billing period earn one $20 credit on the next renewal; refunds/disputes reduce eligibility. No organizer payout or Stripe Connect.
+- 10 qualifying net-paid garments in a billing period earn one $20 credit on the next renewal; refunds/disputes reduce eligibility. No organizer payout or Stripe Connect.
 - Optional combined batch shipping requires MQD capacity/address review and a $25 organizer payment; the order window is 7–14 days.
 - Individual shipping uses existing $10/$15/$20 quantity tiers. All garment proceeds go to MQD.
 
-The user has not reconfirmed these subscription/signup activation effects. Do not enable new live collection or change prices without that concrete decision. Code deployment with collection disabled is separate from an active live Teams ordering feature.
+On October 22, 2026, the user approved $20/month until canceled, a free next month after at least 10 qualifying paid garments in each billing month, and $25 combined shipment to the organizer. Policy version is now 2026-10-22. Collection may be enabled after the remaining release verification succeeds. Code deployment with collection disabled is separate from an active live Teams ordering feature.

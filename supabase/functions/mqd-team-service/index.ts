@@ -4,7 +4,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.95.0';
 import Stripe from 'npm:stripe@22.6.0';
 import JSZip from 'npm:jszip@3.10.1';
 import {hasAdminMfa} from './admin-security.js';
-import {batchDraft,teamAccess,nextMonthReward,TEAM_POLICY_VERSION,TEAM_BATCH_SHIPPING_CENTS} from './contract.js';
+import {batchDraft,teamAccess,nextMonthReward,TEAM_POLICY_VERSION,TEAM_BATCH_SHIPPING_CENTS,TEAM_REWARD_QUANTITY} from './contract.js';
 import {BASE_URL,PUBLIC_KEY,hash,objectId,teamConfig,canonicalTeamShop,teamPriceCatalog,teamQuote,teamMail,checked,safeAccount} from './runtime.js';
 import {shippingCentsForQuantity} from '../_shared/mqd-shipping.js';
 import {assertFixedLogoPackage,garmentLogo,garmentLogoPath,validPhone} from '../mqd-print-shop-pilot/contract.js';
@@ -148,7 +148,7 @@ Deno.serve(async(req:Request)=>{
   if(body.action==='owner-status'){
    const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed,batch_id').eq('team_id',body.id));
    const batches=await checked(db.from('mqd_team_batches').select('id,status,days,expected_quantity,max_quantity,shipping_cents,shipping_paid_at,opens_at,cutoff_at,tracking').eq('team_id',body.id).order('created_at',{ascending:false}).limit(50));
-   return json({account:safeAccount(account),name:account.shop_config.name,slug:business.preferred_slug,batches:batches.map((b:any)=>({...b,paidQuantity:orders.filter((o:any)=>o.batch_id===b.id&&o.payment_status==='paid'&&!o.disputed).reduce((n:number,o:any)=>n+o.quantity-o.refunded_quantity,0)})),reward:account.period_start&&account.period_end?nextMonthReward(orders,account.period_start,account.period_end):{garments:0,target:30,remaining:30,creditCents:0},enabled:config.enabled,mode:config.mode,policyVersion:TEAM_POLICY_VERSION});
+   return json({account:safeAccount(account),name:account.shop_config.name,slug:business.preferred_slug,batches:batches.map((b:any)=>({...b,paidQuantity:orders.filter((o:any)=>o.batch_id===b.id&&o.payment_status==='paid'&&!o.disputed).reduce((n:number,o:any)=>n+o.quantity-o.refunded_quantity,0)})),reward:account.period_start&&account.period_end?nextMonthReward(orders,account.period_start,account.period_end):{garments:0,target:TEAM_REWARD_QUANTITY,remaining:TEAM_REWARD_QUANTITY,creditCents:0},enabled:config.enabled,mode:config.mode,policyVersion:TEAM_POLICY_VERSION});
   }
   if(body.action==='create-batch'){
    if(!teamAccess(account))throw new Error('An active Team subscription is required.');if(!uuid(body.requestId))throw new Error('A batch request identifier is required.');const draft=batchDraft(body.batch);
