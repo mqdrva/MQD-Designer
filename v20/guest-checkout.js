@@ -1,3 +1,4 @@
+import {remainingTemplateFields} from './template-contract.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {garmentPrice,pricingEpoch} from './promotion-pricing.js';
 
@@ -193,7 +194,7 @@ async function buildGuestSubmission(payload){
   const form=new FormData();
   for(const [zone,state] of Object.entries(payload.design?.zones||{})){
     for(const layer of state.layers||[]){
-      if(layer.type!=='image'||layer.libraryAssetId||!layer.src)continue;
+      if(layer.type!=='image'||layer.libraryAssetId||layer.templateAssetPath||!layer.src)continue;
       const filename=layer.filename||'artwork.png';
       const baseMeta={zone,layerId:layer.id,label:layer.label,x:layer.x||0,y:layer.y||0,scale:layer.scale||1,rotation:layer.rotation||0,visible:layer.visible!==false};
       if(layer.backgroundRemoved===true){
@@ -208,7 +209,7 @@ async function buildGuestSubmission(payload){
           form.append('assetMeta',JSON.stringify({...baseMeta,kind:'original-source',processedFilename:processedName}));
         }
       }else{
-        const original=await guestOriginalArtworkBlob(filename);
+        const original=layer.templateReplaced?null:await guestOriginalArtworkBlob(filename);
         const blob=original||await blobFromDataUrl(layer.src);
         form.append('asset',blob,filename);
         form.append('assetMeta',JSON.stringify({...baseMeta,kind:'artwork'}));
@@ -233,6 +234,8 @@ async function addGuestToCart(button){
     if(!window.MQDDesigner?.exportDesign)throw new Error('The designer is still loading. Please try again.');
     const options=selectedOrderOptions();
     const payload=window.MQDDesigner.exportDesign();
+    const remaining=remainingTemplateFields(payload);if(remaining.length)throw new Error('Replace sample details before checkout: '+remaining.join(', ')+'.');
+    if(payload.design?.template?.demo)throw new Error('Unpublished demo designs cannot be ordered.');
     if(!payload?.product?.id||!payload?.design?.zones)throw new Error('The current design could not be read.');
     payload.product.price=priceFor(payload.product.id,payload.product.price);
     payload.orderOptions=options;
@@ -355,6 +358,8 @@ function showTestModeUI(){
 document.addEventListener('click',event=>{
   const addButton=event.target.closest?.('#addToCart');
   if(addButton){
+    const payload=window.MQDDesigner?.exportDesign?.(),remaining=remainingTemplateFields(payload);
+    if(remaining.length||payload?.design?.template?.demo){event.preventDefault();event.stopImmediatePropagation();alert(remaining.length?'Replace sample details before checkout: '+remaining.join(', ')+'.':'Unpublished demo designs cannot be ordered.');return;}
     if(TEST_MODE){
       event.preventDefault();event.stopImmediatePropagation();
       void addGuestToCart(addButton);

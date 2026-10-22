@@ -82,3 +82,32 @@
 @media(max-width:700px){.contest-showcase .giveaway-launch{grid-template-columns:1fr;padding:24px 20px}.giveaway-art{display:none}}
 
 .contest-showcase .giveaway-launch[hidden]{display:none}
+
+.monthly-showdown .giveaway-deadline{border-radius:12px;line-height:1.6}
+.monthly-showdown .giveaway-art{align-self:start;position:sticky;top:20px}
+.monthly-submit{margin:24px 0;padding:20px;border:1px solid #c7a7ff60;border-radius:16px;background:#ffffff08}
+.monthly-submit summary{cursor:pointer;font-size:20px;font-weight:800;color:#89f4e0;padding:8px 0}
+.monthly-submit label,#monthlyOwnerTools label{display:block;margin:16px 0;font-size:14px;font-weight:700}
+.monthly-submit input:not([type=checkbox]),.monthly-submit select,#monthlyOwnerTools select{width:100%;display:block;min-height:48px;padding:12px;background:#211b2b;border:1px solid #81768f;border-radius:9px;color:#fff;font:inherit;margin-top:6px}
+.monthly-submit button{min-height:48px;margin:4px 0;font-size:14px}
+.monthly-submit .monthly-consent{display:flex;align-items:flex-start;gap:10px;font-weight:500;line-height:1.6}
+.monthly-consent input{flex-shrink:0;width:22px;height:22px;margin-top:3px;accent-color:#ff8a3d}
+.monthly-showdown #monthlyEntryForm[hidden],.monthly-showdown #monthlySignIn[hidden],#monthlyShowdown[hidden],#monthlyOwnerTools[hidden],#monthlyVoteLink[hidden]{display:none}
+.monthly-entry-status{display:grid;gap:10px;padding:16px;border:1px solid #ffffff25;border-radius:12px;margin-top:14px}
+.monthly-entry-status span{font-size:13px;color:#c7a7ff}
+.monthly-history-card{margin-top:20px;padding:20px;border:1px solid #ffbf7350;background:#ffbf730b;border-radius:16px}
+.monthly-history-card h3{color:#ffcf68;font-size:24px;overflow-wrap:anywhere}
+.monthly-review-card{margin-top:18px;padding:18px;border:1px solid #ffffff30;border-radius:14px}
+.monthly-review-card img{display:block;width:100%;max-width:450px;max-height:480px;object-fit:contain;background:#fff;border-radius:12px}
+.monthly-review-card .actions{margin:14px 0;gap:8px}
+.monthly-review-card h3{overflow-wrap:anywhere}
+.monthly-review-card p{overflow-wrap:anywhere}
+.monthly-review-card button{font-size:13px;min-height:44px}
+.monthly-winner-image{display:block;width:100%;max-width:420px;max-height:500px;object-fit:contain;background:#fff;border-radius:16px;margin:20px auto 0}
+@media(max-width:600px){.monthly-submit{padding:14px}.monthly-history-card{padding:14px}.monthly-showdown .actions a{width:100%;justify-content:center;text-align:center}.monthly-submit button{width:100%}.owner-form{padding:16px}#monthlyOwnerTools select{font-size:14px}.monthly-review-card{padding:12px}}
+
+
+.monthly-showdown [hidden]{display:none!important}
+#monthlyUploadFields img,#monthlyUploadFields video{display:block;width:100%;max-width:420px;max-height:360px;object-fit:contain;border-radius:12px;margin:12px 0;background:#151020}
+.monthly-submit input[type=file]{max-width:100%;font-size:16px}
+.contest-entry-actions{margin:20px 0}.contest-card video,.monthly-review-card video{display:block;width:100%;max-height:420px;object-fit:contain;margin:12px 0;border-radius:12px}

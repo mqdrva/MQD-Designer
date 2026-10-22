@@ -33,6 +33,9 @@ jobs:
         env:
           MQD_GLB_CACHE_DIR: .cache/mqd-glbs
 
+      - name: Verify Shirt Games privacy, proofs and sandbox boundaries
+        run: node --test games/tests/*.test.mjs
+
   cart-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -80,6 +83,12 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261001220545_allow_multiple_orders_per_checkout_session.sql
           psql -v ON_ERROR_STOP=1 -f tests/checkout-session-sharing.sql
 
+      - name: Verify template privacy and immutable versions in isolated Postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/template-schema-fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020164602_premade_design_templates.sql
+          psql -v ON_ERROR_STOP=1 -f tests/template-schema.sql
+
       - name: Verify isolated print-shop subscriptions and onboarding
         run: |
           node tests/print-shop-subscription.mjs
@@ -92,3 +101,6 @@ jobs:
           node tests/print-shop-management.mjs
           node tests/print-shop-logos.mjs
           node tests/team-service.mjs
+          node tests/team-masters.mjs
+          node tests/team-production.mjs
+          node tests/team-production-placement.mjs

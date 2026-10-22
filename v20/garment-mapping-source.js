@@ -1561,7 +1561,7 @@ function loadGarment(){const loadVersion=++garmentLoadVersion;window.dispatchEve
 // @mapping-begin duplicateLayerIntoZone
 function duplicateLayerIntoZone(source,zone,{offset=false}={}){
   const target=zoneState(zone);
-  if(target.layers.length>=MAX_ZONE_LAYERS)return false;
+  if(target.layers.length>=maxZoneLayers(product,zone))return false;
   const copy={...source,id:'layer-'+layerSeq++,label:'Layer '+(target.layers.length+1),crop:source.crop?{...source.crop}:undefined};
   if(product.id==='tshirt'&&activeZone!==zone&&['Front','Back'].includes(activeZone)&&['Front','Back'].includes(zone)&&!source.libraryLocked&&!source.chatBackground){
     const frame=z=>{

@@ -1,0 +1,523 @@
+{
+  "schema": "mqd-background-review-v1",
+  "sourceDirectory": "approved-template-backgrounds",
+  "totalStarterDesigns": 15,
+  "status": "unpublished-drafts",
+  "placementPolicy": "Original five layouts unchanged. Owner expanded the existing gallery to all fifteen original backgrounds using the matching industry layout, editable contact controls and locked body/sleeve backgrounds. American-themed originals remain unmirrored on Back and Right Sleeve to avoid reversing embedded flags; owner approved these three without seam matching. Models, mappings, UVs, calibration, collar and separate small flag unchanged. All fifteen remain drafts.",
+  "printReadiness": "1024x1536 originals are suitable for review, not confirmed 300-DPI production masters. Exact owner saved garment sources, approved sleeve/flag masters and seam/orientation signoff remain missing.",
+  "slots": [
+    {
+      "slot": 1,
+      "name": "Pressure Wash Demo",
+      "category": "Pressure Washing",
+      "filename": "02-pressure-washing-black-blue.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 2,
+      "name": "Lawn Crew Demo",
+      "category": "Lawn Care",
+      "filename": "07-landscaping-fresh-lawn.png",
+      "base": "#173a2b",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 3,
+      "name": "HVAC Demo",
+      "category": "HVAC",
+      "filename": "13-abstract-blue-flow.jpg",
+      "base": "#202e4c",
+      "textColor": "#10243B",
+      "status": "unpublished-draft",
+      "note": "Abstract review substitute; no HVAC-specific artwork supplied.",
+      "layoutSlot": 3,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 4,
+      "name": "Pool Care Demo",
+      "category": "Pool Care",
+      "filename": "10-pool-cleaning-aqua-ripples.png",
+      "base": "#053b55",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 5,
+      "name": "Business Crew Demo",
+      "category": "General Business",
+      "filename": "14-abstract-dark-waves.jpg",
+      "base": "#282335",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 5,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 6,
+      "name": "Pressure Wash \u00b7 Ice Blue Demo",
+      "category": "Pressure Washing",
+      "filename": "01-pressure-washing-ice-blue.jpg",
+      "base": "#083a59",
+      "textColor": "#000000",
+      "status": "unpublished-draft",
+      "note": "Approved background with black contact text; unpublished draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": true,
+      "contrastReview": false,
+      "blackTextApproved": true
+    },
+    {
+      "slot": 7,
+      "name": "Pressure Wash \u00b7 Ocean Blue Demo",
+      "category": "Pressure Washing",
+      "filename": "03-pressure-washing-ocean-blue.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 8,
+      "name": "Pressure Wash \u00b7 American Classic Demo",
+      "category": "Pressure Washing",
+      "filename": "04-pressure-washing-american-classic.jpg",
+      "base": "#083a59",
+      "textColor": "#000000",
+      "status": "unpublished-draft",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": false,
+      "contrastReview": false,
+      "blackTextApproved": true,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
+    },
+    {
+      "slot": 9,
+      "name": "Pressure Wash \u00b7 American Dark Demo",
+      "category": "Pressure Washing",
+      "filename": "05-pressure-washing-american-dark.jpg",
+      "base": "#083a59",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": false,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
+    },
+    {
+      "slot": 10,
+      "name": "Pressure Wash \u00b7 American Bright Demo",
+      "category": "Pressure Washing",
+      "filename": "06-pressure-washing-american-bright.jpg",
+      "base": "#083a59",
+      "textColor": "#000000",
+      "status": "unpublished-draft",
+      "note": "Patriotic layout approved without mirroring or seam matching; unpublished draft.",
+      "layoutSlot": 1,
+      "mirrorPattern": false,
+      "contrastReview": false,
+      "blackTextApproved": true,
+      "flagLayoutApproved": true,
+      "seamMatchingRequired": false
+    },
+    {
+      "slot": 11,
+      "name": "Lawn Crew \u00b7 Dewy Grass Demo",
+      "category": "Lawn Care",
+      "filename": "08-landscaping-dewy-grass.png",
+      "base": "#173a2b",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 12,
+      "name": "Lawn Crew \u00b7 Sunlit Clippings Demo",
+      "category": "Lawn Care",
+      "filename": "09-landscaping-sunlit-clippings.png",
+      "base": "#173a2b",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 2,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 13,
+      "name": "Pool Care \u00b7 Deep Blue Demo",
+      "category": "Pool Care",
+      "filename": "11-pool-cleaning-deep-blue.png",
+      "base": "#053b55",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 14,
+      "name": "Pool Care \u00b7 Tropical Demo",
+      "category": "Pool Care",
+      "filename": "12-pool-cleaning-tropical.png",
+      "base": "#053b55",
+      "textColor": "#FFFFFF",
+      "status": "unpublished-draft",
+      "note": "Approved background; finished shirt remains a draft.",
+      "layoutSlot": 4,
+      "mirrorPattern": true
+    },
+    {
+      "slot": 15,
+      "name": "Business Crew \u00b7 Soft Gradient Demo",
+      "category": "General Business",
+      "filename": "15-abstract-soft-gradient.jpg",
+      "base": "#282335",
+      "textColor": "#000000",
+      "status": "unpublished-draft",
+      "note": "Approved background with black contact text; unpublished draft.",
+      "layoutSlot": 5,
+      "mirrorPattern": true,
+      "contrastReview": false,
+      "blackTextApproved": true
+    }
+  ],
+  "received": [
+    {
+      "filename": "all-15-preview.jpg",
+      "bytes": 679858,
+      "sha256": "a7a3f35549b3771bffc24203a909d42ca953e57756e8b5885205e7b180b7d17c",
+      "received": true,
+      "width": 1500,
+      "height": 1720,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "received reference only"
+    },
+    {
+      "filename": "assets/01-pressure-washing-ice-blue.jpg",
+      "bytes": 708321,
+      "sha256": "01931403452a630879002f75fcf05c60c84c38bd8264f11ac7118a52c3ef4028",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 6"
+    },
+    {
+      "filename": "assets/02-pressure-washing-black-blue.jpg",
+      "bytes": 827488,
+      "sha256": "5d7527c32b53e2c31e809b20e1196535d6fa8f0e65c556302270723899807cd3",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 1"
+    },
+    {
+      "filename": "assets/03-pressure-washing-ocean-blue.jpg",
+      "bytes": 844947,
+      "sha256": "14d5f9efeaa716076413d2d015c58f54a575ca2c252e90a63218c92415ab7f4b",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 7"
+    },
+    {
+      "filename": "assets/04-pressure-washing-american-classic.jpg",
+      "bytes": 1048646,
+      "sha256": "7bdfcc9ba90f7ce69b41ddf4b688fed48fd666b476d38fb42ef63caf1db8b14a",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 8"
+    },
+    {
+      "filename": "assets/05-pressure-washing-american-dark.jpg",
+      "bytes": 999251,
+      "sha256": "f03ab099886dc766b17a344ab84231bff16ad7d553308d1cfd26312d44c0f1e8",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 9"
+    },
+    {
+      "filename": "assets/06-pressure-washing-american-bright.jpg",
+      "bytes": 832651,
+      "sha256": "c847f21ced29941a2ea00bd7f38b6c4b1357c4c1bc5f3866f02dbf5fd2fcdae9",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 10"
+    },
+    {
+      "filename": "assets/07-landscaping-fresh-lawn.png",
+      "bytes": 1358828,
+      "sha256": "1cbc9a611dfa2758c29131e21f4e228d636f0923cf3e226ca443511e22e89f8c",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 2"
+    },
+    {
+      "filename": "assets/08-landscaping-dewy-grass.png",
+      "bytes": 1598360,
+      "sha256": "0c660f87fc86a8376d8acaaa85d1caafbe6dcf0dff0cb0b6e8fdc6be100a2ec9",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 11"
+    },
+    {
+      "filename": "assets/09-landscaping-sunlit-clippings.png",
+      "bytes": 1605302,
+      "sha256": "41c161ac20b9dc1baeb24332154b4a07fc979c095bb28f6b0040ecf07c44114c",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 12"
+    },
+    {
+      "filename": "assets/10-pool-cleaning-aqua-ripples.png",
+      "bytes": 1959820,
+      "sha256": "8f9a6743cfaf308be73e9ae8024c588f3f23c12cedfac980f6f3c59c98e1d857",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 4"
+    },
+    {
+      "filename": "assets/11-pool-cleaning-deep-blue.png",
+      "bytes": 2146532,
+      "sha256": "977fcbf5163794f482b516c5fdc12c9d67fad502cb8fc8b1bf86aa50cdd9647c",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 13"
+    },
+    {
+      "filename": "assets/12-pool-cleaning-tropical.png",
+      "bytes": 1951517,
+      "sha256": "c274d0e3c8758e7f89078f24b6f0d2ecaa564f8f6e33b5225944053ee032a503",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "PNG",
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "usage": "integrated into review draft slot 14"
+    },
+    {
+      "filename": "assets/13-abstract-blue-flow.jpg",
+      "bytes": 438511,
+      "sha256": "4ac7d2070d17825d3ea134d16e355fea30d989e7eb6e1c7812407c06ced1816d",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 3"
+    },
+    {
+      "filename": "assets/14-abstract-dark-waves.jpg",
+      "bytes": 354037,
+      "sha256": "a30c619a5628a8d2d2aba9ffde4005c0e580a4319aad4373980f44eaaa2be479",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 5"
+    },
+    {
+      "filename": "assets/15-abstract-soft-gradient.jpg",
+      "bytes": 415062,
+      "sha256": "59c96dda688f4d5063c7e3a725873cebb7bb0754edf59a40fad86452dc0657c9",
+      "received": true,
+      "width": 1024,
+      "height": 1536,
+      "format": "JPEG",
+      "mode": "RGB",
+      "usage": "integrated into review draft slot 15"
+    },
+    {
+      "filename": "index.html",
+      "bytes": 4360,
+      "sha256": "8329122ef3b4e6fcaf69a838c256aac759056abd4d3abbcc44292441e1321cdb",
+      "received": true,
+      "format": "HTML catalog",
+      "usage": "received reference only"
+    }
+  ],
+  "baselineCommit": "49e02b1442b9aff5e06d45c377ed56c318e3cfb8",
+  "placementHashes": [
+    "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
+    "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
+    "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
+    "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53",
+    "85874fc2c5d33a67a82354dec34ce7a226334865366368184b5cb82be205da53"
+  ],
+  "protectedPlacementHashes": [
+    "10e0be3551ab05d50092fa7e0c2ca5ecfac8eed25170fb87c08cba6b4d1353f8",
+    "2588ed35f968ae9998f1875611f7e90da00927b69b24345ec3b8385cb3eb053e",
+    "8ae9ffa3795c05c86fcae6d4e74bca0608a2b5e5577031ee2a87303d00797ecc",
+    "e0f0179d7f88866bc9e60c9197a55bae673a508a254e2c87ba3bbb86f1f48ff1",
+    "5b265b70afe69f2d2aaf2cadf4bcb4ee299e1bf1d463617a27d0ee728c4f8fad"
+  ],
+  "layoutRevision": {
+    "status": "review-only",
+    "request": "Smaller sleeve flag; higher/tighter social and phone; three separate editable service lines; Impact phone/services; no printed sample logos.",
+    "frontLogoSlot": {
+      "x": 0,
+      "y": -30,
+      "scale": 0.25
+    },
+    "backLogoSlot": {
+      "x": 0,
+      "y": -48,
+      "scale": 0.16
+    },
+    "backRows": [
+      {
+        "id": "Back-social",
+        "y": -25,
+        "scale": 0.055,
+        "role": "artwork"
+      },
+      {
+        "id": "Back-phone",
+        "y": -13,
+        "scale": 0.72,
+        "role": "text",
+        "font": "Impact"
+      },
+      {
+        "id": "Back-services",
+        "y": 1,
+        "scale": 0.62,
+        "role": "text",
+        "font": "Impact"
+      },
+      {
+        "id": "Back-services-2",
+        "y": 12,
+        "scale": 0.6,
+        "role": "text",
+        "font": "Impact"
+      },
+      {
+        "id": "Back-services-3",
+        "y": 23,
+        "scale": 0.58,
+        "role": "text",
+        "font": "Impact"
+      }
+    ],
+    "socialOrder": [
+      "Instagram",
+      "Facebook",
+      "Google"
+    ],
+    "socialSource": "Approved Clear Haven reusable icon masters; copied unchanged.",
+    "note": "Background/garment/sleeve geometry remains frozen except the explicitly requested flag scale .35 -> .20. Ordinary editor layer limit stays six; only a prepared Back stack of two locked images, one logo and four editable text layers may contain seven.",
+    "flag": {
+      "previousScale": 0.35,
+      "scale": 0.2,
+      "x": 0,
+      "y": 0,
+      "flipX": false,
+      "flipY": false,
+      "note": "Owner requested a smaller flag. Source artwork, sleeve zone, center, rotation and orientation unchanged."
+    },
+    "serviceStructure": "Same approved centered layout for every industry: social icons, number, two separate trade-service lines, then & MORE! on its own bottom line. All service text remains editable.",
+    "customerEditing": "Owner requested movable/resizable/rotatable social icons, phone and service layers. Text styling/content editable; social image optional replacement. Backgrounds/flag locked. Empty logo slots retained for upload, excluded from canvas hit/selection and layer list until replaced."
+  },
+  "sleeveBackground": {
+    "status": "unpublished-review",
+    "source": "Same unmodified 1024x1536 original as the body",
+    "x": 0,
+    "y": -128.91433885100443,
+    "scale": 1,
+    "leftFlipX": false,
+    "rightFlipX": true,
+    "flipY": false,
+    "anchor": "Bottom of source aligned with sleeve hem; preserves grass/water detail on wide sleeve panel. Derived from existing nominal 2841x1702 frame and unchanged 508x380 mask bounds x35 y1 w462 h378.",
+    "layerOrder": "Locked sleeve background first; existing smaller unmirrored flag above on wearer left sleeve.",
+    "approval": "Visual pattern continuity only. Physical seam, final sleeve master and flag approval remain pending."
+  },
+  "originalStarterDesigns": 5,
+  "expansion": {
+    "request": "Use all fifteen supplied backgrounds before launch. Only background varies; industry contact layout and customer controls stay the same.",
+    "grouping": {
+      "Pressure Washing": 6,
+      "Lawn Care": 3,
+      "Pool Care": 3,
+      "Abstract": 3
+    },
+    "orientationException": "Owner approved originals04\u201306 unmirrored as shown, without front/back seam matching. Preserve original flag orientation; no seam-matching review required for these patriotic backgrounds.",
+    "sourceMapping": "Each added slot inherits its layoutSlot from one of the original five; original IDs/versions retained, ten new IDs appended.",
+    "contrastApproval": "Owner approved black default phone/services on the four light backgrounds: originals01/04/06/15. Font, content, positions, sizes, stroke and edit controls unchanged."
+  }
+}

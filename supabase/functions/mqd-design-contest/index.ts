@@ -1,5 +1,6 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.95.0';
 import {hasAdminMfa} from '../_shared/mqd-admin-security.js';
+import {monthlyAction} from './monthly.ts';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store'};
 const json=(v:unknown,status=200)=>new Response(JSON.stringify(v),{status,headers:{...cors,'Content-Type':'application/json'}});
 const validId=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
@@ -9,11 +10,12 @@ Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try{
-  const raw=await req.text();if(raw.length>20000)return json({error:'Request too large'},413);
+  const raw=await req.text();if(raw.length>3000000)return json({error:'Request too large'},413);
   const b=JSON.parse(raw),admin=createClient(Deno.env.get('SUPABASE_URL')!,key(),{auth:{persistSession:false,autoRefreshToken:false}});
   const rpc=async(name:string,args:any)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new Error(error.message);return data;};
+  const monthly=await monthlyAction(req,b,admin,json);if(monthly)return monthly;
   if(b.action==='list'){
-   const {data,error}=await admin.from('mqd_contests').select('id,title,description,closes_at,created_at').order('created_at',{ascending:false}).limit(50);if(error)throw error;return json({contests:data});
+   const {data,error}=await admin.from('mqd_contests').select('id,title,description,closes_at,created_at,round_month').order('created_at',{ascending:false}).limit(50);if(error)throw error;return json({contests:data});
   }
   if(b.action==='public'||b.action==='vote'){
    if(!validId(b.contestId))return json({error:'Contest not found'},404);
@@ -36,6 +38,7 @@ Deno.serve(async req=>{
    return json({designs});
   }
   if(b.action==='close'){
+   const {data:round}=await admin.from('mqd_contests').select('round_month').eq('id',b.contestId).maybeSingle();if(round?.round_month)throw new Error('Monthly rounds close automatically at their published deadline.');
    if(!validId(b.contestId))throw new Error('Invalid contest.');
    const {data,error}=await admin.from('mqd_contests').update({closes_at:new Date().toISOString()}).eq('id',b.contestId).select('id').maybeSingle();if(error)throw error;if(!data)throw new Error('Contest not found.');return json({closed:true});
   }
@@ -56,3 +59,4 @@ Deno.serve(async req=>{
   return json({error:'Unknown action'},400);
  }catch(e){return json({error:e.message||'Contest request failed'},400);}
 });
+

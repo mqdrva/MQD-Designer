@@ -68,6 +68,17 @@ await Promise.all(workers);
 console.log(`PASS: all ${products.length} frozen product GLBs downloaded and structurally validated.`);
 
 const tests=[
+  ['back-layer-capacity.mjs'],
+  ['template-backgrounds.mjs'],
+  ['template-gallery.mjs'],
+  ['template-client.mjs'],
+  ['template-api.mjs'],
+  ['owner-proof-regression.mjs'],
+  ['owner-order-comparison.mjs'],
+  ['owner-paid-work-queue.mjs'],
+  ['owner-order-comparison-access.mjs'],
+  ['owner-paid-email-reliability.mjs'],
+  ['launch-security-guards.mjs'],
   ['checkout-security.mjs'],
   ['checkout-customer-experience.mjs'],
   ['purchase-analytics.mjs'],

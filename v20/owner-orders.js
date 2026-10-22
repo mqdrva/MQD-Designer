@@ -1,3 +1,4 @@
+import {makeGameProductionPackage} from '/shirt-games/production.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {requireAdminMfa} from './admin-security.js?v=1';
 import {isEverydayOrder,everydayProductionZip} from './everyday-production-package.js';
@@ -7,7 +8,7 @@ const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const ORDERS_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const STATUS_LABELS={new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled',test:'Test'};
+const STATUS_LABELS={unpaid:'Unpaid',review:'Payment review','payment-review':'Review payment',new:'New',paid:'Paid','in-production':'In Production',shipped:'Shipped',completed:'Completed',cancelled:'Cancelled',test:'Test'};
 let activeStatus='all',activeSearch='',currentDetail=null,searchTimer=0;
 
 async function request(body){
@@ -49,11 +50,11 @@ function renderOrders(rows=[]){
 }
 async function loadOrders(){
   setOrdersMessage('Loading orders…');
-  try{const result=await request({action:'list',status:activeStatus,search:activeSearch});renderCounts(result.counts||{});renderOrders(result.orders||[]);setOrdersMessage(result.orders?.length?`${result.orders.length} order${result.orders.length===1?'':'s'} shown.`:'');}
+  try{const result=await request({action:'list',status:activeStatus,search:activeSearch});renderCounts(result.counts||{});renderOrders(result.orders||[]);setOrdersMessage(result.orders?.length?`${result.orders.length} ${activeStatus==='unpaid'?'unpaid submission':activeStatus==='test'?'test order':activeStatus==='review'?'order for review':'paid order'}${result.orders.length===1?'':'s'} shown.`:'');}
   catch(error){console.error(error);renderOrders([]);setOrdersMessage(error.message,true);if(/access|required|sign in/i.test(error.message))showAuth(error.message,true);}
 }
 async function startAdmin(){
-  try{await request({action:'list',status:'all',search:''});$('authCard').classList.add('hidden');$('ordersApp').classList.remove('hidden');$('signOut').classList.remove('hidden');await loadOrders();}
+  try{await request({action:'list',status:'all',search:''});$('authCard').classList.add('hidden');$('ordersApp').classList.remove('hidden');$('signOut').classList.remove('hidden');await loadOrders();const initialOrder=new URLSearchParams(location.search).get('order');if(initialOrder&&/^[0-9a-f-]{36}$/i.test(initialOrder))await openOrder(initialOrder);}
   catch(error){showAuth(error.message,true);}
 }
 
@@ -89,17 +90,44 @@ function renderAssets(detail){
   addGroup('Captured zone files',zoneFiles);addGroup('Garment previews',assets.filter(a=>a.layer_type==='mockup-view'));addGroup('Original artwork',artwork);addGroup('Text / layer metadata',textAssets);
   if(detail.order?.mockup_url){const group=document.createElement('section');group.className='asset-group';const h=document.createElement('h4');h.textContent='Mockup';const row=document.createElement('div');row.className='asset-row';const label=document.createElement('span');label.textContent=isEverydayOrder(detail)?'Everyday front preview PNG':'Customer 3D mockup PNG';const a=document.createElement('a');a.href=detail.order.mockup_url;a.target='_blank';a.rel='noopener';a.textContent='Download';row.append(label,a);group.append(h,row);host.prepend(group);}
 }
+function renderOwnerNotifications(detail){
+  const host=$('ownerNotificationStatus');if(!host)return;host.replaceChildren();
+  if(detail.ownerNotificationError){host.textContent=detail.ownerNotificationError;return;}
+  const rows=detail.ownerNotifications||[];
+  if(!rows.length){host.textContent=detail.order?.stripe_payment_status==='paid'?'Not queued. This paid order has no owner email notification recorded.':'Owner email is created after payment.';return;}
+  for(const row of rows){const p=document.createElement('p');p.textContent=(row.status==='sent'?'Sent · accepted by email service':row.status==='failed'?'Failed · needs retry':'Pending · waiting to send')+' · '+String(row.recipient||'owner inbox')+(row.sent_at?' · '+dateTime(row.sent_at):'');host.append(p);if(row.last_error){const error=document.createElement('p');error.textContent=row.last_error;host.append(error);}}
+}
+function renderOrderComparison(result){
+  const host=$('reorderComparisonBody');if(!host)return;host.replaceChildren();
+  const title=document.createElement('strong');title.textContent=result.label||'Review needed';host.append(title);
+  const add=value=>{if(!value)return;const p=document.createElement('p');p.textContent=value;host.append(p);};
+  if(result.previousOrder){
+    const previous=result.previousOrder;
+    if(/^[0-9a-f-]{36}$/i.test(String(previous.id||''))){const link=document.createElement('a');link.href='/owner-orders.html?order='+encodeURIComponent(previous.id);link.textContent='Open previous order '+(previous.orderNumber||'');link.onclick=event=>{event.preventDefault();openOrder(previous.id);};host.append(document.createElement('br'),link);}
+  }
+  for(const [heading,rows] of [['Design changes',result.changes],['Size / quantity changes',result.orderChanges]]){
+    if(!rows?.length)continue;const h=document.createElement('h4');h.textContent=heading;const list=document.createElement('ul');for(const row of rows){const item=document.createElement('li');item.textContent=row;list.append(item);}host.append(h,list);
+  }
+  add(result.guidance);add(result.warning);add(result.historyNote);
+  if(result.previousOrder)add('The previous order provides its saved originals and production ZIP. Your separately prepared print files are not stored here.');
+}
+async function loadOrderComparison(id){
+  const host=$('reorderComparisonBody');if(!host)return;host.textContent='Checking previous paid orders and saved artwork contents…';
+  try{const result=await request({action:'compare',id});if(currentDetail?.order?.id===id)renderOrderComparison(result.comparison||{});}
+  catch(error){if(currentDetail?.order?.id===id)host.textContent='Review needed. Comparison could not be completed: '+error.message;}
+}
 function renderDetail(detail){
   currentDetail=detail;const order=detail.order||{};$('detailLoading').classList.add('hidden');$('detailContent').classList.remove('hidden');$('detailContent').classList.remove('loading');$('orderOverlay').classList.remove('loading');document.querySelector('.drawer')?.classList.remove('loading');text($('detailTitle'),order.order_number||'Order');text($('detailSubtitle'),`${order.is_test===true?'TEST ORDER · ':''}${STATUS_LABELS[order.ui_status]||order.ui_status||'New'} · ${order.product_name||'Custom garment'}`);
   const img=$('mockupImage'),missing=$('mockupMissing');if(order.mockup_url){img.src=order.mockup_url;img.classList.remove('hidden');missing.classList.add('hidden');}else{img.removeAttribute('src');img.classList.add('hidden');missing.classList.remove('hidden');}
   $('downloadColors')?.closest('.detail-section')?.classList.toggle('hidden',isEverydayOrder(detail));
-  const locked=order.is_test===true;
+  const paymentLocked=order.payment_confirmed===false||!!order.payment_review_reason;const locked=order.is_test===true||paymentLocked;
+  $('paymentFulfillmentNotice')?.classList.toggle('hidden',!paymentLocked);
   const status=$('detailStatus'),carrier=$('detailCarrier'),tracking=$('detailTracking'),save=$('saveOrderUpdate');
   status.value=['new','paid','in-production','shipped','completed'].includes(order.ui_status)?order.ui_status:'new';carrier.value=order.shipping_carrier||'';tracking.value=order.tracking_number||'';
   for(const control of [status,carrier,tracking,save]){control.disabled=locked;control.removeAttribute('readonly');control.setAttribute('aria-disabled',locked?'true':'false');control.style.pointerEvents=locked?'none':'auto';control.style.opacity=locked?'.55':'1';}
   if(!locked){carrier.tabIndex=0;tracking.tabIndex=0;status.tabIndex=0;save.tabIndex=0;}
-  $('testOrderNotice').classList.toggle('hidden',!locked);
-  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);
+  $('testOrderNotice').classList.toggle('hidden',order.is_test!==true);
+  text($('customerName'),order.customer_name||order.shipping_name);text($('customerEmail'),order.customer_email);text($('customerPhone'),order.customer_phone);text($('shippingName'),order.shipping_name||order.customer_name);text($('shippingAddress'),formatAddress(order.shipping_address));$('shippingAddress').style.whiteSpace='pre-line';text($('orderReference'),order.order_number);text($('orderPaid'),order.paid_at?`${money(order.amount_paid,order.currency||'USD')} · ${dateTime(order.paid_at)}`:'Not marked paid');text($('orderCreated'),dateTime(order.created_at));renderItems(detail.items||[]);renderColors(order.background_colors||{});renderSavedDesign(detail.savedDesign||null);renderAssets(detail);renderOwnerNotifications(detail);loadOrderComparison(order.id);
 }
 async function openOrder(id){
   $('orderOverlay').classList.remove('hidden');$('detailLoading').classList.remove('hidden');$('detailContent').classList.add('hidden');text($('detailLoading'),'Loading order…');
@@ -116,6 +144,9 @@ async function saveOrderUpdate(){
 async function downloadProductionZip(){
   if(!currentDetail||(!isEverydayOrder(currentDetail)&&!window.JSZip))return;const button=$('downloadProductionZip'),old=button.textContent;button.disabled=true;button.textContent='Building ZIP…';
   try{
+    if(currentDetail.order?.design_json?.range==='shirt-games'){
+      await requireAdminMfa(supabase);const {data}=await supabase.auth.getSession();const response=await fetch(SUPABASE_URL+'/functions/v1/mqd-shirt-games',{method:'POST',headers:{Authorization:'Bearer '+data.session.access_token,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({route:'owner',body:{action:'detail',orderId:currentDetail.order.design_json.gameDraftId}})});const detail=await response.json();if(!response.ok)throw Error(detail.error||'Game production access denied');const result=await makeGameProductionPackage(detail);downloadBlob(safePart(currentDetail.order.order_number)+'-manufacturing.zip',result.blob);return;
+    }
     if(isEverydayOrder(currentDetail)){const blob=await everydayProductionZip(currentDetail,fetchBlob);downloadBlob(`${safePart(currentDetail.order.order_number)}-production.zip`,blob);return;}
     const detail=currentDetail,order=detail.order,zip=new JSZip(),root=zip.folder(`${safePart(order.order_number)}-production`);root.file('design.json',JSON.stringify(order.design_json||{},null,2));root.file('background-colors.json',JSON.stringify(order.background_colors||{},null,2));root.file('order-summary.json',JSON.stringify({orderNumber:order.order_number,status:order.ui_status,customer:{name:order.customer_name,email:order.customer_email,phone:order.customer_phone},shipping:{name:order.shipping_name,address:order.shipping_address,carrier:order.shipping_carrier,trackingNumber:order.tracking_number},items:detail.items||[],createdAt:order.created_at,paidAt:order.paid_at},null,2));
     const zones=zoneMetadata(detail);for(const [zone,data] of Object.entries(zones))root.file(`zones/${safePart(zone)}.json`,JSON.stringify(data,null,2));

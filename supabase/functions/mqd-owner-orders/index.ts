@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { escapeMqdEmailHtml, queueMqdEmail, retryPendingMqdEmails } from "../_shared/mqd-email.js";
 import { hasAdminMfa } from "../_shared/mqd-admin-security.js";
 
+import {classifyOwnerOrder,ownerWorkQueue} from "../_shared/mqd-owner-work-queue.js";
+import {ownerOrderComparison} from "../_shared/mqd-owner-order-comparison.js";
+
 const allowedOrigins=new Set(['https://mymerchnow.app','https://www.mymerchnow.app','https://mqd-designer-vercel.vercel.app']);
 function allowedOrigin(origin:string){return allowedOrigins.has(origin)||/^https:\/\/mqd-designer-vercel(?:-[a-z0-9-]+)?\.vercel\.app$/.test(origin);}
 function cors(req:Request){const origin=req.headers.get('origin')||'';return{'Access-Control-Allow-Origin':allowedOrigin(origin)?origin:'https://mymerchnow.app','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'};}
@@ -30,6 +33,11 @@ Deno.serve(async(req:Request)=>{
 
     const body=await req.json().catch(()=>({})),action=String(body?.action||'list');
 
+    if(action==='compare'){
+      const id=cleanText(body?.id,64);if(!UUID.test(id))return json(req,{error:'Invalid order'},400);
+      return json(req,{comparison:await ownerOrderComparison(supabase,id)});
+    }
+
     if(action==='backup-list'){
       const bucket=String(body.bucket||''),prefix=String(body.prefix||''),offset=Number(body.offset||0);
       if(!['garments','customer-artwork','mqd-library-assets','mqd-production'].includes(bucket)||prefix.length>1024||prefix.split('/').some(p=>p==='.'||p==='..')||!Number.isSafeInteger(offset)||offset<0)return json(req,{error:'Invalid backup request'},400);
@@ -45,21 +53,19 @@ Deno.serve(async(req:Request)=>{
       try{await retryPendingMqdEmails(supabase,5);}catch(error){console.error('MQD pending email retry skipped',error instanceof Error?error.message:String(error));}
       const filter=cleanText(body?.status||'all',30).toLowerCase(),search=cleanText(body?.search||'',160).toLowerCase();
       const {data:orders,error:ordersError}=await supabase.from('mqd_orders')
-        .select('id,order_number,status,is_test,customer_name,customer_email,customer_phone,shipping_name,product_id,product_name,product_price,amount_paid,currency,paid_at,mockup_path,background_colors,tracking_number,shipping_carrier,production_started_at,shipped_at,completed_at,created_at,updated_at')
+        .select('id,order_number,status,is_test,stripe_payment_status,customer_name,customer_email,customer_phone,shipping_name,product_id,product_name,product_price,amount_paid,currency,paid_at,mockup_path,background_colors,tracking_number,shipping_carrier,production_started_at,shipped_at,completed_at,created_at,updated_at')
         .order('created_at',{ascending:false}).limit(300);
       if(ordersError)return json(req,{error:ordersError.message},500);
       const ids=(orders||[]).map((row:any)=>row.id);
       const {data:items,error:itemsError}=ids.length?await supabase.from('mqd_order_items').select('id,order_id,product_id,product_name,unit_price,quantity,order_options').in('order_id',ids):{data:[],error:null};
       if(itemsError)return json(req,{error:itemsError.message},500);
       const byOrder=new Map<string,any[]>();for(const item of items||[]){const list=byOrder.get(item.order_id)||[];list.push(item);byOrder.set(item.order_id,list);}
-      const all=orders||[],production=all.filter((row:any)=>row.is_test!==true),tests=all.filter((row:any)=>row.is_test===true),filtered=all.filter((row:any)=>{
-        if(filter==='test'){if(row.is_test!==true)return false;}else{if(row.is_test===true)return false;if(!matchesStatus(String(row.status||''),filter))return false;}
+      const queue=ownerWorkQueue(orders||[],filter);
+      const filtered=queue.filtered.filter((row:any)=>{
         if(!search)return true;
-        const hay=[row.order_number,row.customer_name,row.customer_email,row.customer_phone,row.shipping_name,row.product_name].map(v=>String(v||'').toLowerCase()).join(' ');
-        return hay.includes(search);
-      }).map((row:any)=>({...row,ui_status:UI_STATUS[row.status]||row.status,items:byOrder.get(row.id)||[]}));
-      const counts={all:production.length,new:0,paid:0,'in-production':0,shipped:0,completed:0,test:tests.length};
-      for(const row of production){const k=UI_STATUS[String(row.status||'')]||String(row.status||'');if(k in counts)(counts as any)[k]++;}
+        return [row.order_number,row.customer_name,row.customer_email,row.customer_phone,row.shipping_name,row.product_name].map(v=>String(v||'').toLowerCase()).join(' ').includes(search);
+      }).map((row:any)=>({...row,items:byOrder.get(row.id)||[]}));
+      const counts=queue.counts;
       return json(req,{orders:filtered,counts,limit:300});
     }
 
@@ -79,15 +85,18 @@ Deno.serve(async(req:Request)=>{
       if(paths.length){const {data,error}=await supabase.storage.from('mqd-production').createSignedUrls(paths,3600);if(error)return json(req,{error:error.message},500);for(const row of data||[])if(row.path&&row.signedUrl)signed.set(row.path,row.signedUrl);}
       let savedDesign:any=null;
       if(order.design_id){const {data}=await supabase.from('customer_designs').select('id,name,status,version,preview_path,created_at,updated_at').eq('id',order.design_id).maybeSingle();savedDesign=data||null;if(savedDesign?.preview_path){const {data:preview}=await supabase.storage.from('customer-artwork').createSignedUrl(savedDesign.preview_path,3600);savedDesign.preview_url=preview?.signedUrl||null;}}
-      return json(req,{order:{...order,ui_status:UI_STATUS[order.status]||order.status,mockup_url:mockupUrl},items:items||[],assets:(assets||[]).map((a:any)=>({...a,download_url:a.storage_path?signed.get(a.storage_path)||null:null})),savedDesign});
+      const {data:ownerNotifications,error:notificationError}=await supabase.from('mqd_email_notifications').select('kind,status,recipient,attempts,last_error,sent_at,updated_at').eq('order_id',id).eq('kind','owner_paid_order');
+      return json(req,{ownerNotifications:ownerNotifications||[],ownerNotificationError:notificationError?'Notification status could not be checked.':null,order:{...order,...classifyOwnerOrder(order),mockup_url:mockupUrl},items:items||[],assets:(assets||[]).map((a:any)=>({...a,download_url:a.storage_path?signed.get(a.storage_path)||null:null})),savedDesign});
     }
 
     if(action==='update'){
       const id=cleanText(body?.id,64);if(!UUID.test(id))return json(req,{error:'Invalid order'},400);
       const requested=cleanText(body?.status,30).toLowerCase(),status=STATUS_MAP[requested];if(!status)return json(req,{error:'Unsupported order status'},400);
-      const {data:existing,error:existingError}=await supabase.from('mqd_orders').select('id,order_number,status,is_test,customer_email,customer_name,shipping_name,product_name').eq('id',id).maybeSingle();
+      const {data:existing,error:existingError}=await supabase.from('mqd_orders').select('id,order_number,status,is_test,stripe_payment_status,paid_at,amount_paid,customer_email,customer_name,shipping_name,product_name').eq('id',id).maybeSingle();
       if(existingError)return json(req,{error:existingError.message},500);if(!existing)return json(req,{error:'Order not found'},404);
       if(existing.is_test===true)return json(req,{error:'Sandbox test orders are locked and cannot be moved into production or shipping.'},409);
+      const payment=classifyOwnerOrder(existing);
+      if(payment.payment_review_reason||(['paid','production','shipped','completed'].includes(status)&&!payment.payment_confirmed))return json(req,{error:'Only confirmed paid orders without a payment review hold can enter production or fulfillment.'},409);
       const trackingNumber=cleanText(body?.trackingNumber,120),carrier=cleanText(body?.carrier,80),now=new Date().toISOString();
       const update:Record<string,unknown>={status,tracking_number:trackingNumber||null,shipping_carrier:carrier||null,updated_at:now};
       if(status==='production')update.production_started_at=now;

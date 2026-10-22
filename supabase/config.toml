@@ -1,3 +1,6 @@
+[functions.mqd-shirt-templates]
+verify_jwt = false
+
 [functions.mqd-artwork-library]
 verify_jwt = false
 

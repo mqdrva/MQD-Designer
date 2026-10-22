@@ -204,12 +204,13 @@ db.mqd_orders=[structuredClone(saved),{id:'premium-paid',order_number:'MQD-PREMI
 db.mqd_order_items=[structuredClone(detail.items[0]),{id:'premium-paid-item',order_id:'premium-paid',quantity:2,unit_price:40,order_options:[{size:'L',quantity:2}]}];
 let webhook;
 const secret='whsec_fixture_only';
-const context=vm.createContext({...shipping,crypto,Request,Response,TextEncoder,Date,console:{error(){}},createClient:()=>supabase,mqdOwnerEmails:async()=>[],queueMqdEmail:async()=>{throw Error('Fixture must not send mail');},escapeMqdEmailHtml:value=>value,Deno:{env:{get:name=>name==='MQD_STRIPE_WEBHOOK_SIGNING_SECRET'?secret:env[name]},serve:fn=>webhook=fn}});
+const ownerMessages=[];
+const context=vm.createContext({...shipping,crypto,Request,Response,TextEncoder,Date,console:{error(){}},createClient:()=>supabase,mqdOwnerEmails:async()=>['owner@example.com'],queueMqdEmail:async(_db,message)=>{ownerMessages.push(message);return{status:'sent'};},escapeMqdEmailHtml:value=>value,Deno:{env:{get:name=>name==='MQD_STRIPE_WEBHOOK_SIGNING_SECRET'?secret:env[name]},serve:fn=>webhook=fn}});
 vm.runInContext(stripTypeScriptTypes(read('supabase/functions/stripe-mqd-webhook/index.ts').replace(/^import .*\n/gm,'')),context);
 async function paymentEvent(paymentStatus,amount){const time=Math.floor(Date.now()/1000),body=JSON.stringify({id:'evt_fixture',livemode:true,type:'checkout.session.completed',created:time,data:{object:{id:'cs_live_fixture',payment_status:paymentStatus,currency:'usd',metadata:{order_numbers:db.mqd_orders.map(o=>o.order_number).join(',')},amount_subtotal:amount,amount_total:amount+shipping.shippingCentsForQuantity(5),total_details:{amount_shipping:shipping.shippingCentsForQuantity(5)}}}});const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const signature=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(`${time}.${body}`))).toString('hex');return webhook(new Request('https://fixture.invalid',{method:'POST',headers:{'stripe-signature':`t=${time},v1=${signature}`},body}));}
 assert.equal((await paymentEvent('paid',1)).status,409);assert(db.mqd_orders.every(o=>o.status==='submitted'));
 assert.equal((await paymentEvent('unpaid',20000)).status,200);assert(db.mqd_orders.every(o=>o.status==='submitted'));
-assert.equal((await paymentEvent('paid',20000)).status,200);assert(db.mqd_orders.every(o=>o.status==='paid'));assert.equal(db.mqd_orders[0].amount_paid,120);
+assert.equal((await paymentEvent('paid',20000)).status,200);assert(db.mqd_orders.every(o=>o.status==='paid'));assert.equal(db.mqd_orders[0].amount_paid,120);assert.equal(ownerMessages.length,2,'Each paid order queues its owner notification through the fixture provider');
 // Verify both added sizes on every Everyday garment through actual canvas
 // exports, validated submissions, saved items, checkout and production ZIPs.
 if(process.env.EVERYDAY_EXTENDED_ZIPS)fs.mkdirSync(process.env.EVERYDAY_EXTENDED_ZIPS,{recursive:true});

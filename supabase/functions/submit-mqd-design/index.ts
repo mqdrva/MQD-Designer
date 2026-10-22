@@ -1,3 +1,4 @@
+import {prepareTemplateOrder} from '../_shared/mqd-template-orders.js';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
@@ -27,7 +28,7 @@ Deno.serve(async(req:Request)=>{
   if(!p?.id||!p?.name||!payload?.design?.zones||!designId)return json({error:'Incomplete design'},400);
   const libraryJobs:Array<{zone:string;layer:any;asset:any;placement:any}>=[];
   for(const [zone,state] of Object.entries<any>(payload.design.zones||{}))for(const layer of state?.layers||[]){
-   if(layer?.type!=='image'||!layer?.libraryAssetId)continue;
+   if(layer?.type!=='image'||!layer?.libraryAssetId||layer.templateAssetPath)continue;
    const {data:asset,error:assetLookupError}=await supabase.from('mqd_library_assets').select('id,name,slug,category,master_path,placement_mode,active').eq('id',String(layer.libraryAssetId)).eq('active',true).maybeSingle();
    if(assetLookupError)return json({error:assetLookupError.message,stage:'library_asset_lookup'},500);
    if(!asset)return json({error:`MQD library artwork is unavailable for ${zone}`,stage:'library_asset_lookup'},400);
@@ -38,9 +39,12 @@ Deno.serve(async(req:Request)=>{
    else layer.libraryLocked=false;
    delete layer.src;delete layer.storagePath;libraryJobs.push({zone,layer,asset,placement});
   }
-  const {data:design,error:designError}=await supabase.from('customer_designs').select('id,preview_path').eq('id',designId).eq('user_id',user.id).maybeSingle();
+  const {data:design,error:designError}=await supabase.from('customer_designs').select('id,preview_path,design_json').eq('id',designId).eq('user_id',user.id).maybeSingle();
   if(designError)return json({error:designError.message,stage:'design_lookup'},500);
   if(!design)return json({error:'The saved design does not belong to this account'},403);
+  if(design.design_json?.design?.template?.copyId&&design.design_json.design.template.copyId!==payload.design?.template?.copyId)return json({error:'The saved template reference does not match this submission'},400);
+  if(payload.design?.template||Object.values<any>(payload.design?.zones||{}).some(z=>z.layers?.some((l:any)=>l.templateLayerId||l.templateAssetPath)))await prepareTemplateOrder(supabase,payload,form,`${user.id}/designs/${designId}/`);
+
   const customerPrefix=`${user.id}/designs/${designId}/`;
   const validCustomerPath=(path:unknown)=>typeof path==='string'&&path.startsWith(customerPrefix)&&!path.includes('..');
   const backgrounds:Record<string,string>={};

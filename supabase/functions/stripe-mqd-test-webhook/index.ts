@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
     if (!orderNumbers.length) return json({ error: "Checkout session has no valid order references" }, 400);
 
     const { data: orders, error: ordersError } = await supabase.from("mqd_orders")
-      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status")
+      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status,design_json,is_test,stripe_checkout_session_id")
       .in("order_number", orderNumbers);
     if (ordersError) throw ordersError;
     if (!orders || orders.length !== orderNumbers.length) return json({ error: "One or more checkout orders were not found" }, 404);
@@ -115,7 +115,9 @@ Deno.serve(async (req: Request) => {
     const customerEmail = String(session.customer_details?.email || session.customer_email || "").trim();
     const customerName = String(session.customer_details?.name || shipping?.name || "Customer").trim();
     const eventTime = Number.isFinite(Number(event.created)) ? new Date(Number(event.created) * 1000).toISOString() : new Date().toISOString();
-    const ownerRecipients = paid ? await mqdOwnerEmails(supabase) : [];
+    const gameSandbox=orders.every((order:any)=>order.is_test===true&&order.design_json?.range==='shirt-games'&&order.design_json?.testMode===true);
+    if(gameSandbox&&orders.some((order:any)=>order.stripe_checkout_session_id!==session.id))return json({error:'Sandbox game checkout session does not match its order'},409);
+    const ownerRecipients = paid&&!gameSandbox ? await mqdOwnerEmails(supabase) : [];
 
     for (const order of orders) {
       const item: any = itemByOrder.get(order.id);

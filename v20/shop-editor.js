@@ -1,4 +1,5 @@
 import {garmentLogo,fixedLogoLayer} from './print-shop-contract.js';
+import {maxZoneLayers} from './layer-capacity.js';
 import {applyGarmentMappings} from './garment-mapping-catalog.js';
 // @mapping-begin imports
 import {partitionTshirtBodyTriangle,tshirtSleeveArtworkBounds} from './tshirt-armhole-seams.js?v=2';
@@ -156,7 +157,7 @@ function textFontFamily(font='Inter'){
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
 function activeLayer(){return zoneState().layers.find(l=>l.id===activeLayerId)||null;}
-function isLockedLibraryLayer(layer=activeLayer()){return !!(layer?.shopFixed||layer?.libraryAssetId&&layer.libraryLocked);}
+function isLockedLibraryLayer(layer=activeLayer()){return !!(designs[product.id]?.teamMaster||layer?.shopFixed||layer?.libraryAssetId&&layer.libraryLocked);}
 function hasLibraryArtwork(){return Object.values(stateFor().zones||{}).some(z=>(z.layers||[]).some(l=>l.libraryAssetId));}
 function templateFor(zone=activeZone){return product.templates?.[zone]||null;}
 function normalizeHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null;}
@@ -1476,7 +1477,7 @@ function renderLayerPanel(){
     addAll.onclick=()=>{
       const layer=activeLayer();
       if(!layer||layer.type!=='image'||layer.libraryAssetId)return;
-      const zones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<MAX_ZONE_LAYERS);
+      const zones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<maxZoneLayers(product,zone));
       if(!zones.length){alert('No additional print zones are available.');return;}
       snapshot();
       for(const zone of zones)duplicateLayerIntoZone(layer,zone);
@@ -1493,7 +1494,7 @@ function renderLayerPanel(){
       const select=customerImageActions.querySelector('#customerDuplicateZone');
       const addOne=customerImageActions.querySelector('#customerDuplicateOne');
       const addAll=customerImageActions.querySelector('#customerDuplicateAll');
-      const availableZones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<MAX_ZONE_LAYERS);
+      const availableZones=product.zones.filter(zone=>zone!==activeZone&&zoneState(zone).layers.length<maxZoneLayers(product,zone));
       select.innerHTML='';
       for(const zone of availableZones){
         const option=document.createElement('option');
@@ -1533,7 +1534,7 @@ function renderStatus(){const t=templateFor();$('zoneName').textContent=activeZo
 const businessLogoImage=new Image();let businessLogoReady=false;
 if(window.MQDPrintShop.garmentLogo){businessLogoImage.onload=()=>{businessLogoReady=true;renderAll();};businessLogoImage.src=window.MQDPrintShop.garmentLogo;}
 function ensureBusinessLogo(){
- const state=stateFor();for(const zone of Object.values(state.zones||{}))zone.layers=(zone.layers||[]).filter(l=>!l.shopFixed&&l.id!=='shop-fixed-logo');
+ const state=stateFor();if(state.teamMaster)return;for(const zone of Object.values(state.zones||{}))zone.layers=(zone.layers||[]).filter(l=>!l.shopFixed&&l.id!=='shop-fixed-logo');
  const layer=fixedLogoLayer(window.MQDPrintShop,product.id);if(layer&&businessLogoReady){layer.image=businessLogoImage;state.zones.Front||={background:'#FFFFFF',layers:[]};state.zones.Front.layers.push(layer);}
 }
 function renderAll(){ensureBusinessLogo();ensureCustomerUx();renderProducts();renderZones();renderLayerPanel();renderStatus();renderPrintQuality();renderGarmentCopyControl();drawEditor();rebuildGarmentPreview();window.dispatchEvent(new Event("mqd:shop-design-change"));}
@@ -2173,8 +2174,7 @@ function selectProduct(id,{preview=false,reason='product-select'}={}){
   if(preview)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('mqd:show-preview',{detail:{productId:product.id,reason}})));
 }
 function selectZone(z){cropMode=false;activeZone=z;activeLayerId=zoneState().layers.at(-1)?.id||null;editorZoom=defaultEditorZoom();ensureTemplateImage(z);renderAll();}
-const MAX_ZONE_LAYERS=6;
-function canAddLayer(zone=activeZone){const z=zoneState(zone);if(z.layers.length>=MAX_ZONE_LAYERS){alert(`This print zone can have up to ${MAX_ZONE_LAYERS} layers.`);return false;}return true;}
+function canAddLayer(zone=activeZone){const z=zoneState(zone);if(z.layers.length>=maxZoneLayers(product,zone)){alert(`This print zone can have up to ${maxZoneLayers(product,zone)} layers.`);return false;}return true;}
 function nextLabel(){return `Layer ${zoneState().layers.length+1}`;}
 function addImage(src,filename){if(!canAddLayer())return;const img=new Image();img.onload=()=>{if(!canAddLayer())return;snapshot();const l={id:'layer-'+layerSeq++,type:'image',label:nextLabel(),filename:filename||'artwork',src,image:img,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};zoneState().layers.push(l);activeLayerId=l.id;renderAll();};img.src=src;}
 function addLibraryAsset(asset){
@@ -2227,7 +2227,7 @@ function alignActive(){const l=activeLayer();if(!l||isLockedLibraryLayer(l))retu
 // @mapping-begin duplicateLayerIntoZone
 function duplicateLayerIntoZone(source,zone,{offset=false}={}){
   const target=zoneState(zone);
-  if(target.layers.length>=MAX_ZONE_LAYERS)return false;
+  if(target.layers.length>=maxZoneLayers(product,zone))return false;
   const copy={...source,id:'layer-'+layerSeq++,label:'Layer '+(target.layers.length+1),crop:source.crop?{...source.crop}:undefined};
   if(product.id==='tshirt'&&activeZone!==zone&&['Front','Back'].includes(activeZone)&&['Front','Back'].includes(zone)&&!source.libraryLocked&&!source.chatBackground){
     const frame=z=>{
@@ -2253,7 +2253,7 @@ function duplicateActiveToZone(zone){if(activeLayer()?.shopFixed)return;
     return;
   }
   const target=zoneState(zone);
-  if(target.layers.length>=MAX_ZONE_LAYERS){alert(zone+' is already at the 6-layer limit.');return;}
+  if(target.layers.length>=maxZoneLayers(product,zone)){alert(zone+' is already at the '+maxZoneLayers(product,zone)+'-layer limit.');return;}
   snapshot();
   const copy=duplicateLayerIntoZone(l,zone,{offset:zone===activeZone});
   if(zone===activeZone&&copy)activeLayerId=copy.id;
@@ -2288,7 +2288,7 @@ async function duplicateLockedLibraryToZones(source,zones){
   let resolved;
   try{resolved=await Promise.all(targets.map(async zone=>({zone,asset:await resolveLockedAssetForZone(source,zone)})));}
   catch(error){console.error(error);alert('The approved placements could not be loaded. Please try again.');return[];}
-  const available=resolved.filter(({zone,asset})=>asset&&zoneState(zone).layers.length<MAX_ZONE_LAYERS),skipped=resolved.filter(({zone,asset})=>!asset||zoneState(zone).layers.length>=MAX_ZONE_LAYERS).map(({zone})=>zone);
+  const available=resolved.filter(({zone,asset})=>asset&&zoneState(zone).layers.length<maxZoneLayers(product,zone)),skipped=resolved.filter(({zone,asset})=>!asset||zoneState(zone).layers.length>=maxZoneLayers(product,zone)).map(({zone})=>zone);
   if(!available.length){alert('No additional print zones are available for this locked artwork.');return[];}
   snapshot();
   for(const {zone,asset} of available){
@@ -2311,8 +2311,8 @@ function cloneActiveToAllZones(){if(activeLayer()?.shopFixed)return;
     if(isLockedLibraryLayer(l))return cloneLockedLibraryToAllZones(l);
     return;
   }
-  const available=product.zones.filter(z=>z!==activeZone&&zoneState(z).layers.length<MAX_ZONE_LAYERS);
-  if(!available.length){alert('All print zones are already at the 6-layer limit.');return;}
+  const available=product.zones.filter(z=>z!==activeZone&&zoneState(z).layers.length<maxZoneLayers(product,z));
+  if(!available.length){alert('All print zones are already at their layer limit.');return;}
   snapshot();
   for(const z of available)duplicateLayerIntoZone(l,z);
   renderAll();
@@ -2596,8 +2596,9 @@ async function loadDesignPayload(payload,{notify=true}={}){
  const pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design.');
+ const reloadModel=product.id!==pid||!garment;
  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
- recomputeLayerSeq();repairImageObjects();editorZoom=defaultEditorZoom();renderAll();loadGarment();
+ recomputeLayerSeq();repairImageObjects();editorZoom=defaultEditorZoom();renderAll();if(reloadModel)loadGarment();
  if(notify)alert('Design loaded.');
 }
 function refreshMobileWorkspace(pane){

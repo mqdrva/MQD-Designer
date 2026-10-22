@@ -1,3 +1,5 @@
+import {verifyTeamProduction} from '../_shared/mqd-team-production.js';
+import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.95.0';
 import Stripe from 'npm:stripe@22.6.0';
 import JSZip from 'npm:jszip@3.10.1';
@@ -14,7 +16,7 @@ Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'',cors:any={'Vary':'Origin','Content-Type':'application/json','Cache-Control':'no-store'};
  const json=(v:any,status=200)=>new Response(JSON.stringify(v),{status,headers:cors});
  if(origin&&!ALLOWED.has(origin))return json({error:'Origin unavailable.'},403);
- if(origin){cors['Access-Control-Allow-Origin']=origin;cors['Access-Control-Allow-Headers']='apikey,authorization,content-type';cors['Access-Control-Allow-Methods']='GET,POST,OPTIONS';}
+ if(origin){cors['Access-Control-Allow-Origin']=origin;cors['Access-Control-Allow-Headers']='apikey,authorization,content-type,x-mqd-master';cors['Access-Control-Allow-Methods']='GET,POST,OPTIONS';}
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
  if(req.headers.get('apikey')!==PUBLIC_KEY)return json({error:'Application key required.'},401);
  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -27,10 +29,13 @@ Deno.serve(async(req:Request)=>{
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
    const batches=await checked(db.from('mqd_team_batches').select('id,cutoff_at,max_quantity,expected_quantity').eq('team_id',a.team_id).eq('status','open').gt('cutoff_at',new Date().toISOString()).eq('shipping_refunded',false));
-   return json({shop:canonicalTeamShop(a.shop_config),batches,mode:config.mode});
+   const versionId=new URL(req.url).searchParams.get('version')||a.master_version_id;
+   const master=versionId?await checked(db.from('mqd_team_master_versions').select('*').eq('id',versionId).eq('team_id',a.team_id).maybeSingle()):null;
+   if(versionId&&!master)return json({error:'Team master unavailable.'},404);
+   return json({shop:canonicalTeamShop(a.shop_config),batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
-  const bytes=await bodyBytes(req,req.headers.get('content-type')?.includes('multipart/form-data')?9*1024*1024:15000);
+  const bytes=await bodyBytes(req,req.headers.get('content-type')?.includes('multipart/form-data')?51*1024*1024:(req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000));
   const isForm=req.headers.get('content-type')?.includes('multipart/form-data');const form=isForm?await new Response(bytes,{headers:{'Content-Type':req.headers.get('content-type')!}}).formData():null;
   if(form&&String(form.get('payload')||'').length>20000)throw new Error('Order details are too large.');
   const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(bytes));
@@ -61,12 +66,21 @@ Deno.serve(async(req:Request)=>{
    const shop=canonicalTeamShop(account.shop_config),quote=teamQuote(shop,summary);summary.productName=shop.productNames[summary.productId];summary.garment=shop.garments[summary.productId];
    if(typeof customer?.name!=='string'||!customer.name.trim()||customer.name.length>100||typeof customer.email!=='string'||customer.email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)||!validPhone(customer.phone)||typeof customer.notes!=='string'||customer.notes.length>1500)throw new Error('Enter valid customer name, email and phone.');
    if(!['team','individual'].includes(body.delivery)||body.delivery==='team'&&!uuid(body.batchId))throw new Error('Choose your delivery option.');
-   const file=form.get('package');if(!(file instanceof File)||file.size<22||file.size>8*1024*1024)throw new Error('Choose a design ZIP under 8 MB.');
+   const file=form.get('package');if(!(file instanceof File)||file.size<22||file.size>50*1024*1024)throw new Error('The production ZIP exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
    const packageBytes=new Uint8Array(await file.arrayBuffer()),zip=await JSZip.loadAsync(packageBytes),entries:any[]=Object.values(zip.files).filter((f:any)=>!f.dir);
-   if(entries.length>60||entries.some((f:any)=>f.name.includes('..')||f.name.startsWith('/')||!/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(json|txt|png|jpg|jpeg|webp)$/i.test(f.name))||entries.reduce((sum,f)=>sum+(f._data?.uncompressedSize||0),0)>32*1024*1024)throw new Error('Design package is invalid.');
-   const designFile:any=zip.file('design.json'),orderFile:any=zip.file('order-request.json');if(!designFile||!orderFile||designFile._data.uncompressedSize>24*1024*1024||orderFile._data.uncompressedSize>20000)throw new Error('Design details are missing.');
+   if(entries.length>500||entries.some((f:any)=>f.name.includes('..')||f.name.startsWith('/')||!/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(json|txt|png|jpg|jpeg|webp|woff2|css)$/i.test(f.name))||entries.reduce((sum,f)=>sum+(f._data?.uncompressedSize||0),0)>128*1024*1024)throw new Error('Design package is invalid.');
+   const designFile:any=zip.file('design.json'),orderFile:any=zip.file('order-request.json');if(!designFile||!orderFile||designFile._data.uncompressedSize>48*1024*1024||orderFile._data.uncompressedSize>20000)throw new Error('Design details are missing.');
    const design=JSON.parse(await designFile.async('string')),order=JSON.parse(await orderFile.async('string'));
    if(design.schema!=='mqd-shop-design-v1'||design.shop!==body.team||design.engine!==summary.engine||order.productId!==summary.productId||order.printMethod!==summary.printMethod||JSON.stringify(order.orderOptions)!==JSON.stringify(summary.orderOptions)||(summary.engine==='2d'?design.draft?.product:design.design?.product?.id)!==summary.productId)throw new Error('Design and order do not match.');
+   let purchasedMaster=null;
+   const masterRef=design.design?.design?.teamMaster;
+   if(account.master_version_id||masterRef){
+    if(summary.engine!=='3d'||!uuid(masterRef?.versionId))throw new Error('Open the team master and personalize your own copy.');
+    purchasedMaster=await checked(db.from('mqd_team_master_versions').select('*').eq('id',masterRef.versionId).eq('team_id',account.team_id).maybeSingle());
+    if(!purchasedMaster)throw new Error('Team master version unavailable.');
+    assertTeamMemberCopy(design.design,purchasedMaster);
+    summary.master={versionId:purchasedMaster.id,copyId:masterRef.copyId,name:purchasedMaster.name};
+   }
    const zoneMap={'Front':'front','Back':'back','Left Sleeve':'left','Right Sleeve':'right'};
    let actualLocations:string[]=[];
    if(summary.engine==='2d'){
@@ -82,12 +96,14 @@ Deno.serve(async(req:Request)=>{
      for(const layer of state.layers||[])if(layer.libraryAssetId||layer.type==='image'&&!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(layer.src||''))throw new Error('Original uploaded artwork is required.');
     }
    }
-   if(garmentLogo(shop,summary.productId).mode==='fixed'&&!actualLocations.includes('front'))actualLocations.push('front');
+   if(!purchasedMaster&&garmentLogo(shop,summary.productId).mode==='fixed'&&!actualLocations.includes('front'))actualLocations.push('front');
    if(JSON.stringify([...actualLocations].sort())!==JSON.stringify([...summary.locations].sort()))throw new Error('Print areas do not match the design.');
-   if(garmentLogo(shop,summary.productId).mode==='fixed'){
+   if(!purchasedMaster&&garmentLogo(shop,summary.productId).mode==='fixed'){
     const manifest:any=zip.file('brand/logo-placement.json'),asset=zip.file(garmentLogoPath(shop));if(!manifest||!asset||manifest._data.uncompressedSize>3000)throw new Error('Fixed logo is missing.');assertFixedLogoPackage(shop,summary,design,JSON.parse(await manifest.async('string')));
     if(await hash(await asset.async('uint8array'))!==await hash(Uint8Array.from(atob(shop.garmentLogo.split(',')[1]),c=>c.charCodeAt(0))))throw new Error('Fixed logo has changed.');
    }
+   const productionManifest=await verifyTeamProduction(zip,design,shop);
+   if(productionManifest)zip.file('production-manifest.json',JSON.stringify(productionManifest,null,2));
    const guestHash=await hash(body.guestToken),requestHash=await hash(JSON.stringify({team:body.team,customer,summary,delivery:body.delivery,batchId:body.batchId||null,packageHash:await hash(packageBytes)}));
    const ipHash=await hash((req.headers.get('x-forwarded-for')||'unknown').split(',')[0]);
    const count=await db.from('mqd_team_orders').select('id',{head:true,count:'exact'}).eq('ip_hash',ipHash).gte('created_at',new Date(Date.now()-86400000).toISOString());if(count.error)throw count.error;if((count.count||0)>100)return json({error:'Too many order attempts. Contact MYMERCHNOW.'},429);
@@ -95,7 +111,8 @@ Deno.serve(async(req:Request)=>{
    const reserve=await db.rpc('mqd_reserve_team_order',{p_order:{id:body.requestId,team_id:account.team_id,batch_id:body.delivery==='team'?body.batchId:null,livemode:config.live,request_hash:requestHash,ip_hash:ipHash,guest_token_hash:guestHash,customer,summary,delivery:body.delivery,quantity:quote.totalQuantity,garment_cents:quote.totalCents,shipping_cents:shipping,package_path:path}});if(reserve.error)throw new Error(reserve.error.message);const stored=reserve.data;
    if(stored.payment_status==='paid')return json({paid:true,id:stored.id});
    if(stored.checkout_id){const existing=await stripe.checkout.sessions.retrieve(stored.checkout_id);if(existing.status==='open'&&existing.url)return json({url:existing.url,id:stored.id});return json({error:'This checkout has ended. Start a new order.'},409);}
-   zip.file('verified-team-order.json',JSON.stringify({orderId:stored.id,teamId:stored.team_id,summary:stored.summary,delivery:stored.delivery,batchId:stored.batch_id,garmentCents:stored.garment_cents,shippingCents:stored.shipping_cents,status:'payment-confirmation-required',productionNote:'Use this server-verified garment and size information; review original artwork before printing.'},null,2));const verifiedBytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});if(verifiedBytes.length>8*1024*1024)throw new Error('Production package exceeds 8 MB. Reduce artwork size.');
+   if(purchasedMaster)zip.file('purchased-team-master.json',JSON.stringify(purchasedMaster));
+   zip.file('verified-team-order.json',JSON.stringify({orderId:stored.id,teamId:stored.team_id,summary:stored.summary,delivery:stored.delivery,batchId:stored.batch_id,garmentCents:stored.garment_cents,shippingCents:stored.shipping_cents,status:'payment-confirmation-required',productionNote:'Use this server-verified garment and size information; review original artwork before printing.'},null,2));const verifiedBytes=await zip.generateAsync({type:'uint8array',compression:'STORE'});if(verifiedBytes.length>50*1024*1024)throw new Error('Production package exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
    const upload=await db.storage.from('mqd-team-production').upload(path,verifiedBytes,{contentType:'application/zip',upsert:false});if(upload.error&&upload.error.statusCode!=='409'&&!String(upload.error.message).includes('already exists'))throw new Error('Production package could not be saved.');
    const session=await stripe.checkout.sessions.create({mode:'payment',line_items:[{price_data:{currency:'usd',unit_amount:stored.garment_cents,product_data:{name:shop.name+' · '+summary.productName+' · '+stored.quantity+' garment(s)'}},quantity:1}],customer_email:customer.email,phone_number_collection:{enabled:true},automatic_tax:{enabled:false},expires_at:Math.floor(Date.now()/1000)+2100,
     ...(body.delivery==='individual'?{shipping_address_collection:{allowed_countries:['US']},shipping_options:[{shipping_rate_data:{type:'fixed_amount',fixed_amount:{amount:stored.shipping_cents,currency:'usd'},display_name:'MYMERCHNOW standard shipping'}}]}:{}),
@@ -117,6 +134,17 @@ Deno.serve(async(req:Request)=>{
    await checked(db.from('mqd_team_actions').insert({id:crypto.randomUUID(),team_id:body.id,actor_id:actor.id,action:'approve-team',details:{revision:business.revision}}));return json({account:safeAccount(account)});
   }
   if(!account)return json({error:'Your team is awaiting MYMERCHNOW approval.'},409);
+  if(['master-load','admin-master-load'].includes(body.action)){
+   const draft=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle());
+   return json({draft:draft?.draft||null,revision:draft?.revision||0,versionId:account.master_version_id||null});
+  }
+  if(['master-save','admin-master-save'].includes(body.action)){
+   if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
+   const draft=validateTeamMaster(body.draft),shop=canonicalTeamShop(account.shop_config);
+   if(!shop.garments[draft.payload.product.id])throw new Error('Choose a garment approved for this team.');
+   const result=await checked(db.rpc('mqd_save_team_master',{p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()}));
+   return json(result);
+  }
   if(body.action==='owner-status'){
    const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed,batch_id').eq('team_id',body.id));
    const batches=await checked(db.from('mqd_team_batches').select('id,status,days,expected_quantity,max_quantity,shipping_cents,shipping_paid_at,opens_at,cutoff_at,tracking').eq('team_id',body.id).order('created_at',{ascending:false}).limit(50));

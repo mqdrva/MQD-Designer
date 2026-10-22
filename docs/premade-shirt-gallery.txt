@@ -1,0 +1,172 @@
+PREMADE SHIRT GALLERY — REVIEW PREVIEW, NOT A PRODUCTION RELEASE
+
+Branch: codex/premade-design-gallery-20261020
+Base: f96613f3adb5307323f6ba76bad91999ff80f448 (matches inspected live release).
+Read-only sources/ and unrelated dirty checkout were left intact.
+
+REVIEW
+Open /template-preview.html for a phone-width or desktop-width demo, or
+/design-gallery.html?demo=1 for the full-screen gallery. Fifteen UNPUBLISHED review
+fixtures using supplied original backgrounds exist only in v20/template-demo.js, never in the live catalog. Cards use
+actual front/back panel renders from the existing editor's layer/silhouette code.
+They are demonstrations, not approved editable launch designs.
+Select a card, add Front/Back logos, edit the prefilled Back phone/services, review the shirt,
+and use Save Design / Reopen saved demo for a browser-local round trip. Ordering,
+account actions, sharing and processing actions are blocked in demo mode before
+competing guest handlers can run. No real payment or order should be attempted.
+The ordinary public gallery is empty until actual owner versions are published.
+
+WHAT CHANGED
+A narrow Start with a design link accompanies the existing homepage designer CTA.
+Scratch-design entry remains. Gallery supports multiple categories per design and
+shows populated category filters only, without search. Editor layer controls lock
+source artwork and guide logo/text replacement. Replacement logos fit their original
+slot with aspect ratio intact, including repeated replacements. Saved template
+copies get independent layer/copy/design IDs and private uploaded logo paths.
+The actual garment mapping source, geometry, templates and calibration are unchanged.
+
+Owner Shirt Templates reuses existing owner session and MFA. It creates drafts
+from the signed-in owner's own saved 3D designs, lets the owner choose layer roles,
+name, categories and range label, attach actual Front/Back previews, preview the
+draft, publish a new immutable version, or unpublish it. Garment is inherited exactly
+from the source: this release does not auto-convert a look to another garment/range.
+Public catalog data is separate from private customer_designs, whose grants/policies
+are unchanged. Only the authenticated admin+MFA server handler edits/publishes.
+Publishing copies deliberately approved master images into unique version paths in
+a dedicated public bucket; draft previews remain private. Published versions/assets
+remain available for existing customer copies and orders after unpublishing.
+Both guest/account submission and final checkout validate the immutable version,
+locked layers, garment/mapping, required sample replacements and logo-content hash.
+Canonical locked master files are fetched server-side, ignoring substituted client
+files. Existing checkout pricing, cart handoff, print/export and payment logic stay.
+
+SETUP REQUIRED — NOT APPLIED TO PRODUCTION
+Only the production Supabase project gsxuhpffgdffsqksrkrf was available; no existing
+development branches were listed. No production migration or edge deployment ran.
+The migration is supabase/migrations/20261020164602_premade_design_templates.sql,
+generated with the official pinned CLI. It creates two private RLS-enabled tables,
+an immutable-version trigger, private draft-preview bucket and public published-
+asset bucket. It does not broaden customer_designs access. No client storage-write
+policies are introduced.
+For real staging tests, provide an isolated Supabase project/branch with the existing
+app schemas, owner MFA test identity, customer identities, artwork/storage endpoints,
+and Stripe TEST configuration. Point staging browser configuration at that project;
+keep read-only garment model URLs as needed. Deploy mqd-shirt-templates and the
+changed signed/guest submission and checkout functions there, with the new shared
+helpers and existing auth/security helpers. mqd-shirt-templates verify_jwt=false
+supports anonymous gallery selection; owner actions still verify getUser+admin+MFA.
+No production secrets should be copied into fixtures, source, logs or test artifacts.
+
+TEST EVIDENCE / LIMITS
+Node tests exercise the actual template route, publication, ownership/MFA checks,
+public/draft/unpublished reads, two independent copies, original-master materialization,
+private data removal, changed versions and historical order validation, using mock
+Supabase/Storage. Actual signed and guest Checkout handlers run with stubbed Stripe
+and database to prove correct pricing/handoff and no Stripe call with sample fields.
+Actual customer save functions and guest capture handler test unique private assets
+and pre-upload validation. Existing 12-garment regressions and mapping checksum run.
+CI runs the exact staged migration in an isolated PostgreSQL service and tests RLS,
+role grants, customer source privacy, immutable versions and unpublish preservation.
+This is real PostgreSQL schema testing, not full hosted Supabase Auth/Storage testing.
+Browser checks use CUA: gallery filtering, phone width, source layers in 3D/2D,
+logo replacement, editable details, disabled protected actions, local save/reopen,
+and blocking demo ordering. Hosted database-backed owner publishing, two real
+customer accounts, hosted storage durability, real cart persistence and Stripe TEST
+session creation remain blocked on an isolated Supabase test environment.
+
+BACKGROUND RECEIPT — PR150 CONTINUATION
+17 files received and decoded/read: 15 originals at 1024 x 1536, a 1500 x 1720
+contact sheet and HTML catalog. Full filenames, dimensions, SHA256 and use status
+are in docs/template-backgrounds.json. Original attachment bytes remain unchanged.
+Five existing slots only: Pressure Wash=02, Lawn=07, HVAC=13 (abstract substitute),
+Pool=10, General Business=14. Others are reference alternatives, not extra designs.
+All five remain unpublished drafts. Card renders use exact editor functions.
+Background Front/Back geometry, back flipX, garment mapping/calibration and the
+separate synthetic left-sleeve flag remain unchanged from 49e02b1. Flag body variants 04-06
+are not integrated because back mirroring would reverse embedded flag artwork.
+Transparency remains in PNG masters over each existing zone base color.
+HVAC text is darkened for contrast on the light abstract background. After the
+background review the owner requested an MQD-style starter layout: no printed
+placeholder logos on either side, with clear centered Front chest/upper Back
+logo slots. Back has a compact Instagram/Facebook/Google row, 888-888-8888,
+then three live editable trade-service lines using Impact for the phone/services. Front has background only until a
+logo is uploaded. Only foreground slot/contact placements changed; background
+and sleeve placement/orientation remain protected. The owner subsequently
+requested a smaller sleeve flag: scale .35 to .20, centered with its source
+artwork and orientation unchanged. Social row y=-25, phone y=-13, services
+y=1/12/23 raise and tighten the contact stack. Pressure Washing / Soft Washing /
+& More! remain three independent text fields. Every trade now uses two distinct
+service lines followed by & MORE! on its own bottom line: Lawn Mowing/Trimming,
+Heating/Cooling, Pool Cleaning/Water Care, and the General Business placeholders.
+Approved background, social/phone/service positions and Impact styling stay fixed. A prepared Back contact layout
+may hold seven layers only with exactly two locked images, one logo and four
+text fields. All other template zones and ordinary editor add/duplicate limits
+stay at six. Font loading waits for the selected family before initial rendering;
+Impact keeps the existing Anton fallback on devices without native Impact. Social icon masters were copied from
+the approved Clear Haven reusable assets without replacing their originals.
+No proof header is printed on the garment. Sample details still use existing
+pre-checkout validation; no checkout or owner permissions were changed. No completed owner
+saved designs or print-ready 300-DPI masters were supplied. Background approval
+does not approve these synthetic garment placements, sample logos or sleeve flag.
+
+FIVE APPROVED LAUNCH SOURCES STILL NEEDED
+For EACH owner-approved design:
+1. Owner saved editable mqd-design-v1 design ID (or save the layered source into
+   the owner account), with the exact intended garment and every print zone.
+2. Original full-resolution background artwork and sleeve/flag assets, with any
+   front/back mirror and seam alignment already approved in the saved placements.
+3. Separate logo placeholders and live text layers; list which text fields must be
+   replaced, their labels, and which artwork must remain locked.
+4. Approved design name, category/categories, exact garment/range and actual
+   Front/Back preview images captured from that design (up to 2 MB each).
+5. Explicit owner approval to publish that design/version. Customer orders and
+   private customer designs are never treated as approved public templates.
+Flattened Tiny Boss/Torrent Crew advertising mockups are not editable launch sources.
+
+BOTH SLEEVES — OWNER REVIEW ADDITION
+All five existing drafts now reuse their exact body background original on both
+sleeves, as locked first layers. The unchanged smaller flag remains separate
+above the left sleeve background, with no flag flip or rotation. Right sleeve
+background is mirrored; no embedded-flag originals are used. Hem anchoring
+retains grass/water detail instead of cropping it out of a wide sleeve panel.
+Actual masked sleeve proof PNGs accompany the existing Front/Back previews.
+Body placement, live contact stack, models, UVs, calibration and collar unchanged.
+This does not establish physical seam matching or print approval. All five
+remain unpublished drafts; full hosted cart/checkout still requires isolated staging.
+
+CUSTOMER CONTACT CONTROLS — OWNER REVIEW ADDITION
+Only social artwork and text fields gain movement, size, rotation and editing.
+Text controls expose existing font/color/style tools; social row accepts optional
+replacement artwork. Existing social originals are canonical at checkout until
+replaced; replacement bytes require their matching hash, like customer logos.
+Empty logo slots remain in the immutable payload for Front/Back upload, without
+canvas hit rectangles/selection outlines or phantom layer rows. Uploaded logos
+retain their existing fixed placement rules. Backgrounds, flag, garment mapping,
+body/sleeve placement, template order and required fields remain protected.
+Legacy locked-social versions retain their original rules. Review-only update.
+
+FIFTEEN-BACKGROUND EXPANSION — SUPERSEDES FIVE-ONLY REVIEW SCOPE
+Owner now requested all fifteen supplied originals before launch. Existing five
+IDs/layouts remain, with ten unique background variants appended in the same
+gallery. Six pressure-washing originals use the pressure-wash contact fields;
+three grass originals use lawn-care fields; three pool originals use pool-care
+fields. Three abstracts retain HVAC/general-business review layouts. No contact
+positions, fonts, text, logo slots or edit controls vary within an industry.
+All fifteen originals are now integrated exactly; no alternative remains unused.
+Originals04–06 embed flag artwork and are deliberately not mirrored on Back or
+Right Sleeve; otherwise flag orientation would reverse. These remain drafts
+pending seam/print signoff, like the rest. Separate small sleeve flag unchanged.
+Sixty actual body/sleeve panel previews. No public catalog publish, production
+backend change, merge or production deployment. Previous staging/print limitations
+still apply. Historical five-only/unused-art notes above describe earlier stages.
+
+OWNER CONTRAST / PATRIOTIC APPROVAL — SUPERSEDES REVIEW NOTES ABOVE
+Owner approved black default phone/services text on the four light variants:
+Ice Blue(slot6), American Classic(slot8), American Bright(slot10), Soft Gradient
+(slot15). Only text fill changes to #000000; all other foreground styling,
+positions, content and editing permissions stay unchanged.
+Owner also approved all three patriotic originals04–06 as shown, unmirrored,
+with no front/back seam matching requirement. Their seam-review blocker is
+cleared. This is layout approval, not a claim of a physical print test.
+All fifteen remain unpublished pending the existing separate staging/checkout
+and production-master work. No production release is authorized by this edit.

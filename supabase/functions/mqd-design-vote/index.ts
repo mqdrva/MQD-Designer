@@ -31,19 +31,19 @@ Deno.serve(async req=>{
   if(b.action==='open'){
    if(!validId(b.pollId)||!validId(b.designId))throw new Error('Invalid design.');
    const {data:p,error:pe}=await admin.from('mqd_polls').select('id').eq('id',b.pollId).eq('user_id',user.id).maybeSingle();if(pe||!p)throw new Error('Voting page not found.');
-   const {data:o,error:oe}=await admin.from('mqd_poll_options').select('design_snapshot,design_id').eq('poll_id',p.id).eq('design_id',b.designId).maybeSingle();if(oe||!o)throw new Error('Voting design not found.');
+   const {data:o,error:oe}=await admin.from('mqd_poll_options').select('design_snapshot,design_id').eq('poll_id',p.id).eq('design_id',b.designId).limit(1).maybeSingle();if(oe||!o)throw new Error('Voting design not found.');
    const {data:d,error:de}=await admin.from('customer_designs').select('design_json').eq('id',o.design_id).eq('user_id',user.id).maybeSingle();if(de||!d)throw new Error('The saved design is no longer available.');
    return json({payload:{...d.design_json,design:o.design_snapshot}});
   }
   if(b.action==='mine'){
-   const {data:polls,error}=await admin.from('mqd_polls').select('id,title,closes_at,created_at').eq('user_id',user.id).order('created_at',{ascending:false});if(error)throw error;
+   const {data:polls,error}=await admin.from('mqd_polls').select('id,title,closes_at,created_at,mode').eq('user_id',user.id).order('created_at',{ascending:false});if(error)throw error;
    const unlocked=!polls?.length||!!await call('mqd_poll_unlock',{p_user:user.id,p_poll:polls[0].id});
    const {data:designs,error:de}=await admin.from('customer_designs').select('id,name,product_name,product_id,preview_path').eq('user_id',user.id).neq('status','archived').order('updated_at',{ascending:false}).limit(50);if(de)throw de;
    const {data:choices,error:ce}=await admin.from('mqd_poll_options').select('poll_id,design_id,label').in('poll_id',(polls||[]).map(p=>p.id));if(ce&&polls?.length)throw ce;
    return json({polls:(polls||[]).map(p=>({...p,choices:(choices||[]).filter(o=>o.poll_id===p.id)})),canCreate:unlocked,designs:(designs||[]).filter(d=>d.preview_path)});
   }
   if(b.action==='create'){
-   if(!Array.isArray(b.designIds)||b.designIds.length<2||b.designIds.length>3||!b.designIds.every(validId))throw new Error('Choose two or three saved designs.');
+   if(!Array.isArray(b.designIds)||b.designIds.length<1||b.designIds.length>3||new Set(b.designIds).size!==b.designIds.length||!b.designIds.every(validId))throw new Error('Choose one, two or three different saved designs.');
    const {data:designs,error}=await admin.from('customer_designs').select('*').eq('user_id',user.id).in('id',b.designIds);if(error)throw error;if(designs?.length!==b.designIds.length)throw new Error('A selected design is unavailable.');
    const options=[];
    for(const id of b.designIds){
@@ -53,6 +53,7 @@ Deno.serve(async req=>{
     const bytes=new Uint8Array(await blob.arrayBuffer());let str='';for(let i=0;i<bytes.length;i+=8192)str+=String.fromCharCode(...bytes.subarray(i,i+8192));
     options.push({design_id:d.id,product_id:d.product_id,design_snapshot:normalize(d.design_json?.design),label:d.name,preview:`data:${blob.type};base64,${btoa(str)}`});
    }
+   if(options.length===1){const single=options[0];options.splice(0,1,{...single,label:'Thumbs up'},{...single,label:'Thumbs down'});}
    const pollId=await call('mqd_poll_create',{p_user:user.id,p_title:b.title,p_closes:b.closesAt,p_options:options});return json({pollId});
   }
   return json({error:'Unknown action'},400);
