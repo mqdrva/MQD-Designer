@@ -30,7 +30,9 @@ export function teamQuote(shop,summary){
  if(summary.engine==='3d'&&summary.printMethod!=='all-over')throw new Error('Choose the approved all-over print method.');
  const quote=requestEstimate(shop,summary);if(quote.quoteRequired||!Number.isSafeInteger(quote.totalCents)||quote.totalCents<50)throw new Error('These garments need an approved price before checkout.');return quote;
 }
-export async function teamMail(db,id,to,subject,text){
+export async function teamMail(db,id,to,subject,text,livemode=false){
+ // Sandbox orders must never notify customers or production staff.
+ if(livemode!==true)return false;
  const key=await secret(db,'mqd_resend_api_key'),from=await secret(db,'mqd_email_from');if(!key||!from)return false;
  const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json','Idempotency-Key':'team-'+id},body:JSON.stringify({from,to:[to],subject,text}),signal:AbortSignal.timeout(10000)});return r.ok;
 }

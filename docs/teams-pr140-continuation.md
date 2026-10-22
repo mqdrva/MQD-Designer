@@ -10,7 +10,7 @@ This continuation merges main 8a050a3 into the existing Teams branch. It does no
 - Historical versions survive subsequent publishing and are included in member order archives. Team/member/master association appears in the owner order view.
 - Existing flexible locked-logo mode remains until a master is published. Masters currently use the existing 3D garment design format; ordinary 2D Teams customization remains supported.
 - Original bytes and pixel dimensions are checked; zone PNG dimensions use existing garment mappings. Text fonts are bundled from the existing web-font stylesheet. System-only fonts that cannot be packaged fail before checkout, rather than silently substituting a font.
-- Proposed ZIP limit: 50 MiB, 128 MiB uncompressed, 500 entries. Oversize files fail without downsampling. The private bucket limit migration must accompany the service update. Hosted runtime/memory acceptance remains a release test, not established by local execution.
+- Proposed ZIP limit: 50 MiB, 128 MiB uncompressed, 500 entries. Oversize files fail without downsampling. The private bucket limit migration was applied with backend version 4. Hosted runtime/memory acceptance remains a release test, not established by local execution.
 - 2D rendered artwork now retains its physical placement instead of being drawn at the output origin.
 
 ## Verification completed locally
@@ -23,7 +23,15 @@ This continuation merges main 8a050a3 into the existing Teams branch. It does no
 
 ## Release gates still to verify
 
-Latest-head CI, hosted function and storage tests, real Stripe test-mode checkout handoff/settlement with notifications suppressed, authenticated MQD download of the paid test order, hosted maximum-package behavior, and production deployment verification. Do not describe local/mock tests as live verification.
+Real Stripe test-mode checkout handoff/settlement with notifications suppressed, authenticated MQD download of the paid test order, hosted maximum-package behavior, and production deployment verification. Do not describe local/mock tests as live verification.
+
+## Hosted verification — 2026-10-22
+
+- PR commit 8dbf06d passed all four GitHub checks; hosted Vercel preview is reachable.
+- Production additive master migration and Teams backend version 4 deployed. Master tables have RLS enabled and deny anonymous SELECT and authenticated INSERT.
+- Deployed negative checks: disabled checkout returns 503; unauthenticated admin master access returns 403; unknown-team authoring returns 404. No orders, charges or messages created.
+- Front end is still a PR preview, not the production Teams feature. Live collection remains disabled.
+- Added explicit sandbox notification suppression so test orders cannot email customers or staff.
 
 ## Billing decision — collection remains disabled
 

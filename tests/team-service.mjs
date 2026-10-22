@@ -76,3 +76,9 @@ mfa=false;assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:
 assert.equal((await api({...saveBody,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',token:'a'.repeat(64)})).status,404);
 const wrong=structuredClone(masterDraft);wrong.rules[0].role='admin';assert.equal((await api({...saveBody,token:'a'.repeat(64),draft:wrong})).status,400);assert.equal(masterSaves,2);
 console.log('PASS actual master API: private organizer authoring, owner MFA authoring, public/foreign token/cross-team denial and invalid permissions rejected.');
+
+// Sandbox mail cannot consult credentials or make external requests.
+const noMailDb={rpc(){throw new Error('Sandbox mail must not access secrets');}};
+assert.equal(await runtime.teamMail(noMailDb,'test','synthetic@example.invalid','Test','Test'),false);
+assert.equal(await runtime.teamMail(noMailDb,'test','synthetic@example.invalid','Test','Test',false),false);
+console.log('PASS sandbox Teams notification suppression');
