@@ -1,3 +1,4 @@
+import {buildSupportChat} from './support-chat.js';
 import {validateDesignRequest} from './design-request-contract.js';
 const CHAT_STORAGE_KEY='mqd-help-chat-v1';
 const state={open:false,busy:false,messages:[]};
@@ -95,7 +96,8 @@ function buildChat(){
   ]);
   const tabs=el('div',{class:'mqd-help-tabs'},[
     el('button',{type:'button',text:'Ask a question',id:'mqdChatTab'}),
-    el('button',{type:'button',text:'Request a design',id:'mqdRequestTab'})
+    el('button',{type:'button',text:'Request a design',id:'mqdRequestTab'}),
+    el('button',{type:'button',text:'Chat with MQD',id:'mqdHumanTab'})
   ]);
   const request=el('form',{class:'mqd-design-request',hidden:'',id:'mqdDesignRequest'});
   request.innerHTML=`<p>Let MQD help design your shirts. We'll email you to confirm options and pricing before creating your mockup.</p>
@@ -107,7 +109,10 @@ function buildChat(){
     <label class="mqd-request-honeypot" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
     <p class="mqd-request-note">No payment or order is placed. Send your logo when MQD replies. <a href="/privacy.html">Privacy</a></p>
     <button type="submit">Send design request</button><p role="status" aria-live="polite" id="mqdRequestStatus"></p>`;
+  let humanMode=false;
+  const human=buildSupportChat({onUnread:count=>{tabs.querySelector('#mqdHumanTab').textContent='Chat with MQD'+(count?' ('+count+')':'');launcher.textContent=count?'Help ('+count+')':'Help';}});
   const setMode=design=>{
+    humanMode=false;human.root.hidden=true;human.setVisible(false);panel.classList.remove('support-mode');tabs.querySelector('#mqdHumanTab').setAttribute('aria-pressed','false');
     messages.hidden=chips.hidden=form.hidden=design;request.hidden=!design;
     panel.classList.toggle('design-mode',design);
     tabs.querySelector('#mqdChatTab').setAttribute('aria-pressed',String(!design));
@@ -115,6 +120,7 @@ function buildChat(){
   };
   tabs.querySelector('#mqdChatTab').onclick=()=>setMode(false);
   tabs.querySelector('#mqdRequestTab').onclick=()=>{setMode(true);request.elements.name.focus();};
+  tabs.querySelector('#mqdHumanTab').onclick=()=>{setMode(false);humanMode=true;messages.hidden=chips.hidden=form.hidden=request.hidden=true;human.root.hidden=false;panel.classList.add('support-mode');tabs.querySelector('#mqdChatTab').setAttribute('aria-pressed','false');tabs.querySelector('#mqdHumanTab').setAttribute('aria-pressed','true');human.setVisible(state.open);};
   let requestId=crypto.randomUUID(), fingerprint='';
   request.addEventListener('submit',async event=>{
     event.preventDefault();const button=request.querySelector('button[type="submit"]'),status=request.querySelector('#mqdRequestStatus');
@@ -129,11 +135,11 @@ function buildChat(){
     }catch(error){status.textContent=error.name==='TimeoutError'?'Sending took too long. Please try again; we will avoid sending duplicates.':error.message||'Could not connect. Please try again or email mqdrva@gmail.com.';}
     finally{button.disabled=false;}
   });
-  panel.append(header,tabs,messages,chips,form,request);
+  panel.append(header,tabs,messages,chips,form,request,human.root);
   setMode(false);
   document.body.append(launcher,panel);
   const close=header.querySelector('.mqd-help-close');
-  const setOpen=open=>{state.open=open;panel.classList.toggle('open',open);launcher.classList.toggle('hidden',open);if(open&&!panel.classList.contains('design-mode'))setTimeout(()=>document.querySelector('#mqdHelpInput')?.focus(),60);};
+  const setOpen=open=>{state.open=open;human.setVisible(open&&humanMode);panel.classList.toggle('open',open);launcher.classList.toggle('hidden',open);if(open&&!humanMode&&!panel.classList.contains('design-mode'))setTimeout(()=>document.querySelector('#mqdHelpInput')?.focus(),60);};
   launcher.onclick=()=>setOpen(true);close.onclick=()=>{setOpen(false);launcher.focus();};
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.open){setOpen(false);launcher.focus();}});
   document.addEventListener('click',event=>{

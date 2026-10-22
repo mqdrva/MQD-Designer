@@ -37,6 +37,7 @@
       <div id="ownerEmail" class="account"></div>
     </div>
     <div class="tools">
+      <a class="tool" href="/owner-chat.html"><strong>Chat with MQD</strong><span>Private customer conversations, unread messages and replies.</span></a>
       <a class="tool orders" href="/owner-orders.html"><strong>Owner Orders</strong><span>Orders, customer details, production files, status, shipping and tracking.</span></a>
       <a class="tool" href="/?owner=1"><strong>Designer &amp; Product Admin</strong><span>Open the 3D designer with your private owner controls enabled.</span></a>
       <a class="tool" href="/library-admin.html"><strong>Artwork Library Admin</strong><span>Manage MQD backgrounds, icons and customer artwork options.</span></a>
@@ -64,6 +65,10 @@
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
   const OWNER_CHECK_URL=SUPABASE_URL+'/functions/v1/mqd-owner-orders';
   const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  import {ownerChatTarget} from '/v20/support-chat-api.js';
+  const requestedChat=new URLSearchParams(location.search).get('chat');
+  if(ownerChatTarget(requestedChat))sessionStorage.setItem('mqd-owner-chat-return',requestedChat);
+  function continueToChat(){const id=sessionStorage.getItem('mqd-owner-chat-return'),target=ownerChatTarget(id);if(target){sessionStorage.removeItem('mqd-owner-chat-return');location.replace(target);}}
   const $=id=>document.getElementById(id);
   let checking=false;
 
@@ -83,13 +88,13 @@
         return fetch(OWNER_CHECK_URL,{method:'POST',headers:{Authorization:`Bearer ${current?.access_token||session.access_token}`,apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'list',status:'all',search:''})});
       };
       let response=await ownerRequest();
-      if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');return;}
+      if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');continueToChat();return;}
       let body=await response.json().catch(()=>({}));
       if(response.status===403&&body.code==='MFA_REQUIRED'){
         show('signInCard');message('Owner account approved. Complete authenticator verification to continue.');
         await requireAdminMfa(supabase);
         response=await ownerRequest();body=await response.json().catch(()=>({}));
-        if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');return;}
+        if(response.ok){$('ownerEmail').textContent=session.user?.email||'Approved owner';show('ownerCard');continueToChat();return;}
       }
       if(response.status===401){await supabase.auth.signOut();show('signInCard');message('Your session expired. Please sign in again.',true);return;}
       show('deniedCard');$('deniedMessage').textContent=body.error||'This account does not have owner access.';
