@@ -1,9 +1,9 @@
 import {mountTeamMasterAuthor} from './team-master-author.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {requireAdminMfa} from './admin-security.js';
-const $=id=>document.getElementById(id),URL='https://gsxuhpffgdffsqksrkrf.supabase.co',KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
-const auth=createClient(URL,KEY,{auth:{storageKey:'mqd-print-shop-admin-session',persistSession:true,detectSessionInUrl:true,flowType:'pkce'}});let accounts=[];
-async function call(body){const {data:{session}}=await auth.auth.getSession();if(!session)throw new Error('Administrator sign-in required.');const r=await fetch(URL+'/functions/v1/mqd-team-service',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json','x-mqd-master':'1'},body:JSON.stringify(body)}),data=await r.json();if(!r.ok)throw new Error(data.error||'Team management failed.');return data;}
+const $=id=>document.getElementById(id),API_ORIGIN='https://gsxuhpffgdffsqksrkrf.supabase.co',KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
+const auth=createClient(API_ORIGIN,KEY,{auth:{storageKey:'mqd-print-shop-admin-session',persistSession:true,detectSessionInUrl:true,flowType:'pkce'}});let accounts=[];
+async function call(body){const {data:{session}}=await auth.auth.getSession();if(!session)throw new Error('Administrator sign-in required.');const r=await fetch(API_ORIGIN+'/functions/v1/mqd-team-service',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json','x-mqd-master':'1'},body:JSON.stringify(body)}),data=await r.json();if(!r.ok)throw new Error(data.error||'Team management failed.');return data;}
 function text(parent,tag,value){const el=document.createElement(tag);el.textContent=value;parent.append(el);return el;}
 function card(parent,title){const s=document.createElement('section');s.className='card';text(s,'h2',title);parent.append(s);return s;}
 function button(parent,label,run,disabled=false){const b=document.createElement('button');b.type='button';b.textContent=label;b.disabled=disabled;b.onclick=async()=>{b.disabled=true;try{await run();await refresh();}catch(e){$('adminStatus').textContent=e.message;b.disabled=false;}};parent.append(b);}
