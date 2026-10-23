@@ -1,3 +1,4 @@
+import {loadSetupPreview} from './setup-preview-store.js';
 import {placeTeamPrint} from './team-production-placement.js';
 import {teamProductionFonts} from './team-production-fonts.js';
 import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-masters.js';
@@ -102,6 +103,7 @@ async function buildPackage() {
     for (const [zone,state] of Object.entries(design.design.zones || {})) for (const [i,layer] of (state.layers || []).entries()) {
       if (layer.libraryAssetId) throw new Error('Shop packages support your own uploaded artwork only.');
       if (layer.type === 'image' && layer.src) {
+        if(teamService&&!teamMaster&&garmentLogo(shop,s.productId).mode!=='none'&&layer.src===shop.garmentLogo)continue;
         if (!/^data:image\/(png|jpeg|webp);base64,/.test(layer.src)) throw new Error('Upload the original artwork from your device.');
         const response = await fetch(layer.src);
         entries.push({name:`originals/${safeArtworkName(zone)}-${i}-${safeArtworkName(layer.filename || 'artwork.png')}`,data:await response.blob()});
@@ -232,7 +234,7 @@ function mount() {
 }
 try {
   if(setupPreview){
-    const packet=JSON.parse(sessionStorage.getItem('mqd-business-setup-preview-v1')||'null');
+    const packet=await loadSetupPreview();
     if(packet?.schema!=='mqd-business-setup-v1'||!packet.shop?.engines?.includes(engine))throw new Error('Complete business setup before opening this preview.');
     shop=packet.shop;
   }else{
