@@ -237,6 +237,7 @@ try {
     shop=packet.shop;
   }else{
     const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
+    if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
     if(!response.ok || !result.shop?.engines?.includes(engine))throw new Error('This shop page is not available.');
     shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;
     if(teamMaster&&engine==='2d'){location.replace('/teams/'+encodeURIComponent(slug)+'/3d');throw new Error('Opening your team master in the 3D designer');}

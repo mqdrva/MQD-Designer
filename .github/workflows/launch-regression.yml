@@ -100,6 +100,8 @@ jobs:
           node tests/print-shop-billing-webhook.mjs
           node tests/print-shop-management.mjs
           node tests/print-shop-logos.mjs
+          node tests/print-shop-setup-simplification.mjs
+          node tests/team-setup-options.mjs
           node tests/team-service.mjs
           node tests/team-masters.mjs
           node tests/team-production.mjs

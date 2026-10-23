@@ -13,15 +13,16 @@ export async function teamConfig(db){
 }
 export function canonicalTeamShop(raw,now=Date.now()){
  const c=everydayPricing(Deno.env.get('MQD_EVERYDAY_PRICING')),shop=structuredClone(raw),allowed2=Object.keys(EVERYDAY_CATALOG),allowed3=['tshirt','long-sleeve-tshirt','short-sleeve-polo','fleece-hoodie'];
- shop.organizationType='team';shop.fulfillmentMode='mymerchnow';shop.engines=['2d','3d'];shop.pilot=false;
+ shop.organizationType='team';shop.fulfillmentMode='mymerchnow';shop.engines=raw.engines?.filter(e=>['2d','3d'].includes(e))||['2d','3d'];shop.pilot=false;
  shop.printMethods={transfer:'Standard transfer',dtf:'DTF',dtg:'DTG'};shop.printMethods3d={'all-over':'All-over print'};
  const garments={};for(const [id,g] of Object.entries(shop.garments||{})){
-  if(![...allowed2,...allowed3].includes(id))continue;
-  const catalog=EVERYDAY_CATALOG[id];if(catalog){g.colors=g.colors.filter(x=>catalog.colors.includes(x));g.sizes=g.sizes.filter(x=>catalog.sizes.includes(x));g.brand='';g.style='';g.printZones=Object.fromEntries((id==='everyday-polo'?['front']:['front','back','left','right']).map(v=>[v,everydayZone(id,'L',v)]));}
+  if(![...allowed2,...allowed3].includes(id)||!shop.engines.includes(allowed2.includes(id)?'2d':'3d'))continue;
+  const catalog=EVERYDAY_CATALOG[id];if(catalog){g.colors=g.colors.filter(x=>catalog.colors.includes(x));g.sizes=g.sizes.filter(x=>x!=='6XL'&&catalog.sizes.includes(x));g.brand='';g.style='';g.printZones=Object.fromEntries((id==='everyday-polo'?['front']:['front','back','left','right']).map(v=>[v,everydayZone(id,'L',v)]));}
   else{g.sizes=g.sizes.filter(x=>['S','M','L','XL','2XL','3XL','4XL','5XL'].includes(x));g.colors=['White'];}
   if(!g.colors.length||!g.sizes.length)throw new Error('Choose supported garment colors and sizes.');garments[id]=g;
  }
  shop.productNames={...Object.fromEntries(Object.entries(EVERYDAY_CATALOG).map(([id,p])=>[id,p.name])),tshirt:'All-Over Print T-Shirt','long-sleeve-tshirt':'All-Over Long Sleeve T-Shirt','short-sleeve-polo':'All-Over Short Sleeve Polo','fleece-hoodie':'All-Over Fleece Hoodie'};
+ shop.engines=shop.engines.filter(engine=>Object.keys(garments).some(id=>(engine==='2d'?allowed2:allowed3).includes(id)));if(!shop.engines.length)throw new Error('Choose a garment for your designer.');
  shop.garments=garments;for(const [id,g] of Object.entries(garments))g.logoPreset=validateGarmentLogo(g.logoPreset,shop,id);
  shop.pricing={version:'team-'+c.version+'-'+pricingEpoch(now),currency:'usd',baseCents:Object.fromEntries(allowed2.filter(x=>garments[x]).map(x=>[x,c.baseCents[x]])),premiumCents:Object.fromEntries(allowed3.filter(x=>garments[x]).map(x=>[x,garmentPriceCents(x,now)])),sizeCents:c.sizeSurchargeCents,methodCents:c.methodCents,methodBackCents:c.methodBackCents,sleeveCents:c.sleeveCents,printRules:{'2d':{},'3d':{}}};
  return shop;
