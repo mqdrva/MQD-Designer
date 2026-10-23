@@ -4,7 +4,7 @@ export function mountTeamMasterAuthor(parent,call,{studioUrl=null}={}){
  const section=document.createElement('section');section.className='card';
  const heading=document.createElement('h2');heading.textContent='Team master design';
  const help=document.createElement('p');help.textContent=(studioUrl?'Open the garment designer, save the owner master there, then return here and load the saved master to choose member fields. Strict masters support one 3D garment and text-only edits. ':'')+'Create your design in the existing designer and save its editable design JSON. Load it here, choose the member fields, then save a draft or publish a new version. Publishing never changes purchased orders. The flexible locked-logo designer remains available until a master is published.';
- const link=document.createElement('a');link.href=studioUrl||'/?owner=1';link.target='_blank';link.rel='noopener';link.textContent='Open garment designer';
+ const link=document.createElement('a');link.href=studioUrl||'/?owner=1';link.target=studioUrl?'_self':'_blank';link.rel='noopener';link.textContent='Open garment designer';
  const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.setAttribute('aria-label','Load editable master design');
  const name=document.createElement('input');name.placeholder='Master design name';name.maxLength=100;name.setAttribute('aria-label','Master design name');
  const fields=document.createElement('div'),status=document.createElement('p');status.setAttribute('role','status');
