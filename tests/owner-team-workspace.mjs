@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+import {stripTypeScriptTypes} from 'node:module';
+globalThis.Deno={env:{get:()=>JSON.stringify({version:'test',baseCents:{'everyday-tshirt':2000,'everyday-long-sleeve':3000,'everyday-polo':3000,'everyday-hoodie':4000},printCents:{front:0,back:1000,left:0,right:0},sleeveCents:500,sizeSurchargeCents:500})}};
+const runtime=await import('../supabase/functions/mqd-team-service/runtime.js');
+const workspace=await import('../supabase/functions/_shared/mqd-owner-workspace.js');
+const masters=await import('../supabase/functions/_shared/mqd-team-masters.js');
+const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/print-shop-setup.json',import.meta.url)));
+fixture.shop.organizationType='team';fixture.shop.engines=['2d'];fixture.shop.garmentLogo='data:image/png;base64,iVBORw0KGgo=';fixture.shop.garments['everyday-tshirt'].logoPreset={mode:'fixed',placement:'center',width:3,height:3,top:0};
+fixture.shop.garments={'everyday-tshirt':fixture.shop.garments['everyday-tshirt']};fixture.shop.pricing.baseCents={'everyday-tshirt':2000};fixture.shop.pricing.premiumCents={};
+fixture.owner.designRequest='PRIVATE organizer note';fixture.owner.referenceUrl='https://example.invalid/private-reference';
+assert.equal(workspace.ownerWorkspace(fixture,'brand').shop.editingMode,'flexible');
+assert.throws(()=>workspace.ownerWorkspace(fixture,'brand','strict'),/one 3D garment/);
+assert.throws(()=>workspace.ownerWorkspace(fixture,'marketplace'),/Choose/);
+const unsafe=structuredClone(fixture);unsafe.shop.garments['everyday-tshirt'].logoPreset.mode='none';assert.throws(()=>workspace.ownerWorkspace(unsafe,'team'),/fixed logo/);
+assert(!JSON.stringify(workspace.publicTeamShop({...fixture.shop,ownerRequest:fixture.owner,email:fixture.owner.requestEmail})).includes('PRIVATE'));
+let handler,role='admin',mfa=true,checkoutCalls=0;
+const tables={mqd_print_shop_businesses:[],mqd_team_accounts:[],mqd_team_master_versions:[]};
+const val=(r,k)=>k.includes('->>')?r[k.split('->>')[0]]?.[k.split('->>')[1]]===true?'true':r[k.split('->>')[0]]?.[k.split('->>')[1]]:r[k];
+const db={auth:{getUser:async()=>({data:{user:{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',app_metadata:{role}}}})},from(table){let op='select',values,ignore=false;const filters=[];const q={select(){return q;},eq(k,v){filters.push(r=>val(r,k)===v);return q;},neq(k,v){filters.push(r=>val(r,k)!==v);return q;},order(){return q;},limit(){return q;},insert(v){op='insert';values=v;return q;},upsert(v,options){op='upsert';values=v;ignore=options.ignoreDuplicates;return q;},update(v){op='update';values=v;return q;},maybeSingle(){return run(true);},single(){return run(true,true);},then(a,b){return run(false).then(a,b);}};async function run(single,required=false){const rows=tables[table]||=[];const matches=rows.filter(r=>filters.every(f=>f(r)));if(op==='insert')rows.push({...structuredClone(values),status:values.status||'pending_review'});if(op==='upsert'){const previous=rows.find(r=>r.team_id===values.team_id);if(!previous)rows.push(structuredClone(values));else if(!ignore)Object.assign(previous,structuredClone(values));}if(op==='update')matches.forEach(r=>Object.assign(r,structuredClone(values)));const output=op==='insert'?[rows.at(-1)]:op==='update'?matches:rows.filter(r=>filters.every(f=>f(r)));return{data:single?structuredClone(output[0]||null):structuredClone(output),error:required&&!output.length?new Error('No row'):null};}return q;}};
+class Stripe{constructor(){this.checkout={sessions:{create:async()=>{checkoutCalls++;throw new Error('No real checkout allowed');}}};}static createFetchHttpClient(){}}
+const context={...runtime,...workspace,...masters,createClient:()=>db,Stripe,hasAdminMfa:async()=>mfa,teamConfig:async()=>({ready:true,enabled:true,live:false,mode:'sandbox',key:'test'}),Response,Request,TextDecoder,Uint8Array,crypto,Date,URL,structuredClone,Error,Deno:{env:{get:()=>''},serve:h=>handler=h}};
+vm.runInNewContext(stripTypeScriptTypes((await fs.readFile(new URL('../supabase/functions/mqd-team-service/index.ts',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'')),context);
+async function post(body,jwt='owner'){const r=await handler(new Request('https://test.invalid',{method:'POST',headers:{apikey:runtime.PUBLIC_KEY,'Content-Type':'application/json','x-mqd-master':'1',authorization:'Bearer '+jwt},body:JSON.stringify(body)}));return{status:r.status,data:await r.json()};}
+async function get(slug){const r=await handler(new Request('https://test.invalid?team='+slug,{headers:{apikey:runtime.PUBLIC_KEY}}));return{status:r.status,data:await r.json()};}
+const id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',save={action:'admin-workspace-save',id,revision:0,kind:'brand',editingMode:'flexible',packet:fixture};
+role='customer';assert.equal((await post(save)).status,403);role='admin';mfa=false;assert.equal((await post(save)).status,403);mfa=true;
+let result=await post(save);assert.equal(result.status,200,JSON.stringify(result));assert.equal(result.data.revision,1);assert.equal(tables.mqd_team_accounts.length,1);assert.equal(tables.mqd_print_shop_businesses[0].email_verified_at,undefined);assert.equal(tables.mqd_print_shop_businesses[0].owner_email,fixture.owner.requestEmail);
+assert.equal((await get(fixture.shop.slug)).status,404,'Draft is unavailable to public');
+result=await post({action:'admin-workspace-load',id});assert.equal(result.data.packet.owner.designRequest,'PRIVATE organizer note');
+assert.equal((await post(save)).status,400,'Stale retry cannot overwrite');
+result=await post({action:'admin-workspace-publish',id,revision:1});assert.equal(result.status,200,JSON.stringify(result));assert(result.data.url.endsWith('/teams/'+fixture.shop.slug));
+const published=await get(fixture.shop.slug);assert.equal(published.status,200,JSON.stringify(published));assert.equal(published.data.reviewOnly,true);assert.equal(published.data.master,null);assert(!JSON.stringify(published.data).includes(fixture.owner.requestEmail));assert(!JSON.stringify(published.data).includes('PRIVATE'));assert(!JSON.stringify(published.data).includes('private-reference'));
+const updated=structuredClone(save);updated.revision=2;updated.packet.shop.name='Unpublished new name';result=await post(updated);assert.equal(result.status,200,JSON.stringify(result));assert.notEqual((await get(fixture.shop.slug)).data.shop.name,'Unpublished new name','Saving keeps published snapshot');
+for(const action of ['admin-approve','subscribe','portal','admin-resume-team'])assert.notEqual((await post({action,id,token:'a'.repeat(64)})).status,200);
+assert.equal((await post({action:'master-load',id,token:'a'.repeat(64)})).status,403);
+result=await post({action:'admin-workspace-unpublish',id,revision:3});assert.equal(result.status,200,JSON.stringify(result));assert.equal((await get(fixture.shop.slug)).status,404);
+const form=new FormData();form.set('payload',JSON.stringify({action:'order-checkout',team:fixture.shop.slug,requestId:crypto.randomUUID(),guestToken:'a'.repeat(64),startedAt:Date.now()-3000}));
+const denied=await handler(new Request('https://test.invalid',{method:'POST',headers:{apikey:runtime.PUBLIC_KEY},body:form}));assert.equal(denied.status,409);assert.equal(checkoutCalls,0);
+const foreign='cccccccc-cccc-4ccc-8ccc-cccccccccccc';tables.mqd_print_shop_businesses.push({id:foreign,preferred_slug:'other',shop_config:{organizationType:'team'}});assert.equal((await post({...save,id:foreign})).status,409,'Cannot overwrite an existing regular Team');
+assert.equal((await post({...save,id:crypto.randomUUID(),packet:{...fixture,shop:{...fixture.shop,slug:fixture.shop.slug}}})).status,400,'Duplicate links denied');
+console.log('PASS owner workspace: fresh admin MFA, private contacts/requests, save/reopen, stale-write denial, explicit normal-link review publishing, immutable published snapshot, unpublish, no payments or organizer authoring.');

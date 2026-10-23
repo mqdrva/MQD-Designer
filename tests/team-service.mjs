@@ -61,7 +61,7 @@ assert.equal((await api({action:'order-checkout'})).status,503,'Disabled Team pa
 assert.equal((await api({action:'owner-status',id:teamId,token:'a'.repeat(64)},{origin:'https://other.example'})).status,403);
 assert.equal((await api({action:'owner-status',padding:'x'.repeat(16000)})).status,400);
 console.log('Team API checks passed: private owner access, fresh admin role/MFA, origin isolation, bounded bodies and disabled checkout.');
-// Master endpoints use the existing private organizer token or fresh admin + MFA.
+// Only the MQD owner with fresh MFA can author masters; organizer tokens cannot.
 const masterContract=await import('../supabase/functions/_shared/mqd-team-masters.js');
 const {GARMENT_MAPPING}=await import('../supabase/functions/_shared/shirt-games/mapping.js');
 Object.assign(apiContext,masterContract);
@@ -69,13 +69,13 @@ const masterDraft={name:'Synthetic master',payload:{schema:'mqd-design-v1',produ
 apiLive=false;apiTables.mqd_team_accounts[0].livemode=false;apiTables.mqd_team_accounts[0].shop_config=structuredClone(fixture.shop);apiTables.mqd_team_accounts[0].shop_config.engines=['2d','3d'];apiTables.mqd_team_accounts[0].shop_config.garments.tshirt={colors:['White'],sizes:['S','M','L','XL']};
 let masterSaves=0;const oldRpc=apiDb.rpc;apiDb.rpc=async(name,args)=>{if(name==='mqd_save_team_master'){assert.equal(args.p_team,teamId);masterSaves++;return{data:{revision:1,versionId:args.p_publish?args.p_version:null}};}return oldRpc(name,args);};
 const saveBody={action:'master-save',id:teamId,revision:0,publish:false,draft:masterDraft};
-assert.equal((await api(saveBody)).status,401);assert.equal((await api({...saveBody,token:'b'.repeat(64)})).status,401);
-const masterSaveResult=await api({...saveBody,token:'a'.repeat(64)});assert.equal(masterSaveResult.status,200,JSON.stringify(masterSaveResult));assert.equal(masterSaves,1);
-assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:'operator'})).status,200);assert.equal(masterSaves,2);
+assert.equal((await api(saveBody)).status,403);assert.equal((await api({...saveBody,token:'b'.repeat(64)})).status,403);
+const masterSaveResult=await api({...saveBody,token:'a'.repeat(64)});assert.equal(masterSaveResult.status,403,JSON.stringify(masterSaveResult));assert.equal(masterSaves,0);
+assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:'operator'})).status,200);assert.equal(masterSaves,1);
 mfa=false;assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:'operator'})).status,403);mfa=true;
-assert.equal((await api({...saveBody,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',token:'a'.repeat(64)})).status,404);
-const wrong=structuredClone(masterDraft);wrong.rules[0].role='admin';assert.equal((await api({...saveBody,token:'a'.repeat(64),draft:wrong})).status,400);assert.equal(masterSaves,2);
-console.log('PASS actual master API: private organizer authoring, owner MFA authoring, public/foreign token/cross-team denial and invalid permissions rejected.');
+assert.equal((await api({...saveBody,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',action:'admin-master-save'},{jwt:'operator'})).status,404);
+const wrong=structuredClone(masterDraft);wrong.rules[0].role='admin';assert.equal((await api({...saveBody,action:'admin-master-save',draft:wrong},{jwt:'operator'})).status,400);assert.equal(masterSaves,1);
+console.log('PASS actual master API: organizer authoring denied, owner MFA authoring, public/foreign token/cross-team denial and invalid permissions rejected.');
 
 // Sandbox mail cannot consult credentials or make external requests.
 const noMailDb={rpc(){throw new Error('Sandbox mail must not access secrets');}};

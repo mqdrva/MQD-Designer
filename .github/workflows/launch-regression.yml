@@ -104,6 +104,7 @@ jobs:
           node tests/team-setup-options.mjs
           node tests/team-large-logo.mjs
           node tests/team-service.mjs
+          node tests/owner-team-workspace.mjs
           node tests/team-masters.mjs
           node tests/team-production.mjs
           node tests/team-production-placement.mjs

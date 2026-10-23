@@ -13,7 +13,7 @@ import { makeZip, safeArtworkName } from './everyday-zip.js';
 const teamService=document.body.dataset.teamService==='true';
 const API = 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-print-shop-pilot';
 const TEAM_API=API.replace('mqd-print-shop-pilot','mqd-team-service');
-let teamBatches=[],teamMode=null,teamMaster=null;
+let teamBatches=[],teamMode=null,teamMaster=null,reviewOnly=false;
 const KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const $ = id => document.getElementById(id);
 const engine = document.body.dataset.shopEngine;
@@ -53,7 +53,7 @@ function summary() {
 }
 function refresh() {
   if (!shop || (engine === '2d' && !getDraft)) return;
-  syncRequestOptions();if(engine==='3d'&&window.MQDDesigner){const mode=garmentLogo(shop,window.MQDDesigner.getContext().productId).mode;const button=$('shopAddBusinessLogo');if(button)button.hidden=mode!=='movable';}
+  syncRequestOptions();if(reviewOnly){for(const option of $('productSelect')?.options||[])option.textContent=option.textContent.replace(/ — \$[\d,.]+$/,'');$('shopEstimate').textContent='Design review only · Save your personal copy. Checkout is disabled.';$('shopSend').disabled=true;return;}if(engine==='3d'&&window.MQDDesigner){const mode=garmentLogo(shop,window.MQDDesigner.getContext().productId).mode;const button=$('shopAddBusinessLogo');if(button)button.hidden=mode!=='movable';}
   try { const estimate = requestEstimate(shop,summary()); $('shopEstimate').textContent = teamService?money(estimate.totalCents)+' garment subtotal · '+estimate.totalQuantity+' garment(s). Shipping is shown separately in checkout.':estimate.quoteRequired ? `Shop quote required · ${estimate.totalQuantity} garment(s).${summary().printMethod === 'sublimation' ? ' The shop must confirm a suitable garment and fabric for sublimation.' : ' The shop confirms artwork, setup and final pricing.'}` : `${money(estimate.totalCents)} estimated total · ${estimate.totalQuantity} garment(s). ${shop.pilot?'Sample pricing; ':''}shop approval, tax and shipping may change the final amount.${summary().printMethod==='sublimation'?' The shop must confirm a suitable garment and fabric.':''}`; $('shopSend').disabled = sending || setupPreview || (teamService&&$('teamDelivery')?.value==='team'&&!$('teamBatch')?.value); }
   catch(error) { $('shopEstimate').textContent = error.message; $('shopSend').disabled = true; }
 }
@@ -170,7 +170,7 @@ async function loadPackage(file) {
   cachedAttempt=null; refresh(); say('Saved design reopened. Review prices, sizes and placement before requesting an order.');
 }
 async function send(event) {
-  event.preventDefault(); if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
+  event.preventDefault(); if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
   sending=true;refresh();say('Preparing your order request…');
   const controls=[...document.querySelectorAll('button,input,select,textarea')], disabled=controls.map(c=>c.disabled);controls.forEach(c=>c.disabled=true);
   try {
@@ -207,18 +207,19 @@ function mount() {
   document.querySelector('.shop-intro > strong').textContent=teamService?(teamMode==='sandbox'?'TEST TEAM · No real payments':'MYMERCHNOW Team apparel · secure checkout'):shop.pilot?'Print-shop pilot · sample prices · no checkout':'Shop order requests · final quote confirmed by the business';
   $('shopDescription').textContent=[shop.tagline,shop.requirements].filter(Boolean).join(' · ');
   const info=document.createElement('a');info.href=teamService?'/team-terms.html':'/print-shop-info.html';info.textContent=teamService?'Team ordering and delivery terms':'Request information and pilot details';const infoLine=document.createElement('p');infoLine.className='shop-download-note';infoLine.append(info);document.querySelector('.shop-intro').append(infoLine);
-  if(teamService){
+  if(teamService&&!reviewOnly){
     const group=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='Delivery';group.append(legend);const label=document.createElement('label');label.textContent='How should we ship?';const choice=document.createElement('select');choice.id='teamDelivery';choice.add(new Option('Ship to me — regular shipping','individual'));choice.add(new Option('Ship together to the team — organizer pays shipping','team'));label.append(choice);group.append(label);const batchLabel=document.createElement('label');batchLabel.textContent='Choose your team batch';const select=document.createElement('select');select.id='teamBatch';for(const b of teamBatches)select.add(new Option('Orders close '+new Date(b.cutoff_at).toLocaleString()+' · up to '+b.max_quantity+' garments',b.id));if(!teamBatches.length)select.add(new Option('No open team batch — choose individual shipping',''));batchLabel.append(select);group.append(batchLabel);const note=document.createElement('p');note.textContent='Individual shipping: $10 for 1–9 garments, $15 for 10–19, $20 for 20+. Combined orders wait until the batch closes; late payments need review. The organizer receives and distributes the shipment.';group.append(note);$('shopForm').prepend(group);choice.onchange=()=>{batchLabel.hidden=choice.value!=='team';select.required=choice.value==='team';$('shopSend').disabled=setupPreview||choice.value==='team'&&!select.value;};choice.onchange();
   }
   if(setupPreview){
     $('shopSwitch').href+='?setupPreview=1';
     const note=document.createElement('p');note.textContent='BUSINESS SETUP PREVIEW · Not a live shop. Customer requests and payments are disabled.';note.className='setup-note';
-    const back=document.createElement('a');back.href=teamService?'/team-setup.html':'/print-shop-setup.html';back.textContent='Return to business setup';note.append(' ',back);
+    const back=document.createElement('a');back.href=new URLSearchParams(location.search).has('ownerWorkspace')?'/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace')):teamService?'/team-setup.html':'/print-shop-setup.html';back.textContent='Return to business setup';note.append(' ',back);
     document.querySelector('.shop-intro').prepend(note);
     $('shopSend').textContent=teamService?'Checkout — available after Team activation':'Send order request — available after activation';
     const test=document.createElement('a');test.href='/shops/pilot';test.textContent='Use the pilot shop to send a test email request';if(!teamService)note.append(' · ',test);
     $('shopStatus').textContent='Review branding, print options and estimates. Return to setup to make changes or download your setup file.';
   }
+  if(reviewOnly){document.querySelector('.shop-intro > strong').textContent='Design review · No checkout';$('shopDescription').textContent=shop.tagline||'';infoLine.hidden=true;const request=document.querySelector('.shop-request');request.querySelector('h2').textContent='Personalize your design review';for(const child of request.children)if(child.tagName==='P'&&child.id!=='shopEstimate'&&child.id!=='shopStatus')child.hidden=true;for(const child of $('shopForm').children)child.hidden=true;$('shopGarmentColor').closest('label').hidden=true;$('shopSend').disabled=true;}
   $('shopPhone').oninput=()=>{$('shopPhone').setCustomValidity(!$('shopPhone').value||validPhone($('shopPhone').value)?'':'Enter a phone number with 7 to 15 digits.');};
   $('shopForm').onsubmit=send;$('shopAddSize').onclick=()=>{addSize();refresh();};
   $('shopStarted').value=Date.now();
@@ -241,12 +242,13 @@ try {
     const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
     if(!response.ok || !result.shop?.engines?.includes(engine))throw new Error('This shop page is not available.');
-    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;
+    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;reviewOnly=result.reviewOnly===true;
     if(teamMaster&&engine==='2d'){location.replace('/teams/'+encodeURIComponent(slug)+'/3d');throw new Error('Opening your team master in the 3D designer');}
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();
   if(engine==='2d')await import('./shop-everyday.js');
   else {await import('./shop-editor.js?v=mapping-43b4b4737bbf7cab');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  if(setupPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'));
   document.body.dataset.ready='true';
 } catch(error) {
   $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);
