@@ -20,7 +20,11 @@ export function validateSetup(packet){
  const engines=organizationType==='team'?(raw.engines||['2d','3d']):(packet.plan==='3d'?['2d','3d']:['2d']);
  if(!Array.isArray(engines)||!engines.length||engines.length>2||new Set(engines).size!==engines.length||engines.some(e=>!['2d','3d'].includes(e)))throw new Error('Choose 2D, 3D, or both designers.');
  const garmentLogo=raw.garmentLogo||'';
- if(garmentLogo){const bytes=typeof garmentLogo==='string'&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(garmentLogo)?Uint8Array.from(atob(garmentLogo.split(',')[1]),c=>c.charCodeAt(0)):[];if(!bytes.length||bytes.length>500*1024||!(bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71||bytes[0]===255&&bytes[1]===216||String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'))throw new Error('Upload a garment logo image under 500 KB.');}
+ if(garmentLogo){const max=organizationType==='team'?15*1024*1024:500*1024,limit=organizationType==='team'?'15 MB':'500 KB';
+  if(typeof garmentLogo!=='string'||garmentLogo.length>Math.ceil(max/3)*4+50||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(garmentLogo))throw new Error('Upload a garment logo up to '+limit+'.');
+  const encoded=garmentLogo.split(',')[1],length=encoded.length*3/4-(encoded.endsWith('==')?2:encoded.endsWith('=')?1:0),head=Uint8Array.from(atob(encoded.slice(0,40)),c=>c.charCodeAt(0));
+  if(length>max||!length||!(head[0]===137&&head[1]===80&&head[2]===78&&head[3]===71||head[0]===255&&head[1]===216||String.fromCharCode(...head.slice(0,4))==='RIFF'&&String.fromCharCode(...head.slice(8,12))==='WEBP'))throw new Error('Upload a supported garment logo up to '+limit+'.');
+ }
  const baseCents={},premiumCents={},garments={};
  for(const [source,dest,allow] of [[p.baseCents,baseCents,two],[packet.plan==='3d'?p.premiumCents:{},premiumCents,three]]){
   if(!source||typeof source!=='object'||Array.isArray(source)||Object.keys(source).some(id=>!allow.includes(id)))throw new Error('Choose supported garments.');
