@@ -1,3 +1,4 @@
+import {tmpdir} from 'node:os';import {join} from 'node:path';
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import {createCanvas} from '@napi-rs/canvas';import {createHash,randomFillSync} from 'node:crypto';
 import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
 import {verifyTeamProduction} from '../supabase/functions/_shared/mqd-team-production.js';
@@ -5,7 +6,7 @@ import {GARMENT_MAPPING} from '../supabase/functions/_shared/shirt-games/mapping
 const max=15*1024*1024;
 function crc32(bytes){let crc=0xffffffff;for(const b of bytes){crc^=b;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return (crc^0xffffffff)>>>0;}
 const canvas=createCanvas(2048,2048),ctx=canvas.getContext('2d'),pixels=ctx.createImageData(2048,2048);randomFillSync(pixels.data);for(let i=3;i<pixels.data.length;i+=4)pixels.data[i]=255;ctx.putImageData(pixels,0,0);const base=canvas.toBuffer('image/png');
-const type=Buffer.from('tEXt'),data=Buffer.alloc(max-base.length-12);data.write('Synthetic QA\0');const chunk=Buffer.alloc(data.length+12);chunk.writeUInt32BE(data.length);type.copy(chunk,4);data.copy(chunk,8);chunk.writeUInt32BE(crc32(chunk.subarray(4,-4)),chunk.length-4);const original=Buffer.concat([base.subarray(0,-12),chunk,base.subarray(-12)]);assert.equal(original.length,max);await fs.writeFile('/private/tmp/mqd-team-original-15mb.png',original);
+const type=Buffer.from('tEXt'),data=Buffer.alloc(max-base.length-12);data.write('Synthetic QA\0');const chunk=Buffer.alloc(data.length+12);chunk.writeUInt32BE(data.length);type.copy(chunk,4);data.copy(chunk,8);chunk.writeUInt32BE(crc32(chunk.subarray(4,-4)),chunk.length-4);const original=Buffer.concat([base.subarray(0,-12),chunk,base.subarray(-12)]);assert.equal(original.length,max);await fs.writeFile(join(tmpdir(),'mqd-team-original-15mb.png'),original);
 const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/print-shop-setup.json',import.meta.url)));fixture.shop.organizationType='team';fixture.shop.garmentLogo='data:image/png;base64,'+original.toString('base64');
 const saved=validateSetup(fixture);assert.equal(createHash('sha256').update(Buffer.from(saved.shop.garmentLogo.split(',')[1],'base64')).digest('hex'),createHash('sha256').update(original).digest('hex'));
 const bad=structuredClone(fixture);bad.shop.garmentLogo='data:image/png;base64,'+Buffer.concat([original,Buffer.from([0])]).toString('base64');assert.throws(()=>validateSetup(bad),/15 MB/);
