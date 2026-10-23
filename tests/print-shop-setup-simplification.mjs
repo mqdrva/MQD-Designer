@@ -16,7 +16,7 @@ class Element {
  querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
 }
 const elements=Object.fromEntries(['shopSlug','setupStatus','garmentRows','premiumRows'].map(id=>[id,new Element('div')]));
-const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo});
+const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,URLSearchParams,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo});
 const source=fs.readFileSync(new URL('../v20/print-shop-setup.js',import.meta.url),'utf8');
 vm.runInContext(source.replace(/^import .*;\n/gm,'').split('for(const [id,name] of Object.entries(SHOP_PRINT_METHODS))')[0],context);
 for(const [input,expected] of [['MQD SHOP','mqd-shop'],['https://mymerchnow.app/shops/MQD-Shop/3d','mqd-shop'],['  Brenda’s Designs  ','brenda-s-designs']]){elements.shopSlug.value=input;vm.runInContext('normalizeShopLink()',context);assert.equal(elements.shopSlug.value,expected);}
