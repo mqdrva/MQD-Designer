@@ -7,7 +7,7 @@ export function ownerWorkspace(packet,kind,mode='flexible'){
  input.shop.organizationType='team';input.plan='3d';
  input.shop.printMethods={transfer:'Standard transfer'};
  input.shop.pricing.printRules={'2d':{transfer:{mode:'calculated',minimumQuantity:1,setupCents:0,tiers:[{fromQuantity:1,frontCents:0,backCents:0,sleevesCents:0}]}}};
- const saved=validateSetup(input),shop=canonicalTeamShop(saved.shop);
+ const saved=validateSetup(input,{allowMissingContact:true}),shop=canonicalTeamShop(saved.shop);
  if(mode==='strict'&&(shop.engines.length!==1||shop.engines[0]!=='3d'||Object.keys(shop.garments).length!==1))throw new Error('A strict master supports one 3D garment. Choose flexible fixed-logo mode for several garments.');
  if(mode==='flexible'&&Object.values(shop.garments).some(g=>g.logoPreset?.mode!=='fixed'))throw new Error('Choose a fixed logo for each garment. Members may add artwork and backgrounds around that protected logo.');
  const note=packet.owner?.designRequest||'';if(typeof note!=='string'||note.length>1500)throw new Error('Keep private design requests under 1,500 characters.');

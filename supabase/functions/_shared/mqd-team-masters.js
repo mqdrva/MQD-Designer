@@ -10,6 +10,8 @@ export function validateTeamMaster(master){
  const mapping=GARMENT_MAPPING[p.product.id];
  if(!mapping||stable(p.templates)!==stable(mapping.templates)||p.product.model!==mapping.model||stable(Object.keys(p.design.zones).sort())!==stable([...mapping.zones].sort()))fail('Keep the approved garment model and production mapping.');
  if(p.design.template||p.design.teamMaster)fail('Use an original master, not a member or gallery copy.');
+ const permissions=p.design.teamPermissions;if(permissions!==undefined&&(!permissions||typeof permissions!=='object'||Array.isArray(permissions)||Object.keys(permissions).some(k=>k!=='wholeGarmentColor')||typeof permissions.wholeGarmentColor!=='boolean'))fail('Choose a supported whole-garment color permission.');
+ if(permissions?.wholeGarmentColor){const colors=Object.values(p.design.zones).map(z=>z.background);if(colors.some(c=>typeof c!=='string'||!/^#[a-f0-9]{6}$/i.test(c))||new Set(colors.map(c=>c.toUpperCase())).size!==1)fail('Apply one solid base color to every zone before allowing whole-shirt colors.');}
  const rows=templateLayers(p),ids=new Set();
  if(!rows.length||rows.length>100||!Array.isArray(master.rules)||master.rules.length!==rows.length)fail('Designate every master layer.');
  for(const [zone,state] of Object.entries(p.design.zones))if(!Array.isArray(state.layers)||state.layers.length>maxZoneLayers(p.product,zone))fail('The master exceeds the garment layer limit.');
@@ -20,6 +22,8 @@ export function validateTeamMaster(master){
   for(const k of ['x','y','scale','rotation'])if(!Number.isFinite(layer[k]))fail('Invalid master placement.');
   const rules=master.rules.filter(r=>r.zone===zone&&r.layerId===layer.id),r=rules[0];
   if(rules.length!==1||!['locked','text'].includes(r.role)||r.role==='text'&&layer.type!=='text')fail('Only explicitly designated text fields may change.');
+  if(r.allowMove!==undefined&&(typeof r.allowMove!=='boolean'||r.role!=='text'))fail('Only designated text may be movable.');
+  if(r.allowMove&&['x','y'].some(k=>layer[k]< -100||layer[k]>100))fail('Keep movable text within the positioning limits.');
   if(typeof r.label!=='string'||!r.label.trim()||r.label.length>100)fail('Name every member field.');
   if(r.role==='text'){
    if(!Number.isInteger(r.maxLength)||r.maxLength<1||r.maxLength>100)fail('Set a field limit from 1 to 100 characters.');
@@ -44,6 +48,7 @@ export function assertTeamMemberCopy(payload,version,{complete=true}={}){
  for(const p of [expected,actual]){delete p.designId;delete p.savedAt;delete p.activeZone;delete p.orderOptions;delete p.totalQuantity;delete p.design.teamMaster;p.product={id:p.product.id,model:p.product.model};}
  // PostgreSQL jsonb reorders zone keys; only layer order within a zone is meaningful.
  const byZone=(left,right)=>left.zone.localeCompare(right.zone);
+ if(version.payload.design.teamPermissions?.wholeGarmentColor){let selected=null;for(const zone of Object.keys(expected.design.zones)){const color=actual.design?.zones?.[zone]?.background;if(typeof color!=='string'||!/^#[a-f0-9]{6}$/i.test(color)||selected&&color.toUpperCase()!==selected)fail('Choose one solid color for the whole garment.');selected=color.toUpperCase();expected.design.zones[zone].background=color;}}
  const a=templateLayers(actual).sort(byZone),e=templateLayers(expected).sort(byZone);
  for(let i=0;i<e.length;i++){
   if(!a[i]||a[i].zone!==e[i].zone||a[i].layer.templateLayerId!==e[i].layer.templateLayerId)fail('Master layers and order cannot change.');
@@ -53,6 +58,7 @@ export function assertTeamMemberCopy(payload,version,{complete=true}={}){
    const value=a[i].layer.text;
    if(typeof value!=='string'||value.length>rule.maxLength||/[\u0000-\u001f\u007f]/.test(value)||complete&&!value.trim()||rule.choices&&!rule.choices.includes(value))fail('Enter an allowed value for '+rule.label+'.');
    e[i].layer.text=value;
+   if(rule.allowMove)for(const coordinate of ['x','y']){const position=a[i].layer[coordinate];if(!Number.isFinite(position)||position< -100||position>100)fail('Keep member text within the positioning limits.');e[i].layer[coordinate]=position;}
   }
  }
  if(stable(actual)!==stable(expected))fail('Protected artwork, styling, garment and placement cannot change.');

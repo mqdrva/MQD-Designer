@@ -6,11 +6,11 @@ const sizes=['XS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'];
 const text=(v,max,label,required=false)=>{if(typeof v!=='string'||v.length>max||required&&!v.trim())throw new Error('Enter valid '+label+'.');return v.trim();};
 const cents=v=>{if(!Number.isSafeInteger(v)||v<0||v>10000000)throw new Error('Enter valid prices.');return v;};
 const choices=(v,allow,label)=>{if(!Array.isArray(v)||!v.length||v.length>allow.length||v.some(x=>!allow.includes(x))||new Set(v).size!==v.length)throw new Error('Choose valid '+label+'.');return v;};
-export function validateSetup(packet){
+export function validateSetup(packet,{allowMissingContact=false}={}){
  if(packet?.schema!=='mqd-business-setup-v1'||!['2d','3d'].includes(packet.plan))throw new Error('Choose a valid setup and plan.');
  const raw=packet.shop,p=raw?.pricing;if(!p)throw new Error('Shop prices are missing.');
- const email=text(packet.owner?.requestEmail,254,'business email',true).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Enter a valid business email.');
- const phone=text(packet.owner?.phone,40,'business phone',true);if(!validPhone(phone))throw new Error('Enter a valid business phone.');
+ const email=text(packet.owner?.requestEmail??'',254,'business email',!allowMissingContact).toLowerCase();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Enter a valid business email.');
+ const phone=text(packet.owner?.phone??'',40,'business phone',!allowMissingContact);if(phone&&!validPhone(phone))throw new Error('Enter a valid business phone.');
  const slug=text(raw.slug,48,'shop link',true);if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||['pilot','admin','setup','support','help'].includes(slug))throw new Error('Choose another shop link name.');
  const logo=text(raw.logo,700000,'logo');if(logo!=='/assets/brand-logo.png'){
   if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logo))throw new Error('Upload a supported logo image.');
