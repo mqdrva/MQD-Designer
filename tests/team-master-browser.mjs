@@ -1,0 +1,35 @@
+import {createCanvas} from '@napi-rs/canvas';
+import JSZip from '/Users/uptownharlem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/jszip/lib/index.js';
+import {verifyTeamProduction} from '../supabase/functions/_shared/mqd-team-production.js';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {chromium} from '/Users/uptownharlem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import {GARMENT_MAPPING} from '../supabase/functions/_shared/shirt-games/mapping.js';
+import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-masters.js';
+const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/print-shop-setup.json',import.meta.url)));
+globalThis.Deno={env:{get:()=>JSON.stringify({version:'test',baseCents:{'everyday-tshirt':2000,'everyday-long-sleeve':3000,'everyday-polo':3000,'everyday-hoodie':4000},printCents:{front:0,back:1000,left:0,right:0},sleeveCents:500,sizeSurchargeCents:500})}};const {canonicalTeamShop}=await import('../supabase/functions/mqd-team-service/runtime.js');fixture.shop.garments.tshirt={colors:['White'],sizes:['S','M','L','XL']};const shop=canonicalTeamShop(fixture.shop);shop.slug='fixture-team';
+const mapping=GARMENT_MAPPING.tshirt;
+const master={id:crypto.randomUUID(),team_id:crypto.randomUUID(),name:'Synthetic team',payload:{schema:'mqd-design-v1',product:{id:'tshirt',name:'Short Sleeve T-Shirt',category:'T-Shirts',price:39,model:mapping.model},engine:{calibration:'v26-surface-uv-collar-strip'},templates:mapping.templates,design:{zones:Object.fromEntries(mapping.zones.map(z=>[z,{background:'#ffffff',layers:[]}]))}},rules:[{zone:'Front',layerId:'name',role:'text',label:'Member name',maxLength:30},{zone:'Back',layerId:'number',role:'text',label:'Number',maxLength:2,choices:['1','2','3']}]};
+master.payload.design.zones.Front.layers=[{id:'name',type:'text',text:'NAME',font:'Inter',x:0,y:0,scale:1,rotation:0,visible:true,color:'#111111'}];master.payload.design.zones.Back.layers=[{...master.payload.design.zones.Front.layers[0],id:'number',text:'1'}];
+const art=createCanvas(256,256);art.getContext('2d').fillRect(0,0,128,256);master.payload.design.zones.Front.layers.unshift({id:'logo',type:'image',filename:'synthetic-logo.png',src:art.toDataURL('image/png'),x:0,y:0,scale:.1,rotation:0,visible:true});master.rules.unshift({zone:'Front',layerId:'logo',role:'locked',label:'Protected logo'});
+const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+try{const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});
+await context.route('**/*',async route=>{const req=route.request();if(req.url().includes('/functions/v1/mqd-team-service'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({shop,batches:[],mode:'sandbox',master})});if(req.method()!=='GET')return route.abort();return route.continue();});
+const page=await context.newPage();page.on('pageerror',e=>console.log('PAGE ERROR',e.message));
+await page.goto('http://127.0.0.1:8776/team-3d.html?shop=fixture-team');await page.waitForFunction(()=>document.body.dataset.ready==='true',null,{timeout:60000}).catch(async e=>{console.log('STARTUP',await page.locator('#shopStatus').textContent());throw e;});
+console.log('READY',await page.locator('#shopStatus').textContent());
+const before=await page.evaluate(()=>window.MQDDesigner.exportDesign());master.payload.engine=before.engine;master.payload.product=before.product;
+// Browser canonical exports include the authoritative engine and product metadata.
+await page.getByLabel('Member name',{exact:true}).fill('Taylor');await page.getByLabel('Member name',{exact:true}).dispatchEvent('change');await page.waitForTimeout(500);
+const edited=await page.evaluate(()=>window.MQDDesigner.exportDesign());assert.equal(edited.design.zones.Front.layers.find(l=>l.type==='text').text,'Taylor');assertTeamMemberCopy(edited,master);
+assert(await page.locator('#productSelect').isDisabled());
+await page.waitForFunction(()=>window.MQDDesigner.shopPreviewReady(),null,{timeout:60000});
+const downloadPromise=page.waitForEvent('download',{timeout:60000});await page.locator('#saveDraft').click();const download=await downloadPromise.catch(async error=>{console.log('DOWNLOAD STATUS',await page.locator('#shopStatus').textContent());throw error;});const file='/private/tmp/mqd-teams-member-test.zip';await download.saveAs(file);const zip=await JSZip.loadAsync(await fs.readFile(file));const saved=JSON.parse(await zip.file('design.json').async('string'));const production=await verifyTeamProduction(zip,saved);assert.equal(production.zones.length,5);assert.equal(production.originals[0].width,256);assert.equal(production.originals[0].height,256);assert(zip.file('fonts/fonts.css'));
+await page.locator('#shopLoad').setInputFiles(file);await page.waitForFunction(()=>document.getElementById('shopStatus').textContent.includes('reopened'),null,{timeout:60000});assert.equal(await page.getByLabel('Member name',{exact:true}).inputValue(),'Taylor');
+const second=await context.newPage();await second.goto('http://127.0.0.1:8776/team-3d.html?shop=fixture-team');await second.waitForFunction(()=>document.body.dataset.ready==='true',null,{timeout:60000});const separate=await second.evaluate(()=>window.MQDDesigner.exportDesign());assert.notEqual(separate.design.teamMaster.copyId,saved.design.design.teamMaster.copyId);assert.equal(separate.design.zones.Front.layers.find(l=>l.type==='text').text,'NAME');await second.close();
+console.log('PASS downloaded production ZIP: exact five zone dimensions, bundled fonts, save/reopen and independent second member.');
+await page.setViewportSize({width:390,height:844});await page.locator('[data-mobile-pane="order"]').click();assert(await page.locator('#teamMemberFields').isVisible());await page.locator('#teamMemberFields').scrollIntoViewIfNeeded();assert(await page.getByLabel('Member name',{exact:true}).isVisible());assert.equal(await page.locator('#addTextBtn').isVisible(),false);
+const mobile=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth}));assert(mobile.scroll<=mobile.width+5,JSON.stringify(mobile));
+await fs.mkdir(new URL('../../../outputs/teams-pr140/',import.meta.url),{recursive:true});await page.screenshot({path:new URL('../../../outputs/teams-pr140/mobile.png',import.meta.url).pathname,fullPage:false});
+console.log('PASS synthetic desktop/mobile master customization and protected garment control.');
+}finally{await browser.close();}

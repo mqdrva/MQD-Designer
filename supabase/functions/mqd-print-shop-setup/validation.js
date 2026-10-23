@@ -1,4 +1,4 @@
-import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone} from './contract.js';
+import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone,validateGarmentLogo} from './contract.js';
 const two=['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'];
 const three=['tshirt','long-sleeve-tshirt','fleece-hoodie','short-sleeve-polo'];
 const colors=['White','Black','Navy','Royal','Red','Sport Grey','Charcoal','Forest Green','Forest','Purple','Gold','Light Blue','Sand'];
@@ -16,12 +16,16 @@ export function validateSetup(packet){
   if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logo))throw new Error('Upload a supported logo image.');
   const bytes=Uint8Array.from(atob(logo.split(',')[1]),c=>c.charCodeAt(0));if(bytes.length>500*1024||!(bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71||bytes[0]===255&&bytes[1]===216||String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'))throw new Error('Upload a supported logo under 500 KB.');
  }
+ const organizationType=raw.organizationType||'print-shop';if(!['print-shop','brand','team'].includes(organizationType))throw new Error('Choose Print shop, Brand or Team.');
+ const garmentLogo=raw.garmentLogo||'';
+ if(garmentLogo){const bytes=typeof garmentLogo==='string'&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(garmentLogo)?Uint8Array.from(atob(garmentLogo.split(',')[1]),c=>c.charCodeAt(0)):[];if(!bytes.length||bytes.length>500*1024||!(bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71||bytes[0]===255&&bytes[1]===216||String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'))throw new Error('Upload a garment logo image under 500 KB.');}
  const baseCents={},premiumCents={},garments={};
  for(const [source,dest,allow] of [[p.baseCents,baseCents,two],[packet.plan==='3d'?p.premiumCents:{},premiumCents,three]]){
   if(!source||typeof source!=='object'||Array.isArray(source)||Object.keys(source).some(id=>!allow.includes(id)))throw new Error('Choose supported garments.');
   for(const [id,price] of Object.entries(source)){
    dest[id]=cents(price);const g=raw.garments?.[id];if(!g)throw new Error('Enter garment details.');
    garments[id]={brand:text(g.brand??'',100,'garment brand'),style:text(g.style??'',100,'garment style'),sizes:choices(g.sizes,sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
+   garments[id].logoPreset=validateGarmentLogo(g.logoPreset,{garmentLogo,garments},id);
    const zones=shopPrintZones({garments},id);garments[id].printZones=Object.fromEntries(Object.entries(zones).map(([key,v])=>[key,{width:v.width,height:v.height}]));
   }
  }
@@ -34,7 +38,7 @@ export function validateSetup(packet){
   rules[id]={mode:'calculated',minimumQuantity:rule.minimumQuantity,setupCents:cents(rule.setupCents),tiers:rule.tiers.map(t=>({fromQuantity:t.fromQuantity,frontCents:cents(t.frontCents),backCents:cents(t.backCents),sleevesCents:cents(t.sleevesCents)}))};
  }
  if(!Object.keys(methods).length)throw new Error('Choose a printing method.');
- const shop={slug,name:text(raw.name,100,'business name',true),logo,tagline:text(raw.tagline,180,'welcome message'),requirements:text(raw.requirements||'',1500,'shop requirements'),garments,engines:packet.plan==='3d'?['2d','3d']:['2d'],printMethods:methods,printMethods3d:packet.plan==='3d'?{...(Object.hasOwn(raw.printMethods3d||{},'all-over')?{'all-over':'All-over print'}:{}),...methods}:{},pilot:false,pricing:{version:'setup-1',currency:'usd',baseCents,premiumCents,sizeCents:cents(p.sizeCents),methodCents:{},methodBackCents:{},sleeveCents:0,printRules:{'2d':rules,'3d':structuredClone(rules)}}};
+ const shop={organizationType,fulfillmentMode:organizationType==='team'?'mymerchnow':'business',garmentLogo,slug,name:text(raw.name,100,'business name',true),logo,tagline:text(raw.tagline,180,'welcome message'),requirements:text(raw.requirements||'',1500,'shop requirements'),garments,engines:packet.plan==='3d'?['2d','3d']:['2d'],printMethods:methods,printMethods3d:packet.plan==='3d'?{...(Object.hasOwn(raw.printMethods3d||{},'all-over')?{'all-over':'All-over print'}:{}),...methods}:{},pilot:false,pricing:{version:'setup-1',currency:'usd',baseCents,premiumCents,sizeCents:cents(p.sizeCents),methodCents:{},methodBackCents:{},sleeveCents:0,printRules:{'2d':rules,'3d':structuredClone(rules)}}};
  const id=Object.keys(baseCents)[0],g=garments[id];for(const method of Object.keys(methods))requestEstimate(shop,{engine:'2d',productId:id,color:g.colors[0],printMethod:method,locations:['front'],orderOptions:[...Array.from({length:5},()=>({size:g.sizes[0],quantity:99})),{size:g.sizes[0],quantity:5}]});
  return {schema:'mqd-business-setup-v1',status:'pending-review',plan:packet.plan,owner:{requestEmail:email,phone},shop};
 }

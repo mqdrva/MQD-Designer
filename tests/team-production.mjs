@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {verifyTeamProduction} from '../supabase/functions/_shared/mqd-team-production.js';
+import {GARMENT_MAPPING} from '../supabase/functions/_shared/shirt-games/mapping.js';
+const png=(w,h)=>{const b=Buffer.alloc(24);b.set([137,80,78,71,13,10,26,10]);b.write('IHDR',12);b.writeUInt32BE(w,16);b.writeUInt32BE(h,20);return b;};
+const files=new Map(),zip={file:path=>files.has(path)?{async:async type=>type==='string'?String(files.get(path)):files.get(path)}:null};
+for(const [i,zone] of GARMENT_MAPPING.tshirt.zones.entries()){const t=GARMENT_MAPPING.tshirt.templates[zone];files.set('production-zones/'+String(i+1).padStart(2,'0')+'-'+zone.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png',png(t.width,t.height));}
+const source=png(250,500);files.set('originals/Front-0-logo.png',source);
+const design={engine:'3d',design:{product:{id:'tshirt'},design:{zones:{Front:{layers:[{id:'logo',type:'image',filename:'logo.png',src:'data:image/png;base64,'+source.toString('base64'),x:0,y:0,scale:1,rotation:0}]}}}}};
+const verified=await verifyTeamProduction(zip,design);assert.equal(verified.originals[0].width,250);assert.equal(verified.originals[0].height,500);assert.equal(verified.zones.length,5);
+files.set('originals/Front-0-logo.png',png(251,500));await assert.rejects(()=>verifyTeamProduction(zip,design),/Original source/);files.set('originals/Front-0-logo.png',source);
+files.set('production-zones/01-front.png',png(100,100));await assert.rejects(()=>verifyTeamProduction(zip,design),/Incorrect output dimensions/);
+console.log('PASS production validation: original header dimensions and SHA-256, exact garment output dimensions, altered source and undersized output rejection.');

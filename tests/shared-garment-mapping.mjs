@@ -32,7 +32,7 @@ try{
   // drawing hooks, business state, controls or custom prices.
   const service=path.join(temp,'v20/shop-editor.js');
   const fixedHook="function drawImageLayer(c,l,b){if(l.shopFixed)return 'fixed-logo-host-hook';return drawMappedImageLayer(c,l,b);}";
-  let source=fs.readFileSync(service,'utf8').replace('function drawImageLayer(c,l,b){return drawMappedImageLayer(c,l,b);}',fixedHook);
+  let source=fs.readFileSync(service,'utf8').replace(/function drawImageLayer\(c,l,b\)\{[\s\S]*?(?=\n\/\/ @mapping-begin drawMappedImageLayer)/,fixedHook);
   fs.writeFileSync(service,source);syncGarmentMapping(temp);assert(fs.readFileSync(service,'utf8').includes(fixedHook));
   const hostCtx={drawMappedImageLayer:()=> 'shared-image-placement'};vm.createContext(hostCtx);vm.runInContext(fixedHook,hostCtx);
   assert.equal(hostCtx.drawImageLayer(null,{shopFixed:true},null),'fixed-logo-host-hook');

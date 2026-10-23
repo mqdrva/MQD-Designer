@@ -38,6 +38,18 @@
     {
       "source": "/shops/:shop",
       "destination": "/shop-2d.html"
+    },
+    {
+      "source": "/teams",
+      "destination": "/teams.html"
+    },
+    {
+      "source": "/teams/:team/3d",
+      "destination": "/team-3d.html"
+    },
+    {
+      "source": "/teams/:team",
+      "destination": "/team-2d.html"
     }
   ],
   "buildCommand": "npm run build:mappings",

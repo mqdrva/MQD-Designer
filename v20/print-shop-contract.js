@@ -19,7 +19,7 @@ export function shopPrintZones(shop,product,size='L') {
   return Object.fromEntries((polo?['front']:['front','back','left','right']).map(view=>{
     const limit=configured?.[view]||defaults[view],maxWidth=polo?5:['left','right'].includes(view)?6:16,maxHeight=polo?5:24;
     if(!Number.isFinite(limit.width)||!Number.isFinite(limit.height)||limit.width<.5||limit.height<.5||limit.width>maxWidth||limit.height>maxHeight)throw new Error('Enter valid print dimensions for this garment.');
-    return [view,{label:polo?'Left chest pocket area':({front:'Front',back:'Back',left:'Left sleeve',right:'Right sleeve'})[view],width:limit.width,height:limit.height,placement:polo?'left-chest':'standard'}];
+    return [view,{label:polo?(shop.garments?.[product]?.logoPreset?.placement==='center'?'Center chest area':'Left chest pocket area'):({front:'Front',back:'Back',left:'Left sleeve',right:'Right sleeve'})[view],width:limit.width,height:limit.height,placement:polo?(shop.garments?.[product]?.logoPreset?.placement||'left-chest'):'standard'}];
   }));
 }
 export function validPhone(value){if(typeof value!=='string'||value.length>40||!/^[-+0-9\s().]+$/.test(value.trim()))return false;const count=value.replace(/\D/g,'').length;return count>=7&&count<=15;}
@@ -62,7 +62,7 @@ export function requestEstimate(shop, summary) {
   for (const row of options) {
     if (!['XS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].includes(row.size) || !Number.isInteger(row.quantity) || row.quantity < 1 || row.quantity > 99) throw new Error('Choose a valid size and quantity from 1 to 99.');
     totalQuantity += row.quantity;
-    if (!['XS','S','M','L','XL'].includes(row.size)) sizeTotal += p.sizeCents * row.quantity;
+    if (!['XS','S','M','L','XL'].includes(row.size)) sizeTotal += (shop.fulfillmentMode==='mymerchnow'&&summary.engine==='3d'?0:p.sizeCents) * row.quantity;
   }
   if (totalQuantity > 500) throw new Error('Contact the shop directly for orders over 500 garments.');
   let unitCents;
@@ -88,3 +88,32 @@ export function requestEstimate(shop, summary) {
   if (quoteRequired) return {totalQuantity,totalCents:null,unitCents:null,sizeTotal:null,quoteRequired:true,currency:'usd',pricingVersion:p.version};
   return { quoteRequired:false, totalQuantity, totalCents: unitCents * totalQuantity + sizeTotal + setupCents, unitCents, sizeTotal, setupCents, currency: 'usd', pricingVersion: p.version };
 }
+
+// Approved garment logos are separate from the page branding logo.
+export function garmentLogo(shop,product){return shop?.garments?.[product]?.logoPreset||{mode:'none'};}
+export function validateGarmentLogo(raw,shop,product){
+ const v=raw||{mode:'none'};if(!['none','movable','fixed'].includes(v.mode))throw new Error('Choose a valid garment logo option.');
+ if(v.mode==='none')return {mode:'none'};
+ if(typeof shop.garmentLogo!=='string'||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(shop.garmentLogo))throw new Error('Upload an original garment logo.');
+ const placement=['everyday-polo','short-sleeve-polo'].includes(product)?v.placement:'center';
+ if(!['center','left-chest'].includes(placement))throw new Error('Choose a logo position.');
+ const zone=shopPrintZones(shop,product).front;
+ const width=Number(v.width),height=Number(v.height),top=Number(v.top);
+ if(!Number.isFinite(width)||!Number.isFinite(height)||!Number.isFinite(top)||width<.25||height<.25||top<0||width>zone.width||height+top>zone.height)throw new Error('The logo must fit inside the garment’s front print dimensions.');
+ return {mode:v.mode,placement,width,height,top};
+}
+export function fixedLogoLayer(shop,product){
+ const preset=garmentLogo(shop,product);if(preset.mode!=='fixed')return null;
+ return {id:'shop-fixed-logo',type:'image',label:shop.name+' fixed logo',filename:garmentLogoPath(shop).split('/').at(-1),src:shop.garmentLogo,shopFixed:true,shopLogoPreset:preset,x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false,crop:{left:0,top:0,right:0,bottom:0},visible:true};
+}
+export function assertFixedLogoPackage(shop,summary,design,manifest){
+ const preset=garmentLogo(shop,summary.productId);
+ if(preset.mode!=='fixed')return;
+ if(!summary.locations?.includes('front')||JSON.stringify(manifest)!==JSON.stringify({product:summary.productId,preset,asset:garmentLogoPath(shop)}))throw new Error('The approved fixed logo is missing. Reload the shop and save again.');
+ if(summary.engine==='3d'){
+  const layers=design.design?.design?.zones?.Front?.layers||[],actual=layers.at(-1),expected=fixedLogoLayer(shop,summary.productId);
+  if(!actual||Object.keys(expected).some(k=>JSON.stringify(actual[k])!==JSON.stringify(expected[k]))||layers.filter(l=>l.shopFixed).length!==1)throw new Error('The fixed logo has changed. Reload the shop and save again.');
+ }
+}
+
+export function garmentLogoPath(shop){return 'brand/business-logo.'+(shop.garmentLogo?.startsWith('data:image/jpeg;')?'jpg':shop.garmentLogo?.startsWith('data:image/webp;')?'webp':'png');}
