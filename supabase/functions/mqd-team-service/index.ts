@@ -29,10 +29,11 @@ Deno.serve(async(req:Request)=>{
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
    const batches=await checked(db.from('mqd_team_batches').select('id,cutoff_at,max_quantity,expected_quantity').eq('team_id',a.team_id).eq('status','open').gt('cutoff_at',new Date().toISOString()).eq('shipping_refunded',false));
-   const versionId=new URL(req.url).searchParams.get('version')||a.master_version_id;
+   const publicShop=canonicalTeamShop(a.shop_config);
+   const versionId=publicShop.engines.includes('3d')?(new URL(req.url).searchParams.get('version')||a.master_version_id):null;
    const master=versionId?await checked(db.from('mqd_team_master_versions').select('*').eq('id',versionId).eq('team_id',a.team_id).maybeSingle()):null;
    if(versionId&&!master)return json({error:'Team master unavailable.'},404);
-   return json({shop:canonicalTeamShop(a.shop_config),batches,mode:config.mode,master});
+   return json({shop:publicShop,batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
   const bytes=await bodyBytes(req,req.headers.get('content-type')?.includes('multipart/form-data')?51*1024*1024:(req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000));
@@ -74,7 +75,7 @@ Deno.serve(async(req:Request)=>{
    if(design.schema!=='mqd-shop-design-v1'||design.shop!==body.team||design.engine!==summary.engine||order.productId!==summary.productId||order.printMethod!==summary.printMethod||JSON.stringify(order.orderOptions)!==JSON.stringify(summary.orderOptions)||(summary.engine==='2d'?design.draft?.product:design.design?.product?.id)!==summary.productId)throw new Error('Design and order do not match.');
    let purchasedMaster=null;
    const masterRef=design.design?.design?.teamMaster;
-   if(account.master_version_id||masterRef){
+   if(account.master_version_id&&shop.engines.includes('3d')||masterRef){
     if(summary.engine!=='3d'||!uuid(masterRef?.versionId))throw new Error('Open the team master and personalize your own copy.');
     purchasedMaster=await checked(db.from('mqd_team_master_versions').select('*').eq('id',masterRef.versionId).eq('team_id',account.team_id).maybeSingle());
     if(!purchasedMaster)throw new Error('Team master version unavailable.');

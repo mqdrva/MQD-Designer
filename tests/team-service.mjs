@@ -66,7 +66,7 @@ const masterContract=await import('../supabase/functions/_shared/mqd-team-master
 const {GARMENT_MAPPING}=await import('../supabase/functions/_shared/shirt-games/mapping.js');
 Object.assign(apiContext,masterContract);
 const masterDraft={name:'Synthetic master',payload:{schema:'mqd-design-v1',product:{id:'tshirt',model:GARMENT_MAPPING.tshirt.model},templates:GARMENT_MAPPING.tshirt.templates,design:{zones:Object.fromEntries(GARMENT_MAPPING.tshirt.zones.map(z=>[z,{background:'#ffffff',layers:z==='Front'?[{id:'name',type:'text',text:'NAME',font:'Inter',x:0,y:0,scale:1,rotation:0,visible:true}]:[]}]))}},rules:[{zone:'Front',layerId:'name',role:'text',label:'Name',maxLength:30}]};
-apiLive=false;apiTables.mqd_team_accounts[0].livemode=false;apiTables.mqd_team_accounts[0].shop_config=structuredClone(fixture.shop);apiTables.mqd_team_accounts[0].shop_config.garments.tshirt={colors:['White'],sizes:['S','M','L','XL']};
+apiLive=false;apiTables.mqd_team_accounts[0].livemode=false;apiTables.mqd_team_accounts[0].shop_config=structuredClone(fixture.shop);apiTables.mqd_team_accounts[0].shop_config.engines=['2d','3d'];apiTables.mqd_team_accounts[0].shop_config.garments.tshirt={colors:['White'],sizes:['S','M','L','XL']};
 let masterSaves=0;const oldRpc=apiDb.rpc;apiDb.rpc=async(name,args)=>{if(name==='mqd_save_team_master'){assert.equal(args.p_team,teamId);masterSaves++;return{data:{revision:1,versionId:args.p_publish?args.p_version:null}};}return oldRpc(name,args);};
 const saveBody={action:'master-save',id:teamId,revision:0,publish:false,draft:masterDraft};
 assert.equal((await api(saveBody)).status,401);assert.equal((await api({...saveBody,token:'b'.repeat(64)})).status,401);
