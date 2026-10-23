@@ -1,3 +1,4 @@
+import {ownerWorkspace,publicTeamShop} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.95.0';
@@ -25,7 +26,14 @@ Deno.serve(async(req:Request)=>{
   if(req.method==='GET'){if(new URL(req.url).searchParams.get('catalog')==='1')return json(teamPriceCatalog());
    const slug=new URL(req.url).searchParams.get('team');if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))throw new Error('Choose a team link.');
    const a=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
-   const business=a?await checked(db.from('mqd_print_shop_businesses').select('id,status,email_verified_at').eq('id',a.team_id).maybeSingle()):null;
+   const business=a?await checked(db.from('mqd_print_shop_businesses').select('id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
+   if(a?.shop_config?.ownerManaged){
+    const published=business?.shop_config?.ownerPublished;
+    if(!published||business.status==='closed')return json({error:'Design review is not published.'},404);
+    const shop=publicTeamShop(published.shop),version=new URL(req.url).searchParams.get('version')||published.masterVersionId;
+    const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
+    return json({shop,master,batches:[],mode:config.mode,reviewOnly:true,kind:business.shop_config.pilotKind});
+   }
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
    const batches=await checked(db.from('mqd_team_batches').select('id,cutoff_at,max_quantity,expected_quantity').eq('team_id',a.team_id).eq('status','open').gt('cutoff_at',new Date().toISOString()).eq('shipping_refunded',false));
@@ -33,7 +41,7 @@ Deno.serve(async(req:Request)=>{
    const versionId=publicShop.engines.includes('3d')?(new URL(req.url).searchParams.get('version')||a.master_version_id):null;
    const master=versionId?await checked(db.from('mqd_team_master_versions').select('*').eq('id',versionId).eq('team_id',a.team_id).maybeSingle()):null;
    if(versionId&&!master)return json({error:'Team master unavailable.'},404);
-   return json({shop:publicShop,batches,mode:config.mode,master});
+   return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
   const bytes=await bodyBytes(req,req.headers.get('content-type')?.includes('multipart/form-data')?51*1024*1024:(req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000));
@@ -42,14 +50,56 @@ Deno.serve(async(req:Request)=>{
   const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(bytes));
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
   if(adminAction){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';const auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required.'},403);actor=auth.data.user;}
+  if(['master-save','master-load'].includes(body.action))return json({error:'Only the MQD owner/admin can create, edit or publish a master. Send change requests to MQD.'},403);
+  if(body.action==='admin-workspace-list')return json({workspaces:await checked(db.from('mqd_print_shop_businesses').select('id,revision,name:shop_config->>name,slug:shop_config->>slug,kind:shop_config->>pilotKind,updated_at').eq('shop_config->>ownerManaged','true').order('updated_at',{ascending:false}).limit(50))});
+  if(['admin-workspace-save','admin-workspace-load','admin-workspace-publish','admin-workspace-unpublish'].includes(body.action)){
+   if(!uuid(body.id))throw new Error('Choose an owner workspace.');
+   const prior=await checked(db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).maybeSingle());
+   if(prior&&!prior.shop_config?.ownerManaged)return json({error:'This setup is managed through its existing Team workflow.'},409);
+   if(body.action==='admin-workspace-save'){
+    if(!Number.isInteger(body.revision)||body.revision<0)throw new Error('Reload before saving.');
+    const {contact,shop}=ownerWorkspace(body.packet,body.kind,body.editingMode);
+    if(prior&&(prior.revision!==body.revision||prior.preferred_slug!==shop.slug))throw new Error('Workspace changed, or link name changed. Reload before saving.');
+    const duplicates=await checked(db.from('mqd_print_shop_businesses').select('id').eq('preferred_slug',shop.slug).neq('status','closed'));
+    if(duplicates.some((r:any)=>r.id!==body.id))throw new Error('This link name is already reserved. Choose another.');
+    if(prior?.shop_config.ownerPublished)shop.ownerPublished=prior.shop_config.ownerPublished;
+    const revision=body.revision+1,values={owner_email:contact.requestEmail,owner_phone:contact.phone,shop_config:shop,revision,updated_at:new Date().toISOString()};
+    if(prior)await checked(db.from('mqd_print_shop_businesses').update(values).eq('id',body.id).eq('revision',body.revision).select('id').single(),'Workspace changed. Reload before saving.');
+    else{
+     if(body.revision!==0)throw new Error('Workspace unavailable.');
+     await checked(db.from('mqd_print_shop_businesses').insert({id:body.id,preferred_slug:shop.slug,plan:'3d',...values,payload_hash:'owner-workspace',ip_hash:'owner:'+actor.id,mail_origin:BASE_URL,token_hash:await hash(crypto.randomUUID()+crypto.randomUUID()),token_cipher:{},token_expires_at:new Date().toISOString()}));
+    }
+    // Recoverable two-step create: no public link exists until explicit publish. Never overwrite account/order state.
+    await checked(db.from('mqd_team_accounts').upsert({team_id:body.id,shop_config:{...shop,ownerPublished:undefined},livemode:config.live},{onConflict:'team_id',ignoreDuplicates:true}));
+    return json({id:body.id,revision,message:'Owner draft saved. No email, subscription or payment was created.'});
+   }
+   if(!prior)return json({error:'Owner workspace unavailable.'},404);
+   const account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
+   if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished});}
+   if(body.revision!==prior.revision)throw new Error('Workspace changed. Reload before publishing.');
+   if(!account)throw new Error('Save this draft again to finish creating its account.');
+   const shop=structuredClone(prior.shop_config);
+   if(body.action==='admin-workspace-publish'){
+    let masterVersionId=null;
+    if(shop.editingMode==='strict'){
+     if(!account.master_version_id)throw new Error('Publish the strict master first.');
+     const master=await checked(db.from('mqd_team_master_versions').select('*').eq('id',account.master_version_id).eq('team_id',body.id).single());validateTeamMaster(master);
+     if(!shop.garments[master.payload.product.id])throw new Error('The master garment must match the saved setup.');masterVersionId=master.id;
+    }
+    const checkedShop=ownerWorkspace({schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone},shop},shop.pilotKind,shop.editingMode).shop;
+    shop.ownerPublished={shop:publicTeamShop(checkedShop),masterVersionId,publishedAt:new Date().toISOString()};
+   }else delete shop.ownerPublished;
+   const saved=await checked(db.from('mqd_print_shop_businesses').update({shop_config:shop,revision:prior.revision+1,updated_at:new Date().toISOString()}).eq('id',body.id).eq('revision',prior.revision).select('id').single(),'Workspace changed. Reload before publishing.');
+   return json({id:saved.id,revision:prior.revision+1,url:shop.ownerPublished?BASE_URL+'/teams/'+encodeURIComponent(shop.slug)+(shop.engines.includes('2d')?'':'/3d'):null,message:shop.ownerPublished?'Design review published. Checkout is disabled. Share this link yourself; no invitation was sent.':'Design review unpublished.'});
+  }
   if(body.action==='admin-list'){
-   const accounts=await checked(db.from('mqd_team_accounts').select('team_id,status,billing_status,period_start,period_end,cancel_at_period_end,name:shop_config->>name,slug:shop_config->>slug').eq('livemode',config.live).order('created_at',{ascending:false}).limit(100));
+   const accounts=await checked(db.from('mqd_team_accounts').select('team_id,status,billing_status,period_start,period_end,cancel_at_period_end,name:shop_config->>name,slug:shop_config->>slug,ownerManaged:shop_config->>ownerManaged').eq('livemode',config.live).order('created_at',{ascending:false}).limit(100));
    const batches=await checked(db.from('mqd_team_batches').select('*').eq('livemode',config.live).order('created_at',{ascending:false}).limit(100));
    const orders=await checked(db.from('mqd_team_orders').select('id,team_id,batch_id,customer,summary,quantity,delivery,garment_cents,shipping_cents,payment_status,production_status,paid_at,refunded_quantity,disputed,tracking,shipping_address').eq('livemode',config.live).order('created_at',{ascending:false}).limit(200));
    const otherModeAccounts=await checked(db.from('mqd_team_accounts').select('team_id').eq('livemode',!config.live));
    const otherModeIds=new Set(otherModeAccounts.map((a:any)=>a.team_id));
-   const pending=(await checked(db.rpc('mqd_team_pending_metadata'))).filter((p:any)=>!otherModeIds.has(p.id));
-   return json({pending,accounts:accounts.map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug})),batches,orders,enabled:config.enabled,mode:config.mode});
+   const pending=(await checked(db.rpc('mqd_team_pending_metadata'))).filter((p:any)=>!otherModeIds.has(p.id)&&!accounts.some((a:any)=>a.team_id===p.id&&a.ownerManaged==='true'));
+   return json({pending,accounts:accounts.filter((a:any)=>a.ownerManaged!=='true').map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug})),batches,orders,enabled:config.enabled,mode:config.mode});
   }
   if(body.action==='order-status'){
    if(!uuid(body.id)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))return json({error:'Private order access required.'},401);
@@ -61,7 +111,7 @@ Deno.serve(async(req:Request)=>{
    if(!form||!uuid(body.requestId)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))throw new Error('Valid private order session required.');
    if(body.website||!Number.isFinite(body.startedAt)||Date.now()-body.startedAt<2000||Date.now()-body.startedAt>86400000)throw new Error('Refresh and review the order form.');
    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.team||''))throw new Error('Choose a valid Team link.');
-   const account=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());if(!teamAccess(account))return json({error:'Team subscription is inactive.'},409);
+   const account=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());if(account?.shop_config?.ownerManaged)return json({error:'This owner-managed design review does not support checkout.'},409);if(!teamAccess(account))return json({error:'Team subscription is inactive.'},409);
    const rawSummary=body.summary,rawCustomer=body.customer,summary={engine:rawSummary?.engine,productId:rawSummary?.productId,color:rawSummary?.color,printMethod:rawSummary?.printMethod,locations:rawSummary?.locations,orderOptions:Array.isArray(rawSummary?.orderOptions)?rawSummary.orderOptions.map((o:any)=>({size:o.size,quantity:o.quantity})):null} as any;
    const customer={name:rawCustomer?.name,email:rawCustomer?.email,phone:rawCustomer?.phone,notes:rawCustomer?.notes};
    const shop=canonicalTeamShop(account.shop_config),quote=teamQuote(shop,summary);summary.productName=shop.productNames[summary.productId];summary.garment=shop.garments[summary.productId];
@@ -126,8 +176,10 @@ Deno.serve(async(req:Request)=>{
   const business=await checked(db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).maybeSingle());
   if(!business||business.shop_config?.organizationType!=='team'&&business.pending_config?.organizationType!=='team')return json({error:'Team setup unavailable.'},404);
   if(!adminAction){if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);}
-  let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).eq('livemode',config.live).maybeSingle());
-  if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.pending_config||business.shop_config)}});
+  let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
+  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-detail'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account&&!account.shop_config?.ownerManaged&&account.livemode!==config.live)return json({error:'Team unavailable.'},404);
+  if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:business.pending_config||business.shop_config)}});
   if(body.action==='admin-approve'){
    if(!business.email_verified_at||body.revision!==business.revision||body.confirm!==business.preferred_slug)throw new Error('Confirm the verified team and current setup revision.');
    
@@ -135,14 +187,14 @@ Deno.serve(async(req:Request)=>{
    await checked(db.from('mqd_team_actions').insert({id:crypto.randomUUID(),team_id:body.id,actor_id:actor.id,action:'approve-team',details:{revision:business.revision}}));return json({account:safeAccount(account)});
   }
   if(!account)return json({error:'Your team is awaiting MYMERCHNOW approval.'},409);
-  if(['master-load','admin-master-load'].includes(body.action)){
+  if(body.action==='admin-master-load'){
    const draft=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle());
    return json({draft:draft?.draft||null,revision:draft?.revision||0,versionId:account.master_version_id||null});
   }
-  if(['master-save','admin-master-save'].includes(body.action)){
+  if(body.action==='admin-master-save'){
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
-   const draft=validateTeamMaster(body.draft),shop=canonicalTeamShop(account.shop_config);
-   if(!shop.garments[draft.payload.product.id])throw new Error('Choose a garment approved for this team.');
+   const draft=validateTeamMaster(body.draft),shop=canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:account.shop_config);
+   if(!shop.engines.includes('3d')||!shop.garments[draft.payload.product.id])throw new Error('Choose a garment approved for this team.');
    const result=await checked(db.rpc('mqd_save_team_master',{p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()}));
    return json(result);
   }

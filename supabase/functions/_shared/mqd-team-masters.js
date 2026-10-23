@@ -24,6 +24,7 @@ export function validateTeamMaster(master){
   if(r.role==='text'){
    if(!Number.isInteger(r.maxLength)||r.maxLength<1||r.maxLength>100)fail('Set a field limit from 1 to 100 characters.');
    if(r.choices!==undefined&&(!Array.isArray(r.choices)||!r.choices.length||r.choices.length>50||r.choices.some(c=>typeof c!=='string'||!c.trim()||c.length>r.maxLength)))fail('Enter valid allowed choices.');
+   if(r.choices&&!r.choices.includes(layer.text))fail('The sample text must match an allowed choice for '+r.label+'.');
   }
  }
  return master;
