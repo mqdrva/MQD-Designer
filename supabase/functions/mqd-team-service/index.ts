@@ -83,6 +83,7 @@ Deno.serve(async(req:Request)=>{
     let masterVersionId=null;
     if(shop.editingMode==='strict'){
      if(!account.master_version_id)throw new Error('Publish the strict master first.');
+     if(body.expectedMasterVersionId&&body.expectedMasterVersionId!==account.master_version_id)throw new Error('Published master changed. Reopen this setup before publishing the review link.');
      const master=await checked(db.from('mqd_team_master_versions').select('*').eq('id',account.master_version_id).eq('team_id',body.id).single());validateTeamMaster(master);
      if(!shop.garments[master.payload.product.id])throw new Error('The master garment must match the saved setup.');masterVersionId=master.id;
     }
