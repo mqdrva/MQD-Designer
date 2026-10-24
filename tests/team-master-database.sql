@@ -1,6 +1,8 @@
 begin;
 do $$
 declare team uuid:=gen_random_uuid();v1 uuid:=gen_random_uuid();v2 uuid:=gen_random_uuid();r jsonb;failed boolean;begin
+ if not exists(select 1 from pg_proc where oid='public.mqd_save_team_master(uuid,integer,jsonb,boolean,uuid)'::regprocedure and not prosecdef and proconfig @> array['statement_timeout=60s']) then raise exception 'Master save must have a bounded function-only timeout and invoker security';end if;
+ if not has_function_privilege('service_role','public.mqd_save_team_master(uuid,integer,jsonb,boolean,uuid)','execute') then raise exception 'Backend master save grant missing';end if;
  if has_table_privilege('anon','public.mqd_team_master_versions','select') or has_table_privilege('authenticated','public.mqd_team_master_drafts','update') or has_function_privilege('authenticated','public.mqd_save_team_master(uuid,integer,jsonb,boolean,uuid)','execute') then raise exception 'Public master access';end if;
  insert into public.mqd_print_shop_businesses(id,preferred_slug,plan,owner_email,owner_phone,shop_config,payload_hash,ip_hash,mail_origin,token_hash,token_cipher,token_expires_at,email_verified_at) values(team,'master-fixture','3d','test@example.invalid','2025550101','{"organizationType":"team"}',repeat('0',64),repeat('0',64),'local',repeat('0',64),'{}',now()+interval '1 day',now());
  insert into public.mqd_team_accounts(team_id,shop_config,status) values(team,'{}','ready');

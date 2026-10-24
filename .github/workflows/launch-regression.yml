@@ -89,6 +89,13 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020164602_premade_design_templates.sql
           psql -v ON_ERROR_STOP=1 -f tests/template-schema.sql
 
+      - name: Verify private team masters and bounded original-artwork saves
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/team-master-schema-fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261022213030_team_master_versions_and_production_capacity.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024012500_team_master_save_timeout.sql
+          psql -v ON_ERROR_STOP=1 -f tests/team-master-database.sql
+
       - name: Verify isolated print-shop subscriptions and onboarding
         run: |
           node tests/print-shop-subscription.mjs
