@@ -98,6 +98,7 @@ const tests=[
   ['tshirt-preview-contract.mjs'],
   ['garment-load-lifecycle.mjs'],
   ['fleece-hoodie-model.mjs',modelPaths.get('fleece-hoodie')],
+  ['fleece-hoodie-artwork.mjs',modelPaths.get('fleece-hoodie')],
   ['hat-zones.mjs',modelPaths.get('hat'),threePath],
   ['hood-mask-panels.mjs',modelPaths.get('hood-mask-shirt'),threePath],
   ['hooded-long-sleeve-panels.mjs',modelPaths.get('hooded-long-sleeve'),threePath],

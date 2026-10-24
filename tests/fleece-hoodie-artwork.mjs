@@ -33,3 +33,23 @@ const a={type:'text'},water={type:'image',libraryLocked:true,libraryAssetId:'99b
 assert.deepEqual(hoodieArtworkBatches('Front',[a,water,b]).map(x=>x.layers),[[a],[water],[b]]);
 assert.equal(hoodieSplashPreviewFrame('Front',b),null);
 console.log('PASS: water reaches all five actual hoodie panel hems; other layers retain order and mapping.');
+
+// Front ordinary artwork must use the physical front body's vertical extent,
+// not a shorter frame derived from the whole garment (which includes the hood).
+const shared=fs.readFileSync(new URL('../v20/garment-mapping-source.js',import.meta.url),'utf8');
+const placement=shared.match(/\/\/ @mapping-begin zonePlacement\n([\s\S]*?)\n\/\/ @mapping-end zonePlacement/)[1];
+vm.runInNewContext(placement,context);
+context.product.zones=['Front','Back'];
+context.stateFor=()=>({zones:{Front:{layers:[{type:'image',visible:true},{type:'text',visible:true}]},Back:{layers:[{type:'image',visible:true}]}}});
+const frames=[];
+context.DecalGeometry=class extends DecalGeometry{constructor(mesh,p,r,d){frames.push({p:p.clone(),r:r.clone(),d:d.clone()});super(mesh,p,r,d);}};
+const oldFront=context.zonePlacement('Front'),oldBack=context.zonePlacement('Back');
+decalGroup.clear();vm.runInNewContext(editor.slice(start,end)+'\nrebuildFleeceHoodiePreview();',context);
+assert.equal(frames.length,2);
+const frontBounds=new THREE.Box3().setFromObject(meshes.get('Front')),frame=frames[0];
+assert(Math.abs(frame.p.y+frame.d.y/2-frontBounds.max.y)<1e-8,'top of flat Front must reach actual shoulder edge');
+assert(Math.abs(frame.p.y-frame.d.y/2-frontBounds.min.y)<1e-8,'bottom of flat Front must reach actual waistband');
+assert(frame.p.y+.4*frame.d.y>oldFront.p.y+.4*oldFront.d.y+.05,'high front logo must no longer be compressed down toward chest');
+assert.equal(frame.p.x,oldFront.p.x);assert.equal(frame.d.x,oldFront.d.x);
+assert.equal(JSON.stringify(frames[1]),JSON.stringify(oldBack),'Back projector must remain exactly unchanged');
+console.log('PASS: actual hoodie Front shoulder/waistband anchors align, high chest artwork rises, horizontal mapping and Back remain unchanged.');
