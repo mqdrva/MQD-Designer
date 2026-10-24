@@ -16,6 +16,7 @@ import {bodyPatternUv} from './long-sleeve-pattern-uv.js';
 import {createJacketZones,jacketProjection,setJacketPanelUvs} from './lightweight-jacket-renderer.js?v=surface-1';
 import {jacketSplashPreviewFrame} from './jacket-splash-preview.js';
 import {isJacketSplash5,drawJacketSplash5} from './jacket-splash-5.js?v=back-1';
+import {hoodieFrontArtworkV} from './hoodie-front-calibration.js';
 import {hoodieSplashPreviewFrame,hoodieArtworkBatches} from './hoodie-splash-preview.js?v=3';
 import {shirtSplashPreviewFrame,clipShirtSplash,isShirtSplash,shirtSplashCutFrame} from './shirt-splash-preview.js?v=2';
 import {isCutlineBottomArtwork,drawFittedSplash} from './water-splash-fit.js?v=grass-1';
@@ -24,7 +25,7 @@ import {createShortsPanels,shortsTemplatePolygons} from './shorts-panels.js';
 import {createSweatPanels,sweatTemplate} from './sweat-pants-panels.js';
 import {createMaskSurface,applyMaskTexture,MASK_MAPPING_CALIBRATION} from './mask-renderer.js';
 import {partitionLongSleevePoloTriangle} from './long-sleeve-polo-panels.js';
-import {partitionFleeceHoodieTriangle,hoodiePanelNames} from './fleece-hoodie-panels.js';
+import {partitionFleeceHoodieTriangle,hoodiePanelNames,HOODIE_WAISTBAND_TOP_Y} from './fleece-hoodie-panels.js';
 import {panelNames, partitionTriangle, partitionBodyTriangle, panelUv} from './panels.js';
 import {TSHIRT_FACE_COUNT,isTshirtCollarFace} from './tshirt-collar-mask.js';
 import {POLO_FACE_COUNT,isPoloCollarFace} from './polo-collar-mask.js';
@@ -1893,14 +1894,15 @@ function rebuildFleeceHoodiePreview(){
     q.r.set(0,side*Math.PI/2,0);
     q.d.set(sleeveSize.z*1.02,sleeveSize.y*1.02,sleeveSize.x*1.02);
   }
-  // The flat Front frame runs from the front shoulder edge to its waistband.
-  // The whole-garment box includes the hood and compresses that vertical frame,
-  // leaving high chest artwork too low. Keep horizontal placement and every
-  // other zone unchanged; special full-panel backgrounds retain their own fit.
+  // The flat front sewing pattern ends at the body/waistband seam. Front
+  // includes the ribbed band for coloring, but using its bottom as the artwork
+  // anchor stretches the pattern downwards and lowers chest logos and names.
+  // Transform the existing model seam into world space, just like the bounds.
   if(zone==='Front'&&!batch.splash){
     const frontBox=new THREE.Box3().setFromObject(target);
-    q.p.y=(frontBox.min.y+frontBox.max.y)/2;
-    q.d.y=Math.max(.001,frontBox.max.y-frontBox.min.y);
+    const hem=new THREE.Vector3(0,HOODIE_WAISTBAND_TOP_Y,0).applyMatrix4(target.matrixWorld).y;
+    q.p.y=(hem+frontBox.max.y)/2;
+    q.d.y=Math.max(.001,frontBox.max.y-hem);
   }
   if(batch.splash){
     const box=new THREE.Box3().setFromObject(target),size=box.getSize(new THREE.Vector3());
@@ -1909,7 +1911,7 @@ function rebuildFleeceHoodiePreview(){
     q.d.set(zone.includes('Sleeve')?size.z:size.x,size.y,zone.includes('Sleeve')?size.x*2:size.z*2);
     q.d.max(new THREE.Vector3(.001,.001,.001));
   }
-  try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10+batchIndex;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
+  try{const geo=new DecalGeometry(target,q.p,q.r,q.d);if(zone==='Front'&&!batch.splash){const uv=geo.getAttribute('uv');for(let i=0;i<uv.count;i++)uv.setY(i,hoodieFrontArtworkV(uv.getY(i)));uv.needsUpdate=true;}const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10+batchIndex;decalGroup.add(mesh);}catch(e){tex.dispose();console.warn('Fleece Hoodie decal failed',zone,e);}
   }
  });
  return true;
@@ -2028,7 +2030,7 @@ function updateTshirtZoneTextures(){
 function findLargestMesh(){let best=null,score=-1;garment?.traverse(o=>{if(!o.isMesh||!o.geometry)return;const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),v=s.x*s.y*s.z;if(v>score){score=v;best=o;}});return best;}
 // @mapping-end findLargestMesh
 // @mapping-begin rebuildDecals
-function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
+function rebuildDecals(){if(!garment||!decalGroup)return;clearDecals();const target=findLargestMesh();if(!target)return;product.zones.forEach(zone=>{if(!zoneHasContent(zone))return;const canvas=makeZoneTextureCanvas(zone),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();const q=zonePlacement(zone);try{const geo=new DecalGeometry(target,q.p,q.r,q.d);if(zone==='Front'&&!batch.splash){const uv=geo.getAttribute('uv');for(let i=0;i<uv.count;i++)uv.setY(i,hoodieFrontArtworkV(uv.getY(i)));uv.needsUpdate=true;}const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.82,metalness:0});const mesh=new THREE.Mesh(geo,mat);mesh.renderOrder=10;decalGroup.add(mesh);}catch(e){console.warn('Decal failed',zone,e);}});}
 // @mapping-end rebuildDecals
 // @mapping-begin rebuildJacketPreview
 function rebuildJacketPreview(){
