@@ -18,7 +18,7 @@ syncGarmentMapping(root,{check:true});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'mqd-shared-mapping-'));
 try{
   for(const dir of ['v20','assets'])fs.cpSync(path.join(root,dir),path.join(temp,dir),{recursive:true});
-  for(const file of ['index.html','shop-3d.html'])fs.copyFileSync(path.join(root,file),path.join(temp,file));
+  for(const file of ['index.html','shop-3d.html','team-3d.html'])fs.copyFileSync(path.join(root,file),path.join(temp,file));
   const canonical=path.join(temp,'v20/garment-mapping-source.js');
   const before=syncGarmentMapping(temp,{check:true}).version;
   fs.writeFileSync(canonical,fs.readFileSync(canonical,'utf8').replace("const MQD_TSHIRT_ZONE_CALIBRATION='v26-surface-uv-collar-strip';","const MQD_TSHIRT_ZONE_CALIBRATION='test-next-approved-mapping';"));
@@ -27,6 +27,7 @@ try{
   for(const host of ['editor.js','shop-editor.js'])assert(fs.readFileSync(path.join(temp,'v20',host),'utf8').includes("const MQD_TSHIRT_ZONE_CALIBRATION='test-next-approved-mapping';"));
   assert(fs.readFileSync(path.join(temp,'index.html'),'utf8').includes(update.version));
   assert(fs.readFileSync(path.join(temp,'shop-3d.html'),'utf8').includes(update.version));
+  assert(fs.readFileSync(path.join(temp,'team-3d.html'),'utf8').includes(update.version));
   assert(fs.readFileSync(path.join(temp,'v20/print-shop.js'),'utf8').includes(update.version));
   // Host policy remains local: release composition must not erase fixed-logo
   // drawing hooks, business state, controls or custom prices.

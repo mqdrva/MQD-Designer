@@ -1,6 +1,6 @@
 {
   "rendererFiles": {
-    "v20/fleece-hoodie-panels.js": "4e0b7bbaf3f8da1b67b898a9a8edca794ab37ee88744d6fd39fd33e0143b0233",
+    "v20/fleece-hoodie-panels.js": "eb3de2d841652c3d6a59aca53a92ec8cdffca39f703e1273344eea23c370d064",
     "v20/hat-renderer.js": "5351b18537a9a698e5628a7cdce615b0e82a22a9073e608c5bffb6c96c9c6b27",
     "v20/hood-mask-panels.js": "19a16d04ec1f9a59be6c17f8069b78ed1c3a481a6bbf634e8532d692e3c0ca0d",
     "v20/hooded-long-sleeve-panels.js": "e6263d96625a93303801626e801cefbe9199b176acb7b7bb5c25808b99199f2b",
@@ -52,7 +52,7 @@
     "zonePlacement": "90c062352b606a548662367868e4986c086820069531537eb841b8bb749d41ad",
     "splitTshirtGeometry": "f5970adcd2342eca35d42bc14d2d7ed3998677c646894ed602496a5f8d7d383d",
     "splitFleeceHoodieGeometry": "33c57c07e61358ab64fe1e4a5110be19e2a704a4fdb3b66e28c882e6e2ddc69e",
-    "rebuildFleeceHoodiePreview": "00237c2fb533e7711dd49e90a02498e6abc8c0b3fe390342a2516b53814ae9ca",
+    "rebuildFleeceHoodiePreview": "208e9e0626344155d7f4e8736e60a50ee40a52bd3946125d530ebb009caf5c40",
     "updateTshirtZoneTextures": "afdbd6a2987f60f6601aaaf9e8f58b02ae6933d50851d35271d9d5870b6de606",
     "rebuildJacketPreview": "00101898fab51b19b982bf9deec8454dc9cf59de58c83eeac725ef63079b4e03",
     "rebuildHoodMaskPreview": "631ccc5d5c9c53f0f296a118db5a24b573a53b5f14e9d09e504560b71deb584a",

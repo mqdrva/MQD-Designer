@@ -3,6 +3,7 @@ import {partitionWithRules} from './panels.js';
 // Fleece Hoodie only. These rules are intentionally isolated from every
 // approved garment renderer. The supplied hoodie GLB is one mesh, so each
 // triangle is clipped into exactly one of five physical print zones.
+export const HOODIE_WAISTBAND_TOP_Y=-.72;
 export const hoodiePanelNames=['Front','Back','Left Sleeve','Right Sleeve','Hood'];
 
 // Match the approved green/black reference mockups: the hood drops lower at
@@ -37,7 +38,7 @@ const rules=[
 
   // Keep the complete waistband in Front; no sixth print zone.
   // Sleeves are removed first so their cuffs remain independent.
-  {zone:0,tests:[v=>-.72-v[1]]},
+  {zone:0,tests:[v=>HOODIE_WAISTBAND_TOP_Y-v[1]]},
 
   // Keep Front high under the hood while preserving Back on the rear face.
   {zone:0,tests:[v=>v[2]-.002+.225*Math.max(0,v[1])]}

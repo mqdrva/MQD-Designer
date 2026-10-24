@@ -44,11 +44,13 @@ export function syncGarmentMapping(root=projectRoot,{check=false}={}){
     outputs.set(file,source.replace(sectionPattern,(_all,name)=>`// @mapping-begin ${name}\n${shared.get(name)}\n// @mapping-end ${name}`));
   }
   const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const team=fs.readFileSync(path.join(root,'team-3d.html'),'utf8');
   const shop=fs.readFileSync(path.join(root,'shop-3d.html'),'utf8');
   const loader=fs.readFileSync(path.join(root,'v20/print-shop.js'),'utf8');
   if(!/v20\/editor\.js(?:\?[^"']*)?["']/.test(index)||!/v20\/print-shop\.js(?:\?[^"']*)?["']/.test(shop)||!/'\.\/shop-editor\.js(?:\?[^']*)?'/.test(loader))throw new Error('Designer entry points are missing.');
   outputs.set('index.html',index.replace(/(v20\/editor\.js)(?:\?[^"']*)?(?=["'])/g,'$1?v='+version));
   outputs.set('shop-3d.html',shop.replace(/(v20\/print-shop\.js)(?:\?[^"']*)?(?=["'])/g,'$1?v='+version));
+  outputs.set('team-3d.html',team.replace(/(v20\/print-shop\.js)(?:\?[^"']*)?(?=["'])/g,'$1?v='+version));
   outputs.set('v20/print-shop.js',loader.replace(/'\.\/shop-editor\.js(?:\?[^']*)?'/g,"'./shop-editor.js?v="+version+"'"));
   const changed=[...outputs].filter(([file,text])=>fs.readFileSync(path.join(root,file),'utf8')!==text);
   if(check&&changed.length)throw new Error('Generated mapping is stale: '+changed.map(([file])=>file).join(', ')+'. Run npm run build:mappings.');
