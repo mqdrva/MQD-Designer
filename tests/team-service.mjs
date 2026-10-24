@@ -75,6 +75,7 @@ assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:'operator'
 mfa=false;assert.equal((await api({...saveBody,action:'admin-master-save'},{jwt:'operator'})).status,403);mfa=true;
 assert.equal((await api({...saveBody,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',action:'admin-master-save'},{jwt:'operator'})).status,404);
 const wrong=structuredClone(masterDraft);wrong.rules[0].role='admin';assert.equal((await api({...saveBody,action:'admin-master-save',draft:wrong},{jwt:'operator'})).status,400);assert.equal(masterSaves,1);
+const goodMasterRpc=apiDb.rpc;apiDb.rpc=async(name,args)=>name==='mqd_save_team_master'?{error:{message:'Master changed. Reload before saving.'}}:goodMasterRpc(name,args);const staleMasterResponse=await api({...saveBody,action:'admin-master-save'},{jwt:'operator'});assert.equal(staleMasterResponse.status,409);assert.equal(staleMasterResponse.data.code,'master_revision_conflict');apiDb.rpc=goodMasterRpc;
 console.log('PASS actual master API: organizer authoring denied, owner MFA authoring, public/foreign token/cross-team denial and invalid permissions rejected.');
 
 // Sandbox mail cannot consult credentials or make external requests.

@@ -1259,7 +1259,8 @@ function drawSelectionOverlay(){
   ctx.lineWidth=2;
   if(isLockedLibraryLayer(l)){
     const g=selectionGeometry(l,q);ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText('Locked',g.corners[0].x,g.corners[0].y-9);
+    const memberRule=designs[product.id]?.teamMaster&&l.type==='text'?window.MQDTeamMaster?.rules.find(r=>r.zone===activeZone&&r.layerId===l.templateLayerId&&r.role==='text'):null;
+    ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText(memberRule?.allowMove?'Drag to move name':memberRule?'Edit name using its field':'Locked',g.corners[0].x,g.corners[0].y-9);
   }else if(cropMode&&l.type==='image'){
     const g=selectionGeometry(l,q);
     ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
