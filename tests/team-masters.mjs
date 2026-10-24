@@ -15,3 +15,12 @@ const databaseVersion=JSON.parse(JSON.stringify(master,(_,value)=>value&&typeof 
 const roundTripCopy=cloneTeamMaster(master);
 assertTeamMemberCopy(roundTripCopy,databaseVersion);
 console.log('PASS PostgreSQL jsonb zone-key reordering preserves valid member copies');
+
+// Permissions are immutable and opt-in on the purchased master version.
+const movable=structuredClone(master);movable.id=id();movable.rules[1].allowMove=true;movable.payload.design.teamPermissions={wholeGarmentColor:true};validateTeamMaster(movable);
+const member=cloneTeamMaster(movable);member.design.zones.Front.layers[1].x=-18;member.design.zones.Front.layers[1].y=23;for(const zone of Object.values(member.design.zones))zone.background='#14213D';assertTeamMemberCopy(member,movable);
+for(const mutate of [p=>p.design.zones.Front.layers[0].x=2,p=>p.design.zones.Front.layers[1].scale=2,p=>p.design.zones.Back.layers[0].x=3,p=>p.design.zones.Front.layers[1].x=101,p=>p.design.zones.Back.background='#FFFFFF',p=>p.design.zones.Front.background='url(https://example.invalid)',p=>p.design.teamPermissions.wholeGarmentColor=false]){const tampered=structuredClone(member);mutate(tampered);assert.throws(()=>assertTeamMemberCopy(tampered,movable));}
+const mixed=structuredClone(movable);mixed.payload.design.zones.Back.background='#000000';assert.throws(()=>validateTeamMaster(mixed));
+const invalid=structuredClone(movable);invalid.rules[0].allowMove=true;assert.throws(()=>validateTeamMaster(invalid));
+assert.throws(()=>assertTeamMemberCopy(member,master));assert.equal(master.payload.design.teamPermissions,undefined);assertTeamMemberCopy(a,master);
+console.log('PASS opt-in text movement and uniform garment color: logo/style/undeclared movement, bounds, per-zone color and permission tampering denied; historical locked versions unchanged.');

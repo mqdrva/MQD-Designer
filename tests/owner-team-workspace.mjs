@@ -11,6 +11,7 @@ fixture.shop.organizationType='team';fixture.shop.engines=['2d'];fixture.shop.ga
 fixture.shop.garments={'everyday-tshirt':fixture.shop.garments['everyday-tshirt']};fixture.shop.pricing.baseCents={'everyday-tshirt':2000};fixture.shop.pricing.premiumCents={};
 fixture.owner.designRequest='PRIVATE organizer note';fixture.owner.referenceUrl='https://example.invalid/private-reference';
 assert.equal(workspace.ownerWorkspace(fixture,'brand').shop.editingMode,'flexible');
+const missing=structuredClone(fixture);missing.owner.requestEmail='';missing.owner.phone='';assert.deepEqual(workspace.ownerWorkspace(missing,'team').contact,{requestEmail:'',phone:''});const {validateSetup}=await import('../supabase/functions/mqd-print-shop-setup/validation.js');assert.throws(()=>validateSetup(missing),'Public signup still requires contact details');missing.owner.requestEmail='invalid';assert.throws(()=>workspace.ownerWorkspace(missing,'team'));missing.owner.requestEmail='';missing.owner.phone='bad';assert.throws(()=>workspace.ownerWorkspace(missing,'team'));
 assert.throws(()=>workspace.ownerWorkspace(fixture,'brand','strict'),/one 3D garment/);
 assert.throws(()=>workspace.ownerWorkspace(fixture,'marketplace'),/Choose/);
 const unsafe=structuredClone(fixture);unsafe.shop.garments['everyday-tshirt'].logoPreset.mode='none';assert.throws(()=>workspace.ownerWorkspace(unsafe,'team'),/fixed logo/);

@@ -17,6 +17,7 @@ let teamBatches=[],teamMode=null,teamMaster=null,reviewOnly=false;
 const KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const $ = id => document.getElementById(id);
 const engine = document.body.dataset.shopEngine;
+const memberPreview=new URLSearchParams(location.search).get('memberPreview')==='1';
 const setupPreview = new URLSearchParams(location.search).get('setupPreview') === '1';
 const slug = location.pathname.match(/^\/(?:shops|teams)\/([a-z0-9-]+)(?:\/3d)?\/?$/)?.[1] || new URLSearchParams(location.search).get('shop') || 'pilot';
 let shop, getDraft, sending = false, cachedAttempt = null;
@@ -198,6 +199,7 @@ async function send(event) {
 }
 async function digest(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function mount() {
+  if(memberPreview){$('saveDraft').hidden=true;$('shopLoad').closest('label').hidden=true;}
   document.title=`${shop.name} · ${engine.toUpperCase()} shirt designer`;
   if(teamService&&engine==='3d'){$('shopGarmentColor').closest('label').hidden=true;const note=$('shopGarmentColor').closest('label').nextElementSibling;if(note)note.textContent='All-over garment colors come from your design. Review the artwork before ordering.';}
   if(engine==='3d'){const button=document.createElement('button');button.id='shopAddBusinessLogo';button.className='btn';button.type='button';button.textContent='Add business logo';button.hidden=true;button.onclick=()=>window.MQDDesigner.addShopLogo().catch(error=>say(error.message));$('shopBrand').after(button);}
@@ -238,6 +240,7 @@ try {
     const packet=await loadSetupPreview();
     if(packet?.schema!=='mqd-business-setup-v1'||!packet.shop?.engines?.includes(engine))throw new Error('Complete business setup before opening this preview.');
     shop=packet.shop;
+    if(memberPreview){const id=new URLSearchParams(location.search).get('ownerWorkspace');if(!id)throw new Error('Owner verification is required for this private preview.');const {ownerCall}=await import('./owner-team-workspace.js');const loaded=await ownerCall('workspace-load',{id}),saved=await ownerCall('master-load',{id});if(!saved.draft)throw new Error('Save the owner master draft before previewing member controls.');shop=loaded.packet.shop;teamMaster={...saved.draft,id:crypto.randomUUID(),team_id:id};reviewOnly=true;}
   }else{
     const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
@@ -247,8 +250,8 @@ try {
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-43b4b4737bbf7cab');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
-  if(setupPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'));
+  else {await import('./shop-editor.js?v=mapping-43b4b4737bbf7cab');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'));
   document.body.dataset.ready='true';
 } catch(error) {
   $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);
