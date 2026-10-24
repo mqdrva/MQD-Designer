@@ -195,8 +195,10 @@ Deno.serve(async(req:Request)=>{
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
    const draft=validateTeamMaster(body.draft),shop=canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:account.shop_config);
    if(!shop.engines.includes('3d')||!shop.garments[draft.payload.product.id])throw new Error('Choose a garment approved for this team.');
-   const result=await checked(db.rpc('mqd_save_team_master',{p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()}));
-   return json(result);
+   const saved=await db.rpc('mqd_save_team_master',{p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()});
+   if(saved.error?.message==='Master changed. Reload before saving.')return json({code:'master_revision_conflict',error:'A newer master draft was saved. Your canvas is unchanged. Open the latest saved draft separately to compare before continuing.'},409);
+   if(saved.error)throw new Error('Team data could not be saved. Your canvas is unchanged. Keep this page open or compare the latest saved draft in a separate tab.');
+   return json(saved.data);
   }
   if(body.action==='owner-status'){
    const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed,batch_id').eq('team_id',body.id));

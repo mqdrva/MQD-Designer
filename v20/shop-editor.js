@@ -157,6 +157,8 @@ function textFontFamily(font='Inter'){
 function stateFor(pid=product.id){if(!designs[pid])designs[pid]={zones:{}};return designs[pid];}
 function zoneState(zone=activeZone){const s=stateFor();if(!s.zones[zone])s.zones[zone]={background:'#FFFFFF',layers:[]};return s.zones[zone];}
 function activeLayer(){return zoneState().layers.find(l=>l.id===activeLayerId)||null;}
+function teamTextRule(layer=activeLayer()){return designs[product.id]?.teamMaster&&layer?.type==='text'?window.MQDTeamMaster?.rules.find(r=>r.zone===activeZone&&r.layerId===layer.templateLayerId&&r.role==='text'):null;}
+function isMovableTeamText(layer=activeLayer()){return teamTextRule(layer)?.allowMove===true;}
 function isLockedLibraryLayer(layer=activeLayer()){return !!(designs[product.id]?.teamMaster||layer?.shopFixed||layer?.libraryAssetId&&layer.libraryLocked);}
 function hasLibraryArtwork(){return Object.values(stateFor().zones||{}).some(z=>(z.layers||[]).some(l=>l.libraryAssetId));}
 function templateFor(zone=activeZone){return product.templates?.[zone]||null;}
@@ -1257,7 +1259,8 @@ function drawSelectionOverlay(){
   ctx.lineWidth=2;
   if(isLockedLibraryLayer(l)){
     const g=selectionGeometry(l,q);ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText('Locked',g.corners[0].x,g.corners[0].y-9);
+    const memberRule=designs[product.id]?.teamMaster&&l.type==='text'?window.MQDTeamMaster?.rules.find(r=>r.zone===activeZone&&r.layerId===l.templateLayerId&&r.role==='text'):null;
+    ctx.fillStyle='#ff6b00';ctx.font='700 13px Inter, sans-serif';ctx.fillText(memberRule?.allowMove?'Drag to move name':memberRule?'Edit name using its field':'Locked',g.corners[0].x,g.corners[0].y-9);
   }else if(cropMode&&l.type==='image'){
     const g=selectionGeometry(l,q);
     ctx.strokeStyle='#ff6b00';ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(g.corners[0].x,g.corners[0].y);for(let i=1;i<4;i++)ctx.lineTo(g.corners[i].x,g.corners[i].y);ctx.closePath();ctx.stroke();ctx.setLineDash([]);
@@ -2414,7 +2417,7 @@ initTextFonts();
 
 $('productSelect').onchange=e=>selectProduct(e.target.value);$('addImageBtn').onclick=()=>$('artUpload').click();$('artUpload').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>addImage(rd.result,f.name);rd.readAsDataURL(f);e.target.value='';};$('addTextBtn').onclick=addText;$('zoneColor').oninput=e=>{const v=e.target.value.toUpperCase();$('zoneHex').value=v;cancelAnimationFrame(colorRaf);colorRaf=requestAnimationFrame(()=>setBackground(v,false));};$('zoneColor').onchange=e=>setBackground(e.target.value.toUpperCase(),false);$('zoneHex').onchange=e=>{const v=normalizeHex(e.target.value);if(v)setBackground(v);else renderStatus();};$('applyAll').onclick=applyBackgroundAll;
 [['layerX','x',Number],['layerY','y',Number],['layerScale','scale',v=>Number(v)/100],['layerRotation','rotation',Number]].forEach(([id,p,fn])=>$(id).oninput=e=>updateLayer(p,fn(e.target.value)));
-function deleteActiveLayer(){const l=activeLayer();if(!l||l.shopFixed)return false;const arr=zoneState().layers,index=arr.findIndex(x=>x.id===l.id);if(index<0)return false;snapshot();arr.splice(index,1);activeLayerId=arr.at(-1)?.id||null;renderAll();return true;}
+function deleteActiveLayer(){const l=activeLayer();if(!l||l.shopFixed)return false;if(designs[product.id]?.teamMaster)return false;const arr=zoneState().layers,index=arr.findIndex(x=>x.id===l.id);if(index<0)return false;snapshot();arr.splice(index,1);activeLayerId=arr.at(-1)?.id||null;renderAll();return true;}
 function keyboardTargetIsEditable(target){const tag=String(target?.tagName||'').toUpperCase();return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||target?.isContentEditable===true;}
 function handleLayerDeleteKey(e){if(!e||!['Delete','Backspace'].includes(e.key)||e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey)return;if(keyboardTargetIsEditable(e.target)||!activeLayer())return;e.preventDefault();deleteActiveLayer();}
 document.addEventListener('keydown',handleLayerDeleteKey);
@@ -2515,11 +2518,12 @@ editorCanvas.addEventListener('pointerdown',e=>{
   const hit=onHandle&&(!pointed||pointed===current||pointed.chatBackground)?current:pointed;
   if(!hit)return;
   if(hit.id!==activeLayerId){activeLayerId=hit.id;cropMode=false;renderLayerPanel();renderPrintQuality();drawEditor();}
-  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l))return;
-  const g=selectionGeometry(l,q);
+  const l=activeLayer(),q=activeLayerScreenRect();if(!l||!q||isLockedLibraryLayer(l)&&!isMovableTeamText(l))return;
+  const g=selectionGeometry(l,q),moveOnly=isMovableTeamText(l);
   snapshot();
   let mode='move',corner=null;
-  if(cropMode&&l.type==='image'){
+  if(moveOnly){mode='move';}
+  else if(cropMode&&l.type==='image'){
     const hit=g.cropHandles.find(h=>near(h.x,h.y));
     if(hit){mode='crop';corner=hit.id;}
   }else{
@@ -2561,12 +2565,14 @@ editorCanvas.addEventListener('pointermove',e=>{
   queueGestureRender();
 });
 function endEditorPointer(e){
+  const moved=dragState?.pointerId===e.pointerId&&isMovableTeamText()?{zone:activeZone,layerId:activeLayer().templateLayerId,x:activeLayer().x,y:activeLayer().y}:null;
   const changed=Boolean(dragState||layerPinch||waitForTouchRelease);
   editorTouches.delete(e.pointerId);
   if(layerPinch||waitForTouchRelease){layerPinch=null;dragState=null;if(!editorTouches.size)waitForTouchRelease=false;}
   else if(dragState?.pointerId===e.pointerId)dragState=null;
   try{editorCanvas.releasePointerCapture(e.pointerId)}catch{}
   if(!dragState&&!layerPinch){editorCanvas.classList.remove('dragging');if(changed)finishGestureRender();}
+  if(moved)window.dispatchEvent(new CustomEvent('mqd:team-text-moved',{detail:moved}));
 }
 editorCanvas.addEventListener('pointerup',endEditorPointer);
 editorCanvas.addEventListener('pointercancel',resetEditorGesture);
@@ -2592,13 +2598,15 @@ function downloadJsonFile(name,data){
 }
 $('saveDesign').onclick=()=>downloadJsonFile(product.id+'-design.json',designJSON());
 $('loadDesign').onclick=()=>$('designUpload').click();
-async function loadDesignPayload(payload,{notify=true}={}){
+async function loadDesignPayload(payload,{notify=true,waitForArtwork=false}={}){
  const pid=payload?.product?.id,p=catalog.find(x=>x.id===pid);
  if(!p)throw new Error('This design belongs to a product that is not in the current catalog.');
  if(!payload?.design||typeof payload.design!=='object')throw new Error('This is not a valid MQD design.');
  const reloadModel=product.id!==pid||!garment;
  snapshot();designs[pid]=payload.design;product=p;activeZone=p.zones.includes(payload.activeZone)?payload.activeZone:p.zones[0];activeLayerId=zoneState().layers.at(-1)?.id||null;
- recomputeLayerSeq();repairImageObjects();editorZoom=defaultEditorZoom();renderAll();if(reloadModel)loadGarment();
+ recomputeLayerSeq();repairImageObjects();
+ if(waitForArtwork)await Promise.all(Object.values(designs[pid].zones||{}).flatMap(z=>z.layers||[]).filter(l=>l.type==='image').map(l=>new Promise((resolve,reject)=>{const img=l.image;if(img?.complete&&img.naturalWidth)return resolve();if(!img)return reject(new Error('Original master artwork is unavailable.'));const timer=setTimeout(()=>reject(new Error('Original master artwork is still loading. Reopen the saved draft; do not save a blank design.')),30000);img.addEventListener('load',()=>{clearTimeout(timer);resolve();},{once:true});img.addEventListener('error',()=>{clearTimeout(timer);reject(new Error('Original master artwork could not load. Reopen the saved draft.'));},{once:true});})));
+ editorZoom=defaultEditorZoom();renderAll();if(reloadModel)loadGarment();
  if(notify)alert('Design loaded.');
 }
 function refreshMobileWorkspace(pane){

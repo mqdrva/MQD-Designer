@@ -20,6 +20,7 @@ const engine = document.body.dataset.shopEngine;
 const memberPreview=new URLSearchParams(location.search).get('memberPreview')==='1';
 const setupPreview = new URLSearchParams(location.search).get('setupPreview') === '1';
 const slug = location.pathname.match(/^\/(?:shops|teams)\/([a-z0-9-]+)(?:\/3d)?\/?$/)?.[1] || new URLSearchParams(location.search).get('shop') || 'pilot';
+let ownerWorkspaceData=null;
 let shop, getDraft, sending = false, cachedAttempt = null;
 const say = message => { $('shopStatus').textContent = message; };
 const download = (blob, name) => { const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000); };
@@ -235,12 +236,20 @@ function mount() {
   document.addEventListener('change',refresh);
   window.addEventListener('mqd:shop-design-change',()=>{ if(window.MQDDesigner)refresh(); });
 }
+let ownerLoading=null;
+if(setupPreview&&new URLSearchParams(location.search).get('ownerWorkspace')){ownerLoading=document.createElement('div');ownerLoading.id='ownerMasterLoading';ownerLoading.setAttribute('role','status');ownerLoading.style.cssText='position:fixed;inset:0;z-index:10000;background:#fff;display:grid;place-content:center;padding:30px;text-align:center;font:18px Arial,sans-serif';ownerLoading.textContent='Opening your saved owner draft and original artwork… Please wait. Do not upload again or save a blank canvas.';document.body.append(ownerLoading);document.body.setAttribute('aria-busy','true');}
 try {
   if(setupPreview){
-    const packet=await loadSetupPreview();
+    const ownerId=new URLSearchParams(location.search).get('ownerWorkspace');
+    let packet;
+    if(teamService&&ownerId){
+      const {ownerCall,ownerAuth}=await import('./owner-team-workspace.js');
+      if(!(await ownerAuth.auth.getSession()).data.session){location.replace('/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(ownerId)+'&openStudio='+(memberPreview?'member':'editor'));throw new Error('Opening MQD owner sign-in.');}
+      ownerWorkspaceData=await ownerCall('workspace-load',{id:ownerId});packet=ownerWorkspaceData.packet;
+    }else packet=await loadSetupPreview();
     if(packet?.schema!=='mqd-business-setup-v1'||!packet.shop?.engines?.includes(engine))throw new Error('Complete business setup before opening this preview.');
-    shop=packet.shop;
-    if(memberPreview){const id=new URLSearchParams(location.search).get('ownerWorkspace');if(!id)throw new Error('Owner verification is required for this private preview.');const {ownerCall}=await import('./owner-team-workspace.js');const loaded=await ownerCall('workspace-load',{id}),saved=await ownerCall('master-load',{id});if(!saved.draft)throw new Error('Save the owner master draft before previewing member controls.');shop=loaded.packet.shop;teamMaster={...saved.draft,id:crypto.randomUUID(),team_id:id};reviewOnly=true;}
+    shop=packet.shop;if(ownerWorkspaceData)reviewOnly=true;
+    if(memberPreview){if(!ownerId||!ownerWorkspaceData)throw new Error('Owner verification is required for this private preview.');const {ownerCall}=await import('./owner-team-workspace.js');const saved=await ownerCall('master-load',{id:ownerId});if(!saved.draft)throw new Error('Save the owner master draft before previewing member controls.');teamMaster={...saved.draft,id:crypto.randomUUID(),team_id:ownerId};reviewOnly=true;}
   }else{
     const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
@@ -250,9 +259,9 @@ try {
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-43b4b4737bbf7cab');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
-  if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'));
-  document.body.dataset.ready='true';
+  else {await import('./shop-editor.js?v=mapping-0e343d963ab3cfcf');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
+  document.body.dataset.ready='true';ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {
-  $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);
+  $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);if(ownerLoading){ownerLoading.textContent='The saved draft could not open: '+error.message+' No master changes have been saved. ';const back=document.createElement('a');back.href='/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace'));back.textContent='Return to the existing owner setup';ownerLoading.append(back);}
 }
