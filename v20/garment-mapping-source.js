@@ -1280,6 +1280,15 @@ function rebuildFleeceHoodiePreview(){
     q.r.set(0,side*Math.PI/2,0);
     q.d.set(sleeveSize.z*1.02,sleeveSize.y*1.02,sleeveSize.x*1.02);
   }
+  // The flat Front frame runs from the front shoulder edge to its waistband.
+  // The whole-garment box includes the hood and compresses that vertical frame,
+  // leaving high chest artwork too low. Keep horizontal placement and every
+  // other zone unchanged; special full-panel backgrounds retain their own fit.
+  if(zone==='Front'&&!batch.splash){
+    const frontBox=new THREE.Box3().setFromObject(target);
+    q.p.y=(frontBox.min.y+frontBox.max.y)/2;
+    q.d.y=Math.max(.001,frontBox.max.y-frontBox.min.y);
+  }
   if(batch.splash){
     const box=new THREE.Box3().setFromObject(target),size=box.getSize(new THREE.Vector3());
     q.p.copy(box.getCenter(new THREE.Vector3()));
