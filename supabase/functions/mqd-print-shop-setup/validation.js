@@ -26,7 +26,7 @@ export function validateSetup(packet,{allowMissingContact=false}={}){
   if(length>max||!length||!(head[0]===137&&head[1]===80&&head[2]===78&&head[3]===71||head[0]===255&&head[1]===216||String.fromCharCode(...head.slice(0,4))==='RIFF'&&String.fromCharCode(...head.slice(8,12))==='WEBP'))throw new Error('Upload a supported garment logo up to '+limit+'.');
  }
  const baseCents={},premiumCents={},garments={};
- for(const [source,dest,allow] of [[p.baseCents,baseCents,two],[packet.plan==='3d'?p.premiumCents:{},premiumCents,three]]){
+ for(const [source,dest,allow] of [[p.baseCents,baseCents,two],[packet.plan==='3d'?p.premiumCents:{},premiumCents,organizationType==='team'?[...three,'long-sleeve-polo']:three]]){
   if(!source||typeof source!=='object'||Array.isArray(source)||Object.keys(source).some(id=>!allow.includes(id)))throw new Error('Choose supported garments.');
   for(const [id,price] of Object.entries(source)){
    dest[id]=cents(price);const g=raw.garments?.[id];if(!g)throw new Error('Enter garment details.');

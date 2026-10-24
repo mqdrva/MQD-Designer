@@ -94,7 +94,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/team-master-schema-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261022213030_team_master_versions_and_production_capacity.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024012500_team_master_save_timeout.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024023500_owner_garment_master_drafts.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-master-database.sql
+          psql -v ON_ERROR_STOP=1 -f tests/team-garment-master-database.sql
+          node tests/team-garment-copy.mjs
 
       - name: Verify isolated print-shop subscriptions and onboarding
         run: |

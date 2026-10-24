@@ -53,7 +53,7 @@ function configuredPrintCost(rule, summary, quantity) {
 export function requestEstimate(shop, summary) {
   const p = shop.pricing;
   if (!shop.engines.includes(summary.engine)) throw new Error('This designer is unavailable for this shop.');
-  if(['everyday-polo','short-sleeve-polo'].includes(summary.productId)&&summary.locations?.some(view=>view!=='front'))throw new Error('Polo printing is available only on the left chest pocket area.');
+  if(['everyday-polo','short-sleeve-polo','long-sleeve-polo'].includes(summary.productId)&&!(shop.fulfillmentMode==='mymerchnow'&&summary.engine==='3d'&&summary.printMethod==='all-over')&&summary.locations?.some(view=>view!=='front'))throw new Error('Polo printing is available only on the left chest pocket area.');
   const details=shop.garments?.[summary.productId];
   if(details && (!details.colors.includes(summary.color)||!Array.isArray(summary.orderOptions)||summary.orderOptions.some(row=>!details.sizes.includes(row.size))))throw new Error('Choose a color and size this shop offers.');
   const options = summary.orderOptions;
