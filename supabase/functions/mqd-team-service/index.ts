@@ -6,7 +6,7 @@ import Stripe from 'npm:stripe@22.6.0';
 import JSZip from 'npm:jszip@3.10.1';
 import {hasAdminMfa} from './admin-security.js';
 import {batchDraft,teamAccess,nextMonthReward,TEAM_POLICY_VERSION,TEAM_BATCH_SHIPPING_CENTS,TEAM_REWARD_QUANTITY} from './contract.js';
-import {BASE_URL,PUBLIC_KEY,hash,objectId,teamConfig,canonicalTeamShop,teamPriceCatalog,teamQuote,teamMail,checked,safeAccount} from './runtime.js';
+import {BASE_URL,PUBLIC_KEY,hash,objectId,teamConfig,canonicalTeamShop,teamPriceCatalog,teamQuote,teamMail,checked,safeAccount,TEAM_3D_GARMENTS,copyOwnerGarmentMaster} from './runtime.js';
 import {shippingCentsForQuantity} from '../_shared/mqd-shipping.js';
 import {assertFixedLogoPackage,garmentLogo,garmentLogoPath,validPhone} from '../mqd-print-shop-pilot/contract.js';
 const ALLOWED=new Set([BASE_URL,'http://127.0.0.1:8776','http://localhost:8776','http://127.0.0.1:8765']);
@@ -30,7 +30,9 @@ Deno.serve(async(req:Request)=>{
    if(a?.shop_config?.ownerManaged){
     const published=business?.shop_config?.ownerPublished;
     if(!published||business.status==='closed')return json({error:'Design review is not published.'},404);
-    const shop=publicTeamShop(published.shop),version=new URL(req.url).searchParams.get('version')||published.masterVersionId;
+    const shop=publicTeamShop(published.shop),params=new URL(req.url).searchParams,productId=params.get('garment')||Object.keys(shop.garments)[0];
+    if(!params.get('version')&&!shop.garments[productId])return json({error:'This garment is not published for this team.'},404);
+    const version=params.get('version')||(published.masterVersionIds?published.masterVersionIds[productId]:published.masterVersionId);
     const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
     return json({shop,master,batches:[],mode:config.mode,reviewOnly:true,kind:business.shop_config.pilotKind});
    }
@@ -80,15 +82,23 @@ Deno.serve(async(req:Request)=>{
    if(!account)throw new Error('Save this draft again to finish creating its account.');
    const shop=structuredClone(prior.shop_config);
    if(body.action==='admin-workspace-publish'){
-    let masterVersionId=null;
+    let masterVersionId=null,masterVersionIds=null;
     if(shop.editingMode==='strict'){
-     if(!account.master_version_id)throw new Error('Publish the strict master first.');
-     if(body.expectedMasterVersionId&&body.expectedMasterVersionId!==account.master_version_id)throw new Error('Published master changed. Reopen this setup before publishing the review link.');
-     const master=await checked(db.from('mqd_team_master_versions').select('*').eq('id',account.master_version_id).eq('team_id',body.id).single());validateTeamMaster(master);
-     if(!shop.garments[master.payload.product.id])throw new Error('The master garment must match the saved setup.');masterVersionId=master.id;
+     masterVersionIds={};
+     if(account.master_version_id){const primary=await checked(db.from('mqd_team_master_versions').select('*').eq('id',account.master_version_id).eq('team_id',body.id).single());masterVersionIds[primary.payload.product.id]=primary.id;}
+     const extra=await checked(db.from('mqd_team_garment_master_drafts').select('product_id,version_id').eq('team_id',body.id));
+     for(const row of extra)if(row.version_id)masterVersionIds[row.product_id]=row.version_id;
+     const expected=body.expectedMasterVersionIds||(body.expectedMasterVersionId?{[Object.keys(shop.garments)[0]]:body.expectedMasterVersionId}:null);
+     if(Object.keys(shop.garments).length>1&&!expected)throw new Error('Confirm the saved master version for every enabled garment before publishing.');
+     for(const product of Object.keys(shop.garments)){
+      const version=masterVersionIds[product];if(!version)throw new Error('Save and prepare the master for '+product+' before publishing.');
+      if(expected&&expected[product]!==version)throw new Error('Published master changed. Reopen this setup before publishing the review link.');
+      const master=await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',body.id).single());validateTeamMaster(master);if(master.payload.product.id!==product)throw new Error('The master garment must match the saved setup.');
+     }
+     masterVersionIds=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,masterVersionIds[product]]));masterVersionId=masterVersionIds[Object.keys(shop.garments)[0]];
     }
     const checkedShop=ownerWorkspace({schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone},shop},shop.pilotKind,shop.editingMode).shop;
-    shop.ownerPublished={shop:publicTeamShop(checkedShop),masterVersionId,publishedAt:new Date().toISOString()};
+    shop.ownerPublished={shop:publicTeamShop(checkedShop),masterVersionId,masterVersionIds,publishedAt:new Date().toISOString()};
    }else delete shop.ownerPublished;
    const saved=await checked(db.from('mqd_print_shop_businesses').update({shop_config:shop,revision:prior.revision+1,updated_at:new Date().toISOString()}).eq('id',body.id).eq('revision',prior.revision).select('id').single(),'Workspace changed. Reload before publishing.');
    return json({id:saved.id,revision:prior.revision+1,url:shop.ownerPublished?BASE_URL+'/teams/'+encodeURIComponent(shop.slug)+(shop.engines.includes('2d')?'':'/3d'):null,message:shop.ownerPublished?'Design review published. Checkout is disabled. Share this link yourself; no invitation was sent.':'Design review unpublished.'});
@@ -178,7 +188,7 @@ Deno.serve(async(req:Request)=>{
   if(!business||business.shop_config?.organizationType!=='team'&&business.pending_config?.organizationType!=='team')return json({error:'Team setup unavailable.'},404);
   if(!adminAction){if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);}
   let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
-  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-detail'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
   if(account&&!account.shop_config?.ownerManaged&&account.livemode!==config.live)return json({error:'Team unavailable.'},404);
   if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:business.pending_config||business.shop_config)}});
   if(body.action==='admin-approve'){
@@ -188,15 +198,30 @@ Deno.serve(async(req:Request)=>{
    await checked(db.from('mqd_team_actions').insert({id:crypto.randomUUID(),team_id:body.id,actor_id:actor.id,action:'approve-team',details:{revision:business.revision}}));return json({account:safeAccount(account)});
   }
   if(!account)return json({error:'Your team is awaiting MYMERCHNOW approval.'},409);
-  if(body.action==='admin-master-load'){
-   const draft=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle());
-   return json({draft:draft?.draft||null,revision:draft?.revision||0,versionId:account.master_version_id||null});
+  if(body.action==='admin-master-copy'){
+   if(business.shop_config.ownerManaged!==true||business.shop_config.editingMode!=='strict')throw new Error('Only an MQD owner strict workspace supports private garment copies.');
+   const primary=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle());
+   const source=primary?.draft?.payload?.product?.id===body.sourceProductId?primary:await checked(db.from('mqd_team_garment_master_drafts').select('revision,draft').eq('team_id',body.id).eq('product_id',body.sourceProductId).maybeSingle());
+   if(!source?.draft||body.sourceRevision!==source.revision)throw new Error('The saved source master changed. Load its current revision before copying.');
+   if(!Array.isArray(body.targets)||!body.targets.length||body.targets.length>4||new Set(body.targets).size!==body.targets.length||body.targets.some((p:any)=>!Object.hasOwn(TEAM_3D_GARMENTS,p)||p===body.sourceProductId))throw new Error('Choose distinct supported destination garments.');
+   const copies=[];for(const productId of body.targets){const existing=productId===primary?.draft?.payload?.product?.id?primary:await checked(db.from('mqd_team_garment_master_drafts').select('revision').eq('team_id',body.id).eq('product_id',productId).maybeSingle());if(existing)throw new Error('A '+TEAM_3D_GARMENTS[productId]+' draft already exists. It was not replaced.');copies.push({productId,draft:copyOwnerGarmentMaster(source.draft,productId,body.movableTextLayers||[])});}
+   const created=[];for(const copy of copies){copy.draft.copiedFrom={productId:body.sourceProductId,revision:source.revision};const saved=await db.rpc('mqd_save_owner_garment_master',{p_team:body.id,p_product:copy.productId,p_revision:0,p_draft:copy.draft,p_publish:false,p_version:crypto.randomUUID()});if(saved.error)return json({error:'Copying stopped. Created drafts were retained; reopen each destination before retrying.',created},409);created.push({productId:copy.productId,revision:saved.data.revision});}
+   return json({created,sourceProductId:body.sourceProductId,sourceRevision:source.revision,message:'Private garment drafts copied from saved revision '+source.revision+'. Review every garment and save final placements yourself. Nothing published.'});
   }
-  if(body.action==='admin-master-save'){
+  if(['admin-master-load','admin-master-save'].includes(body.action)){
+   const primary=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
+   const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),primaryProduct=primary?.draft?.payload?.product?.id||Object.keys(shop.garments)[0];
+   const product=body.productId||(body.action==='admin-master-save'?body.draft?.payload?.product?.id:primaryProduct);
+   if(owner&&(!Object.hasOwn(TEAM_3D_GARMENTS,product)||shop.editingMode!=='strict'))throw new Error('Choose a supported strict-master garment.');
+   const extra=owner&&product!==primary?.draft?.payload?.product?.id?await checked(db.from('mqd_team_garment_master_drafts').select('revision,draft,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
+   const secondary=owner&&(!!extra||product!==primaryProduct),current=secondary?extra:primary;
+   if(body.action==='admin-master-load')return json({draft:current?.draft||null,revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
-   const draft=validateTeamMaster(body.draft),shop=canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:account.shop_config);
-   if(!shop.engines.includes('3d')||!shop.garments[draft.payload.product.id])throw new Error('Choose a garment approved for this team.');
-   const saved=await db.rpc('mqd_save_team_master',{p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()});
+   const draft=validateTeamMaster(body.draft);
+   if(product!==draft.payload.product.id)throw new Error('The saved garment must match this editor.');
+   if(!shop.engines.includes('3d')||(!shop.garments[product]&&(!owner||body.publish)))throw new Error('Choose a garment approved for this team.');
+   const params={p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()};
+   const saved=await db.rpc(secondary?'mqd_save_owner_garment_master':'mqd_save_team_master',secondary?{...params,p_product:product}:params);
    if(saved.error?.message==='Master changed. Reload before saving.')return json({code:'master_revision_conflict',error:'A newer master draft was saved. Your canvas is unchanged. Open the latest saved draft separately to compare before continuing.'},409);
    if(saved.error)throw new Error('Team data could not be saved. Your canvas is unchanged. Keep this page open or compare the latest saved draft in a separate tab.');
    return json(saved.data);

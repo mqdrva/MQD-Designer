@@ -1,3 +1,5 @@
+import {TEAM_3D_GARMENTS} from '../_shared/mqd-team-garments.js';
+export {TEAM_3D_GARMENTS,copyOwnerGarmentMaster} from '../_shared/mqd-team-garments.js';
 import {everydayPricing,EVERYDAY_CATALOG,everydayZone} from '../_shared/mqd-everyday.js';
 import {garmentPriceCents,pricingEpoch} from '../_shared/mqd-promotion-pricing.js';
 import {requestEstimate,validateGarmentLogo} from '../mqd-print-shop-pilot/contract.js';
@@ -12,7 +14,7 @@ export async function teamConfig(db){
  return {mode,live:mode==='live',key,webhook,price,portal,ready,enabled:ready&&flag==='true'};
 }
 export function canonicalTeamShop(raw,now=Date.now()){
- const c=everydayPricing(Deno.env.get('MQD_EVERYDAY_PRICING')),shop=structuredClone(raw),allowed2=Object.keys(EVERYDAY_CATALOG),allowed3=['tshirt','long-sleeve-tshirt','short-sleeve-polo','fleece-hoodie'];
+ const c=everydayPricing(Deno.env.get('MQD_EVERYDAY_PRICING')),shop=structuredClone(raw),allowed2=Object.keys(EVERYDAY_CATALOG),allowed3=Object.keys(TEAM_3D_GARMENTS);
  shop.organizationType='team';shop.fulfillmentMode='mymerchnow';shop.engines=raw.engines?.filter(e=>['2d','3d'].includes(e))||['2d','3d'];shop.pilot=false;
  shop.printMethods={transfer:'Standard transfer',dtf:'DTF',dtg:'DTG'};shop.printMethods3d={'all-over':'All-over print'};
  const garments={};for(const [id,g] of Object.entries(shop.garments||{})){
@@ -21,7 +23,7 @@ export function canonicalTeamShop(raw,now=Date.now()){
   else{g.sizes=g.sizes.filter(x=>['S','M','L','XL','2XL','3XL','4XL','5XL'].includes(x));g.colors=['White'];}
   if(!g.colors.length||!g.sizes.length)throw new Error('Choose supported garment colors and sizes.');garments[id]=g;
  }
- shop.productNames={...Object.fromEntries(Object.entries(EVERYDAY_CATALOG).map(([id,p])=>[id,p.name])),tshirt:'All-Over Print T-Shirt','long-sleeve-tshirt':'All-Over Long Sleeve T-Shirt','short-sleeve-polo':'All-Over Short Sleeve Polo','fleece-hoodie':'All-Over Fleece Hoodie'};
+ shop.productNames={...Object.fromEntries(Object.entries(EVERYDAY_CATALOG).map(([id,p])=>[id,p.name])),tshirt:'All-Over Print T-Shirt','long-sleeve-tshirt':'All-Over Long Sleeve T-Shirt','short-sleeve-polo':'All-Over Short Sleeve Polo','long-sleeve-polo':'All-Over Long Sleeve Polo','fleece-hoodie':'All-Over Fleece Hoodie'};
  shop.engines=shop.engines.filter(engine=>Object.keys(garments).some(id=>(engine==='2d'?allowed2:allowed3).includes(id)));if(!shop.engines.length)throw new Error('Choose a garment for your designer.');
  shop.garments=garments;for(const [id,g] of Object.entries(garments))g.logoPreset=validateGarmentLogo(g.logoPreset,shop,id);
  shop.pricing={version:'team-'+c.version+'-'+pricingEpoch(now),currency:'usd',baseCents:Object.fromEntries(allowed2.filter(x=>garments[x]).map(x=>[x,c.baseCents[x]])),premiumCents:Object.fromEntries(allowed3.filter(x=>garments[x]).map(x=>[x,garmentPriceCents(x,now)])),sizeCents:c.sizeSurchargeCents,methodCents:c.methodCents,methodBackCents:c.methodBackCents,sleeveCents:c.sleeveCents,printRules:{'2d':{},'3d':{}}};
@@ -40,4 +42,4 @@ export async function teamMail(db,id,to,subject,text,livemode=false){
 export async function checked(query,message='Team data could not be saved.'){const r=await query;if(r.error)throw new Error(message);return r.data;}
 export function safeAccount(a){return {teamId:a.team_id,status:a.status,billingStatus:a.billing_status,periodStart:a.period_start,periodEnd:a.period_end,cancelAtPeriodEnd:a.cancel_at_period_end,hasSubscription:!!a.stripe_subscription_id,hasCustomer:!!a.stripe_customer_id};}
 
-export function teamPriceCatalog(){return {pricing:everydayPricing(Deno.env.get('MQD_EVERYDAY_PRICING')),premiumCents:Object.fromEntries(['tshirt','long-sleeve-tshirt','short-sleeve-polo','fleece-hoodie'].map(id=>[id,garmentPriceCents(id)]))};}
+export function teamPriceCatalog(){return {pricing:everydayPricing(Deno.env.get('MQD_EVERYDAY_PRICING')),premiumCents:Object.fromEntries(Object.keys(TEAM_3D_GARMENTS).map(id=>[id,garmentPriceCents(id)]))};}
