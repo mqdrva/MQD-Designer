@@ -1,4 +1,4 @@
-import {ownerWorkspace,publicTeamShop} from '../_shared/mqd-owner-workspace.js';
+import {ownerWorkspace,publicTeamShop,ownerGarmentCheckout} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.95.0';
@@ -34,7 +34,7 @@ Deno.serve(async(req:Request)=>{
     if(!params.get('version')&&!shop.garments[productId])return json({error:'This garment is not published for this team.'},404);
     const version=params.get('version')||(published.masterVersionIds?published.masterVersionIds[productId]:published.masterVersionId);
     const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
-    return json({shop,master,batches:[],mode:config.mode,reviewOnly:true,kind:business.shop_config.pilotKind});
+    return json({shop,master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
    }
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
@@ -77,10 +77,17 @@ Deno.serve(async(req:Request)=>{
    }
    if(!prior)return json({error:'Owner workspace unavailable.'},404);
    const account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
-   if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished});}
+   if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished,organizerFeeWaived:prior.shop_config.ownerPublished?.organizerFeeWaived===true});}
    if(body.revision!==prior.revision)throw new Error('Workspace changed. Reload before publishing.');
    if(!account)throw new Error('Save this draft again to finish creating its account.');
    const shop=structuredClone(prior.shop_config);
+   if(body.action==='admin-workspace-publish'&&body.savedMasterRevisions){
+    if(prior.shop_config.editingMode!=='strict')throw new Error('Saved garment publishing requires strict masters.');
+    if(body.organizerFeeWaived!==undefined&&typeof body.organizerFeeWaived!=='boolean')throw new Error('Choose review-only or free organizer access.');
+    const checkedShop=ownerWorkspace({schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone},shop},shop.pilotKind,shop.editingMode).shop;
+    const saved=await checked(db.rpc('mqd_publish_owner_saved_masters',{p_team:body.id,p_revision:prior.revision,p_expected:body.savedMasterRevisions,p_public_shop:publicTeamShop(checkedShop),p_waive:body.organizerFeeWaived===true,p_actor:actor.id}),'Saved masters could not be published. Reopen to confirm their latest revisions.');
+    return json({...saved,url:BASE_URL+'/teams/'+encodeURIComponent(shop.slug)+'/3d',message:body.organizerFeeWaived?'Customer link published with free organizer access. Garments and shipping use normal prices. No subscription, charge or invitation was created.':'Design review published. Checkout is disabled.'});
+   }
    if(body.action==='admin-workspace-publish'){
     let masterVersionId=null,masterVersionIds=null;
     if(shop.editingMode==='strict'){
@@ -122,10 +129,13 @@ Deno.serve(async(req:Request)=>{
    if(!form||!uuid(body.requestId)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))throw new Error('Valid private order session required.');
    if(body.website||!Number.isFinite(body.startedAt)||Date.now()-body.startedAt<2000||Date.now()-body.startedAt>86400000)throw new Error('Refresh and review the order form.');
    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.team||''))throw new Error('Choose a valid Team link.');
-   const account=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());if(account?.shop_config?.ownerManaged)return json({error:'This owner-managed design review does not support checkout.'},409);if(!teamAccess(account))return json({error:'Team subscription is inactive.'},409);
+   const account=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());const ownerBusiness=account?.shop_config?.ownerManaged?await checked(db.from('mqd_print_shop_businesses').select('status,shop_config').eq('id',account.team_id).maybeSingle()):null;
+   const waived=ownerGarmentCheckout(account,ownerBusiness);
+   if(account?.shop_config?.ownerManaged&&!waived)return json({error:'This owner-managed design review does not support checkout.'},409);
+   if(!waived&&!teamAccess(account))return json({error:'Team subscription is inactive.'},409);
    const rawSummary=body.summary,rawCustomer=body.customer,summary={engine:rawSummary?.engine,productId:rawSummary?.productId,color:rawSummary?.color,printMethod:rawSummary?.printMethod,locations:rawSummary?.locations,orderOptions:Array.isArray(rawSummary?.orderOptions)?rawSummary.orderOptions.map((o:any)=>({size:o.size,quantity:o.quantity})):null} as any;
    const customer={name:rawCustomer?.name,email:rawCustomer?.email,phone:rawCustomer?.phone,notes:rawCustomer?.notes};
-   const shop=canonicalTeamShop(account.shop_config),quote=teamQuote(shop,summary);summary.productName=shop.productNames[summary.productId];summary.garment=shop.garments[summary.productId];
+   const shop=canonicalTeamShop(waived?ownerBusiness.shop_config.ownerPublished.shop:account.shop_config),quote=teamQuote(shop,summary);summary.productName=shop.productNames[summary.productId];summary.garment=shop.garments[summary.productId];
    if(typeof customer?.name!=='string'||!customer.name.trim()||customer.name.length>100||typeof customer.email!=='string'||customer.email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)||!validPhone(customer.phone)||typeof customer.notes!=='string'||customer.notes.length>1500)throw new Error('Enter valid customer name, email and phone.');
    if(!['team','individual'].includes(body.delivery)||body.delivery==='team'&&!uuid(body.batchId))throw new Error('Choose your delivery option.');
    const file=form.get('package');if(!(file instanceof File)||file.size<22||file.size>50*1024*1024)throw new Error('The production ZIP exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
@@ -215,7 +225,7 @@ Deno.serve(async(req:Request)=>{
    if(owner&&(!Object.hasOwn(TEAM_3D_GARMENTS,product)||shop.editingMode!=='strict'))throw new Error('Choose a supported strict-master garment.');
    const extra=owner&&product!==primary?.draft?.payload?.product?.id?await checked(db.from('mqd_team_garment_master_drafts').select('revision,draft,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
    const secondary=owner&&(!!extra||product!==primaryProduct),current=secondary?extra:primary;
-   if(body.action==='admin-master-load')return json({draft:current?.draft||null,revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
+   if(body.action==='admin-master-load')return json({...(body.metadataOnly?{hasDraft:!!current?.draft}:{draft:current?.draft||null}),revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
    const draft=validateTeamMaster(body.draft);
    if(product!==draft.payload.product.id)throw new Error('The saved garment must match this editor.');

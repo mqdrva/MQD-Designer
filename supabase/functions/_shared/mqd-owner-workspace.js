@@ -20,3 +20,10 @@ export function publicTeamShop(shop){
  const allowed=['name','slug','logo','garmentLogo','tagline','requirements','garments','engines','pricing','printMethods','printMethods3d','productNames','organizationType','fulfillmentMode','pilot','teamEnvironment'];
  return Object.fromEntries(allowed.filter(key=>Object.hasOwn(shop,key)).map(key=>[key,structuredClone(shop[key])]));
 }
+
+// The waiver is an explicit MFA-protected publication choice, never inferred from
+// a missing email, unpaid subscription, or an owner-managed draft alone.
+export function ownerGarmentCheckout(account,business){
+ const p=business?.shop_config?.ownerPublished;
+ return account?.status!=='closed'&&business?.status!=='closed'&&account?.shop_config?.ownerManaged===true&&business?.shop_config?.ownerManaged===true&&business?.shop_config?.pilotKind==='team'&&p?.organizerFeeWaived===true&&!!p?.authorizedBy&&!!p?.masterVersionIds;
+}
