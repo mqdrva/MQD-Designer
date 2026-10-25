@@ -63,6 +63,12 @@ Deno.serve(async(req:Request)=>{
     return json({hasDraft:!!row,revision:row?.revision||0,productId:body.productId});
    }
   if(['master-save','master-load'].includes(body.action))return json({error:'Only the MQD owner/admin can create, edit or publish a master. Send change requests to MQD.'},403);
+  if(body.action==='admin-workspace-duplicate'){
+   if(!uuid(body.id)||!uuid(body.targetId)||body.id===body.targetId||!Number.isInteger(body.revision)||body.revision<1)throw new Error('Reopen the source workspace before duplicating.');
+   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>80||typeof body.slug!=='string'||body.slug.length<3||body.slug.length>48||['pilot','admin','setup','support','help'].includes(body.slug)||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.slug))throw new Error('Enter a new team name and a lowercase link name (3–48 letters, numbers or hyphens).');
+   const result=await checked(db.rpc('mqd_duplicate_owner_team',{p_source:body.id,p_target:body.targetId,p_revision:body.revision,p_name:body.name.trim(),p_slug:body.slug,p_actor:actor.id,p_live:config.live}));
+   return json({...result,message:'Private copy ready. Replace the team logo in setup and the artwork in each saved garment draft, then preview before publishing. No contact, billing, orders or published link was copied.'});
+  }
   if(body.action==='admin-workspace-list')return json({workspaces:await checked(db.from('mqd_print_shop_businesses').select('id,revision,name:shop_config->>name,slug:shop_config->>slug,kind:shop_config->>pilotKind,updated_at').eq('shop_config->>ownerManaged','true').order('updated_at',{ascending:false}).limit(50))});
   if(['admin-workspace-save','admin-workspace-load','admin-workspace-publish','admin-workspace-unpublish'].includes(body.action)){
    if(!uuid(body.id))throw new Error('Choose an owner workspace.');

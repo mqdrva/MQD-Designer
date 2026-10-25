@@ -6,7 +6,7 @@ const browser=await chromium.launch({headless:true,executablePath:'/Applications
 try{
  const context=await browser.newContext({viewport:{width:1280,height:900}});
  const state={name:'Synthetic Organizer Team',slug:'synthetic-organizer',billingOnly:true,hasBillingPeriod:true,canSubscribe:true,enabled:true,mode:'sandbox',policyVersion:'2026-10-25-owner',account:{status:'active',billingStatus:'active',hasSubscription:true,periodEnd:'2026-11-25T00:00:00Z'},reward:{garments:3,target:5,remaining:2,creditCents:0},batches:[]};
- let packet=null,revision=0;
+ let packet=null,revision=0,copyAttempt=0,copyTarget;
  const pricing={version:'qa',baseCents:{'everyday-tshirt':2000,'everyday-long-sleeve':3000,'everyday-polo':3000,'everyday-hoodie':4000},printCents:{front:0,back:1000,left:0,right:0},sleeveCents:500,sizeSurchargeCents:500};
  await context.route('**/*',async route=>{
   const req=route.request(),url=req.url();
@@ -19,6 +19,7 @@ try{
    if(body.action==='portal')return route.fulfill({status:409,json:{error:'Synthetic billing portal captured.'}});
    if(body.action==='admin-workspace-list')return route.fulfill({json:{workspaces:[]}});
    if(body.action==='admin-workspace-save'){packet=body.packet;return route.fulfill({json:{revision:++revision,message:'Owner draft saved.'}});}
+   if(body.action==='admin-workspace-duplicate'){copyAttempt++;assert.equal(body.name,'Second Team');assert.equal(body.slug,'second-team');assert.equal(body.revision,2);if(copyTarget)assert.equal(body.targetId,copyTarget,'Retry must reuse destination');copyTarget=body.targetId;if(copyAttempt===1)return route.fulfill({status:503,json:{error:'Synthetic interrupted response'}});return route.fulfill({json:{id:copyTarget,revision:1,message:'Private copy ready. Nothing published.'}});}
    if(body.action==='admin-master-load')return route.fulfill({json:{draft:null,revision:0}});
    throw new Error('Unexpected action '+body.action);
   }
@@ -38,6 +39,14 @@ try{
  assert.equal(await page.locator('#workspaceOrganizerBilling').isChecked(),false);assert.equal(await page.locator('#workspaceRewardQuantity').inputValue(),'5');assert(await page.locator('#workspaceOrganizerLink').isHidden());
  await page.locator('#workspaceEditing').selectOption('strict');await page.locator('#teamDesignerMode').selectOption('3d');await page.locator('#businessName').fill('Synthetic Organizer Team');await page.locator('#setupConsent').check();await page.locator('#submitSetup').click();await page.getByText('Owner draft saved.',{exact:true}).waitFor();assert.deepEqual(packet.owner.organizerAccess,{enabled:false,rewardQuantity:5});
  await page.locator('#requestEmail').fill('organizer@example.invalid');await page.locator('#workspaceOrganizerBilling').check();await page.locator('#submitSetup').click();await page.waitForFunction(()=>!document.getElementById('workspaceOrganizerLink').hidden);assert.equal(packet.owner.organizerAccess.enabled,true);assert((await page.locator('#workspaceOrganizerLink').getAttribute('href')).endsWith('&organizer=1'));
+ const sourceUrl=page.url(),sourcePacket=JSON.stringify(packet);assert(await page.locator('#workspaceDuplicate').isVisible());
+ await page.locator('#workspaceDuplicate').click();await page.locator('#duplicateCreate').click();assert.equal(copyAttempt,0,'Empty name must not send a copy');
+ await page.locator('#duplicateName').fill('Second Team');assert.equal(await page.locator('#duplicateSlug').inputValue(),'second-team');
+ await page.locator('#duplicateCreate').click();await page.getByText(/Synthetic interrupted response/).waitFor();assert(await page.locator('#duplicateOpen').isHidden());
+ await page.locator('#duplicateCreate').click();await page.getByText('Private copy ready. Nothing published.',{exact:true}).waitFor();
+ assert.equal(await page.locator('#duplicateOpen').getAttribute('href'),'/team-setup.html?ownerWorkspace=1&workspaceId='+copyTarget);assert.equal(page.url(),sourceUrl);assert.equal(JSON.stringify(packet),sourcePacket);
+ await page.setViewportSize({width:390,height:844});assert(await page.locator('#duplicateOpen').isVisible());assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+5));await page.locator('#duplicateCancel').click();assert(await page.locator('#duplicateCreate').isHidden());
+ console.log('PASS duplicate team browser: named private copy, no unsaved-source mutation/navigation, same-ID retry recovery, private editor link, mobile and cancel.');
  assert.deepEqual(errors,[]);await fs.mkdir('/private/tmp/mqd-organizer-qa',{recursive:true});await page.screenshot({path:'/private/tmp/mqd-organizer-qa/owner-controls.png',fullPage:true});
  console.log('PASS browser: owner access defaults off/target five; explicit grant and billing-only link; organizer progress, consent-required synthetic checkout/portal, hidden management/batches, mobile. No live writes/payments/messages.');
 }finally{await browser.close();}
