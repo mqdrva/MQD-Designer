@@ -219,6 +219,13 @@ Deno.serve(async(req:Request)=>{
    return json({created,sourceProductId:body.sourceProductId,sourceRevision:source.revision,message:'Private garment drafts copied from saved revision '+source.revision+'. Review every garment and save final placements yourself. Nothing published.'});
   }
   if(['admin-master-load','admin-master-save'].includes(body.action)){
+   if(body.action==='admin-master-load'&&body.metadataOnly===true){
+    if(business.shop_config.ownerManaged!==true||business.shop_config.editingMode!=='strict'||!Object.hasOwn(TEAM_3D_GARMENTS,body.productId))throw new Error('Choose a supported owner garment.');
+    const primary=await checked(db.from('mqd_team_master_drafts').select('revision,product_id:draft->payload->product->>id').eq('team_id',body.id).maybeSingle());
+    const primaryProduct=primary?.product_id;
+    const row=primaryProduct===body.productId?primary:await checked(db.from('mqd_team_garment_master_drafts').select('revision').eq('team_id',body.id).eq('product_id',body.productId).maybeSingle());
+    return json({hasDraft:!!row,revision:row?.revision||0,productId:body.productId});
+   }
    const primary=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
    const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),primaryProduct=primary?.draft?.payload?.product?.id||Object.keys(shop.garments)[0];
    const product=body.productId||(body.action==='admin-master-save'?body.draft?.payload?.product?.id:primaryProduct);
