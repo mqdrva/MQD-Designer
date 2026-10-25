@@ -33,7 +33,7 @@ export async function verifyTeamProduction(zip,design,shop){
    const bytes=Buffer.from(match[2],'base64'),dimensions=imageDimensions(bytes,match[1]);if(dimensions.width<1||dimensions.height<1)throw new Error('Invalid source dimensions.');
    const sharedLogo=!payload.design.teamMaster&&shop?.garmentLogo===layer.src&&garmentLogo(shop,payload.product.id).mode!=='none';
    const path=sharedLogo?garmentLogoPath(shop):'originals/'+safe(zone)+'-'+index+'-'+safe(layer.filename||'artwork.png'),original=zip.file(path);if(!original||await hash(await original.async('uint8array'))!==await hash(bytes))throw new Error('Original source artwork does not match the saved member design.');
-   manifest.originals.push({zone,layerId:layer.id,path,...dimensions,sha256:await hash(bytes),placement:{x:layer.x,y:layer.y,scale:layer.scale,rotation:layer.rotation,crop:layer.crop}});
+   manifest.originals.push({zone,layerId:layer.id,templateLayerId:layer.templateLayerId,path,...dimensions,sha256:await hash(bytes),placement:{x:layer.x,y:layer.y,scale:layer.scale,rotation:layer.rotation,crop:layer.crop}});
   }
  }
  if(manifest.text.length){const cssFile=zip.file('fonts/fonts.css');if(!cssFile)throw new Error('Reproduction fonts are missing.');const css=await cssFile.async('string');
@@ -41,4 +41,30 @@ export async function verifyTeamProduction(zip,design,shop){
   for(const match of css.matchAll(/url\(([^)]+)\)/g)){if(!/^font-\d+\.woff2$/.test(match[1])||!zip.file('fonts/'+match[1]))throw new Error('Reproduction font resource missing.');}
  }
  return manifest;
+}
+
+// Reuse verified originals instead of repeating their base64 bytes inside the
+// purchased master. The source map can restore the exact historical JSON.
+export async function packageTeamMaster(zip,master,production){
+ const snapshot=structuredClone(master),sources=[];
+ for(const [zone,state] of Object.entries(snapshot.payload.design.zones)){
+  for(const layer of state.layers||[]){
+   if(layer.type!=='image')continue;
+   const match=layer.src?.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);
+   if(!match)throw new Error('Purchased master original source is missing.');
+   const digest=await hash(Buffer.from(match[2],'base64'));
+   const original=production.originals.find(item=>item.zone===zone&&(item.templateLayerId||item.layerId)===layer.id&&item.sha256===digest);
+   if(!original||!zip.file(original.path))throw new Error('Purchased master original does not match the verified member artwork.');
+   sources.push({zone,layerId:layer.id,path:original.path,mime:'image/'+match[1],sha256:digest});layer.src='zip:'+original.path;
+  }
+ }
+ zip.file('purchased-team-master.json',JSON.stringify(snapshot));
+ zip.file('purchased-team-master-sources.json',JSON.stringify({schema:'mqd-team-master-sources-v1',versionId:master.id,originalJsonSha256:await hash(new TextEncoder().encode(JSON.stringify(master))),sources},null,2));
+ zip.file('purchased-team-master-README.txt','The purchased master retains its exact version, layers, placements and permissions. Image src values beginning zip: reference unchanged originals in this ZIP. The source map records their MIME types and SHA-256 hashes. To reconstruct the exact saved master JSON, replace each mapped layer src with data:<mime>;base64,<original file bytes encoded as base64>. No artwork was resized or recompressed. design.json remains the independently personalized garment design.');
+}
+export async function restorePackagedTeamMaster(zip){
+ const master=JSON.parse(await zip.file('purchased-team-master.json').async('string')),map=JSON.parse(await zip.file('purchased-team-master-sources.json').async('string'));
+ if(map.schema!=='mqd-team-master-sources-v1'||map.versionId!==master.id)throw new Error('Purchased master identity mismatch.');
+ for(const item of map.sources){const source=zip.file(item.path),layer=master.payload.design.zones[item.zone]?.layers.find(l=>l.id===item.layerId);if(!source||!layer||layer.src!=='zip:'+item.path)throw new Error('Purchased master source missing.');const bytes=await source.async('uint8array');if(await hash(bytes)!==item.sha256)throw new Error('Purchased master source changed.');layer.src='data:'+item.mime+';base64,'+Buffer.from(bytes).toString('base64');}
+ if(await hash(new TextEncoder().encode(JSON.stringify(master)))!==map.originalJsonSha256)throw new Error('Purchased master snapshot changed.');return master;
 }
