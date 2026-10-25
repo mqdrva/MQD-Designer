@@ -26,7 +26,7 @@ export function refundedGarments(quantity,garmentCents,refundedCents){
  if(!Number.isSafeInteger(quantity)||quantity<1||!Number.isSafeInteger(garmentCents)||garmentCents<1||!Number.isSafeInteger(refundedCents)||refundedCents<0)throw new Error('Refund details are invalid.');
  return Math.min(quantity,Math.ceil(quantity*Math.min(garmentCents,refundedCents)/garmentCents));
 }
-export function nextMonthReward(orders,start,end){const garments=paidGarmentCount(orders,start,end);return {garments,target:TEAM_REWARD_QUANTITY,remaining:Math.max(0,TEAM_REWARD_QUANTITY-garments),creditCents:garments>=TEAM_REWARD_QUANTITY?TEAM_FEE_CENTS:0};}
+export function nextMonthReward(orders,start,end,target=TEAM_REWARD_QUANTITY){if(!Number.isSafeInteger(target)||target<1||target>500)throw new Error('Invalid reward target.');const garments=paidGarmentCount(orders,start,end);return {garments,target,remaining:Math.max(0,target-garments),creditCents:garments>=target?TEAM_FEE_CENTS:0};}
 export function deliveryMode(value){if(!['individual','team'].includes(value))throw new Error('Choose individual shipping or a combined team batch.');return value;}
 export function batchDraft(raw,now=Date.now()){
  if(!Number.isInteger(raw.days)||raw.days<7||raw.days>14)throw new Error('Choose an ordering window of 7–14 whole days.');

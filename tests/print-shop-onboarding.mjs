@@ -46,3 +46,8 @@ const recoveredToken=emails.at(-1).text.match(/#manage=([a-f0-9]{64})/)[1];asser
 res=await call({action:'load',id,token});assert.equal(res.status,401,'expired owner link stays revoked after recovery');
 res=await call({action:'load',id,token:recoveredToken});assert.equal(res.status,200);
 console.log('Onboarding passed: private confirmation, idempotency, admin authorization, review, owner updates, stale revisions, and saved-state email failure handling.');
+
+rows.get(id).shop_config.ownerManaged=true;
+for(const action of ['load','update'])assert.equal((await call({action,id,token:recoveredToken,revision:rows.get(id).revision,setup:fixture})).status,403,'Old organizer setup token must not expose an MQD-owned master workspace');
+assert.equal((await call({action:'admin-recover',id,revision:rows.get(id).revision},'admin-mfa')).status,403,'Generic recovery cannot create an organizer setup-access link for an owner workspace');
+console.log('PASS owner-managed setup isolation from legacy private tokens and recovery.');

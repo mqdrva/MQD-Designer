@@ -71,10 +71,10 @@ Deno.serve(async(req:Request)=>{
       if(invoice.status!=='draft'||invoice.currency!=='usd'||objectId(invoice.customer)!==a.stripe_customer_id||objectId(invoice.parent?.subscription_details?.subscription)!==sub.id)throw new Error('Reward invoice ownership mismatch');
       const lines=invoice.lines.data.filter((l:any)=>objectId(l.pricing?.price_details?.price)===config.price);if(lines.length!==1||lines[0].amount!==2000||lines[0].quantity!==1||!(invoice.subtotal===2000||invoice.subtotal===0&&invoice.lines.data.some((l:any)=>l.amount===-2000&&l.metadata?.service==='mqd-teams'&&l.metadata?.team===a.team_id)))throw new Error('Reward applies only to the $20 Team renewal.');
       const start=new Date(lines[0].period.start*1000).toISOString(),prior=await checked(db.from('mqd_team_periods').select('*').eq('team_id',a.team_id).eq('period_end',start).maybeSingle());
-      if(prior){const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed').eq('team_id',a.team_id));const reward=nextMonthReward(orders,prior.period_start,prior.period_end);
+      if(prior){const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed').eq('team_id',a.team_id));const reward=nextMonthReward(orders,prior.period_start,prior.period_end,a.reward_quantity??10);
        if(reward.creditCents){
         await checked(db.from('mqd_team_rewards').upsert({invoice_id:invoice.id,team_id:a.team_id,period_start:prior.period_start,period_end:prior.period_end,quantity:reward.garments,credit_cents:2000},{onConflict:'invoice_id',ignoreDuplicates:true}));
-        const item=await stripe.invoiceItems.create({customer:a.stripe_customer_id,invoice:invoice.id,amount:-2000,currency:'usd',description:'Team reward: 10 paid garments in the previous subscription month',metadata:{service:'mqd-teams',team:a.team_id}},{idempotencyKey:'team-reward-'+invoice.id});
+        const item=await stripe.invoiceItems.create({customer:a.stripe_customer_id,invoice:invoice.id,amount:-2000,currency:'usd',description:'Team reward: '+reward.target+' paid garments in the previous subscription month',metadata:{service:'mqd-teams',team:a.team_id}},{idempotencyKey:'team-reward-'+invoice.id});
         await checked(db.from('mqd_team_rewards').update({invoice_item_id:item.id,status:'applied'}).eq('invoice_id',invoice.id));
        }
       }

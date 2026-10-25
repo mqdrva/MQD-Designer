@@ -1,3 +1,4 @@
+import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {ownerWorkspace,publicTeamShop,ownerGarmentCheckout} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction,packageTeamMaster} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
@@ -74,6 +75,8 @@ Deno.serve(async(req:Request)=>{
     const duplicates=await checked(db.from('mqd_print_shop_businesses').select('id').eq('preferred_slug',shop.slug).neq('status','closed'));
     if(duplicates.some((r:any)=>r.id!==body.id))throw new Error('This link name is already reserved. Choose another.');
     if(prior?.shop_config.ownerPublished)shop.ownerPublished=prior.shop_config.ownerPublished;
+    const billing=prior?await checked(db.from('mqd_team_accounts').select('organizer_user_id,reward_quantity,stripe_checkout_id,stripe_subscription_id').eq('team_id',body.id).maybeSingle()):null;
+    if(billing?.organizer_user_id&&(contact.requestEmail!==prior.owner_email||shop.organizerAccess.rewardQuantity!==billing.reward_quantity))throw new Error('The organizer and reward terms are bound to an existing signup. Keep those terms unchanged.');
     const revision=body.revision+1,values={owner_email:contact.requestEmail,owner_phone:contact.phone,shop_config:shop,revision,updated_at:new Date().toISOString()};
     if(prior)await checked(db.from('mqd_print_shop_businesses').update(values).eq('id',body.id).eq('revision',body.revision).select('id').single(),'Workspace changed. Reload before saving.');
     else{
@@ -86,7 +89,7 @@ Deno.serve(async(req:Request)=>{
    }
    if(!prior)return json({error:'Owner workspace unavailable.'},404);
    const account=await checked(db.from('mqd_team_accounts').select('team_id,master_version_id').eq('team_id',body.id).maybeSingle());
-   if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished,organizerFeeWaived:prior.shop_config.ownerPublished?.organizerFeeWaived===true});}
+   if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest,organizerAccess:prior.shop_config.organizerAccess||{enabled:false,rewardQuantity:5}},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished,organizerFeeWaived:prior.shop_config.ownerPublished?.organizerFeeWaived===true});}
    if(body.revision!==prior.revision)throw new Error('Workspace changed. Reload before publishing.');
    if(!account)throw new Error('Save this draft again to finish creating its account.');
    const shop=structuredClone(prior.shop_config);
@@ -95,7 +98,7 @@ Deno.serve(async(req:Request)=>{
     if(body.organizerFeeWaived!==undefined&&typeof body.organizerFeeWaived!=='boolean')throw new Error('Choose review-only or free organizer access.');
     const checkedShop=ownerWorkspace({schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone},shop},shop.pilotKind,shop.editingMode).shop;
     const saved=await checked(db.rpc('mqd_publish_owner_saved_masters',{p_team:body.id,p_revision:prior.revision,p_expected:body.savedMasterRevisions,p_public_shop:publicTeamShop(checkedShop),p_waive:body.organizerFeeWaived===true,p_actor:actor.id}),'Saved masters could not be published. Reopen to confirm their latest revisions.');
-    return json({...saved,url:BASE_URL+'/teams/'+encodeURIComponent(shop.slug)+'/3d',message:body.organizerFeeWaived?'Customer link published with free organizer access. Garments and shipping use normal prices. No subscription, charge or invitation was created.':'Design review published. Checkout is disabled.'});
+    return json({...saved,url:BASE_URL+'/teams/'+encodeURIComponent(shop.slug)+'/3d',message:body.organizerFeeWaived?'Customer link published with garment checkout. Organizer access is free before subscription enrollment; enrolled Teams require current paid access. No subscription, charge or invitation was created.':'Design review published. Checkout is disabled.'});
    }
    if(body.action==='admin-workspace-publish'){
     let masterVersionId=null,masterVersionIds=null;
@@ -203,11 +206,22 @@ Deno.serve(async(req:Request)=>{
   }
   // All remaining operations address one team, with private owner-token access or fresh admin MFA.
   if(!uuid(body.id))throw new Error('Valid team identifier required.');
-  const business=await checked(db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).maybeSingle());
+  let business=await checked(db.from('mqd_print_shop_businesses').select(ORGANIZER_ACTIONS.has(body.action)?'id,status,preferred_slug,owner_email,token_hash,token_expires_at,email_verified_at,owner_managed:shop_config->ownerManaged,organizer_access:shop_config->organizerAccess,pilot_kind:shop_config->>pilotKind,team_name:shop_config->>name,organization_type:shop_config->>organizationType,published_masters:shop_config->ownerPublished->masterVersionIds':'*').eq('id',body.id).maybeSingle());
+  if(business&&Object.hasOwn(business,'owner_managed'))business={...business,shop_config:{ownerManaged:business.owner_managed===true,organizerAccess:business.organizer_access,pilotKind:business.pilot_kind,name:business.team_name,organizationType:business.organization_type,ownerPublished:business.published_masters?{masterVersionIds:business.published_masters}:null}};
   if(!business||business.shop_config?.organizationType!=='team'&&business.pending_config?.organizationType!=='team')return json({error:'Team setup unavailable.'},404);
-  if(!adminAction){if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);}
-  let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
-  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail','admin-package','admin-production'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  let account=await checked(db.from('mqd_team_accounts').select(ORGANIZER_ACTIONS.has(body.action)?'team_id,status,billing_status,livemode,stripe_customer_id,stripe_subscription_id,stripe_checkout_id,period_start,period_end,cancel_at_period_end,policy_version,organizer_user_id,reward_quantity,owner_managed:shop_config->ownerManaged,team_name:shop_config->>name':'*').eq('team_id',body.id).maybeSingle());
+  if(account&&Object.hasOwn(account,'owner_managed'))account={...account,shop_config:{ownerManaged:account.owner_managed===true,name:account.team_name}};
+  const ownerManaged=business.shop_config?.ownerManaged===true;
+  let organizer:any=null;
+  if(!adminAction){
+   if(ownerManaged){
+    if(!ORGANIZER_ACTIONS.has(body.action))return json({error:'Organizer access is limited to subscription billing and reward status.'},403);
+    const result=await db.auth.getUser(req.headers.get('authorization')?.replace(/^Bearer /i,'')||'');organizer=result.data?.user;
+    if(result.error||!organizerIdentityAllowed(business,account,organizer))return json({error:'Sign in with the organizer account approved by MQD. Organizer access is off unless MQD enables it.'},403);
+   }else if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);
+  }
+  if(ownerManaged&&adminAction&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail','admin-package','admin-production'].includes(body.action))return json({error:'Use the private owner workspace to manage this Team.'},403);
+  if(ownerManaged&&(!account||account.livemode!==config.live))return json({error:'Team unavailable.'},404);
   if(account&&account.livemode!==config.live&&['admin-package','admin-production'].includes(body.action))return json({error:'Team unavailable.'},404);
   if(account&&!account.shop_config?.ownerManaged&&account.livemode!==config.live)return json({error:'Team unavailable.'},404);
   if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:business.pending_config||business.shop_config)}});
@@ -247,6 +261,7 @@ Deno.serve(async(req:Request)=>{
    return json(saved.data);
   }
   if(body.action==='owner-status'){
+   if(ownerManaged){const target=organizerRewardTarget(account,business),orders=account.period_start&&account.period_end?await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed').eq('team_id',body.id)):[];return json({account:safeAccount(account),name:business.shop_config.name,slug:business.preferred_slug,batches:[],billingOnly:true,hasBillingPeriod:!!(account.period_start&&account.period_end),reward:account.period_start&&account.period_end?nextMonthReward(orders,account.period_start,account.period_end,target):{garments:0,target,remaining:target,creditCents:0},enabled:config.enabled,mode:config.mode,policyVersion:OWNER_TEAM_POLICY,canSubscribe:business.shop_config.pilotKind==='team'&&!!business.shop_config.ownerPublished?.masterVersionIds});}
    const orders=await checked(db.from('mqd_team_orders').select('payment_status,paid_at,quantity,refunded_quantity,disputed,batch_id').eq('team_id',body.id));
    const batches=await checked(db.from('mqd_team_batches').select('id,status,days,expected_quantity,max_quantity,shipping_cents,shipping_paid_at,opens_at,cutoff_at,tracking').eq('team_id',body.id).order('created_at',{ascending:false}).limit(50));
    return json({account:safeAccount(account),name:account.shop_config.name,slug:business.preferred_slug,batches:batches.map((b:any)=>({...b,paidQuantity:orders.filter((o:any)=>o.batch_id===b.id&&o.payment_status==='paid'&&!o.disputed).reduce((n:number,o:any)=>n+o.quantity-o.refunded_quantity,0)})),reward:account.period_start&&account.period_end?nextMonthReward(orders,account.period_start,account.period_end):{garments:0,target:TEAM_REWARD_QUANTITY,remaining:TEAM_REWARD_QUANTITY,creditCents:0},enabled:config.enabled,mode:config.mode,policyVersion:TEAM_POLICY_VERSION});
@@ -281,14 +296,16 @@ Deno.serve(async(req:Request)=>{
    else await checked(db.from('mqd_team_orders').update({production_status:body.status,tracking:body.tracking||null}).eq('id',body.orderId).eq('team_id',body.id).eq('delivery','individual').eq('payment_status','paid').eq('disputed',false).in('production_status',['ready','in_production']).select('id').single());return json({updated:true});
   }
   if(!config.enabled||!stripe)return json({error:'Team payments are not enabled yet.'},503);
-  const returnSite=!config.live&&ALLOWED.has(origin)?origin:BASE_URL;const ownerReturn=returnSite+'/team-owner.html?setupId='+body.id;
+  const returnSite=!config.live&&ALLOWED.has(origin)?origin:BASE_URL;const ownerReturn=returnSite+'/team-owner.html?setupId='+body.id+(ownerManaged?'&organizer=1':'');
   if(body.action==='subscribe'){
-   if(body.policyVersion!==TEAM_POLICY_VERSION)throw new Error('Read and accept the Team subscription terms.');if(account.status==='closed'||teamAccess(account)||account.stripe_subscription_id&&account.billing_status!=='canceled')throw new Error('Manage your existing Team subscription first.');
+   const policy=ownerManaged?OWNER_TEAM_POLICY:TEAM_POLICY_VERSION;if(body.policyVersion!==policy)throw new Error('Read and accept the Team subscription terms.');
+   if(ownerManaged){if(body.rewardQuantity!==organizerRewardTarget(account,business))throw new Error('Reward terms changed. Refresh and review before subscribing.');account=await checked(db.rpc('mqd_bind_owner_organizer',{p_team:body.id,p_user:organizer.id,p_email:organizer.email,p_quantity:body.rewardQuantity,p_policy:policy}));}
+   if(account.status==='closed'||teamAccess(account)||account.stripe_subscription_id&&account.billing_status!=='canceled')throw new Error('Manage your existing Team subscription first.');
    const price=await stripe.prices.retrieve(config.price);if(price.livemode!==config.live||price.currency!=='usd'||price.unit_amount!==2000||price.recurring?.interval!=='month'||price.recurring.interval_count!==1)throw new Error('Team plan price is not configured correctly.');
    if(account.stripe_checkout_id){const previous=await stripe.checkout.sessions.retrieve(account.stripe_checkout_id);if(previous.status==='open'&&previous.url)return json({url:previous.url});}
    if(!account.stripe_customer_id){const customer=await stripe.customers.create({email:business.owner_email,name:account.shop_config.name,metadata:{service:'mqd-teams',team:body.id}},{idempotencyKey:'team-customer-'+body.id});await checked(db.from('mqd_team_accounts').update({stripe_customer_id:customer.id}).eq('team_id',body.id));account.stripe_customer_id=customer.id;}
-   const session=await stripe.checkout.sessions.create({mode:'subscription',customer:account.stripe_customer_id,line_items:[{price:config.price,quantity:1}],subscription_data:{billing_mode:{type:'flexible'},metadata:{service:'mqd-teams',team:body.id}},automatic_tax:{enabled:false},integration_identifier:identifier(body.id),success_url:ownerReturn,cancel_url:ownerReturn},{idempotencyKey:'team-subscribe-'+body.id+'-'+(account.stripe_checkout_id||'first')});
-   await checked(db.from('mqd_team_accounts').update({stripe_checkout_id:session.id,policy_version:TEAM_POLICY_VERSION,policy_accepted_at:new Date().toISOString()}).eq('team_id',body.id));return json({url:session.url});
+   const session=await stripe.checkout.sessions.create({mode:'subscription',customer:account.stripe_customer_id,line_items:[{price:config.price,quantity:1}],subscription_data:{billing_mode:{type:'flexible'},metadata:{service:'mqd-teams',team:body.id}},automatic_tax:{enabled:false},integration_identifier:identifier(body.id),...(ownerManaged?{custom_text:{submit:{message:'$20/month until canceled. '+account.reward_quantity+' qualifying paid garments in one subscription month earn one $20 credit on the next renewal. First month is $20.'}}}:{}),success_url:ownerReturn,cancel_url:ownerReturn},{idempotencyKey:'team-subscribe-'+body.id+'-'+(account.stripe_checkout_id||'first')});
+   await checked(db.from('mqd_team_accounts').update({stripe_checkout_id:session.id,policy_version:policy,policy_accepted_at:new Date().toISOString()}).eq('team_id',body.id));return json({url:session.url});
   }
   if(body.action==='portal'){
    if(!account.stripe_customer_id)throw new Error('No Team billing account yet.');const portal=await stripe.billingPortal.sessions.create({customer:account.stripe_customer_id,configuration:config.portal,return_url:ownerReturn});return json({url:portal.url});

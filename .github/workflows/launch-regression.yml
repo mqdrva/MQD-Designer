@@ -100,6 +100,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024134136_owner_saved_master_publish.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261025041153_owner_organizer_billing.sql
+          psql -v ON_ERROR_STOP=1 -f tests/owner-organizer-billing.sql
           node tests/team-garment-copy.mjs
 
       - name: Verify isolated print-shop subscriptions and onboarding
