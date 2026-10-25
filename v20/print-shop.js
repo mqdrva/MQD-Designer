@@ -257,12 +257,12 @@ try {
     const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}${requestedGarment?'&garment='+encodeURIComponent(requestedGarment):''}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
     if(!response.ok || !result.shop?.engines?.includes(engine))throw new Error('This shop page is not available.');
-    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;reviewOnly=result.reviewOnly===true;if(reviewOnly&&teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
+    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;reviewOnly=result.reviewOnly===true;if(teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
     if(teamMaster&&engine==='2d'){location.replace('/teams/'+encodeURIComponent(slug)+'/3d');throw new Error('Opening your team master in the 3D designer');}
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-ec5daf664392d716');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  else {await import('./shop-editor.js?v=mapping-19a0e7289b01a523');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
   if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
   document.body.dataset.ready='true';ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {
