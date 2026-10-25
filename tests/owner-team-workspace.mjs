@@ -22,7 +22,8 @@ assert(!JSON.stringify(workspace.publicTeamShop({...fixture.shop,ownerRequest:fi
 let handler,role='admin',mfa=true,checkoutCalls=0;let organizerUser={id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',email:fixture.owner.requestEmail,email_confirmed_at:new Date().toISOString(),app_metadata:{role:'customer'}};
 const tables={mqd_print_shop_businesses:[],mqd_team_accounts:[],mqd_team_master_versions:[]};
 const val=(r,k)=>k.includes('->>')?r[k.split('->>')[0]]?.[k.split('->>')[1]]===true?'true':r[k.split('->>')[0]]?.[k.split('->>')[1]]:r[k];
-const db={async rpc(name,p){if(name==='mqd_bind_owner_organizer'){const a=tables.mqd_team_accounts.find(a=>a.team_id===p.p_team),b=tables.mqd_print_shop_businesses.find(b=>b.id===p.p_team);if(!organizerAccess.organizerIdentityAllowed(b,a,organizerUser)||b.shop_config.pilotKind!=='team'||!b.shop_config.ownerPublished?.masterVersionIds)return{error:{message:'Organizer signup is not authorized'}};Object.assign(a,{organizer_user_id:p.p_user,reward_quantity:p.p_quantity});return{data:structuredClone(a)};}if(name==='mqd_team_pending_metadata')return{data:[]};if(name==='mqd_publish_owner_saved_masters'){
+let duplicateRpcCalls=[];
+const db={async rpc(name,p){if(name==='mqd_duplicate_owner_team'){duplicateRpcCalls.push(structuredClone(p));return{data:{id:p.p_target,revision:1,copiedDrafts:5}};}if(name==='mqd_bind_owner_organizer'){const a=tables.mqd_team_accounts.find(a=>a.team_id===p.p_team),b=tables.mqd_print_shop_businesses.find(b=>b.id===p.p_team);if(!organizerAccess.organizerIdentityAllowed(b,a,organizerUser)||b.shop_config.pilotKind!=='team'||!b.shop_config.ownerPublished?.masterVersionIds)return{error:{message:'Organizer signup is not authorized'}};Object.assign(a,{organizer_user_id:p.p_user,reward_quantity:p.p_quantity});return{data:structuredClone(a)};}if(name==='mqd_team_pending_metadata')return{data:[]};if(name==='mqd_publish_owner_saved_masters'){
  const b=tables.mqd_print_shop_businesses.find(b=>b.id===p.p_team),a=tables.mqd_team_accounts.find(a=>a.team_id===p.p_team);
  if(b.revision!==p.p_revision||p.p_waive&&b.shop_config.pilotKind!=='team')return{error:{message:'Invalid saved publication'}};
  const pending=Object.keys(b.shop_config.garments).map(product=>{const primary=tables.mqd_team_master_drafts.find(d=>d.team_id===p.p_team&&d.draft.payload.product.id===product);const row=primary||(tables.mqd_team_garment_master_drafts||[]).find(d=>d.team_id===p.p_team&&d.product_id===product);return{product,row};});
@@ -122,3 +123,12 @@ organizerAccount.stripe_subscription_id='sub_synthetic';organizerAccount.status=
 assert.equal(workspace.ownerGarmentCheckout(organizerAccount,organizerBusiness),true);organizerAccount.billing_status='past_due';assert.equal(workspace.ownerGarmentCheckout(organizerAccount,organizerBusiness),false,'Old waiver cannot bypass subscribed account status');organizerAccount.billing_status='active';
 organizerBusiness.shop_config.organizerAccess.enabled=false;assert.equal((await post({action:'portal',id},'organizer')).status,200,'Enrolled payer retains billing cancellation access');
 console.log('PASS organizer billing: default-off, verified identity, immutable payer binding, isolated five-garment terms, scoped dashboard, no master/order/batch access, synthetic checkout/portal, paid access gating.');
+
+// The real duplication transaction is exercised by owner-team-duplicate.sql.
+const duplication={action:'admin-workspace-duplicate',id,targetId:crypto.randomUUID(),revision:1,name:'New Private Team',slug:'new-private-team'};
+role='customer';assert.equal((await post(duplication)).status,403);role='admin';mfa=false;assert.equal((await post(duplication)).status,403);mfa=true;
+assert.equal(duplicateRpcCalls.length,0);
+for(const bad of [{slug:'pilot'},{slug:'bad/link'},{slug:'x'.repeat(49)},{name:''},{targetId:id},{revision:0}])assert.equal((await post({...duplication,...bad})).status,400);
+assert.equal(duplicateRpcCalls.length,0);
+result=await post(duplication);assert.equal(result.status,200);assert.equal(result.data.id,duplication.targetId);assert.equal(duplicateRpcCalls.length,1);assert.equal(duplicateRpcCalls[0].p_actor,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');assert.equal(duplicateRpcCalls[0].p_live,false);
+console.log('PASS team duplication API: owner MFA required, reserved/invalid links denied, server-owned actor/mode, private draft response.');

@@ -53,3 +53,10 @@ The first month costs $20. Five qualifying paid garments in that subscription pe
 Garment checkout before subscription enrollment continues under the explicit owner waiver. Once a subscription exists, new orders require current paid status; a failed/expired subscription cannot fall back to the old waiver. Review-only publication or unpublishing stops new checkout but does not cancel recurring billing. The existing Stripe subscription webhook controls paid status. No real order or subscription is used during QA.
 
 Validation includes `tests/organizer-billing-browser.mjs`, actual-handler auth/enrollment/portal tests in `tests/owner-team-workspace.mjs`, the real invoice-created handler in `tests/team-service.mjs`, and service-only binding/free-to-paid database checks in `tests/owner-organizer-billing.sql`.
+
+
+## Duplicate a saved team into a private draft
+
+From an existing MQD owner workspace, choose **Duplicate team**, enter the new team name and unused link name, then **Create private copy**. Only the last saved setup and all saved garment drafts are copied; unsaved browser edits are not included. Open the returned private draft, replace its setup logo and artwork in each garment with the existing visual editor, save/reopen and preview, then explicitly publish when ready. Changing the setup logo does not automatically replace image layers inside strict masters.
+
+The atomic copy retains garment choices, original inline artwork, backgrounds, placements and member rules, including movable names. It starts with new draft revisions, no published versions/link, no checkout waiver, blank organizer contacts/private request notes, organizer access off and the default reward target of five. No orders, Stripe identities, subscription terms, or production files are copied. The source team is unchanged. Same-request retries recover the created draft without resetting its edits. The server endpoint requires current MQD admin MFA; the database operation is service-role only.
