@@ -52,6 +52,15 @@ Deno.serve(async(req:Request)=>{
   const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(bytes));
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
   if(adminAction){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';const auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required.'},403);actor=auth.data.user;}
+   if(body.action==='admin-master-load'&&body.metadataOnly===true){
+    if(!uuid(body.id))throw new Error('Choose an owner workspace.');
+    const metadata=await checked(db.from('mqd_print_shop_businesses').select('id,status,owner_managed:shop_config->>ownerManaged,editing_mode:shop_config->>editingMode').eq('id',body.id).maybeSingle());
+    if(metadata?.status==='closed'||String(metadata?.owner_managed)!=='true'||metadata?.editing_mode!=='strict'||!Object.hasOwn(TEAM_3D_GARMENTS,body.productId))throw new Error('Choose a supported owner garment.');
+    const primary=await checked(db.from('mqd_team_master_drafts').select('revision,product_id:draft->payload->product->>id').eq('team_id',body.id).maybeSingle());
+    const primaryProduct=primary?.product_id;
+    const row=primaryProduct===body.productId?primary:await checked(db.from('mqd_team_garment_master_drafts').select('revision').eq('team_id',body.id).eq('product_id',body.productId).maybeSingle());
+    return json({hasDraft:!!row,revision:row?.revision||0,productId:body.productId});
+   }
   if(['master-save','master-load'].includes(body.action))return json({error:'Only the MQD owner/admin can create, edit or publish a master. Send change requests to MQD.'},403);
   if(body.action==='admin-workspace-list')return json({workspaces:await checked(db.from('mqd_print_shop_businesses').select('id,revision,name:shop_config->>name,slug:shop_config->>slug,kind:shop_config->>pilotKind,updated_at').eq('shop_config->>ownerManaged','true').order('updated_at',{ascending:false}).limit(50))});
   if(['admin-workspace-save','admin-workspace-load','admin-workspace-publish','admin-workspace-unpublish'].includes(body.action)){
@@ -76,7 +85,7 @@ Deno.serve(async(req:Request)=>{
     return json({id:body.id,revision,message:'Owner draft saved. No email, subscription or payment was created.'});
    }
    if(!prior)return json({error:'Owner workspace unavailable.'},404);
-   const account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
+   const account=await checked(db.from('mqd_team_accounts').select('team_id,master_version_id').eq('team_id',body.id).maybeSingle());
    if(body.action==='admin-workspace-load'){const draftShop=structuredClone(prior.shop_config);delete draftShop.ownerPublished;return json({id:body.id,revision:prior.revision,kind:prior.shop_config.pilotKind,editingMode:prior.shop_config.editingMode,packet:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:prior.owner_email,phone:prior.owner_phone,...prior.shop_config.ownerRequest},shop:draftShop},masterVersionId:account?.master_version_id,published:!!prior.shop_config.ownerPublished,organizerFeeWaived:prior.shop_config.ownerPublished?.organizerFeeWaived===true});}
    if(body.revision!==prior.revision)throw new Error('Workspace changed. Reload before publishing.');
    if(!account)throw new Error('Save this draft again to finish creating its account.');
@@ -117,7 +126,7 @@ Deno.serve(async(req:Request)=>{
    const otherModeAccounts=await checked(db.from('mqd_team_accounts').select('team_id').eq('livemode',!config.live));
    const otherModeIds=new Set(otherModeAccounts.map((a:any)=>a.team_id));
    const pending=(await checked(db.rpc('mqd_team_pending_metadata'))).filter((p:any)=>!otherModeIds.has(p.id)&&!accounts.some((a:any)=>a.team_id===p.id&&a.ownerManaged==='true'));
-   return json({pending,accounts:accounts.filter((a:any)=>a.ownerManaged!=='true').map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug})),batches,orders,enabled:config.enabled,mode:config.mode});
+   return json({pending,accounts:accounts.map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug,ownerManaged:a.ownerManaged==='true'})),batches,orders,enabled:config.enabled,mode:config.mode});
   }
   if(body.action==='order-status'){
    if(!uuid(body.id)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))return json({error:'Private order access required.'},401);
@@ -198,7 +207,8 @@ Deno.serve(async(req:Request)=>{
   if(!business||business.shop_config?.organizationType!=='team'&&business.pending_config?.organizationType!=='team')return json({error:'Team setup unavailable.'},404);
   if(!adminAction){if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);}
   let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
-  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail','admin-package','admin-production'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account&&account.livemode!==config.live&&['admin-package','admin-production'].includes(body.action))return json({error:'Team unavailable.'},404);
   if(account&&!account.shop_config?.ownerManaged&&account.livemode!==config.live)return json({error:'Team unavailable.'},404);
   if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:business.pending_config||business.shop_config)}});
   if(body.action==='admin-approve'){
