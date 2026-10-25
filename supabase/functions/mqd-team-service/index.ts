@@ -126,7 +126,7 @@ Deno.serve(async(req:Request)=>{
    const otherModeAccounts=await checked(db.from('mqd_team_accounts').select('team_id').eq('livemode',!config.live));
    const otherModeIds=new Set(otherModeAccounts.map((a:any)=>a.team_id));
    const pending=(await checked(db.rpc('mqd_team_pending_metadata'))).filter((p:any)=>!otherModeIds.has(p.id)&&!accounts.some((a:any)=>a.team_id===p.id&&a.ownerManaged==='true'));
-   return json({pending,accounts:accounts.filter((a:any)=>a.ownerManaged!=='true').map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug})),batches,orders,enabled:config.enabled,mode:config.mode});
+   return json({pending,accounts:accounts.map((a:any)=>({...safeAccount(a),name:a.name,slug:a.slug,ownerManaged:a.ownerManaged==='true'})),batches,orders,enabled:config.enabled,mode:config.mode});
   }
   if(body.action==='order-status'){
    if(!uuid(body.id)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))return json({error:'Private order access required.'},401);
@@ -207,7 +207,8 @@ Deno.serve(async(req:Request)=>{
   if(!business||business.shop_config?.organizationType!=='team'&&business.pending_config?.organizationType!=='team')return json({error:'Team setup unavailable.'},404);
   if(!adminAction){if(!/^[a-f0-9]{64}$/.test(body.token||'')||await hash(body.token)!==business.token_hash||Date.parse(business.token_expires_at)<=Date.now()||!business.email_verified_at)return json({error:'Confirm your email using the private setup link.'},401);}
   let account=await checked(db.from('mqd_team_accounts').select('*').eq('team_id',body.id).maybeSingle());
-  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account?.shop_config?.ownerManaged&&!['admin-master-load','admin-master-save','admin-master-copy','admin-detail','admin-package','admin-production'].includes(body.action))return json({error:'Owner-managed design review: billing and commercial activation are unavailable.'},403);
+  if(account&&account.livemode!==config.live&&['admin-package','admin-production'].includes(body.action))return json({error:'Team unavailable.'},404);
   if(account&&!account.shop_config?.ownerManaged&&account.livemode!==config.live)return json({error:'Team unavailable.'},404);
   if(body.action==='admin-detail')return json({setup:{schema:'mqd-business-setup-v1',plan:'3d',owner:{requestEmail:business.owner_email,phone:business.owner_phone},shop:canonicalTeamShop(business.shop_config.ownerManaged?business.shop_config:business.pending_config||business.shop_config)}});
   if(body.action==='admin-approve'){
