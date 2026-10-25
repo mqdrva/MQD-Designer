@@ -74,6 +74,7 @@ function shopOrderSheet(d) {
   return {schemaVersion:1,range:'print-shop',product:d.product,garment:shop.garments?.[d.product],color:d.color,size:d.size,quantity:d.quantity,units:'inches',printMethod:d.printMethod,printMethodLabel:SHOP_PRINT_METHODS[d.printMethod],status:'shop-review-required',printLimits:shopPrintZones(shop,d.product,d.size),locations:Object.fromEntries(VIEWS.map(view=>[view,d.artwork[view]?printMetadata(d.artwork[view],view,zoneFor(d,view)):{status:'No print'}]))};
 }
 async function buildPackage() {
+  await window.MQDTeamFlush?.();
   const entries = [], s = summary();
   if(teamService&&teamMaster)assertTeamMemberCopy(window.MQDDesigner.exportDesign(),teamMaster);
   if (engine === '2d') {
@@ -181,6 +182,7 @@ async function send(event) {
   try {
     const customer={name:$('shopName').value.trim(),email:$('shopEmail').value.trim(),phone:$('shopPhone').value.trim(),notes:$('shopNotes').value.trim()};
     if(!validPhone(customer.phone))throw new Error('Enter a valid phone number with 7 to 15 digits.');
+    await window.MQDTeamFlush?.();
     const current=engine==='2d'?getDraft():window.MQDDesigner.exportDesign();
     const fileDigests=[];
     if(engine==='2d')for(const v of VIEWS)if(current.artwork[v]?.file)fileDigests.push(await digest(await current.artwork[v].file.arrayBuffer()));
