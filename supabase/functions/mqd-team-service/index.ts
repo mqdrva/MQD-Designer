@@ -1,6 +1,6 @@
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
-import {restoreTeamImages} from '../_shared/mqd-team-image-refs.js';
+import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
 import {ownerWorkspace,publicTeamShop,ownerGarmentCheckout} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction,packageTeamMaster} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
@@ -15,6 +15,7 @@ import {assertFixedLogoPackage,garmentLogo,garmentLogoPath,validPhone} from '../
 const ALLOWED=new Set([BASE_URL,'http://127.0.0.1:8776','http://localhost:8776','http://127.0.0.1:8765']);
 const uuid=(v:any)=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const identifier=(id:string)=>'mqd-teams-'+id.replaceAll('-','').slice(0,8).replace(/[0-9]/g,n=>String.fromCharCode(97+Number(n)));
+const checkpoint=(stage:string)=>{if(typeof Deno.memoryUsage==='function')console.info('TEAM_CHECKOUT_MEMORY '+stage+' '+JSON.stringify(Deno.memoryUsage()));};
 async function bodyBytes(req:Request,max:number){const reader=req.body?.getReader();if(!reader)throw new Error('Request body required');const pieces:Uint8Array[]= [];let n=0;while(true){const part=await reader.read();if(part.done)break;n+=part.value.length;if(n>max){await reader.cancel();throw new Error('Request is too large.');}pieces.push(part.value);}const bytes=new Uint8Array(n);let offset=0;for(const part of pieces){bytes.set(part,offset);offset+=part.length;}return bytes;}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'',cors:any={'Vary':'Origin','Content-Type':'application/json','Cache-Control':'no-store'};
@@ -49,7 +50,7 @@ Deno.serve(async(req:Request)=>{
    return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
-  const isForm=req.headers.get('content-type')?.includes('multipart/form-data');const form=isForm?await boundedMultipart(req,51*1024*1024):null;
+  const isForm=req.headers.get('content-type')?.includes('multipart/form-data');if(isForm)checkpoint('multipart-start');const form=isForm?await boundedMultipart(req,51*1024*1024):null;if(isForm)checkpoint('multipart-parsed');
   if(form&&String(form.get('payload')||'').length>20000)throw new Error('Order details are too large.');
   const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(await bodyBytes(req,req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000)));
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
@@ -149,9 +150,11 @@ Deno.serve(async(req:Request)=>{
    if(body.website||!Number.isFinite(body.startedAt)||Date.now()-body.startedAt<2000||Date.now()-body.startedAt>86400000)throw new Error('Refresh and review the order form.');
    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.team||''))throw new Error('Choose a valid Team link.');
    let account=await checked(db.from('mqd_team_accounts').select('team_id,status,billing_status,period_end,organizer_user_id,stripe_subscription_id,master_version_id,owner_managed:shop_config->ownerManaged').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());
+   checkpoint('account-loaded');
    const ownerManaged=account?.owner_managed===true||account?.shop_config?.ownerManaged===true;
    if(account)account={...account,shop_config:ownerManaged?{ownerManaged:true}:(await checked(db.from('mqd_team_accounts').select('shop_config').eq('team_id',account.team_id).single())).shop_config};
    let ownerBusiness=ownerManaged?await checked(db.from('mqd_print_shop_businesses').select('status,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived').eq('id',account.team_id).maybeSingle()):null;
+   checkpoint('business-loaded');
    if(ownerBusiness&&Object.hasOwn(ownerBusiness,'published_shop'))ownerBusiness={status:ownerBusiness.status,shop_config:{ownerManaged:true,pilotKind:ownerBusiness.pilot_kind,ownerPublished:ownerBusiness.published_shop?{shop:ownerBusiness.published_shop,authorizedBy:ownerBusiness.publication_authorized_by,masterVersionIds:ownerBusiness.publication_master_ids,organizerFeeWaived:ownerBusiness.publication_waived}:null}};
    const waived=ownerGarmentCheckout(account,ownerBusiness);
    if(account?.shop_config?.ownerManaged&&!waived)return json({error:'This owner-managed design review does not support checkout.'},409);
@@ -159,21 +162,26 @@ Deno.serve(async(req:Request)=>{
    const rawSummary=body.summary,rawCustomer=body.customer,summary={engine:rawSummary?.engine,productId:rawSummary?.productId,color:rawSummary?.color,printMethod:rawSummary?.printMethod,locations:rawSummary?.locations,orderOptions:Array.isArray(rawSummary?.orderOptions)?rawSummary.orderOptions.map((o:any)=>({size:o.size,quantity:o.quantity})):null} as any;
    const customer={name:rawCustomer?.name,email:rawCustomer?.email,phone:rawCustomer?.phone,notes:rawCustomer?.notes};
    const shop=canonicalTeamShop(waived?ownerBusiness.shop_config.ownerPublished.shop:account.shop_config),quote=teamQuote(shop,summary);summary.productName=shop.productNames[summary.productId];summary.garment=shop.garments[summary.productId];
+   checkpoint('shop-validated');
    if(typeof customer?.name!=='string'||!customer.name.trim()||customer.name.length>100||typeof customer.email!=='string'||customer.email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)||!validPhone(customer.phone)||typeof customer.notes!=='string'||customer.notes.length>1500)throw new Error('Enter valid customer name, email and phone.');
    if(!['team','individual'].includes(body.delivery)||body.delivery==='team'&&!uuid(body.batchId))throw new Error('Choose your delivery option.');
    const file=form.get('package');if(!(file instanceof File)||file.size<22||file.size>50*1024*1024)throw new Error('The production ZIP exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
    const packageBytes=new Uint8Array(await file.arrayBuffer()),zip=await JSZip.loadAsync(packageBytes),entries:any[]=Object.values(zip.files).filter((f:any)=>!f.dir);
+   checkpoint('zip-opened');
    if(entries.length>500||entries.some((f:any)=>f.name.includes('..')||f.name.startsWith('/')||!/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(json|txt|png|jpg|jpeg|webp|woff2|css)$/i.test(f.name))||entries.reduce((sum,f)=>sum+(f._data?.uncompressedSize||0),0)>128*1024*1024)throw new Error('Design package is invalid.');
    const designFile:any=zip.file('design.json'),orderFile:any=zip.file('order-request.json');if(!designFile||!orderFile||designFile._data.uncompressedSize>48*1024*1024||orderFile._data.uncompressedSize>20000)throw new Error('Design details are missing.');
    const design=await restoreTeamImages(JSON.parse(await designFile.async('string')),zip),order=JSON.parse(await orderFile.async('string'));
+   checkpoint('sources-restored');
    if(design.schema!=='mqd-shop-design-v1'||design.shop!==body.team||design.engine!==summary.engine||order.productId!==summary.productId||order.printMethod!==summary.printMethod||JSON.stringify(order.orderOptions)!==JSON.stringify(summary.orderOptions)||(summary.engine==='2d'?design.draft?.product:design.design?.product?.id)!==summary.productId)throw new Error('Design and order do not match.');
    let purchasedMaster=null;
    const masterRef=design.design?.design?.teamMaster;
    if(account.master_version_id&&shop.engines.includes('3d')||masterRef){
     if(summary.engine!=='3d'||!uuid(masterRef?.versionId))throw new Error('Open the team master and personalize your own copy.');
-    purchasedMaster=await checked(db.from('mqd_team_master_versions').select('*').eq('id',masterRef.versionId).eq('team_id',account.team_id).maybeSingle());
+    purchasedMaster=await hydrateCheckoutMaster(await checked(db.rpc('mqd_team_checkout_master',{p_team:account.team_id,p_version:masterRef.versionId})),design.design);
+    checkpoint('master-restored');
     if(!purchasedMaster)throw new Error('Team master version unavailable.');
     assertTeamMemberCopy(design.design,purchasedMaster);
+    checkpoint('master-validated');
     summary.master={versionId:purchasedMaster.id,copyId:masterRef.copyId,name:purchasedMaster.name};
    }
    const zoneMap={'Front':'front','Back':'back','Left Sleeve':'left','Right Sleeve':'right'};
