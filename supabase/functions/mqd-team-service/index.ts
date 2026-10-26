@@ -1,4 +1,5 @@
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
+import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {ownerWorkspace,publicTeamShop,ownerGarmentCheckout} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction,packageTeamMaster} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
@@ -47,10 +48,9 @@ Deno.serve(async(req:Request)=>{
    return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
-  const bytes=await bodyBytes(req,req.headers.get('content-type')?.includes('multipart/form-data')?51*1024*1024:(req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000));
-  const isForm=req.headers.get('content-type')?.includes('multipart/form-data');const form=isForm?await new Response(bytes,{headers:{'Content-Type':req.headers.get('content-type')!}}).formData():null;
+  const isForm=req.headers.get('content-type')?.includes('multipart/form-data');const form=isForm?await boundedMultipart(req,51*1024*1024):null;
   if(form&&String(form.get('payload')||'').length>20000)throw new Error('Order details are too large.');
-  const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(bytes));
+  const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(await bodyBytes(req,req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000)));
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
   if(adminAction){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';const auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required.'},403);actor=auth.data.user;}
    if(body.action==='admin-master-load'&&body.metadataOnly===true){
@@ -147,7 +147,11 @@ Deno.serve(async(req:Request)=>{
    if(!form||!uuid(body.requestId)||!/^[a-f0-9]{64}$/.test(body.guestToken||''))throw new Error('Valid private order session required.');
    if(body.website||!Number.isFinite(body.startedAt)||Date.now()-body.startedAt<2000||Date.now()-body.startedAt>86400000)throw new Error('Refresh and review the order form.');
    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.team||''))throw new Error('Choose a valid Team link.');
-   const account=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());const ownerBusiness=account?.shop_config?.ownerManaged?await checked(db.from('mqd_print_shop_businesses').select('status,shop_config').eq('id',account.team_id).maybeSingle()):null;
+   let account=await checked(db.from('mqd_team_accounts').select('team_id,status,billing_status,period_end,organizer_user_id,stripe_subscription_id,master_version_id,owner_managed:shop_config->ownerManaged').eq('shop_config->>slug',body.team).eq('livemode',config.live).neq('status','closed').maybeSingle());
+   const ownerManaged=account?.owner_managed===true||account?.shop_config?.ownerManaged===true;
+   if(account)account={...account,shop_config:ownerManaged?{ownerManaged:true}:(await checked(db.from('mqd_team_accounts').select('shop_config').eq('team_id',account.team_id).single())).shop_config};
+   let ownerBusiness=ownerManaged?await checked(db.from('mqd_print_shop_businesses').select('status,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived').eq('id',account.team_id).maybeSingle()):null;
+   if(ownerBusiness&&Object.hasOwn(ownerBusiness,'published_shop'))ownerBusiness={status:ownerBusiness.status,shop_config:{ownerManaged:true,pilotKind:ownerBusiness.pilot_kind,ownerPublished:ownerBusiness.published_shop?{shop:ownerBusiness.published_shop,authorizedBy:ownerBusiness.publication_authorized_by,masterVersionIds:ownerBusiness.publication_master_ids,organizerFeeWaived:ownerBusiness.publication_waived}:null}};
    const waived=ownerGarmentCheckout(account,ownerBusiness);
    if(account?.shop_config?.ownerManaged&&!waived)return json({error:'This owner-managed design review does not support checkout.'},409);
    if(!waived&&!teamAccess(account))return json({error:'Team subscription is inactive.'},409);

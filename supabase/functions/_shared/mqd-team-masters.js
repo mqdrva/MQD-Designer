@@ -2,6 +2,15 @@ import {GARMENT_MAPPING} from './shirt-games/mapping.js';
 import {cloneTemplate,templateLayers,UUID} from './mqd-template-contract.js';
 import {maxZoneLayers} from './mqd-layer-capacity.js';
 const stable=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
+// Compare large inline originals directly. Serializing two complete designs just
+// to compare them duplicates tens of megabytes and can exhaust the Edge runtime.
+function sameJson(a,b){
+ if(a===b)return true;
+ if(a===null||b===null||typeof a!=='object'||typeof b!=='object')return false;
+ if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((value,i)=>sameJson(value,b[i]));
+ const ak=Object.keys(a).filter(k=>a[k]!==undefined).sort(),bk=Object.keys(b).filter(k=>b[k]!==undefined).sort();
+ return ak.length===bk.length&&ak.every((key,i)=>key===bk[i]&&sameJson(a[key],b[key]));
+}
 const fail=message=>{throw new Error(message);};
 export function validateTeamMaster(master){
  const p=master?.payload;
@@ -61,6 +70,6 @@ export function assertTeamMemberCopy(payload,version,{complete=true}={}){
    if(rule.allowMove)for(const coordinate of ['x','y']){const position=a[i].layer[coordinate];if(!Number.isFinite(position)||position< -100||position>100)fail('Keep member text within the positioning limits.');e[i].layer[coordinate]=position;}
   }
  }
- if(stable(actual)!==stable(expected))fail('Protected artwork, styling, garment and placement cannot change.');
+ if(!sameJson(actual,expected))fail('Protected artwork, styling, garment and placement cannot change.');
  return true;
 }
