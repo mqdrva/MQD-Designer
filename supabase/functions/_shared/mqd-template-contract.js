@@ -34,8 +34,8 @@ export function assertTemplateDraft(draft){
   if(draft.rules.length!==rows.length||!draft.rules.some(r=>r.role==='logo'))throw new Error('Include at least one replaceable logo and exactly one rule per layer.');
   return draft;
 }
-export function cloneTemplate(version,uuid=()=>crypto.randomUUID()){
-  const payload=structuredClone(version.payload),copyId=uuid();
+export function cloneTemplate(version,uuid=()=>crypto.randomUUID(),clone=structuredClone){
+  const payload=clone(version.payload),copyId=uuid();
   delete payload.designId;delete payload.orderOptions;delete payload.totalQuantity;
   for(const {zone,layer} of templateLayers(payload)){
     const rule=version.rules.find(r=>r.zone===zone&&r.layerId===layer.id);

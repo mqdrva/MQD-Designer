@@ -1,4 +1,5 @@
 import {garmentLogo,garmentLogoPath} from '../mqd-print-shop-pilot/contract.js';
+import {TEAM_RESTORED_PATHS} from './mqd-team-image-refs.js';
 import {Buffer} from 'node:buffer';
 import {imageDimensions} from './shirt-games/image-info.mjs';
 import {GARMENT_MAPPING} from './shirt-games/mapping.js';
@@ -32,7 +33,7 @@ export async function verifyTeamProduction(zip,design,shop){
    if(layer.type!=='image')continue;const match=layer.src?.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);if(!match)throw new Error('Original source required.');
    const bytes=Buffer.from(match[2],'base64'),dimensions=imageDimensions(bytes,match[1]);if(dimensions.width<1||dimensions.height<1)throw new Error('Invalid source dimensions.');
    const sharedLogo=!payload.design.teamMaster&&shop?.garmentLogo===layer.src&&garmentLogo(shop,payload.product.id).mode!=='none';
-   const path=sharedLogo?garmentLogoPath(shop):'originals/'+safe(zone)+'-'+index+'-'+safe(layer.filename||'artwork.png'),original=zip.file(path);if(!original||await hash(await original.async('uint8array'))!==await hash(bytes))throw new Error('Original source artwork does not match the saved member design.');
+   const path=design[TEAM_RESTORED_PATHS]?.[zone]?.[index]||(sharedLogo?garmentLogoPath(shop):'originals/'+safe(zone)+'-'+index+'-'+safe(layer.filename||'artwork.png')),original=zip.file(path);if(!original||await hash(await original.async('uint8array'))!==await hash(bytes))throw new Error('Original source artwork does not match the saved member design.');
    manifest.originals.push({zone,layerId:layer.id,templateLayerId:layer.templateLayerId,path,...dimensions,sha256:await hash(bytes),placement:{x:layer.x,y:layer.y,scale:layer.scale,rotation:layer.rotation,crop:layer.crop}});
   }
  }

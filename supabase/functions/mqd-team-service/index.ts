@@ -1,5 +1,6 @@
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
+import {restoreTeamImages} from '../_shared/mqd-team-image-refs.js';
 import {ownerWorkspace,publicTeamShop,ownerGarmentCheckout} from '../_shared/mqd-owner-workspace.js';
 import {verifyTeamProduction,packageTeamMaster} from '../_shared/mqd-team-production.js';
 import {validateTeamMaster,assertTeamMemberCopy} from '../_shared/mqd-team-masters.js';
@@ -164,7 +165,7 @@ Deno.serve(async(req:Request)=>{
    const packageBytes=new Uint8Array(await file.arrayBuffer()),zip=await JSZip.loadAsync(packageBytes),entries:any[]=Object.values(zip.files).filter((f:any)=>!f.dir);
    if(entries.length>500||entries.some((f:any)=>f.name.includes('..')||f.name.startsWith('/')||!/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(json|txt|png|jpg|jpeg|webp|woff2|css)$/i.test(f.name))||entries.reduce((sum,f)=>sum+(f._data?.uncompressedSize||0),0)>128*1024*1024)throw new Error('Design package is invalid.');
    const designFile:any=zip.file('design.json'),orderFile:any=zip.file('order-request.json');if(!designFile||!orderFile||designFile._data.uncompressedSize>48*1024*1024||orderFile._data.uncompressedSize>20000)throw new Error('Design details are missing.');
-   const design=JSON.parse(await designFile.async('string')),order=JSON.parse(await orderFile.async('string'));
+   const design=await restoreTeamImages(JSON.parse(await designFile.async('string')),zip),order=JSON.parse(await orderFile.async('string'));
    if(design.schema!=='mqd-shop-design-v1'||design.shop!==body.team||design.engine!==summary.engine||order.productId!==summary.productId||order.printMethod!==summary.printMethod||JSON.stringify(order.orderOptions)!==JSON.stringify(summary.orderOptions)||(summary.engine==='2d'?design.draft?.product:design.design?.product?.id)!==summary.productId)throw new Error('Design and order do not match.');
    let purchasedMaster=null;
    const masterRef=design.design?.design?.teamMaster;
