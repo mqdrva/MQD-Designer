@@ -60,3 +60,10 @@ Validation includes `tests/organizer-billing-browser.mjs`, actual-handler auth/e
 From an existing MQD owner workspace, choose **Duplicate team**, enter the new team name and unused link name, then **Create private copy**. Only the last saved setup and all saved garment drafts are copied; unsaved browser edits are not included. Open the returned private draft, replace its setup logo and artwork in each garment with the existing visual editor, save/reopen and preview, then explicitly publish when ready. Changing the setup logo does not automatically replace image layers inside strict masters.
 
 The atomic copy retains garment choices, original inline artwork, backgrounds, placements and member rules, including movable names. It starts with new draft revisions, no published versions/link, no checkout waiver, blank organizer contacts/private request notes, organizer access off and the default reward target of five. No orders, Stripe identities, subscription terms, or production files are copied. The source team is unchanged. Same-request retries recover the created draft without resetting its edits. The server endpoint requires current MQD admin MFA; the database operation is service-role only.
+
+
+## Customer checkout with large original artwork
+
+Checkout keeps the existing 50 MiB ZIP and 51 MiB multipart limits. The server counts the multipart stream before native parsing, reads only account/publication fields needed for checkout, and compares protected designs directly without serializing two complete copies of inline artwork. Every existing master, print-zone, source-byte, font, order, payment and private-storage check still runs.
+
+Customers see a persistent checkout progress dialog while artwork is prepared and sent, including on mobile when production capture switches preview panes. A failed request shows a clear recovery message and retains the design. Unchanged retries reuse the exact ZIP and request identifier; view state and export timestamps do not create a new attempt. A single mandatory all-over print method is hidden from the form.

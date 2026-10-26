@@ -1,4 +1,5 @@
 import {TEAM_3D_GARMENTS,ownerGarmentShop} from '../supabase/functions/_shared/mqd-team-garments.js';
+import {checkoutProgress} from './checkout-progress.js';
 import {loadSetupPreview} from './setup-preview-store.js';
 import {placeTeamPrint} from './team-production-placement.js';
 import {teamProductionFonts} from './team-production-fonts.js';
@@ -24,8 +25,8 @@ const slug = location.pathname.match(/^\/(?:shops|teams)\/([a-z0-9-]+)(?:\/3d)?\
 let ownerWorkspaceData=null,garmentChoices=null;
 const requestedGarment=new URLSearchParams(location.search).get('garment');
 function mountGarmentDraftLinks(){if(!garmentChoices||Object.keys(garmentChoices).length<2)return;const nav=document.createElement('nav');nav.id='teamGarmentLinks';nav.style.cssText='display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px';nav.setAttribute('aria-label','Team garment drafts');const title=document.createElement('strong');title.textContent=ownerWorkspaceData&&!memberPreview?'Separate private garment drafts: ':'Choose your garment: ';nav.append(title);for(const [product,label]of Object.entries(garmentChoices)){const link=document.createElement('a'),url=new URL(location.href);url.searchParams.set('garment',product);link.href=url.pathname+url.search;link.textContent=label;link.style.margin='0 10px';if(teamMaster&&product===teamMaster.payload.product.id||!teamMaster&&product===Object.keys(shop.garments)[0])link.setAttribute('aria-current','page');if(!ownerWorkspaceData)link.onclick=event=>{if(!confirm('Changing garments starts a separate personal copy. Save your current personalized design first if you want to keep it. Continue?'))event.preventDefault();};nav.append(link);}document.querySelector('.shop-intro').after(nav);}
-let shop, getDraft, sending = false, cachedAttempt = null;
-const say = message => { $('shopStatus').textContent = message; };
+let shop, getDraft, sending = false, cachedAttempt = null,checkoutFeedback;
+const say = message => { $('shopStatus').textContent = message;checkoutFeedback?.update(message); };
 const download = (blob, name) => { const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000); };
 const blobFromCanvas = canvas => new Promise((resolve,reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Preview could not export.')), 'image/png'));
 function rows() {
@@ -73,7 +74,8 @@ function shopOrderSheet(d) {
   if(!shopColors(shop,d.product).includes(d.color)||!shopSizes(shop,d.product,d.color).includes(d.size))throw new Error('Choose an offered color and size.');
   return {schemaVersion:1,range:'print-shop',product:d.product,garment:shop.garments?.[d.product],color:d.color,size:d.size,quantity:d.quantity,units:'inches',printMethod:d.printMethod,printMethodLabel:SHOP_PRINT_METHODS[d.printMethod],status:'shop-review-required',printLimits:shopPrintZones(shop,d.product,d.size),locations:Object.fromEntries(VIEWS.map(view=>[view,d.artwork[view]?printMetadata(d.artwork[view],view,zoneFor(d,view)):{status:'No print'}]))};
 }
-async function buildPackage() {
+async function buildPackage(progress=()=>{}) {
+  progress('Saving your name and color choices…');
   await window.MQDTeamFlush?.();
   const entries = [], s = summary();
   if(teamService&&teamMaster)assertTeamMemberCopy(window.MQDDesigner.exportDesign(),teamMaster);
@@ -99,13 +101,13 @@ async function buildPackage() {
     entries.push({name:'measurements.json',data:JSON.stringify(shopOrderSheet(d),null,2)});
   } else {
     const design = window.MQDDesigner.exportDesign();
-    if(teamService)entries.push(...await teamProductionFonts(Object.values(design.design.zones).flatMap(z=>z.layers||[])));
+    if(teamService){progress('Preparing your artwork and lettering…');entries.push(...await teamProductionFonts(Object.values(design.design.zones).flatMap(z=>z.layers||[])));}
     if(!window.MQDDesigner.shopPreviewReady())throw new Error('The 3D garment is still loading. Try saving again when the preview is ready.');
     window.dispatchEvent(new Event('mqd:show-preview'));
     window.MQDDesigner.refreshMobileWorkspace('preview');
     entries.push({name:'design.json',data:JSON.stringify({schema:'mqd-shop-design-v1',engine,shop:shop.slug,design})});
     entries.push({name:'previews/3d.png',data:await window.MQDDesigner.captureShopPreview()});
-    if(teamService)entries.push(...await window.MQDDesigner.exportShopProductionZones());
+    if(teamService){progress('Preparing the print files for your garment…');entries.push(...await window.MQDDesigner.exportShopProductionZones());}
     for (const [zone,state] of Object.entries(design.design.zones || {})) for (const [i,layer] of (state.layers || []).entries()) {
       if (layer.libraryAssetId) throw new Error('Shop packages support your own uploaded artwork only.');
       if (layer.type === 'image' && layer.src) {
@@ -124,7 +126,7 @@ async function buildPackage() {
   const estimate = requestEstimate(shop,s);
   entries.push({name:'order-request.json',data:JSON.stringify({shop:shop.name,...s,estimate,status:'design-only-unpaid'},null,2)});
   entries.push({name:'READ-ME.txt',data:'Saved design — not a paid order.\nKeep this ZIP to reopen the design using Load saved design on the same shop page.\nOriginal artwork and a mockup are included. The shop must verify print quality, placement and production preparation. Prices and availability may change.\n'});
-  return { blob:await makeZip(entries), summary:s };
+  progress('Packaging your original artwork…');return { blob:await makeZip(entries), summary:s };
 }
 async function savePackage() {
   if (sending) return;
@@ -177,19 +179,20 @@ async function loadPackage(file) {
 }
 async function send(event) {
   event.preventDefault(); if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
-  sending=true;refresh();say('Preparing your order request…');
-  const controls=[...document.querySelectorAll('button,input,select,textarea')], disabled=controls.map(c=>c.disabled);controls.forEach(c=>c.disabled=true);
+  sending=true;refresh();if(teamService){checkoutFeedback||=checkoutProgress();checkoutFeedback.start('Preparing your order…');}say('Preparing your order…');
+  const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(c=>!c.closest('#checkoutProgress')), disabled=controls.map(c=>c.disabled),buttonText=$('shopSend').textContent;controls.forEach(c=>c.disabled=true);$('shopSend').textContent='Preparing checkout…';
   try {
     const customer={name:$('shopName').value.trim(),email:$('shopEmail').value.trim(),phone:$('shopPhone').value.trim(),notes:$('shopNotes').value.trim()};
     if(!validPhone(customer.phone))throw new Error('Enter a valid phone number with 7 to 15 digits.');
     await window.MQDTeamFlush?.();
     const current=engine==='2d'?getDraft():window.MQDDesigner.exportDesign();
+    const fingerprintDesign=engine==='3d'?Object.fromEntries(Object.entries(current).filter(([key])=>!['savedAt','activeZone','designId'].includes(key))):current;
     const fileDigests=[];
     if(engine==='2d')for(const v of VIEWS)if(current.artwork[v]?.file)fileDigests.push(await digest(await current.artwork[v].file.arrayBuffer()));
     const delivery=teamService?$('teamDelivery').value:null,batchId=teamService&&delivery==='team'?$('teamBatch').value:null;
-    const fingerprint=await digest(new TextEncoder().encode(JSON.stringify([current,summary(),customer,fileDigests,delivery,batchId])));
+    const fingerprint=await digest(new TextEncoder().encode(JSON.stringify([fingerprintDesign,summary(),customer,fileDigests,delivery,batchId])));
     if(!cachedAttempt||cachedAttempt.fingerprint!==fingerprint) {
-      const packet=await buildPackage();
+      const packet=await buildPackage(say);
       if(packet.blob.size>(teamService?50*1024*1024:MAX_REQUEST_BYTES))throw new Error(teamService?'This original production package exceeds the 50 MB checkout limit. Keep the full artwork intact and contact MYMERCHNOW before ordering.':'This package exceeds the design-package limit. Keep the original artwork and contact MYMERCHNOW.');
       cachedAttempt={...packet,fingerprint,id:crypto.randomUUID(),customer};
     }
@@ -197,11 +200,12 @@ async function send(event) {
     let guestToken=sessionStorage.getItem('mqd-team-guest-token');if(teamService&&!guestToken){guestToken=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');sessionStorage.setItem('mqd-team-guest-token',guestToken);}
     form.append('payload',JSON.stringify({...(teamService?{action:'order-checkout',team:slug,guestToken,delivery,batchId}:{shop:slug}),requestId:attempt.id,summary:attempt.summary,customer:attempt.customer,website:$('shopWebsite').value,startedAt:Number($('shopStarted').value)}));
     form.append('package',attempt.blob,`${slug}-${engine}-design.zip`);
-    const response=await fetch(teamService?TEAM_API:API,{method:'POST',headers:{apikey:KEY},body:form}),result=await response.json();
-    if(!response.ok)throw new Error(result.error||'Request could not be sent. Your design is still here; please retry.');
+    say('Sending your artwork securely and opening checkout…');
+    const response=await fetch(teamService?TEAM_API:API,{method:'POST',headers:{apikey:KEY},body:form}),result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(response.status>=500?'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.':result.error||'Your design is still here. Please review the order and retry.');
     if(teamService){if(result.paid){location.href='/team-order.html?id='+result.id;return;}const url=new URL(result.url);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com')throw new Error('Secure checkout link unavailable.');location.assign(url.href);return;}
     say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.`);
-  }catch(error){say(error.message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);sending=false;refresh();}
+  }catch(error){const message=error instanceof TypeError?'The connection was interrupted. Your design is safe. Check your connection and retry.':error.message;say(message);checkoutFeedback?.fail(message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);$('shopSend').textContent=buttonText;sending=false;refresh();}
 }
 async function digest(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function mount() {
@@ -237,6 +241,7 @@ function mount() {
   methodSelect.replaceChildren();
   const offeredMethods=engine==='3d'?shop.printMethods3d || shop.printMethods:shop.printMethods;
   for(const [id,label] of Object.entries(offeredMethods || {}))methodSelect.add(new Option(`${label}${methodNeedsQuote(shop,engine,id)?' — shop quote required':''}`,id));
+  if(teamService&&engine==='3d'&&methodSelect.options.length===1)methodSelect.closest('label').hidden=true;
   if(engine==='3d')addSize();
   document.addEventListener('change',refresh);
   window.addEventListener('mqd:shop-design-change',()=>{ if(window.MQDDesigner)refresh(); });

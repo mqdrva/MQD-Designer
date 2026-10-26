@@ -15,6 +15,7 @@ const art=createCanvas(256,256);art.getContext('2d').fillRect(0,0,128,256);maste
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
 try{const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});
 await context.route('**/*',async route=>{const req=route.request();if(req.url().includes('/functions/v1/mqd-team-service'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({shop,batches:[],mode:'sandbox',master})});if(req.method()!=='GET')return route.abort();return route.continue();});
+let checkoutRequests=[];
 const page=await context.newPage();page.on('pageerror',e=>console.log('PAGE ERROR',e.message));
 await page.goto('http://127.0.0.1:8776/team-3d.html?shop=fixture-team');await page.waitForFunction(()=>document.body.dataset.ready==='true',null,{timeout:60000}).catch(async e=>{console.log('STARTUP',await page.locator('#shopStatus').textContent());throw e;});
 console.log('READY',await page.locator('#shopStatus').textContent());
@@ -32,4 +33,21 @@ await page.setViewportSize({width:390,height:844});await page.locator('[data-mob
 const mobile=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth}));assert(mobile.scroll<=mobile.width+5,JSON.stringify(mobile));
 await fs.mkdir(new URL('../../../outputs/teams-pr140/',import.meta.url),{recursive:true});await page.screenshot({path:new URL('../../../outputs/teams-pr140/mobile.png',import.meta.url).pathname,fullPage:false});
 console.log('PASS synthetic desktop/mobile master customization and protected garment control.');
+
+// Exercise the actual customer submit handler and make failures visible even
+// when production capture switches a mobile customer to the preview pane.
+await context.route('**/functions/v1/mqd-team-service',async route=>{
+ const r=route.request();if(r.method()!=='POST')return route.fulfill({json:{shop,batches:[],mode:'sandbox',master}});
+ const body=await new Response(r.postDataBuffer(),{headers:{'content-type':r.headers()['content-type']}}).formData();
+ checkoutRequests.push({payload:JSON.parse(body.get('payload')),bytes:Buffer.from(await body.get('package').arrayBuffer())});
+ return checkoutRequests.length===1?route.fulfill({status:546,json:{code:'WORKER_LIMIT',message:'Synthetic resource error'}}):route.fulfill({json:{url:'https://checkout.stripe.com/c/pay/synthetic-no-charge'}});
+});
+await context.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Synthetic secure checkout reached</h1>'}));
+await page.locator('#shopName').fill('Synthetic checkout customer');await page.locator('#shopEmail').fill('qa@example.invalid');await page.locator('#shopPhone').fill('2025550104');await page.locator('#shopForm input[type=checkbox][required]').check();
+await page.locator('#shopSend').click();await page.getByRole('heading',{name:'Checkout could not open',exact:true}).waitFor({timeout:90000});
+assert(await page.locator('#checkoutProgress').isVisible());assert((await page.locator('#checkoutProgress').innerText()).includes('Your design is safe'));assert.equal(checkoutRequests.length,1);assert.equal(await page.locator('#shopPrintMethod').isVisible(),false);
+await page.getByRole('button',{name:'Return to my design',exact:true}).click();await page.locator('[data-mobile-pane="order"]').click();assert.equal(await page.getByLabel('Member name',{exact:true}).inputValue(),'Taylor');
+await page.locator('#shopSend').click();await page.waitForURL('https://checkout.stripe.com/**',{timeout:90000});assert.equal(checkoutRequests.length,2);assert.equal(checkoutRequests[0].payload.requestId,checkoutRequests[1].payload.requestId,'Retry retains the same order identity');assert.deepEqual(checkoutRequests[0].bytes,checkoutRequests[1].bytes,'Retry retains exact artwork package');
+console.log('PASS actual mobile checkout: all details completed, visible server-failure recovery, saved names preserved, identical retry package/request identity and captured Stripe handoff. No real requests, payments or emails.');
+
 }finally{await browser.close();}
