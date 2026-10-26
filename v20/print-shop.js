@@ -269,7 +269,7 @@ try {
   }
   window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-19a0e7289b01a523');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  else {await import('./shop-editor.js?v=mapping-0f91ba5cf4d3ca25');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
   if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
   document.body.dataset.ready='true';ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {
