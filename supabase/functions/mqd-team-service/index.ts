@@ -1,4 +1,4 @@
-import {packTeamMaster} from '../_shared/mqd-team-master-transport.js';
+import {packTeamResponse} from '../_shared/mqd-team-master-transport.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -31,6 +31,7 @@ Deno.serve(async(req:Request)=>{
   if(ownerTest){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'',auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required for test payments.'},403);}
   const config=await teamConfig(db,ownerTest?'sandbox':null);const stripe=config.ready?new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2}):null;
   if(req.method==='GET'){if(new URL(req.url).searchParams.get('catalog')==='1')return json(teamPriceCatalog());
+   const publicResponse=packet=>json(new URL(req.url).searchParams.get('compact')==='1'?packTeamResponse(packet):packet);
    const slug=new URL(req.url).searchParams.get('team');if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))throw new Error('Choose a team link.');
    const a=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
    let business=a?await checked(db.from('mqd_print_shop_businesses').select(a.shop_config?.ownerManaged?'id,status,email_verified_at,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived':'id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
@@ -42,7 +43,7 @@ Deno.serve(async(req:Request)=>{
     if(!params.get('version')&&!shop.garments[productId])return json({error:'This garment is not published for this team.'},404);
     const version=params.get('version')||(published.masterVersionIds?published.masterVersionIds[productId]:published.masterVersionId);
     const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
-    return json({shop,master:new URL(req.url).searchParams.get('compact')==='1'?packTeamMaster(master):master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
+    return publicResponse({shop,master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
    }
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
@@ -51,7 +52,7 @@ Deno.serve(async(req:Request)=>{
    const versionId=publicShop.engines.includes('3d')?(new URL(req.url).searchParams.get('version')||a.master_version_id):null;
    const master=versionId?await checked(db.from('mqd_team_master_versions').select('*').eq('id',versionId).eq('team_id',a.team_id).maybeSingle()):null;
    if(versionId&&!master)return json({error:'Team master unavailable.'},404);
-   return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master:new URL(req.url).searchParams.get('compact')==='1'?packTeamMaster(master):master});
+   return publicResponse({shop:publicTeamShop(publicShop),batches,mode:config.mode,master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
   const isForm=req.headers.get('content-type')?.includes('multipart/form-data');if(isForm)checkpoint('multipart-start');const form=isForm?await boundedMultipart(req,51*1024*1024):null;if(isForm)checkpoint('multipart-parsed');

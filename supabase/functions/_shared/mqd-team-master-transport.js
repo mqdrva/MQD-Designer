@@ -9,3 +9,12 @@ export function unpackTeamMaster(master){
  for(const zone of Object.values(master.payload.design.zones))for(const layer of zone.layers){if(layer.type!=='image')continue;const match=/^source:(\d+)$/.exec(layer.src),source=match&&master.sources[Number(match[1])];if(typeof source!=='string'||!/^data:image\/(png|jpeg|webp);base64,/.test(source))throw Error('Team original artwork is missing.');layer.src=source;}
  delete master.sourceFormat;delete master.sources;return master;
 }
+export function packTeamResponse(packet){
+ const master=packTeamMaster(packet.master),shop={...packet.shop};
+ if(master){const i=master.sources.indexOf(shop.garmentLogo);if(i>=0)shop.garmentLogo='master-source:'+i;}
+ return{...packet,shop,master};
+}
+export function unpackTeamResponse(packet){
+ if(/^master-source:/.test(packet.shop?.garmentLogo||'')){const index=/^master-source:(\d+)$/.exec(packet.shop.garmentLogo),source=index&&packet.master?.sources?.[Number(index[1])];if(typeof source!=='string'||!/^data:image\/(png|jpeg|webp);base64,/.test(source))throw Error('Team garment logo is missing.');packet.shop.garmentLogo=source;}
+ packet.master=unpackTeamMaster(packet.master);return packet;
+}

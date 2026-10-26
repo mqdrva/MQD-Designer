@@ -1,4 +1,4 @@
-import {unpackTeamMaster} from '../supabase/functions/_shared/mqd-team-master-transport.js';
+import {unpackTeamResponse} from '../supabase/functions/_shared/mqd-team-master-transport.js';
 import {TEAM_3D_GARMENTS,ownerGarmentShop} from '../supabase/functions/_shared/mqd-team-garments.js';
 import {checkoutProgress} from './checkout-progress.js';
 import {TEAM_IMAGE_REFS,restoreTeamImages} from '../supabase/functions/_shared/mqd-team-image-refs.js';
@@ -273,7 +273,7 @@ try {
     const response=await fetch(teamService?teamEndpoint(`?compact=1&team=${encodeURIComponent(slug)}${requestedGarment?'&garment='+encodeURIComponent(requestedGarment):''}`):`${API}?shop=${encodeURIComponent(slug)}`,{headers:teamHeaders()}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
     if(!response.ok || !result.shop?.engines?.includes(engine))throw new Error('This shop page is not available.');
-    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=unpackTeamMaster(result.master)||null;reviewOnly=result.reviewOnly===true;if(teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
+    if(teamService)unpackTeamResponse(result);shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;reviewOnly=result.reviewOnly===true;if(teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
     if(teamMaster&&engine==='2d'){location.replace('/teams/'+encodeURIComponent(slug)+'/3d');throw new Error('Opening your team master in the 3D designer');}
   }
   window.MQDTeamStartup?.stage('Loading your garment preview…');window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
