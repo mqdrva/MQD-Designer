@@ -116,3 +116,18 @@ vm.runInNewContext(stripTypeScriptTypes(source),{...context,Stripe:SplitStripe,t
 const signedTest=live=>new Request('https://test.invalid',{method:'POST',headers:{'stripe-signature':'test-signed'},body:JSON.stringify({livemode:live,type:'unhandled.test'})});
 assert.equal((await webhookTestHandler(signedTest(false))).status,200);assert(usedTestKey);assert.equal((await webhookTestHandler(signedTest(true))).status,400);
 console.log('PASS signed sandbox webhook alongside live: correct test signature accepted, test-signed live event denied.');
+// The accelerated read retains the same publication and current billing gates.
+const ownerReadContract=await import('../supabase/functions/_shared/mqd-owner-workspace.js');
+const transport=await import('../supabase/functions/_shared/mqd-team-master-transport.js');
+Object.assign(apiContext,ownerReadContract,transport);
+let readPacket={account:{team_id:teamId,status:'active',shop_config:{ownerManaged:true}},business:{status:'active',shop_config:{ownerManaged:true,pilotKind:'team',ownerPublished:{shop:{name:'Published team',garments:{tshirt:{}}},masterVersionIds:{tshirt:'v1'},organizerFeeWaived:true,authorizedBy:'admin'}}},master:{id:'v1',team_id:teamId,payload:{design:{zones:{}}},sources:[],sourceFormat:'mqd-master-sources-v1'}};
+apiDb.rpc=async(name)=>({data:name==='mqd_read_owner_team_public'?structuredClone(readPacket):null,error:null});
+apiContext.teamConfig=async()=>({ready:false,enabled:true,live:true,mode:'live'});
+const publicRead=async suffix=>{const r=await apiHandler(new Request('https://example.invalid?compact=1&team=published'+(suffix||''),{headers:{apikey:runtime.PUBLIC_KEY}}));return{status:r.status,data:await r.json()};};
+assert.equal((await publicRead()).data.reviewOnly,false);
+readPacket.account.organizer_user_id='payer';readPacket.account.stripe_subscription_id='sub';readPacket.account.billing_status='past_due';assert.equal((await publicRead()).data.reviewOnly,true,'Current billing overrides cached artwork');
+readPacket.business.shop_config.ownerPublished=null;assert.equal((await publicRead()).status,404,'Unpublished team denied');
+readPacket.business.shop_config.ownerPublished={shop:{garments:{tshirt:{}}},masterVersionIds:{tshirt:'v1'}};readPacket.business.status='closed';assert.equal((await publicRead()).status,404);
+readPacket.business.status='active';assert.equal((await publicRead('&garment=foreign')).status,404);
+readPacket.master=null;assert.equal((await publicRead()).status,404,'Missing or cross-team version fails closed');
+console.log('PASS accelerated public reads: current billing, unpublish, closed team, garment and missing/cross-team master denial.');
