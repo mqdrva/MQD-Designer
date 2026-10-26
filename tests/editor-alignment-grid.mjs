@@ -17,22 +17,25 @@ for(const host of ['editor.js','shop-editor.js']){
     drawLayerStack:(ctx,_zone,r)=>{ctx.fillStyle=c.fill;ctx.fillRect(r.x,r.y,r.w,r.h);}};
   vm.createContext(c);
   vm.runInContext(['editorRect','drawGridLines','drawZoneComposite'].map(n=>section(source,n)).join('\n'),c);
+  // Reuse native canvas allocations: thousands of fresh surfaces can exhaust
+  // smaller CI runners before their native allocations are garbage-collected.
+  const bitmap=createCanvas(400,400),surfaces=Array.from({length:5},()=>createCanvas(760,860));
   for(const [id,product] of Object.entries(GARMENT_MAPPING))for(const zone of product.zones){
     if(host==='editor.js')zones++;
     c.product={id,...product};c.activeZone=zone;
     for(const fallback of [false,true])for(const zoom of [.6,1,1.6])for(const fill of ['#101010','#ffffff','#b82969']){
       c.editorZoom=zoom;c.fill=fill;
-      const bitmap=createCanvas(400,400),b=bitmap.getContext('2d');b.fillStyle=fill;b.fillRect(0,0,400,400);
+      const b=bitmap.getContext('2d');b.fillStyle=fill;b.fillRect(0,0,400,400);
       const rec={img:bitmap,maskCanvas:bitmap,bounds:{x:0,y:0,w:400,h:400}};
       c.ensureTemplateImage=()=>fallback?null:rec;c.renderMaskedZoneCanvas=()=>bitmap;
-      const render=(grid,guides=true)=>{c.showGrid=grid;const out=createCanvas(760,860);c.drawZoneComposite(out.getContext('2d'),760,860,guides);return out;};
-      const before=render(false),after=render(true),r=c.editorRect(zone),cx=r.x+r.w/2,cy=r.y+r.h/2;
+      const render=(grid,guides=true,index=0)=>{c.showGrid=grid;const out=surfaces[index];c.drawZoneComposite(out.getContext('2d'),760,860,guides);return out;};
+      const before=render(false,true,0),after=render(true,true,1),r=c.editorRect(zone),cx=r.x+r.w/2,cy=r.y+r.h/2;
       assert.notDeepEqual(pixel(after,cx,cy),pixel(before,cx,cy),`${host} ${id}/${zone}: grid crosses opaque artwork (${fill}, zoom ${zoom}, fallback ${fallback})`);
       // A continuous center line must also reach the editor edges at every zoom.
       assert.notDeepEqual(pixel(after,380,2),pixel(before,380,2),`${id}/${zone}: top edge coverage`);
       assert.notDeepEqual(pixel(after,2,430),pixel(before,2,430),`${id}/${zone}: left edge coverage`);
-      assert.deepEqual(pixels(render(true,false)),pixels(render(false,false)),`${id}/${zone}: guide-free output must not depend on grid toggle`);
-      assert.deepEqual(pixels(render(false)),pixels(before),`${id}/${zone}: toggling off restores artwork`);
+      assert.deepEqual(pixels(render(true,false,2)),pixels(render(false,false,3)),`${id}/${zone}: guide-free output must not depend on grid toggle`);
+      assert.deepEqual(pixels(render(false,true,4)),pixels(before),`${id}/${zone}: toggling off restores artwork`);
       cases++;
     }
   }
