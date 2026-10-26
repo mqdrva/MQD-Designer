@@ -19,13 +19,15 @@ export async function mountTeamMember(master,{payload=null}={}){
 
  }
  if(master.payload.design.teamPermissions?.wholeGarmentColor){
-  const applyColor=color=>edits.apply(current=>{for(const zone of Object.values(current.design.zones))zone.background=color.toUpperCase();});
+  const applyColor=async color=>{await edits.apply(current=>{for(const zone of Object.values(current.design.zones))zone.background=color.toUpperCase();});box.querySelector('input[type=color]').value=color.toLowerCase();};
   const label=document.createElement('label');label.textContent='Custom whole-shirt color';const picker=document.createElement('input');picker.type='color';picker.value=copy.design.zones.Front.background;picker.onchange=()=>applyColor(picker.value).catch(error=>document.getElementById('shopStatus').textContent=error.message);label.append(picker);box.append(label);mountTeamColorPresets({container:box,applyColor,allowMaster:true});
  }
+ const preview=document.createElement('button');preview.type='button';preview.className='btn team-member-preview';preview.textContent='Preview my shirt';preview.onclick=()=>window.dispatchEvent(new Event('mqd:show-preview'));box.append(preview);
  document.getElementById('shopForm').prepend(box);
  if(window.MQDTeamTextMoved)window.removeEventListener('mqd:team-text-moved',window.MQDTeamTextMoved);
  window.MQDTeamTextMoved=event=>{const moved=event.detail;try{assertTeamMemberCopy(designer.exportDesign(),master,{complete:false});for(const slider of box.querySelectorAll('[data-team-coordinate]'))if(slider.dataset.teamLayer===moved.layerId&&slider.dataset.teamZone===moved.zone)slider.value=moved[slider.dataset.teamCoordinate];edits.apply(current=>{const layer=current.design.zones[moved.zone]?.layers.find(l=>l.templateLayerId===moved.layerId);if(!layer)throw new Error('Name layer unavailable.');layer.x=moved.x;layer.y=moved.y;}).catch(error=>document.getElementById('shopStatus').textContent=error.message);}catch(error){document.getElementById('shopStatus').textContent=error.message;}};
  window.addEventListener('mqd:team-text-moved',window.MQDTeamTextMoved);
+ const mobileEdit=document.getElementById('mobileEditLayer');if(mobileEdit)mobileEdit.textContent='Personalize';
  const mobileOrder=document.querySelector('[data-mobile-pane="order"]');if(mobileOrder)mobileOrder.textContent='Personalize & Order';
  // Designated text inputs and move-only canvas gestures are the authoring controls for this mode. Server validation
  // independently enforces the same rule, including saved-file and direct API requests.

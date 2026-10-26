@@ -3,3 +3,25 @@ body.print-shop{--shop-accent:#ee7623}body.print-shop .btn.primary{background:va
 .print-shop .shop-request form[hidden]{display:none!important}
 
 .print-shop [hidden]{display:none!important}
+
+.team-member-preview{display:none}
+/* Team personalization is a document, not the generic designer's clipped tool sheet.
+   One page scroll remains usable when Safari opens/closes the keyboard. */
+@media(max-width:850px){
+ body.print-shop[data-team-master="true"] .team-member-preview{display:block;width:100%;min-height:44px;margin-top:12px}
+ body.print-shop[data-team-master="true"] .app.mobile-design-studio{height:auto;min-height:0;overflow:visible;scroll-margin-top:76px}
+ body.print-shop[data-team-master="true"] .app.mobile-design-studio[data-mobile-workspace="canvas"]>.canvas-pane{flex:none;height:540px;height:clamp(420px,75svh,640px);min-height:0}
+ body.print-shop[data-team-master="true"] .app.mobile-design-studio[data-mobile-workspace="canvas"]>.control-pane{display:none!important}
+ body.print-shop[data-team-master="true"] .app.mobile-design-studio[data-mobile-workspace="order"]>#controlPane{height:auto;min-height:0;max-height:none;overflow:visible;padding:12px 12px calc(24px + env(safe-area-inset-bottom));scroll-margin-top:76px}
+ body.print-shop[data-team-master="true"] .mobile-studio-toolbar{display:none}
+ body.print-shop[data-team-master="true"] .mobile-design-studio[data-mobile-workspace="canvas"] .editor-wrap{bottom:54px}
+ body.print-shop[data-team-master="true"] #teamMemberFields{min-width:0;margin:0;padding:12px;border:1px solid #ddd;border-radius:12px}
+ body.print-shop[data-team-master="true"] #teamMemberFields input:not([type="range"]):not([type="color"]),
+ body.print-shop[data-team-master="true"] #teamMemberFields select,
+ body.print-shop[data-team-master="true"] .shop-request input:not([type="checkbox"]),
+ body.print-shop[data-team-master="true"] .shop-request select,
+ body.print-shop[data-team-master="true"] .shop-request textarea{font-size:16px;min-height:44px}
+ body.print-shop[data-team-master="true"] #teamMemberFields input[type="color"]{display:block;width:100%;height:48px;min-height:48px;padding:4px;border:1px solid #aaa;border-radius:8px;background:#fff}
+ body.print-shop[data-team-master="true"] #teamMemberFields input[type="range"]{display:block;min-height:44px;padding:0}
+ body.print-shop[data-team-master="true"] #teamMemberFields p{font-size:14px;line-height:1.5}
+}
