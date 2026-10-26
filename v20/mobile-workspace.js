@@ -53,11 +53,12 @@ function selection(){return window.MQDDesigner?.getSelection?.()||null;}
 function syncSelection(detail=selection()){
   const zone=detail?.zone||document.getElementById('zoneName')?.textContent||'Front';
   const name=detail?.id?(detail.type==='text'?`Text: ${detail.text||detail.label}`:`Image: ${detail.filename||detail.label}`):'No layer selected';
-  selectedLabel.textContent=`${zone} · ${name}${detail?.locked?' · Locked':''}${detail?.visible===false?' · Hidden':''}`;
+  const teamMember=document.body.dataset.teamMaster==='true';
+  selectedLabel.textContent=`${zone} · ${name}${detail?.locked&&!teamMember?' · Locked':''}${detail?.visible===false?' · Hidden':''}`;
   editButton.disabled=!detail?.id;
   const key=detail?.id?`${detail.productId}:${zone}:${detail.id}`:null;
   if(mobile.matches&&active==='canvas'&&!canvasGesture&&key!==lastSelection){
-    sheetOpen=Boolean(key);
+    sheetOpen=Boolean(key)&&!teamMember;
     if(key)sheetPanel='edit';
     else if(sheetPanel==='edit')sheetPanel='layers';
   }
@@ -83,6 +84,11 @@ function render(refresh=true){
 }
 
 function setSheet(panel){
+  if(document.body.dataset.teamMaster==='true'){
+    active='order';sheetOpen=false;render();
+    panes.control.scrollTop=0;panes.control.scrollIntoView({block:'start'});
+    return;
+  }
   active='canvas';sheetPanel=panel;sheetOpen=true;
   window.dispatchEvent(new CustomEvent('mqd:sidebar-tab',{detail:'design'}));
   const section=panes.control?.querySelector(`[data-sidebar-section="${panel==='background'?'background':'layers'}"]`);
@@ -96,6 +102,7 @@ for(const tab of tabs)tab.addEventListener('click',()=>{
   if(tab.dataset.mobilePane==='control'){sheetOpen=true;sheetPanel='layers';}
   window.dispatchEvent(new CustomEvent('mqd:sidebar-tab',{detail:active==='order'?'order':'design'}));
   render();
+  if(document.body.dataset.teamMaster==='true')app.scrollIntoView({block:'start'});
 });
 studio.addEventListener('click',event=>{
   const action=event.target.closest('[data-studio-action]')?.dataset.studioAction;
@@ -127,7 +134,7 @@ panes.control?.addEventListener('click',event=>{
   requestAnimationFrame(()=>setSheet('edit'));
 },{capture:true});
 window.addEventListener('mqd:text-added',()=>{if(mobile.matches)setSheet('edit');});
-window.addEventListener('mqd:show-preview',()=>{if(mobile.matches){active='preview';render();}});
+window.addEventListener('mqd:show-preview',()=>{if(mobile.matches){active='preview';render();if(document.body.dataset.teamMaster==='true')app.scrollIntoView({block:'start'});}});
 window.addEventListener('mqd:garment-ready',()=>{if(mobile.matches&&active==='preview')render();});
 window.addEventListener('mqd:sidebar-changed',event=>{
   if(!mobile.matches)return;
