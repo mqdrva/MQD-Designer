@@ -1,5 +1,6 @@
 import {TEAM_3D_GARMENTS,ownerGarmentShop} from '../supabase/functions/_shared/mqd-team-garments.js';
 import {checkoutProgress} from './checkout-progress.js';
+import {TEAM_IMAGE_REFS,restoreTeamImages} from '../supabase/functions/_shared/mqd-team-image-refs.js';
 import {loadSetupPreview} from './setup-preview-store.js';
 import {placeTeamPrint} from './team-production-placement.js';
 import {teamProductionFonts} from './team-production-fonts.js';
@@ -74,7 +75,7 @@ function shopOrderSheet(d) {
   if(!shopColors(shop,d.product).includes(d.color)||!shopSizes(shop,d.product,d.color).includes(d.size))throw new Error('Choose an offered color and size.');
   return {schemaVersion:1,range:'print-shop',product:d.product,garment:shop.garments?.[d.product],color:d.color,size:d.size,quantity:d.quantity,units:'inches',printMethod:d.printMethod,printMethodLabel:SHOP_PRINT_METHODS[d.printMethod],status:'shop-review-required',printLimits:shopPrintZones(shop,d.product,d.size),locations:Object.fromEntries(VIEWS.map(view=>[view,d.artwork[view]?printMetadata(d.artwork[view],view,zoneFor(d,view)):{status:'No print'}]))};
 }
-async function buildPackage(progress=()=>{}) {
+async function buildPackage(progress=()=>{},{checkout=false}={}) {
   progress('Saving your name and color choices…');
   await window.MQDTeamFlush?.();
   const entries = [], s = summary();
@@ -105,7 +106,7 @@ async function buildPackage(progress=()=>{}) {
     if(!window.MQDDesigner.shopPreviewReady())throw new Error('The 3D garment is still loading. Try saving again when the preview is ready.');
     window.dispatchEvent(new Event('mqd:show-preview'));
     window.MQDDesigner.refreshMobileWorkspace('preview');
-    entries.push({name:'design.json',data:JSON.stringify({schema:'mqd-shop-design-v1',engine,shop:shop.slug,design})});
+    const packed=checkout&&teamService&&!!teamMaster,sources=new Map(),sourceTypes={};
     entries.push({name:'previews/3d.png',data:await window.MQDDesigner.captureShopPreview()});
     if(teamService){progress('Preparing the print files for your garment…');entries.push(...await window.MQDDesigner.exportShopProductionZones());}
     for (const [zone,state] of Object.entries(design.design.zones || {})) for (const [i,layer] of (state.layers || []).entries()) {
@@ -113,10 +114,12 @@ async function buildPackage(progress=()=>{}) {
       if (layer.type === 'image' && layer.src) {
         if(teamService&&!teamMaster&&garmentLogo(shop,s.productId).mode!=='none'&&layer.src===shop.garmentLogo)continue;
         if (!/^data:image\/(png|jpeg|webp);base64,/.test(layer.src)) throw new Error('Upload the original artwork from your device.');
-        const response = await fetch(layer.src);
-        entries.push({name:`originals/${safeArtworkName(zone)}-${i}-${safeArtworkName(layer.filename || 'artwork.png')}`,data:await response.blob()});
+        let path=packed?sources.get(layer.src):null;
+        if(!path){const response=await fetch(layer.src);path=`originals/${safeArtworkName(zone)}-${i}-${safeArtworkName(layer.filename || 'artwork.png')}`;entries.push({name:path,data:await response.blob()});if(packed){sources.set(layer.src,path);sourceTypes[path]=layer.src.match(/^data:(image\/(?:png|jpeg|webp));base64,/)[1];}}
+        if(packed)layer.src='zip:'+path;
       }
     }
+    entries.push({name:'design.json',data:JSON.stringify({schema:'mqd-shop-design-v1',engine,shop:shop.slug,design,...(packed?{imageSourceFormat:TEAM_IMAGE_REFS,imageSourceTypes:sourceTypes}:{})})});
   }
   const preset=garmentLogo(shop,s.productId);
   if(preset.mode!=='none'&&!teamMaster){
@@ -140,7 +143,7 @@ async function loadPackage(file) {
   if (entries.length > (teamService?500:60) || entries.some(f=>f.name.includes('..') || f.name.startsWith('/')) || entries.reduce((n,f)=>n+(f._data?.uncompressedSize||0),0) > (teamService?128:64)*1024*1024) throw new Error('This saved design package is too large or invalid.');
   const entry=zip.file('design.json'); if (!entry) throw new Error('The ZIP does not contain a saved design.');
   if ((entry._data?.uncompressedSize || 0) > (teamService?48:24)*1024*1024) throw new Error('Saved design is too large.');
-  const saved=JSON.parse(await entry.async('string'));
+  const saved=await restoreTeamImages(JSON.parse(await entry.async('string')),zip);
   if(saved.schema!=='mqd-shop-design-v1'||saved.engine!==engine||saved.shop!==shop.slug) throw new Error('Open this design on its original shop and designer page.');
   if(engine==='2d') {
     const d=saved.draft;
@@ -192,7 +195,7 @@ async function send(event) {
     const delivery=teamService?$('teamDelivery').value:null,batchId=teamService&&delivery==='team'?$('teamBatch').value:null;
     const fingerprint=await digest(new TextEncoder().encode(JSON.stringify([fingerprintDesign,summary(),customer,fileDigests,delivery,batchId])));
     if(!cachedAttempt||cachedAttempt.fingerprint!==fingerprint) {
-      const packet=await buildPackage(say);
+      const packet=await buildPackage(say,{checkout:true});
       if(packet.blob.size>(teamService?50*1024*1024:MAX_REQUEST_BYTES))throw new Error(teamService?'This original production package exceeds the 50 MB checkout limit. Keep the full artwork intact and contact MYMERCHNOW before ordering.':'This package exceeds the design-package limit. Keep the original artwork and contact MYMERCHNOW.');
       cachedAttempt={...packet,fingerprint,id:crypto.randomUUID(),customer};
     }

@@ -11,6 +11,9 @@ function sameJson(a,b){
  const ak=Object.keys(a).filter(k=>a[k]!==undefined).sort(),bk=Object.keys(b).filter(k=>b[k]!==undefined).sort();
  return ak.length===bk.length&&ak.every((key,i)=>key===bk[i]&&sameJson(a[key],b[key]));
 }
+// Object containers must be independent; primitive source strings are immutable
+// and can safely be shared while validating. structuredClone copies their bytes.
+const comparisonCopy=value=>Array.isArray(value)?value.map(comparisonCopy):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,comparisonCopy(v)])):value;
 const fail=message=>{throw new Error(message);};
 export function validateTeamMaster(master){
  const p=master?.payload;
@@ -42,9 +45,9 @@ export function validateTeamMaster(master){
  }
  return master;
 }
-export function cloneTeamMaster(version,uuid=()=>crypto.randomUUID()){
+export function cloneTeamMaster(version,uuid=()=>crypto.randomUUID(),clone=structuredClone){
  validateTeamMaster(version);
- const copy=cloneTemplate({...version,template_id:version.team_id},uuid);
+ const copy=cloneTemplate({...version,template_id:version.team_id},uuid,clone);
  copy.design.teamMaster={teamId:version.team_id,versionId:version.id,copyId:copy.design.template.copyId,name:version.name};
  delete copy.design.template;
  return copy;
@@ -52,7 +55,7 @@ export function cloneTeamMaster(version,uuid=()=>crypto.randomUUID()){
 export function assertTeamMemberCopy(payload,version,{complete=true}={}){
  const ref=payload?.design?.teamMaster;
  if(!ref||ref.teamId!==version.team_id||ref.versionId!==version.id||!UUID.test(ref.copyId))fail('This copy does not belong to the selected team master.');
- const expected=cloneTeamMaster(version,()=>ref.copyId),actual=structuredClone(payload);
+ const expected=cloneTeamMaster(version,()=>ref.copyId,comparisonCopy),actual=comparisonCopy(payload);
  // Copy identifiers and save/view state are local; every production property is protected.
  for(const p of [expected,actual]){delete p.designId;delete p.savedAt;delete p.activeZone;delete p.orderOptions;delete p.totalQuantity;delete p.design.teamMaster;p.product={id:p.product.id,model:p.product.model};}
  // PostgreSQL jsonb reorders zone keys; only layer order within a zone is meaningful.
