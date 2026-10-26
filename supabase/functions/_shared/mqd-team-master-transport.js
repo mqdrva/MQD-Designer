@@ -1,6 +1,6 @@
 // Only transport changes: identical source strings are sent once, never resized.
 export function packTeamMaster(master){
- if(!master)return null;const sources=[],ids=new Map();
+ if(!master)return null;if(master.sourceFormat==='mqd-master-sources-v1')return master;const sources=[],ids=new Map();
  const zones=Object.fromEntries(Object.entries(master.payload.design.zones).map(([name,zone])=>[name,{...zone,layers:zone.layers.map(layer=>{if(layer.type!=='image')return layer;let id=ids.get(layer.src);if(id===undefined){id=sources.length;ids.set(layer.src,id);sources.push(layer.src);}return{...layer,src:'source:'+id};})}]));
  return{...master,payload:{...master.payload,design:{...master.payload.design,zones}},sourceFormat:'mqd-master-sources-v1',sources};
 }

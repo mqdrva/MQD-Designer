@@ -33,8 +33,10 @@ Deno.serve(async(req:Request)=>{
   if(req.method==='GET'){if(new URL(req.url).searchParams.get('catalog')==='1')return json(teamPriceCatalog());
    const publicResponse=packet=>json(new URL(req.url).searchParams.get('compact')==='1'?packTeamResponse(packet):packet);
    const slug=new URL(req.url).searchParams.get('team');if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))throw new Error('Choose a team link.');
-   const a=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
-   let business=a?await checked(db.from('mqd_print_shop_businesses').select(a.shop_config?.ownerManaged?'id,status,email_verified_at,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived':'id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
+   const params=new URL(req.url).searchParams;
+   const compact=params.get('compact')==='1'?await checked(db.rpc('mqd_read_owner_team_public',{p_slug:slug,p_live:config.live,p_garment:params.get('garment'),p_version:params.get('version')})):null;
+   const a=compact?compact.account:await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
+   let business=compact?compact.business:a?await checked(db.from('mqd_print_shop_businesses').select(a.shop_config?.ownerManaged?'id,status,email_verified_at,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived':'id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
    if(business&&Object.hasOwn(business,'published_shop'))business={...business,shop_config:{ownerManaged:true,pilotKind:business.pilot_kind,ownerPublished:business.published_shop?{shop:business.published_shop,authorizedBy:business.publication_authorized_by,masterVersionIds:business.publication_master_ids,organizerFeeWaived:business.publication_waived}:null}};
    if(a?.shop_config?.ownerManaged){
     const published=business?.shop_config?.ownerPublished;
@@ -42,7 +44,8 @@ Deno.serve(async(req:Request)=>{
     const shop=publicTeamShop(published.shop),params=new URL(req.url).searchParams,productId=params.get('garment')||Object.keys(shop.garments)[0];
     if(!params.get('version')&&!shop.garments[productId])return json({error:'This garment is not published for this team.'},404);
     const version=params.get('version')||(published.masterVersionIds?published.masterVersionIds[productId]:published.masterVersionId);
-    const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
+    const master=compact?compact.master:version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
+    if(version&&!master)return json({error:'Team master unavailable.'},404);
     return publicResponse({shop,master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
    }
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
