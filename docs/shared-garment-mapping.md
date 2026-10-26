@@ -12,6 +12,12 @@ Validation: `npm run check:mappings`, `node tests/shared-garment-mapping.mjs`, t
 
 Deployment changes only add the mapping preparation build and normal cache versioning. Billing, fulfillment, customer submissions and the pending service management/Team release remain separate. Physical print/sew accuracy still requires production verification; no manufactured sample is certified by this change.
 
+## Continuous editor alignment grid
+
+The Gridlines toggle draws one panel-centered grid across the full visible artwork editor for every zone on all twelve garments, including opaque artwork, colored backgrounds, sleeves, collars, hoods, and fallback shapes. Solid major lines contain four smaller dashed squares. Light under-strokes keep the guides visible on dark images; red cut/sew guides and editing handles stay above the grid. The grid follows the garment's zoom and extends to the canvas edges. The main and branded/Team premium editors receive the same generated change. It is an editor-only overlay: guide-free output, customer layer coordinates, saved designs, production masks, and 3D textures do not change.
+
+Validation: `node tests/editor-alignment-grid.mjs` checks every catalog zone in both hosts with dark/white/color artwork, three zoom levels, template and fallback rendering, toggle restoration, and unchanged guide-free output. Existing frozen renderer and shared-mapping checks remain required.
+
 ## Hoodie front alignment correction
 
 The user-reported high-front-logo mismatch is corrected in the shared hoodie preview: ordinary front artwork uses the actual partitioned Front panel's vertical bounds, from shoulder edge to waistband. The previous whole-garment fraction compressed this frame and placed high chest artwork too low. Horizontal placement, Back, sleeves, hood and special full-panel background fitting remain unchanged. Saved layer coordinates, production templates and output dimensions are unchanged; existing designs receive the preview correction on a fresh load. Both main and Team/branded hosts are generated from the same correction. The frozen baseline changes only `rebuildFleeceHoodiePreview`, reflecting this explicitly requested correction. Actual model geometry tests cover front top/bottom anchors, high-chest placement and unchanged Back; browser checks render identical synthetic designs in both hosts without writing live records. This is preview alignment verification, not a manufactured sample certification.

@@ -48,6 +48,7 @@ jobs:
           node --check v20/editor.js
           node --check v20/shop-editor.js
           node tests/shared-garment-mapping.mjs
+          node tests/editor-alignment-grid.mjs
           node tests/fleece-hoodie-zones.mjs
           node tests/long-sleeve-pattern-uv.mjs
           node tests/mask-renderer.mjs

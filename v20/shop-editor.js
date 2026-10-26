@@ -1069,10 +1069,29 @@ function editorRect(zone=activeZone,w=editorCanvas.width,h=editorCanvas.height){
 }
 // @mapping-end editorRect
 // @mapping-begin drawGridLines
-function drawGridLines(c,r){
-  const step=Math.max(24,Math.round(Math.min(r.w,r.h)/14));c.save();c.strokeStyle='rgba(0,0,0,.075)';c.lineWidth=1;
-  for(let x=r.x;x<=r.x+r.w;x+=step){c.beginPath();c.moveTo(x,r.y);c.lineTo(x,r.y+r.h);c.stroke();}
-  for(let y=r.y;y<=r.y+r.h;y+=step){c.beginPath();c.moveTo(r.x,y);c.lineTo(r.x+r.w,y);c.stroke();}c.restore();
+function drawGridLines(c,r,viewport=r){
+  // A single panel-centered lattice covers the entire visible editor. Four
+  // minor squares per major square match the alignment guide reference.
+  const step=Math.max(24,Math.round(Math.min(r.w,r.h)/14));
+  const cx=r.x+r.w/2,cy=r.y+r.h/2;
+  c.save();c.globalAlpha=1;c.globalCompositeOperation='source-over';
+  const line=(x1,y1,x2,y2,major)=>{
+    c.setLineDash(major?[]:[4,3]);
+    c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);
+    // A light under-stroke keeps the same grid legible on dark artwork as
+    // well as white canvas, without changing any customer layer pixels.
+    c.strokeStyle=major?'rgba(255,255,255,.48)':'rgba(255,255,255,.30)';
+    c.lineWidth=major?2.5:1.5;c.stroke();
+    c.strokeStyle=major?'rgba(100,100,100,.60)':'rgba(100,100,100,.34)';
+    c.lineWidth=major?1.5:.75;c.stroke();
+  };
+  for(let i=Math.ceil((viewport.x-cx)/step);i<=Math.floor((viewport.x+viewport.w-cx)/step);i++){
+    const x=cx+i*step;line(x,viewport.y,x,viewport.y+viewport.h,i%4===0);
+  }
+  for(let i=Math.ceil((viewport.y-cy)/step);i<=Math.floor((viewport.y+viewport.h-cy)/step);i++){
+    const y=cy+i*step;line(viewport.x,y,viewport.x+viewport.w,y,i%4===0);
+  }
+  c.restore();
 }
 // @mapping-end drawGridLines
 // @mapping-begin drawTemplateGuide
@@ -1125,19 +1144,7 @@ function traceZonePath(c,zone,w,h){
 // @mapping-begin fitRect
 function fitRect(){const pad=58;const w=editorCanvas.width-pad*2,h=editorCanvas.height-pad*2;return{x:pad,y:pad,w,h};}
 // @mapping-end fitRect
-// @mapping-begin drawLongSleeveWhiteGrid
-function drawLongSleeveWhiteGrid(c,zone,r,rec){
-  if(product.id!=='long-sleeve-tshirt'||!showGrid||(zoneState(zone).background||'#FFFFFF').toUpperCase()!=='#FFFFFF')return;
-  const grid=document.createElement('canvas');grid.width=r.w;grid.height=r.h;
-  const g=grid.getContext('2d');drawGridLines(g,{x:0,y:0,w:r.w,h:r.h});
-  g.globalCompositeOperation='destination-in';g.drawImage(rec.maskCanvas,0,0,r.w,r.h);
-  // Keep the grid over white fill only, not across customer text or pictures.
-  const b=scaleBounds(rec.bounds,rec.img.naturalWidth||rec.img.width,rec.img.naturalHeight||rec.img.height,r.w,r.h);
-  g.globalCompositeOperation='destination-out';
-  g.drawImage(makeLongSleeveTshirtArtworkCanvas(zone),b.x,b.y,b.w,b.h);
-  c.drawImage(grid,r.x,r.y);
-}
-// @mapping-end drawLongSleeveWhiteGrid
+
 // @mapping-begin drawZoneComposite
 function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   const r=editorRect(activeZone,w,h),rec=ensureTemplateImage(activeZone);
@@ -1146,7 +1153,13 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
   targetCtx.translate(w/2,h/2);
   targetCtx.scale(editorZoom,editorZoom);
   targetCtx.translate(-w/2,-h/2);
-  if(showGrid&&includeGuides)drawGridLines(targetCtx,r);
+  const drawAlignmentGrid=()=>{
+    if(!showGrid||!includeGuides)return;
+    // Undo the zoom only for the visible bounds, keeping the lattice anchored
+    // to the same garment frame while it extends past every print-zone edge.
+    const vw=w/editorZoom,vh=h/editorZoom;
+    drawGridLines(targetCtx,r,{x:(w-vw)/2,y:(h-vh)/2,w:vw,h:vh});
+  };
 
   if(rec?.img&&rec?.maskCanvas&&rec?.bounds){
     // Render the T-shirt editor at the same aspect as its print export.
@@ -1179,7 +1192,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     // Front/Back/Sleeves/Collar placement correspond to the same normalized
     // coordinates consumed by the locked 3D UV textures.
     if(product.id!=='sweat-pants'&&product.id!=='tshirt'&&product.id!=='long-sleeve-tshirt'&&product.id!=='lightweight-jacket'&&product.id!=='shorts'&&product.id!=='hooded-long-sleeve'&&!hoodMaskSleeve&&!longPoloCollar)drawEditorTextOverlay(targetCtx,activeZone,r,rec);
-    if(includeGuides)drawLongSleeveWhiteGrid(targetCtx,activeZone,r,rec);
+    drawAlignmentGrid();
     drawSafeAreaGuide(targetCtx,activeZone,r,rec);
 
     // Production cut/sew lines are always drawn last in true red so they stay
@@ -1205,6 +1218,7 @@ function drawZoneComposite(targetCtx,w,h,includeGuides=false){
     targetCtx.clip();
     drawLayerStack(targetCtx,activeZone,{x:0,y:0,w:r.w,h:r.h});
     targetCtx.restore();
+    drawAlignmentGrid();
     // Fallback red guide for zones without a production-template bitmap.
     targetCtx.save();
     targetCtx.translate(r.x,r.y);
