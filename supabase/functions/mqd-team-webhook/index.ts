@@ -6,11 +6,16 @@ const EVENT_TYPES=new Set(['checkout.session.completed','checkout.session.async_
 Deno.serve(async(req:Request)=>{
  const json=(body:any,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
  if(req.method!=='POST')return json({error:'Method unavailable.'},405);
- const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!),config=await teamConfig(db);
+ const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);let config=await teamConfig(db);
  if(!config.ready)return json({error:'Team webhook is awaiting configuration.'},503);
- const stripe=new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
+ let stripe=new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
  let event:any,lease=crypto.randomUUID();
- try{const reader=req.body?.getReader();if(!reader)throw new Error('missing');let raw='',length=0;const decoder=new TextDecoder();while(true){const p=await reader.read();if(p.done)break;length+=p.value.length;if(length>512000){await reader.cancel();throw new Error('large');}raw+=decoder.decode(p.value,{stream:true});}raw+=decoder.decode();event=await stripe.webhooks.constructEventAsync(raw,req.headers.get('stripe-signature')||'',config.webhook,300,Stripe.createSubtleCryptoProvider());}catch{return json({error:'Invalid webhook signature.'},400);}
+ try{const reader=req.body?.getReader();if(!reader)throw new Error('missing');let raw='',length=0;const decoder=new TextDecoder();while(true){const p=await reader.read();if(p.done)break;length+=p.value.length;if(length>512000){await reader.cancel();throw new Error('large');}raw+=decoder.decode(p.value,{stream:true});}raw+=decoder.decode();try{event=await stripe.webhooks.constructEventAsync(raw,req.headers.get('stripe-signature')||'',config.webhook,300,Stripe.createSubtleCryptoProvider());}catch(error){
+ // Existing sandbox events remain isolated and verifiable while live ordering is on.
+ if(!config.live)throw error;const test=await teamConfig(db,'sandbox');if(!test.ready)throw error;
+ const testStripe=new Stripe(test.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
+ event=await testStripe.webhooks.constructEventAsync(raw,req.headers.get('stripe-signature')||'',test.webhook,300,Stripe.createSubtleCryptoProvider());if(event.livemode!==false)throw error;config=test;stripe=testStripe;
+ }}catch{return json({error:'Invalid webhook signature.'},400);}
  if(event.livemode!==config.live||!EVENT_TYPES.has(event.type))return json({received:true,ignored:true});
  try{
   const claim=await db.rpc('mqd_claim_team_event',{p_event:event.id,p_type:event.type,p_lease:lease});if(claim.error)throw claim.error;if(!claim.data)return json({received:true,duplicate:true});

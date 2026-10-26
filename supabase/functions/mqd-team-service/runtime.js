@@ -7,8 +7,8 @@ export const BASE_URL='https://mymerchnow.app',PUBLIC_KEY='sb_publishable_T8BLz1
 export const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof value==='string'?new TextEncoder().encode(value):value)),b=>b.toString(16).padStart(2,'0')).join('');
 export const objectId=v=>typeof v==='string'?v:v?.id;
 export const secret=async(db,name)=>{const env=Deno.env.get(name.toUpperCase());if(env)return env;const {data,error}=await db.rpc('mqd_get_vault_secret',{secret_name:name});return error?'':String(data||'');};
-export async function teamConfig(db){
- const mode=await secret(db,'mqd_team_mode')==='live'?'live':'sandbox',prefix='mqd_team_'+mode;
+export async function teamConfig(db,override=null){
+ const mode=override==='sandbox'?'sandbox':await secret(db,'mqd_team_mode')==='live'?'live':'sandbox',prefix='mqd_team_'+mode;
  const [key,webhook,price,portal,flag]=await Promise.all(['key','webhook_secret','price','portal','enabled'].map(x=>secret(db,prefix+'_'+x)));
  const ready=(mode==='live'?/^rk_live_/:/^rk_test_/).test(key)&&webhook.startsWith('whsec_')&&price.startsWith('price_')&&portal.startsWith('bpc_');
  return {mode,live:mode==='live',key,webhook,price,portal,ready,enabled:ready&&flag==='true'};
