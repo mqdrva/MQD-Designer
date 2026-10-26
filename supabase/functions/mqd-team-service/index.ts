@@ -1,3 +1,4 @@
+import {packTeamMaster} from '../_shared/mqd-team-master-transport.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -26,11 +27,14 @@ Deno.serve(async(req:Request)=>{
  if(req.headers.get('apikey')!==PUBLIC_KEY)return json({error:'Application key required.'},401);
  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
  try{
-  const config=await teamConfig(db);const stripe=config.ready?new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2}):null;
+  const ownerTest=new URL(req.url).searchParams.get('ownerTest')==='1';
+  if(ownerTest){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'',auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required for test payments.'},403);}
+  const config=await teamConfig(db,ownerTest?'sandbox':null);const stripe=config.ready?new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2}):null;
   if(req.method==='GET'){if(new URL(req.url).searchParams.get('catalog')==='1')return json(teamPriceCatalog());
    const slug=new URL(req.url).searchParams.get('team');if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))throw new Error('Choose a team link.');
    const a=await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
-   const business=a?await checked(db.from('mqd_print_shop_businesses').select('id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
+   let business=a?await checked(db.from('mqd_print_shop_businesses').select(a.shop_config?.ownerManaged?'id,status,email_verified_at,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived':'id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
+   if(business&&Object.hasOwn(business,'published_shop'))business={...business,shop_config:{ownerManaged:true,pilotKind:business.pilot_kind,ownerPublished:business.published_shop?{shop:business.published_shop,authorizedBy:business.publication_authorized_by,masterVersionIds:business.publication_master_ids,organizerFeeWaived:business.publication_waived}:null}};
    if(a?.shop_config?.ownerManaged){
     const published=business?.shop_config?.ownerPublished;
     if(!published||business.status==='closed')return json({error:'Design review is not published.'},404);
@@ -38,7 +42,7 @@ Deno.serve(async(req:Request)=>{
     if(!params.get('version')&&!shop.garments[productId])return json({error:'This garment is not published for this team.'},404);
     const version=params.get('version')||(published.masterVersionIds?published.masterVersionIds[productId]:published.masterVersionId);
     const master=version?await checked(db.from('mqd_team_master_versions').select('*').eq('id',version).eq('team_id',a.team_id).single()):null;
-    return json({shop,master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
+    return json({shop,master:new URL(req.url).searchParams.get('compact')==='1'?packTeamMaster(master):master,batches:[],mode:config.mode,reviewOnly:!(config.enabled&&ownerGarmentCheckout(a,business)),kind:business.shop_config.pilotKind});
    }
    if(!business||business.status==='closed'||!business.email_verified_at)return json({error:'Team unavailable.'},404);
    if(!a||!config.enabled||!teamAccess(a))return json({error:'This team link is not active.'},404);
@@ -47,12 +51,13 @@ Deno.serve(async(req:Request)=>{
    const versionId=publicShop.engines.includes('3d')?(new URL(req.url).searchParams.get('version')||a.master_version_id):null;
    const master=versionId?await checked(db.from('mqd_team_master_versions').select('*').eq('id',versionId).eq('team_id',a.team_id).maybeSingle()):null;
    if(versionId&&!master)return json({error:'Team master unavailable.'},404);
-   return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master});
+   return json({shop:publicTeamShop(publicShop),batches,mode:config.mode,master:new URL(req.url).searchParams.get('compact')==='1'?packTeamMaster(master):master});
   }
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
   const isForm=req.headers.get('content-type')?.includes('multipart/form-data');if(isForm)checkpoint('multipart-start');const form=isForm?await boundedMultipart(req,51*1024*1024):null;if(isForm)checkpoint('multipart-parsed');
   if(form&&String(form.get('payload')||'').length>20000)throw new Error('Order details are too large.');
   const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(await bodyBytes(req,req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000)));
+  if(ownerTest&&!['order-checkout','order-status','admin-list','admin-detail','admin-package'].includes(body.action))return json({error:'Test access only supports checkout and order verification.'},403);
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
   if(adminAction){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';const auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required.'},403);actor=auth.data.user;}
    if(body.action==='admin-master-load'&&body.metadataOnly===true){
@@ -219,7 +224,7 @@ Deno.serve(async(req:Request)=>{
    const upload=await db.storage.from('mqd-team-production').upload(path,verifiedBytes,{contentType:'application/zip',upsert:false});if(upload.error&&upload.error.statusCode!=='409'&&!String(upload.error.message).includes('already exists'))throw new Error('Production package could not be saved.');
    const session=await stripe.checkout.sessions.create({mode:'payment',line_items:[{price_data:{currency:'usd',unit_amount:stored.garment_cents,product_data:{name:shop.name+' · '+summary.productName+' · '+stored.quantity+' garment(s)'}},quantity:1}],customer_email:customer.email,phone_number_collection:{enabled:true},automatic_tax:{enabled:false},expires_at:Math.floor(Date.now()/1000)+2100,
     ...(body.delivery==='individual'?{shipping_address_collection:{allowed_countries:['US']},shipping_options:[{shipping_rate_data:{type:'fixed_amount',fixed_amount:{amount:stored.shipping_cents,currency:'usd'},display_name:'MYMERCHNOW standard shipping'}}]}:{}),
-    client_reference_id:'MQD-TEAM-'+stored.id,integration_identifier:identifier(stored.id),metadata:{service:'mqd-teams',team:account.team_id,order:stored.id},payment_intent_data:{metadata:{service:'mqd-teams',team:account.team_id,order:stored.id}},success_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/team-order.html?id='+stored.id,cancel_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/teams/'+shop.slug+(summary.engine==='3d'?'/3d':'')},{idempotencyKey:'team-order-'+stored.id});
+    client_reference_id:'MQD-TEAM-'+stored.id,integration_identifier:identifier(stored.id),metadata:{service:'mqd-teams',team:account.team_id,order:stored.id},payment_intent_data:{metadata:{service:'mqd-teams',team:account.team_id,order:stored.id}},success_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/team-order.html?id='+stored.id+(ownerTest?'&ownerTest=1':''),cancel_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/teams/'+shop.slug+(summary.engine==='3d'?'/3d':'')},{idempotencyKey:'team-order-'+stored.id});
    if(session.livemode!==config.live||!session.url)throw new Error('Checkout environment mismatch.');
    await checked(db.from('mqd_team_orders').update({checkout_id:session.id,reserved_until:new Date(session.expires_at*1000).toISOString()}).eq('id',stored.id));return json({url:session.url,id:stored.id});
   }

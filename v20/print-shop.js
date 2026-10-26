@@ -1,3 +1,4 @@
+import {unpackTeamMaster} from '../supabase/functions/_shared/mqd-team-master-transport.js';
 import {TEAM_3D_GARMENTS,ownerGarmentShop} from '../supabase/functions/_shared/mqd-team-garments.js';
 import {checkoutProgress} from './checkout-progress.js';
 import {TEAM_IMAGE_REFS,restoreTeamImages} from '../supabase/functions/_shared/mqd-team-image-refs.js';
@@ -15,7 +16,11 @@ import { makeZip, safeArtworkName } from './everyday-zip.js';
 
 const teamService=document.body.dataset.teamService==='true';
 const API = 'https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-print-shop-pilot';
+const ownerPaymentTest=new URLSearchParams(location.search).get('ownerTest')==='1';
 const TEAM_API=API.replace('mqd-print-shop-pilot','mqd-team-service');
+let paymentTestToken='';
+const teamHeaders=()=>({apikey:KEY,...(paymentTestToken?{Authorization:'Bearer '+paymentTestToken}:{})});
+const teamEndpoint=suffix=>TEAM_API+suffix+(ownerPaymentTest?(suffix.includes('?')?'&':'?')+'ownerTest=1':'');
 let teamBatches=[],teamMode=null,teamMaster=null,reviewOnly=false;
 const KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const $ = id => document.getElementById(id);
@@ -165,7 +170,7 @@ async function loadPackage(file) {
     }
     if(teamService&&(teamMaster||d.design?.teamMaster)){
      const ref=d.design?.teamMaster;if(!ref)throw new Error('Open a saved member copy of this team master.');
-     const response=await fetch(TEAM_API+'?team='+encodeURIComponent(slug)+'&version='+encodeURIComponent(ref.versionId),{headers:{apikey:KEY}}),result=await response.json();
+     const response=await fetch(teamEndpoint('?team='+encodeURIComponent(slug)+'&version='+encodeURIComponent(ref.versionId)),{headers:teamHeaders()}),result=await response.json();
      if(!response.ok||!result.master)throw new Error('This team master version is unavailable.');
      assertTeamMemberCopy(d,result.master,{complete:false});teamMaster=result.master;await mountTeamMember(teamMaster,{payload:d});
     }else await window.MQDDesigner.loadDesign(d,{notify:false});
@@ -204,7 +209,7 @@ async function send(event) {
     form.append('payload',JSON.stringify({...(teamService?{action:'order-checkout',team:slug,guestToken,delivery,batchId}:{shop:slug}),requestId:attempt.id,summary:attempt.summary,customer:attempt.customer,website:$('shopWebsite').value,startedAt:Number($('shopStarted').value)}));
     form.append('package',attempt.blob,`${slug}-${engine}-design.zip`);
     say('Sending your artwork securely and opening checkout…');
-    const response=await fetch(teamService?TEAM_API:API,{method:'POST',headers:{apikey:KEY},body:form}),result=await response.json().catch(()=>({}));
+    const response=await fetch(teamService?teamEndpoint(''):API,{method:'POST',headers:teamHeaders(),body:form}),result=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(response.status>=500?'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.':result.error||'Your design is still here. Please review the order and retry.');
     if(teamService){if(result.paid){location.href='/team-order.html?id='+result.id;return;}const url=new URL(result.url);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com')throw new Error('Secure checkout link unavailable.');location.assign(url.href);return;}
     say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.`);
@@ -252,6 +257,7 @@ function mount() {
 let ownerLoading=null;
 if(setupPreview&&new URLSearchParams(location.search).get('ownerWorkspace')){ownerLoading=document.createElement('div');ownerLoading.id='ownerMasterLoading';ownerLoading.setAttribute('role','status');ownerLoading.style.cssText='position:fixed;inset:0;z-index:10000;background:#fff;display:grid;place-content:center;padding:30px;text-align:center;font:18px Arial,sans-serif';ownerLoading.textContent='Opening your saved owner draft and original artwork… Please wait. Do not upload again or save a blank canvas.';document.body.append(ownerLoading);document.body.setAttribute('aria-busy','true');}
 try {
+  if(ownerPaymentTest){const {ownerAuth}=await import('./owner-team-workspace.js');const {requireAdminMfa}=await import('./admin-security.js');await requireAdminMfa(ownerAuth);paymentTestToken=(await ownerAuth.auth.getSession()).data.session?.access_token;if(!paymentTestToken)throw new Error('Sign into the MQD owner workspace first.');}
   if(setupPreview){
     const ownerId=new URLSearchParams(location.search).get('ownerWorkspace');
     let packet;
@@ -264,17 +270,17 @@ try {
     shop=packet.shop;if(ownerWorkspaceData){reviewOnly=true;if(ownerWorkspaceData.editingMode==='strict'){garmentChoices=TEAM_3D_GARMENTS;shop=ownerGarmentShop(shop,requestedGarment||Object.keys(shop.garments)[0]);ownerWorkspaceData.packet.shop=shop;}}
     if(memberPreview){if(!ownerId||!ownerWorkspaceData)throw new Error('Owner verification is required for this private preview.');const {ownerCall}=await import('./owner-team-workspace.js');const saved=await ownerCall('master-load',{id:ownerId,productId:requestedGarment||Object.keys(shop.garments)[0]});if(!saved.draft)throw new Error('Save the owner master draft before previewing member controls.');teamMaster={...saved.draft,id:crypto.randomUUID(),team_id:ownerId};reviewOnly=true;}
   }else{
-    const response=await fetch(teamService?`${TEAM_API}?team=${encodeURIComponent(slug)}${requestedGarment?'&garment='+encodeURIComponent(requestedGarment):''}`:`${API}?shop=${encodeURIComponent(slug)}`,{headers:{apikey:KEY}}),result=await response.json();
+    const response=await fetch(teamService?teamEndpoint(`?compact=1&team=${encodeURIComponent(slug)}${requestedGarment?'&garment='+encodeURIComponent(requestedGarment):''}`):`${API}?shop=${encodeURIComponent(slug)}`,{headers:teamHeaders()}),result=await response.json();
     if(response.ok&&teamService&&!result.shop?.engines?.includes(engine)&&result.shop?.engines?.length===1){location.replace('/teams/'+encodeURIComponent(slug)+(result.shop.engines[0]==='3d'?'/3d':''));throw new Error('Opening the selected team designer');}
     if(!response.ok || !result.shop?.engines?.includes(engine))throw new Error('This shop page is not available.');
-    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=result.master||null;reviewOnly=result.reviewOnly===true;if(teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
+    shop=result.shop;teamBatches=result.batches||[];teamMode=result.mode;teamMaster=unpackTeamMaster(result.master)||null;reviewOnly=result.reviewOnly===true;if(teamMaster)garmentChoices=Object.fromEntries(Object.keys(shop.garments).map(product=>[product,TEAM_3D_GARMENTS[product]||product]));
     if(teamMaster&&engine==='2d'){location.replace('/teams/'+encodeURIComponent(slug)+'/3d');throw new Error('Opening your team master in the 3D designer');}
   }
-  window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
+  window.MQDTeamStartup?.stage('Loading your garment preview…');window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-0f91ba5cf4d3ca25');await import('./mobile-workspace.js');if(teamMaster)await mountTeamMember(teamMaster);else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  else {await import('./shop-editor.js?v=mapping-0f91ba5cf4d3ca25');await import('./mobile-workspace.js');if(teamMaster){window.MQDTeamStartup?.stage('Placing your team artwork and names…');await mountTeamMember(teamMaster);}else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
   if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
-  document.body.dataset.ready='true';ownerLoading?.remove();document.body.removeAttribute('aria-busy');
+  document.body.dataset.ready='true';window.MQDTeamStartup?.ready();ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {
-  $('shopSend').disabled=true;say(`The test designer could not start: ${error.message}. Refresh to try again.`);if(ownerLoading){ownerLoading.textContent='The saved draft could not open: '+error.message+' No master changes have been saved. ';const back=document.createElement('a');back.href='/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace'));back.textContent='Return to the existing owner setup';ownerLoading.append(back);}
+  window.MQDTeamStartup?.fail();$('shopSend').disabled=true;say(`The team designer could not start: ${error.message}. Refresh to try again.`);if(ownerLoading){ownerLoading.textContent='The saved draft could not open: '+error.message+' No master changes have been saved. ';const back=document.createElement('a');back.href='/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace'));back.textContent='Return to the existing owner setup';ownerLoading.append(back);}
 }
