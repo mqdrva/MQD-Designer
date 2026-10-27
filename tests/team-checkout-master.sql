@@ -24,5 +24,13 @@ begin
  if (select v.payload from mqd_team_master_versions v where v.id=version)<>payload then raise exception 'Stored master changed';end if;
  if mqd_team_checkout_master(gen_random_uuid(),version) is not null or mqd_team_checkout_master(team,gen_random_uuid()) is not null then raise exception 'Foreign master accessed';end if;
 end$$;
+set local role service_role;
+do $$ declare item record; result jsonb; begin
+ for item in select version_id,team_id from public.mqd_team_checkout_projections loop
+  result:=public.mqd_team_checkout_master(item.team_id,item.version_id);
+  if result->>'id'<>item.version_id::text then raise exception 'Service role cache lookup failed';end if;
+ end loop;
+end$$;
+reset role;
 select 'PASS service-only transient master fingerprints: exact UTF8 source SHA256, unchanged protected fields/text rules/stored master, cross-team denial' as verification;
 rollback;
