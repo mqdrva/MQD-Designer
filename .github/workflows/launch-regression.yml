@@ -112,6 +112,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027173307_team_checkout_cache_read_permissions.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027174930_team_checkout_business_projection.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027175809_team_checkout_small_publication.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027180829_team_checkout_projection_alias.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-organizer-billing.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-checkout-master.sql
