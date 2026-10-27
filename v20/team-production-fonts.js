@@ -2,7 +2,7 @@
 // unicode subsets. Production PNGs remain the final rendered reference.
 export async function teamProductionFonts(layers){
  const families=[...new Set(layers.filter(l=>l.type==='text').map(l=>l.font||'Inter'))];if(!families.length)return[];
- const entries=[],faces=[],seen=new Map();
+ const entries=[],faces=[],seen=new Map(),downloads=[];
  const links=[...document.querySelectorAll('link[rel="stylesheet"]')].map(l=>l.href).filter(url=>new URL(url).hostname==='fonts.googleapis.com');
  for(const url of links){
   const response=await fetch(url);if(!response.ok)throw new Error('Font source unavailable. Keep your artwork and retry before checkout.');
@@ -12,12 +12,23 @@ export async function teamProductionFonts(layers){
    let local=block;
    for(const match of block.matchAll(/url\(([^)]+)\)/g)){
     const source=match[1].replace(/['"]/g,'');if(new URL(source).hostname!=='fonts.gstatic.com')throw new Error('Unapproved font source.');
-    let path=seen.get(source);if(!path){const r=await fetch(source);if(!r.ok)throw new Error('Font download failed for '+family);const data=await r.blob();if(data.size>5*1024*1024)throw new Error('Font source is too large.');path='font-'+seen.size+'.woff2';seen.set(source,path);entries.push({name:'fonts/'+path,data});}
+    let path=seen.get(source);if(!path){path='font-'+seen.size+'.woff2';seen.set(source,path);downloads.push({source,path,family});}
     local=local.replace(match[0],'url('+path+')');
    }
    faces.push({family,css:local});
   }
  }
+ // Fetch independent subsets together, bounded to four requests on phones.
+ // Assign archive paths before starting requests so completion order cannot
+ // change CSS references or duplicate a font shared by multiple faces.
+ let cursor=0;const files=new Array(downloads.length);
+ await Promise.all(Array.from({length:Math.min(4,downloads.length)},async()=>{
+  while(cursor<downloads.length){const index=cursor++,{source,path,family}=downloads[index];
+   const r=await fetch(source);if(!r.ok)throw new Error('Font download failed for '+family);
+   const data=await r.blob();if(data.size>5*1024*1024)throw new Error('Font source is too large.');
+   files[index]={name:'fonts/'+path,data};
+  }
+ }));entries.push(...files);
  for(const family of families){if(!faces.some(f=>f.family===family))throw new Error('The font '+family+' cannot be included for reproduction. Choose an available web font before ordering.');
   await document.fonts.load('32px "'+family+'"');if(!document.fonts.check('32px "'+family+'"'))throw new Error('Font not loaded: '+family);
  }
