@@ -110,6 +110,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/owner-organizer-billing.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027171643_team_checkout_projection_cache.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027173307_team_checkout_cache_read_permissions.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027174930_team_checkout_business_projection.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-checkout-master.sql
           node tests/team-garment-copy.mjs
 
@@ -130,6 +131,7 @@ jobs:
           node tests/team-service.mjs
           node tests/owner-team-workspace.mjs
           node tests/team-masters.mjs
+          psql -v ON_ERROR_STOP=1 -f tests/team-checkout-business.sql
           node tests/team-checkout-memory.mjs
           node tests/team-master-transport.mjs
           node tests/team-production.mjs
