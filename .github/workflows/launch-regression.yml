@@ -105,6 +105,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261025044233_duplicate_owner_team.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-duplicate.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026165602_team_checkout_master_fingerprints.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027054347_team_checkout_read_cost.sql
+          psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce.sql
+          psql -v ON_ERROR_STOP=1 -f tests/owner-organizer-billing.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-checkout-master.sql
           node tests/team-garment-copy.mjs
 

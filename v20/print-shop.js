@@ -213,7 +213,7 @@ async function send(event) {
     if(!response.ok)throw new Error(response.status>=500?'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.':result.error||'Your design is still here. Please review the order and retry.');
     if(teamService){if(result.paid){location.href='/team-order.html?id='+result.id;return;}const url=new URL(result.url);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com')throw new Error('Secure checkout link unavailable.');location.assign(url.href);return;}
     say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.`);
-  }catch(error){const message=error instanceof TypeError?'The connection was interrupted. Your design is safe. Check your connection and retry.':error.message;say(message);checkoutFeedback?.fail(message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);$('shopSend').textContent=buttonText;sending=false;refresh();}
+  }catch(error){const message=error instanceof TypeError?'Checkout could not be reached or the request was interrupted. Your design is safe. Please retry; if this continues, contact MYMERCHNOW.':error.message;say(message);checkoutFeedback?.fail(message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);$('shopSend').textContent=buttonText;sending=false;refresh();}
 }
 async function digest(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function mount() {

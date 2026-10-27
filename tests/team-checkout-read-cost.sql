@@ -1,0 +1,49 @@
+-- Transaction-only integration fixtures: no persisted orders, charges or messages.
+begin;
+
+do $$
+declare team uuid:=gen_random_uuid();version uuid:=gen_random_uuid();payload jsonb;compact jsonb;original text:='data:image/png;base64,SYNTHETIC';
+begin
+ if has_function_privilege('anon','mqd_team_checkout_master(uuid,uuid)','execute') or has_function_privilege('authenticated','mqd_team_checkout_master(uuid,uuid)','execute') then raise exception 'Public snapshot access';end if;
+ insert into mqd_print_shop_businesses(id,preferred_slug,plan,owner_email,owner_phone,shop_config,payload_hash,ip_hash,mail_origin,token_hash,token_cipher,token_expires_at) values(team,'qa-'||team,'3d','qa@example.invalid','2025550104','{}','qa','qa','https://mymerchnow.app','qa','{}',now());insert into mqd_team_accounts(team_id,shop_config) values(team,'{}');
+ payload:=jsonb_build_object('product',jsonb_build_object('id','tshirt'),'design',jsonb_build_object('zones',jsonb_build_object('Front',jsonb_build_object('layers',jsonb_build_array(jsonb_build_object('id','logo','type','image','src',original,'x',12,'scale',0.4),jsonb_build_object('id','name','type','text','text','NAME'))))));
+ insert into mqd_team_master_versions(id,team_id,name,payload,rules) values(version,team,'Synthetic',payload,'[{"layerId":"name","role":"text","allowMove":true}]');
+ compact:=mqd_team_checkout_master(team,version);
+ if compact->'payload'->'design'->'zones'->'Front'->'layers'->0->>'src' <> 'sha256:'||encode(sha256(convert_to(original,'UTF8')),'hex') then raise exception 'Wrong source fingerprint';end if;
+ if compact->'payload'->'design'->'zones'->'Front'->'layers'->1 <> payload->'design'->'zones'->'Front'->'layers'->1 or compact->'rules'<>'[{"layerId":"name","role":"text","allowMove":true}]'::jsonb then raise exception 'Layer/permissions changed';end if;
+ if (select v.payload from mqd_team_master_versions v where v.id=version)<>payload then raise exception 'Stored master changed';end if;
+ if mqd_team_checkout_master(gen_random_uuid(),version) is not null or mqd_team_checkout_master(team,gen_random_uuid()) is not null then raise exception 'Foreign master accessed';end if;
+end$$;
+select 'PASS service-only transient master fingerprints: exact UTF8 source SHA256, unchanged protected fields/text rules/stored master, cross-team denial' as verification;
+
+
+do $$
+declare team uuid:=gen_random_uuid();actor uuid:=gen_random_uuid();product text;shop jsonb;expected jsonb:='{}';r jsonb;v uuid;failed boolean;o jsonb;begin
+ if has_function_privilege('anon','mqd_publish_owner_saved_masters(uuid,integer,jsonb,jsonb,boolean,uuid)','execute') or has_function_privilege('authenticated','mqd_publish_owner_saved_masters(uuid,integer,jsonb,jsonb,boolean,uuid)','execute') then raise exception 'Public publication access';end if;
+ shop:='{"ownerManaged":true,"editingMode":"strict","pilotKind":"team","garments":{"tshirt":{},"long-sleeve-tshirt":{},"short-sleeve-polo":{},"long-sleeve-polo":{},"fleece-hoodie":{}}}';
+ insert into mqd_print_shop_businesses(id,preferred_slug,plan,owner_email,owner_phone,shop_config,payload_hash,ip_hash,mail_origin,token_hash,token_cipher,token_expires_at) values(team,'qa-'||team,'3d','qa@example.invalid','2025550104',shop,'qa','qa','https://mymerchnow.app','qa','{}',now());
+ insert into mqd_team_accounts(team_id,shop_config) values(team,shop);
+ perform mqd_save_team_master(team,0,'{"name":"Tee","payload":{"product":{"id":"tshirt"}},"rules":[]}',false,gen_random_uuid());
+ expected:='{"tshirt":1}';
+ foreach product in array array['long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo','fleece-hoodie'] loop
+ perform mqd_save_owner_garment_master(team,product,0,jsonb_build_object('name',product,'payload',jsonb_build_object('product',jsonb_build_object('id',product),'original','unaltered-pixels'),'rules','[]'::jsonb),false,gen_random_uuid());expected:=expected||jsonb_build_object(product,1);
+ end loop;
+ failed:=false;begin perform mqd_publish_owner_saved_masters(team,1,expected||'{"tshirt":0}',shop,true,actor);exception when others then failed:=true;end;
+ if not failed or exists(select 1 from mqd_team_master_versions where team_id=team) then raise exception 'Partial stale publication';end if;
+ r:=mqd_publish_owner_saved_masters(team,1,expected,shop,true,actor);
+ if (select count(*) from mqd_team_master_versions where team_id=team)<>5 or (select revision from mqd_team_master_drafts where team_id=team)<>1 or exists(select 1 from mqd_team_garment_master_drafts where team_id=team and revision<>1) then raise exception 'Saved drafts changed';end if;
+ if (select billing_status from mqd_team_accounts where team_id=team)<>'not_configured' then raise exception 'Billing changed';end if;
+ v:=(r->'masterVersionIds'->>'fleece-hoodie')::uuid;
+ if (select payload->>'original' from mqd_team_master_versions where id=v)<>'unaltered-pixels' then raise exception 'Original changed';end if;
+ o:=jsonb_build_object('id',gen_random_uuid(),'team_id',team,'request_hash','synthetic','guest_token_hash','synthetic','ip_hash','synthetic','customer','{}'::jsonb,'package_path','synthetic.zip','livemode',false,'delivery','individual','quantity',1,'garment_cents',5000,'shipping_cents',1000,'summary',jsonb_build_object('productId','fleece-hoodie','master',jsonb_build_object('versionId',v)));
+ perform mqd_reserve_team_order(o);
+ if (select count(*) from mqd_team_orders where team_id=team)<>1 then raise exception 'Waived individual order failed';end if;
+ failed:=false;begin perform mqd_reserve_team_order(o||jsonb_build_object('id',gen_random_uuid(),'delivery','team'));exception when others then failed:=true;end;if not failed then raise exception 'Unpaid batch enabled';end if;
+ failed:=false;begin perform mqd_reserve_team_order(o||jsonb_build_object('id',gen_random_uuid(),'livemode',true));exception when others then failed:=true;end;if not failed then raise exception 'Wrong payment mode allowed';end if;
+ update mqd_print_shop_businesses set shop_config=shop_config-'ownerPublished' where id=team;
+ failed:=false;begin perform mqd_reserve_team_order(o||jsonb_build_object('id',gen_random_uuid()));exception when others then failed:=true;end;if not failed then raise exception 'Unpublished checkout allowed';end if;
+end$$;
+select 'PASS atomic saved publication, immutable originals, unchanged revisions, private grants, waived organizer individual checkout, mode/batch/unpublished denial' as verification;
+
+
+rollback;
