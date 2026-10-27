@@ -12,9 +12,15 @@ begin
  if mqd_team_checkout_master(team,version)<>compact then raise exception 'Cache altered projection';end if;
  if not exists(select 1 from mqd_team_checkout_projections where version_id=version and team_id=team) then raise exception 'Projection not cached';end if;
  if has_table_privilege('anon','mqd_team_checkout_projections','select') or has_table_privilege('authenticated','mqd_team_checkout_projections','select') then raise exception 'Public cache access';end if;
- update mqd_team_master_versions set name='Updated synthetic' where id=version;
- if exists(select 1 from mqd_team_checkout_projections where version_id=version) then raise exception 'Stale projection retained';end if;
- if mqd_team_checkout_master(team,version)->>'name'<>'Updated synthetic' then raise exception 'Stale name';end if;
+ -- Production has an immutable-master trigger; the minimal SQL fixture does not.
+ begin
+  update mqd_team_master_versions set name='Updated synthetic' where id=version;
+  if exists(select 1 from mqd_team_checkout_projections where version_id=version) then raise exception 'Stale projection retained';end if;
+  if mqd_team_checkout_master(team,version)->>'name'<>'Updated synthetic' then raise exception 'Stale name';end if;
+ exception when raise_exception then
+  if SQLERRM <> 'Published team masters are immutable' then raise;end if;
+  if mqd_team_checkout_master(team,version)<>compact then raise exception 'Rejected update altered master cache';end if;
+ end;
  if (select v.payload from mqd_team_master_versions v where v.id=version)<>payload then raise exception 'Stored master changed';end if;
  if mqd_team_checkout_master(gen_random_uuid(),version) is not null or mqd_team_checkout_master(team,gen_random_uuid()) is not null then raise exception 'Foreign master accessed';end if;
 end$$;
