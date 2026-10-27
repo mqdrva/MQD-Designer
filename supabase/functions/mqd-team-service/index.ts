@@ -162,7 +162,7 @@ Deno.serve(async(req:Request)=>{
    checkpoint('account-loaded');
    const ownerManaged=account?.owner_managed===true||account?.shop_config?.ownerManaged===true;
    if(account)account={...account,shop_config:ownerManaged?{ownerManaged:true}:(await checked(db.from('mqd_team_accounts').select('shop_config').eq('team_id',account.team_id).single())).shop_config};
-   let ownerBusiness=ownerManaged?await checked(db.from('mqd_print_shop_businesses').select('status,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived').eq('id',account.team_id).maybeSingle()):null;
+   let ownerBusiness=ownerManaged?await checked(db.rpc('mqd_team_checkout_business',{p_team:account.team_id})):null;
    checkpoint('business-loaded');
    if(ownerBusiness&&Object.hasOwn(ownerBusiness,'published_shop'))ownerBusiness={status:ownerBusiness.status,shop_config:{ownerManaged:true,pilotKind:ownerBusiness.pilot_kind,ownerPublished:ownerBusiness.published_shop?{shop:ownerBusiness.published_shop,authorizedBy:ownerBusiness.publication_authorized_by,masterVersionIds:ownerBusiness.publication_master_ids,organizerFeeWaived:ownerBusiness.publication_waived}:null}};
    const waived=ownerGarmentCheckout(account,ownerBusiness);
@@ -214,7 +214,7 @@ Deno.serve(async(req:Request)=>{
     const manifest:any=zip.file('brand/logo-placement.json'),asset=zip.file(garmentLogoPath(shop));if(!manifest||!asset||manifest._data.uncompressedSize>3000)throw new Error('Fixed logo is missing.');assertFixedLogoPackage(shop,summary,design,JSON.parse(await manifest.async('string')));
     if(await hash(await asset.async('uint8array'))!==await hash(Uint8Array.from(atob(shop.garmentLogo.split(',')[1]),c=>c.charCodeAt(0))))throw new Error('Fixed logo has changed.');
    }
-   const productionManifest=await verifyTeamProduction(zip,design,shop);
+   const productionManifest=await verifyTeamProduction(zip,design,shop);checkpoint('production-verified');
    if(productionManifest)zip.file('production-manifest.json',JSON.stringify(productionManifest,null,2));
    const guestHash=await hash(body.guestToken),requestHash=await hash(JSON.stringify({team:body.team,customer,summary,delivery:body.delivery,batchId:body.batchId||null,packageHash:await hash(packageBytes)}));
    const ipHash=await hash((req.headers.get('x-forwarded-for')||'unknown').split(',')[0]);
@@ -223,11 +223,13 @@ Deno.serve(async(req:Request)=>{
    const reserve=await db.rpc('mqd_reserve_team_order',{p_order:{id:body.requestId,team_id:account.team_id,batch_id:body.delivery==='team'?body.batchId:null,livemode:config.live,request_hash:requestHash,ip_hash:ipHash,guest_token_hash:guestHash,customer,summary,delivery:body.delivery,quantity:quote.totalQuantity,garment_cents:quote.totalCents,shipping_cents:shipping,package_path:path}});if(reserve.error)throw new Error(reserve.error.message);const stored=reserve.data;
    if(stored.payment_status==='paid')return json({paid:true,id:stored.id});
    if(stored.checkout_id){const existing=await stripe.checkout.sessions.retrieve(stored.checkout_id);if(existing.status==='open'&&existing.url)return json({url:existing.url,id:stored.id});return json({error:'This checkout has ended. Start a new order.'},409);}
-   if(purchasedMaster)await packageTeamMaster(zip,purchasedMaster,productionManifest);
+   checkpoint('order-reserved');
+   if(purchasedMaster)await packageTeamMaster(zip,purchasedMaster,productionManifest);checkpoint('master-packaged');
    // PNG/JPEG/WebP/WOFF2 are already compressed. STORE preserves every file byte
    // and avoids spending the Edge CPU budget recompressing full-size artwork.
-   zip.file('verified-team-order.json',JSON.stringify({orderId:stored.id,teamId:stored.team_id,summary:stored.summary,delivery:stored.delivery,batchId:stored.batch_id,garmentCents:stored.garment_cents,shippingCents:stored.shipping_cents,status:'payment-confirmation-required',productionNote:'Use this server-verified garment and size information; review original artwork before printing.'},null,2));const verifiedBytes=await zip.generateAsync({type:'uint8array',compression:'STORE'});if(verifiedBytes.length>50*1024*1024)throw new Error('Production package exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
+   zip.file('verified-team-order.json',JSON.stringify({orderId:stored.id,teamId:stored.team_id,summary:stored.summary,delivery:stored.delivery,batchId:stored.batch_id,garmentCents:stored.garment_cents,shippingCents:stored.shipping_cents,status:'payment-confirmation-required',productionNote:'Use this server-verified garment and size information; review original artwork before printing.'},null,2));const verifiedBytes=await zip.generateAsync({type:'uint8array',compression:'STORE'});checkpoint('zip-generated');if(verifiedBytes.length>50*1024*1024)throw new Error('Production package exceeds 50 MB. Keep originals intact and contact MYMERCHNOW.');
    const upload=await db.storage.from('mqd-team-production').upload(path,verifiedBytes,{contentType:'application/zip',upsert:false});if(upload.error&&upload.error.statusCode!=='409'&&!String(upload.error.message).includes('already exists'))throw new Error('Production package could not be saved.');
+   checkpoint('package-uploaded');
    const session=await stripe.checkout.sessions.create({mode:'payment',line_items:[{price_data:{currency:'usd',unit_amount:stored.garment_cents,product_data:{name:shop.name+' · '+summary.productName+' · '+stored.quantity+' garment(s)'}},quantity:1}],customer_email:customer.email,phone_number_collection:{enabled:true},automatic_tax:{enabled:false},expires_at:Math.floor(Date.now()/1000)+2100,
     ...(body.delivery==='individual'?{shipping_address_collection:{allowed_countries:['US']},shipping_options:[{shipping_rate_data:{type:'fixed_amount',fixed_amount:{amount:stored.shipping_cents,currency:'usd'},display_name:'MYMERCHNOW standard shipping'}}]}:{}),
     client_reference_id:'MQD-TEAM-'+stored.id,integration_identifier:identifier(stored.id),metadata:{service:'mqd-teams',team:account.team_id,order:stored.id},payment_intent_data:{metadata:{service:'mqd-teams',team:account.team_id,order:stored.id}},success_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/team-order.html?id='+stored.id+(ownerTest?'&ownerTest=1':''),cancel_url:(!config.live&&ALLOWED.has(origin)?origin:BASE_URL)+'/teams/'+shop.slug+(summary.engine==='3d'?'/3d':'')},{idempotencyKey:'team-order-'+stored.id});
@@ -344,6 +346,7 @@ Deno.serve(async(req:Request)=>{
   if(body.action==='batch-shipping'){
    if(!teamAccess(account))throw new Error('Team subscription is inactive.');const batch=await checked(db.from('mqd_team_batches').select('*').eq('id',body.batchId).eq('team_id',body.id).single());if(batch.status!=='approved'||batch.shipping_paid_at)throw new Error('This batch needs approval or is already funded.');
    if(batch.shipping_checkout_id){const prior=await stripe.checkout.sessions.retrieve(batch.shipping_checkout_id);if(prior.status==='open'&&prior.url)return json({url:prior.url});}
+   checkpoint('package-uploaded');
    const session=await stripe.checkout.sessions.create({mode:'payment',customer:account.stripe_customer_id,line_items:[{price_data:{currency:'usd',unit_amount:TEAM_BATCH_SHIPPING_CENTS,product_data:{name:'Combined team shipment · one batch'}},quantity:1}],automatic_tax:{enabled:false},metadata:{service:'mqd-teams',team:body.id,batch:batch.id},payment_intent_data:{metadata:{service:'mqd-teams',team:body.id,batch:batch.id}},integration_identifier:identifier(batch.id),success_url:ownerReturn,cancel_url:ownerReturn},{idempotencyKey:'team-batch-shipping-'+batch.id+'-'+(batch.shipping_checkout_id||'first')});await checked(db.from('mqd_team_batches').update({shipping_checkout_id:session.id}).eq('id',batch.id));return json({url:session.url});
   }
   if(body.action==='pause'||body.action==='resume'){

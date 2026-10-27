@@ -22,19 +22,20 @@ export async function verifyTeamProduction(zip,design,shop){
  }
  if(design.engine!=='3d')throw new Error('Unsupported production engine.');
  const payload=design.design,mapping=GARMENT_MAPPING[payload.product.id];if(!mapping)throw new Error('Unsupported production garment.');
+ const sourceCache=new Map(),fileHashes=new Map();
  const manifest={schema:'mqd-team-production-v1',productId:payload.product.id,zones:[],originals:[],text:[],resolutionNote:'Source pixel dimensions are measured from original image headers. Output pixel dimensions follow the approved garment templates. Output dimensions do not increase source detail; no source DPI is inferred.'};
  for(const [i,zone] of mapping.zones.entries()){
   const expected=mapping.templates[zone],path='production-zones/'+String(i+1).padStart(2,'0')+'-'+zone.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png',file=zip.file(path);
-  if(!file)throw new Error('Missing production zone: '+zone);const bytes=await file.async('uint8array'),size=imageDimensions(Buffer.from(bytes),'png');
+  if(!file)throw new Error('Missing production zone: '+zone);const bytes=await file.async('uint8array'),size=imageDimensions(Buffer.from(bytes),'png');zip.file(path,bytes);
   if(size.width!==expected.width||size.height!==expected.height)throw new Error('Incorrect output dimensions for '+zone);
   manifest.zones.push({zone,path,...size,sha256:await hash(bytes),template:expected});
   for(const [index,layer] of (payload.design.zones[zone]?.layers||[]).entries()){
    if(layer.type==='text'){manifest.text.push({zone,...layer});continue;}
    if(layer.type!=='image')continue;const match=layer.src?.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);if(!match)throw new Error('Original source required.');
-   const bytes=Buffer.from(match[2],'base64'),dimensions=imageDimensions(bytes,match[1]);if(dimensions.width<1||dimensions.height<1)throw new Error('Invalid source dimensions.');
+   let source=sourceCache.get(layer.src);if(!source){const bytes=Buffer.from(match[2],'base64'),dimensions=imageDimensions(bytes,match[1]);if(dimensions.width<1||dimensions.height<1)throw new Error('Invalid source dimensions.');source={dimensions,digest:await hash(bytes)};sourceCache.set(layer.src,source);}const {dimensions,digest}=source;
    const sharedLogo=!payload.design.teamMaster&&shop?.garmentLogo===layer.src&&garmentLogo(shop,payload.product.id).mode!=='none';
-   const path=design[TEAM_RESTORED_PATHS]?.[zone]?.[index]||(sharedLogo?garmentLogoPath(shop):'originals/'+safe(zone)+'-'+index+'-'+safe(layer.filename||'artwork.png')),original=zip.file(path);if(!original||await hash(await original.async('uint8array'))!==await hash(bytes))throw new Error('Original source artwork does not match the saved member design.');
-   manifest.originals.push({zone,layerId:layer.id,templateLayerId:layer.templateLayerId,path,...dimensions,sha256:await hash(bytes),placement:{x:layer.x,y:layer.y,scale:layer.scale,rotation:layer.rotation,crop:layer.crop}});
+   const path=design[TEAM_RESTORED_PATHS]?.[zone]?.[index]||(sharedLogo?garmentLogoPath(shop):'originals/'+safe(zone)+'-'+index+'-'+safe(layer.filename||'artwork.png')),original=zip.file(path);if(!original)throw new Error('Original source artwork does not match the saved member design.');let fileHash=fileHashes.get(path);if(!fileHash){const bytes=await original.async('uint8array');zip.file(path,bytes);fileHash=await hash(bytes);fileHashes.set(path,fileHash);}if(fileHash!==digest)throw new Error('Original source artwork does not match the saved member design.');
+   manifest.originals.push({zone,layerId:layer.id,templateLayerId:layer.templateLayerId,path,...dimensions,sha256:digest,placement:{x:layer.x,y:layer.y,scale:layer.scale,rotation:layer.rotation,crop:layer.crop}});
   }
  }
  if(manifest.text.length){const cssFile=zip.file('fonts/fonts.css');if(!cssFile)throw new Error('Reproduction fonts are missing.');const css=await cssFile.async('string');
@@ -47,13 +48,13 @@ export async function verifyTeamProduction(zip,design,shop){
 // Reuse verified originals instead of repeating their base64 bytes inside the
 // purchased master. The source map can restore the exact historical JSON.
 export async function packageTeamMaster(zip,master,production){
- const snapshot=structuredClone(master),sources=[];
+ const snapshot=structuredClone(master),sources=[],sourceHashes=new Map();
  for(const [zone,state] of Object.entries(snapshot.payload.design.zones)){
   for(const layer of state.layers||[]){
    if(layer.type!=='image')continue;
    const match=layer.src?.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);
    if(!match)throw new Error('Purchased master original source is missing.');
-   const digest=await hash(Buffer.from(match[2],'base64'));
+   let digest=sourceHashes.get(layer.src);if(!digest){digest=await hash(Buffer.from(match[2],'base64'));sourceHashes.set(layer.src,digest);}
    const original=production.originals.find(item=>item.zone===zone&&(item.templateLayerId||item.layerId)===layer.id&&item.sha256===digest);
    if(!original||!zip.file(original.path))throw new Error('Purchased master original does not match the verified member artwork.');
    sources.push({zone,layerId:layer.id,path:original.path,mime:'image/'+match[1],sha256:digest});layer.src='zip:'+original.path;
