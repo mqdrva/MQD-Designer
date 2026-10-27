@@ -9,6 +9,12 @@ begin
  compact:=mqd_team_checkout_master(team,version);
  if compact->'payload'->'design'->'zones'->'Front'->'layers'->0->>'src' <> 'sha256:'||encode(sha256(convert_to(original,'UTF8')),'hex') then raise exception 'Wrong source fingerprint';end if;
  if compact->'payload'->'design'->'zones'->'Front'->'layers'->1 <> payload->'design'->'zones'->'Front'->'layers'->1 or compact->'rules'<>'[{"layerId":"name","role":"text","allowMove":true}]'::jsonb then raise exception 'Layer/permissions changed';end if;
+ if mqd_team_checkout_master(team,version)<>compact then raise exception 'Cache altered projection';end if;
+ if not exists(select 1 from mqd_team_checkout_projections where version_id=version and team_id=team) then raise exception 'Projection not cached';end if;
+ if has_table_privilege('anon','mqd_team_checkout_projections','select') or has_table_privilege('authenticated','mqd_team_checkout_projections','select') then raise exception 'Public cache access';end if;
+ update mqd_team_master_versions set name='Updated synthetic' where id=version;
+ if exists(select 1 from mqd_team_checkout_projections where version_id=version) then raise exception 'Stale projection retained';end if;
+ if mqd_team_checkout_master(team,version)->>'name'<>'Updated synthetic' then raise exception 'Stale name';end if;
  if (select v.payload from mqd_team_master_versions v where v.id=version)<>payload then raise exception 'Stored master changed';end if;
  if mqd_team_checkout_master(gen_random_uuid(),version) is not null or mqd_team_checkout_master(team,gen_random_uuid()) is not null then raise exception 'Foreign master accessed';end if;
 end$$;
