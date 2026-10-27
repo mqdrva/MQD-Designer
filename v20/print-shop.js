@@ -208,6 +208,7 @@ async function send(event) {
     let guestToken=sessionStorage.getItem('mqd-team-guest-token');if(teamService&&!guestToken){guestToken=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');sessionStorage.setItem('mqd-team-guest-token',guestToken);}
     form.append('payload',JSON.stringify({...(teamService?{action:'order-checkout',team:slug,guestToken,delivery,batchId}:{shop:slug}),requestId:attempt.id,summary:attempt.summary,customer:attempt.customer,website:$('shopWebsite').value,startedAt:Number($('shopStarted').value)}));
     form.append('package',attempt.blob,`${slug}-${engine}-design.zip`);
+    if(ownerPaymentTest){const {ownerAuth}=await import('./owner-team-workspace.js');const {ownerTestAccessToken}=await import('./owner-test-session.js');paymentTestToken=await ownerTestAccessToken(ownerAuth);}
     say('Sending your artwork securely and opening checkout…');
     const response=await fetch(teamService?teamEndpoint(''):API,{method:'POST',headers:teamHeaders(),body:form}),result=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(response.status>=500?'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.':result.error||'Your design is still here. Please review the order and retry.');
