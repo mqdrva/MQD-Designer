@@ -70,7 +70,7 @@ Deno.serve(async(req:Request)=>{
     if(!uuid(body.id))throw new Error('Choose an owner workspace.');
     const metadata=await checked(db.from('mqd_print_shop_businesses').select('id,status,owner_managed:shop_config->>ownerManaged,editing_mode:shop_config->>editingMode').eq('id',body.id).maybeSingle());
     if(metadata?.status==='closed'||String(metadata?.owner_managed)!=='true'||metadata?.editing_mode!=='strict'||!Object.hasOwn(TEAM_3D_GARMENTS,body.productId))throw new Error('Choose a supported owner garment.');
-    const primary=await checked(db.from('mqd_team_master_drafts').select('revision,product_id:draft->payload->product->>id').eq('team_id',body.id).maybeSingle());
+    const primary=await checked(db.rpc('mqd_owner_master_metadata',{p_team:body.id}));
     const primaryProduct=primary?.product_id;
     const row=primaryProduct===body.productId?primary:await checked(db.from('mqd_team_garment_master_drafts').select('revision').eq('team_id',body.id).eq('product_id',body.productId).maybeSingle());
     return json({hasDraft:!!row,revision:row?.revision||0,productId:body.productId});
@@ -279,7 +279,7 @@ Deno.serve(async(req:Request)=>{
   if(['admin-master-load','admin-master-save'].includes(body.action)){
    if(body.action==='admin-master-save')body.draft=unpackTeamMaster(body.draft,{requestBytes:parsed.byteLength,maxBytes:48*1024*1024});
    const saving=body.action==='admin-master-save';
-   const primary=await checked(db.from('mqd_team_master_drafts').select('revision,product_id:draft->payload->product->>id').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
+   const primary=await checked(db.rpc('mqd_owner_master_metadata',{p_team:body.id})),owner=business.shop_config.ownerManaged===true;
    const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),storedProduct=primary?.product_id||primary?.draft?.payload?.product?.id,primaryProduct=storedProduct||Object.keys(shop.garments)[0];
    const product=body.productId||(body.action==='admin-master-save'?body.draft?.payload?.product?.id:primaryProduct);
    if(owner&&(!Object.hasOwn(TEAM_3D_GARMENTS,product)||shop.editingMode!=='strict'))throw new Error('Choose a supported strict-master garment.');
