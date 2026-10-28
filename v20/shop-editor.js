@@ -860,9 +860,9 @@ function normalizedLibraryContentBounds(l){
 }
 // @mapping-end normalizedLibraryContentBounds
 function drawImageLayer(c,l,b){
- if(l.teamLogo)l={...l,image:teamLogoImage(l)};
  if(l.shopFixed&&l.image){const p=l.shopLogoPreset,w=b.w*p.width/16,h=b.h*p.height/24,scale=Math.min(w/l.image.width,h/l.image.height),dx=p.placement==='left-chest'?b.w*.21:0,dy=-b.h*.28+b.h*p.top/24;
   c.drawImage(l.image,dx-l.image.width*scale/2,dy+(h-l.image.height*scale)/2,l.image.width*scale,l.image.height*scale);return;}
+ if(l.teamLogo)l={...l,image:teamLogoImage(l)};
  return drawMappedImageLayer(c,l,b);
 }
 // @mapping-begin drawMappedImageLayer
