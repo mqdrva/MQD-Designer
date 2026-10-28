@@ -1,7 +1,7 @@
 begin;
 do $$
 declare team uuid:=gen_random_uuid();version uuid:=gen_random_uuid();slug text:='read-cache-test';payload jsonb;r jsonb;m jsonb;body text;i integer;begin
- insert into mqd_print_shop_businesses(id,shop_config) values(team,jsonb_build_object('ownerManaged',true,'pilotKind','team','ownerPublished',jsonb_build_object('shop',jsonb_build_object('garments',jsonb_build_object('tshirt','{}'::jsonb)),'masterVersionIds',jsonb_build_object('tshirt',version))));
+ insert into mqd_print_shop_businesses(id,preferred_slug,shop_config) values(team,slug,jsonb_build_object('ownerManaged',true,'pilotKind','team','ownerPublished',jsonb_build_object('shop',jsonb_build_object('garments',jsonb_build_object('tshirt','{}'::jsonb)),'masterVersionIds',jsonb_build_object('tshirt',version))));
  insert into mqd_team_accounts(team_id,shop_config,livemode) values(team,jsonb_build_object('ownerManaged',true,'slug',slug),false);
  payload:=jsonb_build_object('product',jsonb_build_object('id','tshirt'),'design',jsonb_build_object('zones',jsonb_build_object('Front',jsonb_build_object('layers',jsonb_build_array(jsonb_build_object('type','image','src',repeat('x',5000000)))))));
  update mqd_print_shop_businesses set shop_config=jsonb_set(shop_config,'{ownerPublished,shop,garmentLogo}',to_jsonb(repeat('x',5000000))) where id=team;
