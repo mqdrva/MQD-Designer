@@ -6,6 +6,7 @@ declare team uuid:=gen_random_uuid();u uuid:=gen_random_uuid();packet jsonb;body
  insert into public.mqd_print_shop_businesses(id,shop_config) values(team,'{"ownerManaged":true,"editingMode":"strict"}');insert into public.mqd_team_accounts(team_id,shop_config) values(team,'{}');
  packet:=jsonb_build_object('p_team',team,'p_revision',0,'p_publish',false,'p_version',gen_random_uuid(),'p_product',null,'p_draft',jsonb_build_object('name','Unicode — 水','payload',jsonb_build_object('product',jsonb_build_object('id','tshirt'),'original',original),'rules','[]'::jsonb));
  -- ASCII is the transport encoding; test Unicode separately below.
+ execute 'set local role service_role';
  body:=replace(replace(packet::text,'—','\u2014'),'水','\u6c34');n:=ceil(octet_length(body)/2097152.0);
  perform public.mqd_begin_master_upload(u,team,n,octet_length(body));
  failed:=false;begin perform public.mqd_finish_master_upload(u);exception when others then failed:=true;end;if not failed then raise exception 'Incomplete master committed';end if;

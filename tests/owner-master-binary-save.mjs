@@ -11,4 +11,5 @@ assert.equal((await saveTeamMasterRequest(db,params)).data.revision,1);assert.eq
 const staleDb=masterUploadDb({rpc:async()=>({error:{code:'P0001',message:'Master changed. Reload before saving.'}})});assert.equal((await saveTeamMasterRequest(staleDb,params)).error.code,'P0001');
 let finalized=false,cleaned=false;const failed={rpc:async n=>{if(n==='mqd_put_master_upload_part')return{error:{message:'Interrupted'}};if(n==='mqd_finish_master_upload')finalized=true;if(n==='mqd_abort_master_upload')cleaned=true;return{data:true};}};
 assert.equal((await saveTeamMasterRequest(failed,params)).error.message,'Interrupted');assert(!finalized);assert(cleaned);
+const thenableDb={rpc:(n,a)=>({then:(resolve,reject)=>stage.rpc(n,a).then(resolve,reject)})};assert.equal((await saveTeamMasterRequest(thenableDb,params)).data.revision,1);
 console.log('PASS near-48 MiB original unchanged; <=2 MiB requests; Unicode, revision conflict and partial cleanup.');

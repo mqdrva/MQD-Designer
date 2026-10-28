@@ -17,6 +17,6 @@ export async function saveTeamMasterRequest(db,params,productId=null){
  }finally{
   // Scoped cleanup also handles an interrupted final response; a committed
   // master is never removed. Expired unfinished uploads are pruned on begin.
-  await db.rpc('mqd_abort_master_upload',{p_upload:id}).catch(()=>{});
+  try{await db.rpc('mqd_abort_master_upload',{p_upload:id});}catch{}
  }
 }
