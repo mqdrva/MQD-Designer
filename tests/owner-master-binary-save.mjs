@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {saveTeamMasterRequest} from '../supabase/functions/_shared/mqd-owner-master-save.js';
+let rpc,sent;const db={rpc:async(name,args)=>(rpc={name,args},{data:{revision:1}})},params={p_team:'synthetic-team',p_revision:0,p_publish:false,p_version:'synthetic-version',p_draft:{name:'Victory — 水 😀',payload:{product:{id:'tshirt'},design:{zones:{Front:{layers:[{type:'image',src:'data:image/png;base64,YWJj'}]}}}}}};
+await saveTeamMasterRequest(db,params);assert.equal(rpc.name,'mqd_save_team_master');
+await saveTeamMasterRequest(db,params,'fleece-hoodie');assert.equal(rpc.name,'mqd_save_owner_garment_master');assert.equal(rpc.args.p_product,'fleece-hoodie');
+params.p_draft.payload.design.zones.Front.layers[0].src='data:image/png;base64,'+'YWJj'.repeat(3*1024*1024);
+const before=JSON.stringify(params);rpc=null;
+const transport={url:'https://synthetic.invalid',key:'synthetic-service',fetcher:async(url,options)=>{sent={url,...options};return new Response('{"revision":1,"versionId":null}');}};
+const result=await saveTeamMasterRequest(db,params,null,transport);assert.equal(result.data.revision,1);assert.equal(rpc,null);assert.equal(sent.url,transport.url+'/rest/v1/rpc/mqd_save_team_master_bytes');assert.equal(sent.headers['Content-Type'],'application/octet-stream');assert.equal(sent.headers.Authorization,'Bearer synthetic-service');assert(!/[^\x00-\x7f]/.test(sent.body));const restored=JSON.parse(sent.body);assert.equal(restored.p_draft.name,params.p_draft.name);assert.equal(restored.p_draft.payload.design.zones.Front.layers[0].src,params.p_draft.payload.design.zones.Front.layers[0].src);assert.equal(JSON.stringify(params),before);
+transport.fetcher=async()=>new Response('{"code":"P0001","message":"Master changed. Reload before saving."}',{status:400});const stale=await saveTeamMasterRequest(db,params,null,transport);assert.equal(stale.error.message,'Master changed. Reload before saving.');assert.equal(stale.error.code,'P0001');
+console.log('PASS large owner save uses raw-byte RPC; exact artwork and Unicode, existing small-save paths and stale-write errors retained.');
