@@ -1,6 +1,14 @@
 {
   "routes": [
     {
+      "src": "/[lL][nN][oO]/?",
+      "status": 307,
+      "headers": {
+        "Location": "/teams/luvnoone/3d",
+        "Cache-Control": "no-store"
+      }
+    },
+    {
       "src": "/games(?:/.*)?",
       "status": 404,
       "headers": {
