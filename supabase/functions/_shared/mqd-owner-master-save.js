@@ -20,3 +20,13 @@ export async function saveTeamMasterRequest(db,params,productId=null){
   try{await db.rpc('mqd_abort_master_upload',{p_upload:id});}catch{}
  }
 }
+
+// Read bounded pieces from one revision; never return a mixed revision.
+export async function readTeamMasterRequest(db,team,product){
+ const args={p_team:team,p_product:product||null,p_revision:null,p_part:0};
+ const first=await db.rpc('mqd_read_team_master_part',args);if(first.error||!first.data)return first;
+ const {revision,parts,text,versionId}=first.data;
+ if(!Number.isInteger(parts)||parts<1||parts>26)throw Error('Saved master size is unavailable.');
+ const chunks=[text];for(let part=1;part<parts;part++){const next=await db.rpc('mqd_read_team_master_part',{...args,p_revision:revision,p_part:part});if(next.error)return next;if(next.data?.revision!==revision)throw Error('Master changed. Reopen the saved draft.');chunks.push(next.data.text);}
+ return {data:{revision,draft:JSON.parse(chunks.join('')),version_id:versionId}};
+}

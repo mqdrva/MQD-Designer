@@ -16,6 +16,13 @@ declare team uuid:=gen_random_uuid();u uuid:=gen_random_uuid();packet jsonb;body
  r:=public.mqd_finish_master_upload(u);if (r->>'revision')::int<>1 or r->>'versionId' is not null or exists(select 1 from public.mqd_team_master_versions where team_id=team) then raise exception 'Draft published';end if;
  if (select draft->'payload'->>'original' from public.mqd_team_master_drafts where team_id=team) is distinct from original or (select draft->>'name' from public.mqd_team_master_drafts where team_id=team)<>'Unicode — 水' then raise exception 'Original changed';end if;
  if exists(select 1 from public.mqd_master_uploads where id=u) or exists(select 1 from public.mqd_master_upload_parts where upload_id=u) then raise exception 'Stage not cleaned';end if;
+ -- Reopen original content through bounded service-only reads.
+ if has_function_privilege('anon','public.mqd_read_team_master_part(uuid,text,integer,integer)','execute') then raise exception 'Public draft read';end if;
+ r:=public.mqd_read_team_master_part(team,null,null,0);body:=r->>'text';
+ for i in 1..(r->>'parts')::int-1 loop body:=body||(public.mqd_read_team_master_part(team,null,1,i)->>'text');end loop;
+ if body::jsonb is distinct from packet->'p_draft' then raise exception 'Read changed original';end if;
+ failed:=false;begin perform public.mqd_read_team_master_part(team,null,2,1);exception when others then failed:=true;end;if not failed then raise exception 'Mixed read revision';end if;
+ body:=replace(replace(packet::text,'—','\u2014'),'水','\u6c34');
  -- Stale writes remain atomic, leaving the existing revision intact.
  u:=gen_random_uuid();perform public.mqd_begin_master_upload(u,team,n,octet_length(body));for i in 0..n-1 loop perform public.mqd_put_master_upload_part(u,i,substring(body from i*2097152+1 for 2097152));end loop;
  failed:=false;begin perform public.mqd_finish_master_upload(u);exception when others then failed:=true;end;if not failed or (select revision from public.mqd_team_master_drafts where team_id=team)<>1 then raise exception 'Stale master overwritten';end if;perform public.mqd_abort_master_upload(u);

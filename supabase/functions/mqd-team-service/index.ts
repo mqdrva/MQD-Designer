@@ -1,7 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {packTeamMaster,unpackTeamMaster,packTeamResponse} from '../_shared/mqd-team-master-transport.js';
 import {boundedJson} from '../_shared/mqd-bounded-json.js';
-import {saveTeamMasterRequest} from '../_shared/mqd-owner-master-save.js';
+import {saveTeamMasterRequest,readTeamMasterRequest} from '../_shared/mqd-owner-master-save.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -279,12 +279,12 @@ Deno.serve(async(req:Request)=>{
   if(['admin-master-load','admin-master-save'].includes(body.action)){
    if(body.action==='admin-master-save')body.draft=unpackTeamMaster(body.draft,{requestBytes:parsed.byteLength,maxBytes:48*1024*1024});
    const saving=body.action==='admin-master-save';
-   const primary=await checked(db.from('mqd_team_master_drafts').select(saving?'revision,product_id:draft->payload->product->>id':'revision,draft').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
+   const primary=await checked(db.from('mqd_team_master_drafts').select('revision,product_id:draft->payload->product->>id').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
    const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),storedProduct=primary?.product_id||primary?.draft?.payload?.product?.id,primaryProduct=storedProduct||Object.keys(shop.garments)[0];
    const product=body.productId||(body.action==='admin-master-save'?body.draft?.payload?.product?.id:primaryProduct);
    if(owner&&(!Object.hasOwn(TEAM_3D_GARMENTS,product)||shop.editingMode!=='strict'))throw new Error('Choose a supported strict-master garment.');
-   const extra=owner&&product!==storedProduct?await checked(db.from('mqd_team_garment_master_drafts').select(saving?'revision,version_id':'revision,draft,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
-   const secondary=owner&&(!!extra||product!==primaryProduct),current=secondary?extra:primary;
+   const extra=owner&&product!==storedProduct?await checked(db.from('mqd_team_garment_master_drafts').select('revision,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
+   const secondary=owner&&(!!extra||product!==primaryProduct),current=saving?(secondary?extra:primary):await checked(readTeamMasterRequest(db,body.id,secondary?product:null));
    if(body.action==='admin-master-load')return json({...(body.metadataOnly?{hasDraft:!!current?.draft}:{draft:body.compact?packTeamMaster(current?.draft):current?.draft||null}),revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
    const draft=validateTeamMaster(body.draft);
