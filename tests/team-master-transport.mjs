@@ -5,3 +5,9 @@ const before=structuredClone(master),packed=packTeamMaster(master);assert.equal(
 
 const packet={shop:{garmentLogo:src,name:'Team'},master:before};assert.deepEqual(unpackTeamResponse(JSON.parse(JSON.stringify(packTeamResponse(packet)))),packet);assert.equal(packet.shop.garmentLogo,src);
 assert.deepEqual(packTeamResponse(packTeamResponse(packet)),packTeamResponse(packet),'Database-packed sources stay packed exactly once');
+
+const wire=JSON.stringify({action:'admin-master-save',draft:packed}),requestBytes=Buffer.byteLength(wire),expandedBytes=Buffer.byteLength(JSON.stringify({action:'admin-master-save',draft:master}));
+assert.deepEqual(unpackTeamMaster(JSON.parse(JSON.stringify(packed)),{requestBytes,maxBytes:expandedBytes+100}),master);
+assert.throws(()=>unpackTeamMaster(JSON.parse(JSON.stringify(packed)),{requestBytes,maxBytes:requestBytes+10}),/too large/);
+const malformed=JSON.parse(JSON.stringify(packed));malformed.payload.design.zones.Back.layers[0].src='source:400';assert.throws(()=>unpackTeamMaster(malformed,{requestBytes,maxBytes:expandedBytes+100}));
+console.log('PASS compact owner-save roundtrip and expanded artwork size bounds.');
