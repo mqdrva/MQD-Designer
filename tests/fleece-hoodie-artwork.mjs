@@ -2,6 +2,7 @@ import {hoodieFrontArtworkV,HOODIE_FRONT_PATTERN_NECK_T,HOODIE_FRONT_MODEL_NECK_
 import assert from 'node:assert/strict';
 import {hoodieArtworkBatches,hoodieSplashPreviewFrame} from '../v20/hoodie-splash-preview.js';
 import fs from 'node:fs';
+import {teamRenderZone} from '../v20/team-brand-render.js';
 import vm from 'node:vm';
 import * as THREE from 'three';
 import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
@@ -12,7 +13,7 @@ const primitive=gltf.meshes[0].primitives[0],position=accessor(primitive.attribu
 for(let i=0;i<gltf.accessors[primitive.indices].count;i+=3){for(const [zone,poly] of partitionFleeceHoodieTriangle([0,1,2].map(k=>position(index(i+k)[0])))){for(let k=1;k<poly.length-1;k++)for(const p of [poly[0],poly[k],poly[k+1]])points[zone].push(...p);}}
 const garment=new THREE.Group(),meshes=new Map();points.forEach((p,i)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial());garment.add(m);meshes.set(hoodiePanelNames[i],m);});
 const editor=fs.readFileSync(new URL('../v20/editor.js',import.meta.url),'utf8'),start=editor.indexOf('function rebuildFleeceHoodiePreview()'),end=editor.indexOf('\nfunction disposeZoneTexture',start),decalGroup=new THREE.Group();
-const context={hoodieFrontArtworkV,HOODIE_WAISTBAND_TOP_Y,THREE,DecalGeometry,hoodieArtworkBatches,hoodieSplashPreviewFrame,product:{id:'fleece-hoodie',zones:['Left Sleeve','Right Sleeve']},fleeceHoodieZoneMeshes:meshes,garment,decalGroup,clearDecals(){},updateFleeceHoodieZoneColors(){},zoneState:()=>({layers:[{visible:true}]}),stateFor:()=>({zones:Object.fromEntries(hoodiePanelNames.map(z=>[z,{layers:[{visible:true}]}]))}),makeCleanZoneArtworkCanvas:()=>({width:512,height:1024}),renderer:{capabilities:{getMaxAnisotropy:()=>1}},zonePlacement:()=>({p:new THREE.Vector3(),r:new THREE.Euler(),d:new THREE.Vector3(1,1,1)}),console};
+const context={hoodieFrontArtworkV,HOODIE_WAISTBAND_TOP_Y,THREE,DecalGeometry,hoodieArtworkBatches,hoodieSplashPreviewFrame,product:{id:'fleece-hoodie',zones:['Left Sleeve','Right Sleeve']},fleeceHoodieZoneMeshes:meshes,garment,decalGroup,clearDecals(){},updateFleeceHoodieZoneColors(){},zoneState:(zone,render)=>render?teamRenderZone(context.stateFor().zones[zone],context.stateFor().teamBackground,zone):context.stateFor().zones[zone],stateFor:()=>({zones:Object.fromEntries(hoodiePanelNames.map(z=>[z,{layers:[{visible:true}]}]))}),makeCleanZoneArtworkCanvas:()=>({width:512,height:1024}),renderer:{capabilities:{getMaxAnisotropy:()=>1}},zonePlacement:()=>({p:new THREE.Vector3(),r:new THREE.Euler(),d:new THREE.Vector3(1,1,1)}),console};
 vm.runInNewContext(editor.slice(start,end)+'\nrebuildFleeceHoodiePreview();',context);
 assert.equal(decalGroup.children.length,2);
 for(let i=0;i<2;i++){const zone=context.product.zones[i],target=meshes.get(zone),decal=decalGroup.children[i].geometry;assert.ok(decal.attributes.position.count>1000,zone+' must receive artwork');decal.computeBoundingBox();target.geometry.computeBoundingBox();const b=target.geometry.boundingBox,d=decal.boundingBox;assert.ok(d.min.y<=b.min.y+.01,zone+' covers wrist');assert.ok(d.max.y>=b.max.y-.01,zone+' covers shoulder');const uv=decal.attributes.uv;let lower=0;for(let j=0;j<uv.count;j++)if(uv.getY(j)<.35)lower++;assert.ok(lower>100,zone+' receives bottom grass portion');}
@@ -72,3 +73,7 @@ let opening=-Infinity;
 for(let i=0;i<gltf.accessors[primitive.attributes.POSITION].count;i++){const [x,y,z]=position(i);if(Math.abs(x)<.01&&z>.1)opening=Math.max(opening,y);}
 assert(Math.abs(opening-.69868803024)<1e-6,'calibration opening must match the actual supplied GLB');
 assert(Math.abs((frontBounds.max.y-opening)/(frontBounds.max.y-HOODIE_WAISTBAND_TOP_Y)-HOODIE_FRONT_MODEL_NECK_T)<1e-6,'neckline fraction must match model geometry');
+
+const backgroundState={teamBackground:{src:'synthetic-background',image:{complete:true,naturalWidth:64}},zones:Object.fromEntries(hoodiePanelNames.map(zone=>[zone,{layers:[]}]))};context.stateFor=()=>backgroundState;context.product.zones=hoodiePanelNames;decalGroup.clear();
+vm.runInNewContext(editor.slice(start,end)+'\nrebuildFleeceHoodiePreview();',context);assert.equal(decalGroup.children.length,5,'Optional member background must render through all five approved hoodie zones even without master artwork');assert(hoodiePanelNames.every(zone=>backgroundState.zones[zone].layers.length===0),'Rendering cannot add editable layers to the saved master');
+console.log('PASS optional hoodie background: five approved zones receive artwork without mutating saved master layers.');
