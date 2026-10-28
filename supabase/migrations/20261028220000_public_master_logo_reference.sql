@@ -26,6 +26,10 @@ begin
  if p_part<0 or p_part>26 then raise exception 'Invalid public master part';end if;
  select * into a from public.mqd_team_accounts where shop_config->>'slug'=p_slug and livemode=p_live and status<>'closed';
  if not found or a.shop_config->>'ownerManaged' is distinct from 'true' then return null;end if;
+ if p_part>0 and p_version is not null then
+  select * into c from public.mqd_master_read_cache where cache_key='version:'||a.team_id::text||':'||p_version::text and part=p_part;
+  if found then return jsonb_build_object('masterChunk',jsonb_build_object('id',p_version,'parts',c.parts,'text',c.body));end if;
+ end if;
  select id,status,email_verified_at,shop_config->>'pilotKind' as kind,shop_config->'ownerPublished' as published into b from public.mqd_print_shop_businesses where id=a.team_id;
  if not found then return jsonb_build_object('account',null,'business',null,'master',null);end if;
  p:=b.published;
