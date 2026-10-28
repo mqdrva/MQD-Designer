@@ -1,11 +1,23 @@
 import {TEAM_3D_GARMENTS} from '../supabase/functions/_shared/mqd-team-garments.js';
+import {packTeamMaster,unpackTeamMaster} from '../supabase/functions/_shared/mqd-team-master-transport.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {requireAdminMfa} from './admin-security.js';
 import {saveSetupPreview} from './setup-preview-store.js';
 import {mountTeamMasterAuthor} from './team-master-author.js';
 const ORIGIN='https://gsxuhpffgdffsqksrkrf.supabase.co',KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 export const ownerAuth=createClient(ORIGIN,KEY,{auth:{storageKey:'mqd-print-shop-admin-session',persistSession:true,detectSessionInUrl:true,flowType:'pkce'}});
-export async function ownerCall(action,extra={}){await requireAdminMfa(ownerAuth);const {data:{session}}=await ownerAuth.auth.getSession();if(!session)throw new Error('Owner sign-in required.');const r=await fetch(ORIGIN+'/functions/v1/mqd-team-service',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json','x-mqd-master':'1'},body:JSON.stringify({action:'admin-'+action,...extra})}),data=await r.json();if(!r.ok){const error=new Error(data.error||'Owner setup unavailable.');error.code=data.code;throw error;}return data;}
+export async function ownerCall(action,extra={}){
+ await requireAdminMfa(ownerAuth);const {data:{session}}=await ownerAuth.auth.getSession();if(!session)throw new Error('Owner sign-in required.');
+ const packet={action:'admin-'+action,...extra};
+ if(action==='master-save')packet.draft=packTeamMaster(extra.draft);
+ if(action==='master-load')packet.compact=true;
+ // Escape only JSON text, not image bytes. ASCII transport avoids widening the
+ // entire large body to UTF-16 because a layer label contains an em dash.
+ let body=JSON.stringify(packet);if(action==='master-save')body=body.replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+ const r=await fetch(ORIGIN+'/functions/v1/mqd-team-service',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json','x-mqd-master':'1'},body}),data=await r.json();
+ if(!r.ok){const error=new Error(data.error||'Owner setup unavailable.');error.code=data.code;throw error;}
+ if(action==='master-load'&&data.draft)data.draft=unpackTeamMaster(data.draft);return data;
+}
 export async function initOwnerWorkspace({build,load}){
  const $=id=>document.getElementById(id),form=$('setupForm');form.hidden=true;
  document.title='Owner Team / Brand workspace | MYMERCHNOW';document.querySelector('h1').textContent='Create a Team or Brand design';

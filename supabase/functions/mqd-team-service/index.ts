@@ -1,5 +1,6 @@
 import {Buffer} from 'node:buffer';
-import {packTeamResponse} from '../_shared/mqd-team-master-transport.js';
+import {packTeamMaster,unpackTeamMaster,packTeamResponse} from '../_shared/mqd-team-master-transport.js';
+import {boundedJson} from '../_shared/mqd-bounded-json.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -18,7 +19,6 @@ const ALLOWED=new Set([BASE_URL,'http://127.0.0.1:8776','http://localhost:8776',
 const uuid=(v:any)=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const identifier=(id:string)=>'mqd-teams-'+id.replaceAll('-','').slice(0,8).replace(/[0-9]/g,n=>String.fromCharCode(97+Number(n)));
 const checkpoint=(stage:string)=>{if(typeof Deno.memoryUsage==='function')console.info('TEAM_CHECKOUT_MEMORY '+stage+' '+JSON.stringify(Deno.memoryUsage()));};
-async function bodyBytes(req:Request,max:number){const reader=req.body?.getReader();if(!reader)throw new Error('Request body required');const pieces:Uint8Array[]= [];let n=0;while(true){const part=await reader.read();if(part.done)break;n+=part.value.length;if(n>max){await reader.cancel();throw new Error('Request is too large.');}pieces.push(part.value);}const bytes=new Uint8Array(n);let offset=0;for(const part of pieces){bytes.set(part,offset);offset+=part.length;}return bytes;}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'',cors:any={'Vary':'Origin','Content-Type':'application/json','Cache-Control':'no-store'};
  const json=(v:any,status=200)=>new Response(JSON.stringify(v),{status,headers:cors});
@@ -61,7 +61,7 @@ Deno.serve(async(req:Request)=>{
   if(req.method!=='POST')return json({error:'Method unavailable.'},405);
   const isForm=req.headers.get('content-type')?.includes('multipart/form-data');if(isForm)checkpoint('multipart-start');const form=isForm?await boundedMultipart(req,51*1024*1024):null;if(isForm)checkpoint('multipart-parsed');
   if(form&&String(form.get('payload')||'').length>20000)throw new Error('Order details are too large.');
-  const body=form?JSON.parse(String(form.get('payload')||'')):JSON.parse(new TextDecoder().decode(await bodyBytes(req,req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000)));
+  const parsed=form?{value:JSON.parse(String(form.get('payload')||'')),byteLength:0}:await boundedJson(req,req.headers.get('x-mqd-master')==='1'?48*1024*1024:15000),body=parsed.value;
   if(ownerTest&&!['order-checkout','order-status','admin-list','admin-detail','admin-package'].includes(body.action))return json({error:'Test access only supports checkout and order verification.'},403);
   const adminAction=String(body.action||'').startsWith('admin-');let actor:any=null;
   if(adminAction){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')||'';const auth=await db.auth.getUser(token);if(auth.error||auth.data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,token))return json({error:'Owner administrator sign-in and MFA required.'},403);actor=auth.data.user;}
@@ -276,13 +276,15 @@ Deno.serve(async(req:Request)=>{
    return json({created,sourceProductId:body.sourceProductId,sourceRevision:source.revision,message:'Private garment drafts copied from saved revision '+source.revision+'. Review every garment and save final placements yourself. Nothing published.'});
   }
   if(['admin-master-load','admin-master-save'].includes(body.action)){
-   const primary=await checked(db.from('mqd_team_master_drafts').select('revision,draft').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
-   const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),primaryProduct=primary?.draft?.payload?.product?.id||Object.keys(shop.garments)[0];
+   if(body.action==='admin-master-save')body.draft=unpackTeamMaster(body.draft,{requestBytes:parsed.byteLength,maxBytes:48*1024*1024});
+   const saving=body.action==='admin-master-save';
+   const primary=await checked(db.from('mqd_team_master_drafts').select(saving?'revision,product_id:draft->payload->product->>id':'revision,draft').eq('team_id',body.id).maybeSingle()),owner=business.shop_config.ownerManaged===true;
+   const shop=canonicalTeamShop(owner?business.shop_config:account.shop_config),storedProduct=primary?.product_id||primary?.draft?.payload?.product?.id,primaryProduct=storedProduct||Object.keys(shop.garments)[0];
    const product=body.productId||(body.action==='admin-master-save'?body.draft?.payload?.product?.id:primaryProduct);
    if(owner&&(!Object.hasOwn(TEAM_3D_GARMENTS,product)||shop.editingMode!=='strict'))throw new Error('Choose a supported strict-master garment.');
-   const extra=owner&&product!==primary?.draft?.payload?.product?.id?await checked(db.from('mqd_team_garment_master_drafts').select('revision,draft,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
+   const extra=owner&&product!==storedProduct?await checked(db.from('mqd_team_garment_master_drafts').select(saving?'revision,version_id':'revision,draft,version_id').eq('team_id',body.id).eq('product_id',product).maybeSingle()):null;
    const secondary=owner&&(!!extra||product!==primaryProduct),current=secondary?extra:primary;
-   if(body.action==='admin-master-load')return json({...(body.metadataOnly?{hasDraft:!!current?.draft}:{draft:current?.draft||null}),revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
+   if(body.action==='admin-master-load')return json({...(body.metadataOnly?{hasDraft:!!current?.draft}:{draft:body.compact?packTeamMaster(current?.draft):current?.draft||null}),revision:current?.revision||0,productId:product,versionId:secondary?extra?.version_id||null:account.master_version_id||null});
    if(!Number.isInteger(body.revision)||body.revision<0||typeof body.publish!=='boolean')throw new Error('Reload the current master before saving.');
    const draft=validateTeamMaster(body.draft);
    if(product!==draft.payload.product.id)throw new Error('The saved garment must match this editor.');

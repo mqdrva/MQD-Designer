@@ -143,5 +143,6 @@ jobs:
           node tests/owner-test-session.mjs
           node tests/team-production-fonts.mjs
           node tests/team-master-transport.mjs
+          node tests/owner-master-transport.mjs
           node tests/team-production.mjs
           node tests/team-production-placement.mjs
