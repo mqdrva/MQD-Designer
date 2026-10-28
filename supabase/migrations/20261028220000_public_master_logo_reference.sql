@@ -1,4 +1,24 @@
 begin;
+create or replace function public.mqd_read_team_master_part(p_team uuid,p_product text,p_revision integer,p_part integer)
+returns jsonb language plpgsql security invoker set search_path=public set statement_timeout='60s' as $$
+declare d jsonb;r integer;v uuid;t text;n integer;k text;c public.mqd_master_read_cache%rowtype;i integer;
+begin
+ if p_part is null or p_part<0 or p_part>25 then raise exception 'Invalid master part';end if;
+ if p_product is null then select revision into r from public.mqd_team_master_drafts where team_id=p_team;
+ else select revision,version_id into r,v from public.mqd_team_garment_master_drafts where team_id=p_team and product_id=p_product;end if;
+ if r is null then return null;end if;
+ if p_revision is not null and r<>p_revision then raise exception 'Master changed. Reopen the saved draft.';end if;
+ k:='draft:'||p_team::text||':'||coalesce(p_product,'primary')||':'||r::text;
+ select * into c from public.mqd_master_read_cache where cache_key=k and part=p_part;
+ if found then return jsonb_build_object('revision',r,'versionId',v,'parts',c.parts,'text',c.body);end if;
+ delete from public.mqd_master_read_cache where cache_key like 'draft:'||p_team::text||':'||coalesce(p_product,'primary')||':%' and cache_key<>k;
+ if p_product is null then select draft into d from public.mqd_team_master_drafts where team_id=p_team and revision=r;else select draft into d from public.mqd_team_garment_master_drafts where team_id=p_team and product_id=p_product and revision=r;end if;
+ if d is null then raise exception 'Master changed. Reopen the saved draft.';end if;
+ t:=d::text;n:=ceil(length(t)::numeric/2097152)::integer;
+ for i in 0..n-1 loop insert into public.mqd_master_read_cache values(k,i,substring(t from i*2097152+1 for 2097152),n) on conflict do nothing;end loop;
+ if n>26 or p_part>=n then raise exception 'Invalid master part';end if;
+ return jsonb_build_object('revision',r,'versionId',v,'parts',n,'text',substring(t from p_part*2097152+1 for 2097152));
+end $$;
 create or replace function public.mqd_read_owner_team_public_part(p_slug text,p_live boolean,p_garment text default null,p_version uuid default null,p_part integer default 0)
 returns jsonb language plpgsql security invoker set search_path=public set statement_timeout='60s' as $$
 declare a public.mqd_team_accounts;b record;m jsonb;p jsonb;product text;version uuid;zone record;layer jsonb;layers jsonb;zones jsonb:='{}';sources text[]:=array[]::text[];source text;i integer;k text;c public.mqd_master_read_cache%rowtype;t text;n integer;j integer;ref jsonb;
