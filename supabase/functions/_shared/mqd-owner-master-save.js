@@ -30,3 +30,10 @@ export async function readTeamMasterRequest(db,team,product){
  const chunks=[text];for(let part=1;part<parts;part++){const next=await db.rpc('mqd_read_team_master_part',{...args,p_revision:revision,p_part:part});if(next.error)return next;if(next.data?.revision!==revision)throw Error('Master changed. Reopen the saved draft.');chunks.push(next.data.text);}
  return {data:{revision,draft:JSON.parse(chunks.join('')),version_id:versionId}};
 }
+
+export async function readOwnerPublicRequest(db,args){
+ const first=await db.rpc('mqd_read_owner_team_public_part',{...args,p_part:0});if(first.error||!first.data?.masterChunk)return first;
+ const {id,parts,text}=first.data.masterChunk;if(!Number.isInteger(parts)||parts<1||parts>27)throw Error('Team artwork unavailable.');const chunks=[text];
+ for(let part=1;part<parts;part++){const next=await db.rpc('mqd_read_owner_team_public_part',{...args,p_version:id,p_part:part});if(next.error)return next;if(next.data?.masterChunk?.id!==id)throw Error('Team artwork unavailable.');chunks.push(next.data.masterChunk.text);}
+ const data={...first.data,master:JSON.parse(chunks.join(''))};delete data.masterChunk;return{data};
+}

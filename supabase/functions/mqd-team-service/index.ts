@@ -1,7 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {packTeamMaster,unpackTeamMaster,packTeamResponse} from '../_shared/mqd-team-master-transport.js';
 import {boundedJson} from '../_shared/mqd-bounded-json.js';
-import {saveTeamMasterRequest,readTeamMasterRequest} from '../_shared/mqd-owner-master-save.js';
+import {saveTeamMasterRequest,readTeamMasterRequest,readOwnerPublicRequest} from '../_shared/mqd-owner-master-save.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -36,7 +36,7 @@ Deno.serve(async(req:Request)=>{
    const publicResponse=packet=>json(new URL(req.url).searchParams.get('compact')==='1'?packTeamResponse(packet):packet);
    const slug=new URL(req.url).searchParams.get('team');if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug||''))throw new Error('Choose a team link.');
    const params=new URL(req.url).searchParams;
-   const compact=params.get('compact')==='1'?await checked(db.rpc('mqd_read_owner_team_public',{p_slug:slug,p_live:config.live,p_garment:params.get('garment'),p_version:params.get('version')})):null;
+   const compact=params.get('compact')==='1'?await checked(readOwnerPublicRequest(db,{p_slug:slug,p_live:config.live,p_garment:params.get('garment'),p_version:params.get('version')})):null;
    const a=compact?compact.account:await checked(db.from('mqd_team_accounts').select('*').eq('shop_config->>slug',slug).eq('livemode',config.live).neq('status','closed').maybeSingle());
    let business=compact?compact.business:a?await checked(db.from('mqd_print_shop_businesses').select(a.shop_config?.ownerManaged?'id,status,email_verified_at,pilot_kind:shop_config->>pilotKind,published_shop:shop_config->ownerPublished->shop,publication_authorized_by:shop_config->ownerPublished->>authorizedBy,publication_master_ids:shop_config->ownerPublished->masterVersionIds,publication_waived:shop_config->ownerPublished->organizerFeeWaived':'id,status,email_verified_at,shop_config').eq('id',a.team_id).maybeSingle()):null;
    if(business&&Object.hasOwn(business,'published_shop'))business={...business,shop_config:{ownerManaged:true,pilotKind:business.pilot_kind,ownerPublished:business.published_shop?{shop:business.published_shop,authorizedBy:business.publication_authorized_by,masterVersionIds:business.publication_master_ids,organizerFeeWaived:business.publication_waived}:null}};

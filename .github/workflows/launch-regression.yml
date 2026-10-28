@@ -104,6 +104,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028205945_owner_master_chunked_save.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028211104_owner_master_staging_lock_permission.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028212500_owner_master_bounded_read.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028212800_master_read_cache.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-master-chunked-save.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024134136_owner_saved_master_publish.sql
