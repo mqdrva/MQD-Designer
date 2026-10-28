@@ -1,6 +1,22 @@
 {
   "routes": [
     {
+      "src": "/teams/?",
+      "status": 307,
+      "headers": {
+        "Location": "/team-setup.html",
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "src": "/print-shops/?",
+      "status": 307,
+      "headers": {
+        "Location": "/print-shop-setup.html",
+        "Cache-Control": "no-store"
+      }
+    },
+    {
       "src": "/[lL][nN][oO]/?",
       "status": 307,
       "headers": {
