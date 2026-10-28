@@ -1,6 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {packTeamMaster,unpackTeamMaster,packTeamResponse} from '../_shared/mqd-team-master-transport.js';
 import {boundedJson} from '../_shared/mqd-bounded-json.js';
+import {saveTeamMasterRequest} from '../_shared/mqd-owner-master-save.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -290,9 +291,9 @@ Deno.serve(async(req:Request)=>{
    if(product!==draft.payload.product.id)throw new Error('The saved garment must match this editor.');
    if(!shop.engines.includes('3d')||(!shop.garments[product]&&(!owner||body.publish)))throw new Error('Choose a garment approved for this team.');
    const params={p_team:body.id,p_revision:body.revision,p_draft:draft,p_publish:body.publish,p_version:crypto.randomUUID()};
-   const saved=await db.rpc(secondary?'mqd_save_owner_garment_master':'mqd_save_team_master',secondary?{...params,p_product:product}:params);
+   const saved=await saveTeamMasterRequest(db,params,secondary?product:null);
    if(saved.error?.message==='Master changed. Reload before saving.')return json({code:'master_revision_conflict',error:'A newer master draft was saved. Your canvas is unchanged. Open the latest saved draft separately to compare before continuing.'},409);
-   if(saved.error)throw new Error('Team data could not be saved. Your canvas is unchanged. Keep this page open or compare the latest saved draft in a separate tab.');
+   if(saved.error){console.warn('TEAM_MASTER_SAVE_ERROR '+JSON.stringify({code:saved.error.code||'unknown',status:saved.error.status||null}));throw new Error('Team data could not be saved. Your canvas is unchanged. Keep this page open or compare the latest saved draft in a separate tab.');}
    return json(saved.data);
   }
   if(body.action==='owner-status'){

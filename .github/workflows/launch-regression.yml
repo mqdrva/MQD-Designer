@@ -99,6 +99,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024023500_owner_garment_master_drafts.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-master-database.sql
           psql -v ON_ERROR_STOP=1 -f tests/team-garment-master-database.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028080000_owner_master_binary_save.sql
+          psql -v ON_ERROR_STOP=1 -f tests/owner-master-binary-save.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024134136_owner_saved_master_publish.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce.sql
@@ -144,5 +146,6 @@ jobs:
           node tests/team-production-fonts.mjs
           node tests/team-master-transport.mjs
           node tests/owner-master-transport.mjs
+          node tests/owner-master-binary-save.mjs
           node tests/team-production.mjs
           node tests/team-production-placement.mjs
