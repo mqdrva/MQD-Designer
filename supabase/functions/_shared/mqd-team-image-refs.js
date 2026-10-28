@@ -30,6 +30,8 @@ export async function restoreTeamImages(saved,zip,encode=originalBase64){
   if(!source){const file=zip.file(match[1]),mime=saved.imageSourceTypes?.[match[1]];if(!file||(file._data?.uncompressedSize||0)>50*1024*1024||!/^image\/(png|jpeg|webp)$/.test(mime||''))throw new Error('Original artwork file is missing or invalid.');const bytes=await file.async('uint8array');zip.file(match[1],bytes);source='data:'+mime+';base64,'+encode(bytes);cache.set(match[1],source);}
   expanded+=source.length;if(expanded>48*1024*1024)throw new Error('Expanded design exceeds the supported artwork limit.');layer.src=source;(paths[zone]||=[])[index]=match[1];
  }
+ const background=saved.design?.design?.teamBackground;
+ if(background){const match=background.src?.match(/^zip:(originals\/member-background\.(png|jpeg|webp))$/);if(!match)throw new Error('Background original reference is invalid.');const file=zip.file(match[1]),mime=saved.imageSourceTypes?.[match[1]];if(!file||!/^image\/(png|jpeg|webp)$/.test(mime||'')||(file._data?.uncompressedSize||0)>15*1024*1024)throw new Error('Background original is missing or too large.');const bytes=await file.async('uint8array');if(bytes.length>15*1024*1024)throw new Error('Background original is too large.');zip.file(match[1],bytes);background.src='data:'+mime+';base64,'+encode(bytes);paths.background=match[1];expanded+=background.src.length;if(expanded>48*1024*1024)throw new Error('Expanded design exceeds the supported artwork limit.');}
  Object.defineProperty(saved,TEAM_RESTORED_PATHS,{value:paths});
  return saved;
 }

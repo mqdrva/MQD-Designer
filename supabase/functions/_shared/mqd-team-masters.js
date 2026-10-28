@@ -22,18 +22,21 @@ export function validateTeamMaster(master){
  const mapping=GARMENT_MAPPING[p.product.id];
  if(!mapping||stable(p.templates)!==stable(mapping.templates)||p.product.model!==mapping.model||stable(Object.keys(p.design.zones).sort())!==stable([...mapping.zones].sort()))fail('Keep the approved garment model and production mapping.');
  if(p.design.template||p.design.teamMaster)fail('Use an original master, not a member or gallery copy.');
- const permissions=p.design.teamPermissions;if(permissions!==undefined&&(!permissions||typeof permissions!=='object'||Array.isArray(permissions)||Object.keys(permissions).some(k=>k!=='wholeGarmentColor')||typeof permissions.wholeGarmentColor!=='boolean'))fail('Choose a supported whole-garment color permission.');
+ const permissions=p.design.teamPermissions;if(permissions!==undefined&&(!permissions||typeof permissions!=='object'||Array.isArray(permissions)||Object.keys(permissions).some(k=>!['wholeGarmentColor','backgroundImage'].includes(k))||Object.values(permissions).some(v=>typeof v!=='boolean')))fail('Choose a supported whole-garment color permission.');
  if(permissions?.wholeGarmentColor){const colors=Object.values(p.design.zones).map(z=>z.background);if(colors.some(c=>typeof c!=='string'||!/^#[a-f0-9]{6}$/i.test(c))||new Set(colors.map(c=>c.toUpperCase())).size!==1)fail('Apply one solid base color to every zone before allowing whole-shirt colors.');}
+ if(p.design.teamBackground!==undefined)fail('Keep optional member backgrounds out of the master; members add their own independent image.');
  const rows=templateLayers(p),ids=new Set();
  if(!rows.length||rows.length>100||!Array.isArray(master.rules)||master.rules.length!==rows.length)fail('Designate every master layer.');
- for(const [zone,state] of Object.entries(p.design.zones))if(!Array.isArray(state.layers)||state.layers.length>maxZoneLayers(p.product,zone))fail('The master exceeds the garment layer limit.');
+ for(const [zone,state] of Object.entries(p.design.zones))if(!Array.isArray(state.layers)||state.layers.length+(permissions?.backgroundImage?1:0)>maxZoneLayers(p.product,zone))fail('The master exceeds the garment layer limit.');
  for(const {zone,layer} of rows){
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}$/.test(layer.id||'')||ids.has(layer.id))fail('Master layers need unique identifiers.');ids.add(layer.id);
   if(!['text','image'].includes(layer.type)||layer.visible===false||layer.libraryAssetId)fail('Include visible original artwork and text only.');
   if(layer.type==='image'&&!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(layer.src||''))fail('Include the original uploaded artwork.');
   for(const k of ['x','y','scale','rotation'])if(!Number.isFinite(layer[k]))fail('Invalid master placement.');
   const rules=master.rules.filter(r=>r.zone===zone&&r.layerId===layer.id),r=rules[0];
-  if(rules.length!==1||!['locked','text'].includes(r.role)||r.role==='text'&&layer.type!=='text')fail('Only explicitly designated text fields may change.');
+  if(rules.length!==1||!['locked','text','logoColor'].includes(r.role)||r.role==='text'&&layer.type!=='text')fail('Only explicitly designated text fields may change.');
+  if(r.role==='logoColor'&&(layer.type!=='image'||!layer.teamLogo))fail('Choose a single-color logo treatment before allowing logo color.');
+  if(layer.teamLogo!==undefined&&(layer.type!=='image'||!layer.teamLogo||Object.keys(layer.teamLogo).sort().join(',')!=='color,mode'||!['alpha-v1','dark-on-white-v1'].includes(layer.teamLogo.mode)||!/^#[a-f0-9]{6}$/i.test(layer.teamLogo.color||'')))fail('Choose a supported logo treatment and solid color.');
   if(r.allowMove!==undefined&&(typeof r.allowMove!=='boolean'||r.role!=='text'))fail('Only designated text may be movable.');
   if(r.allowMove&&['x','y'].some(k=>layer[k]< -100||layer[k]>100))fail('Keep movable text within the positioning limits.');
   if(typeof r.label!=='string'||!r.label.trim()||r.label.length>100)fail('Name every member field.');
@@ -61,11 +64,17 @@ export function assertTeamMemberCopy(payload,version,{complete=true}={}){
  // PostgreSQL jsonb reorders zone keys; only layer order within a zone is meaningful.
  const byZone=(left,right)=>left.zone.localeCompare(right.zone);
  if(version.payload.design.teamPermissions?.wholeGarmentColor){let selected=null;for(const zone of Object.keys(expected.design.zones)){const color=actual.design?.zones?.[zone]?.background;if(typeof color!=='string'||!/^#[a-f0-9]{6}$/i.test(color)||selected&&color.toUpperCase()!==selected)fail('Choose one solid color for the whole garment.');selected=color.toUpperCase();expected.design.zones[zone].background=color;}}
+ if(version.payload.design.teamPermissions?.backgroundImage&&actual.design.teamBackground!==undefined){
+  const bg=actual.design.teamBackground;
+  if(!bg||Object.keys(bg).sort().join(',')!=='filename,src'||typeof bg.filename!=='string'||bg.filename.length>120||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(bg.src||'')||bg.src.length>20*1024*1024+64)fail('Choose an original PNG, JPEG or WebP background up to 15 MB.');
+  expected.design.teamBackground=bg;
+ }
  const a=templateLayers(actual).sort(byZone),e=templateLayers(expected).sort(byZone);
  for(let i=0;i<e.length;i++){
   if(!a[i]||a[i].zone!==e[i].zone||a[i].layer.templateLayerId!==e[i].layer.templateLayerId)fail('Master layers and order cannot change.');
   const rule=version.rules.find(r=>r.layerId===e[i].layer.templateLayerId&&r.zone===e[i].zone);
   delete a[i].layer.id;delete e[i].layer.id;
+  if(rule.role==='logoColor'){const color=a[i].layer.teamLogo?.color;if(!/^#[a-f0-9]{6}$/i.test(color||''))fail('Choose a solid logo color.');e[i].layer.teamLogo.color=color;}
   if(rule.role==='text'){
    const value=a[i].layer.text;
    if(typeof value!=='string'||value.length>rule.maxLength||/[\u0000-\u001f\u007f]/.test(value)||complete&&!value.trim()||rule.choices&&!rule.choices.includes(value))fail('Enter an allowed value for '+rule.label+'.');

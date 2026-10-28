@@ -6,7 +6,7 @@ import {loadSetupPreview} from './setup-preview-store.js';
 import {placeTeamPrint} from './team-production-placement.js';
 import {teamProductionFonts} from './team-production-fonts.js';
 import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-masters.js';
-import {mountTeamMember} from './team-master-member.js';
+import {mountTeamMember} from './team-master-member.js?v=brand-controls-20261028';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
 import { MAX_REQUEST_BYTES, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath } from './print-shop-contract.js';
 import { VIEWS, constrainPlacement, constrainImagePlacement } from './everyday-contract.js';
@@ -124,6 +124,8 @@ async function buildPackage(progress=()=>{},{checkout=false}={}) {
         if(packed)layer.src='zip:'+path;
       }
     }
+    const background=design.design.teamBackground;
+    if(background){if(!/^data:image\/(png|jpeg|webp);base64,/.test(background.src))throw new Error('Upload an original background image.');const mime=background.src.match(/^data:(image\/(png|jpeg|webp));/)[1],ext=mime.split('/')[1],path='originals/member-background.'+ext;entries.push({name:path,data:await(await fetch(background.src)).blob()});if(packed){sourceTypes[path]=mime;background.src='zip:'+path;}}
     entries.push({name:'design.json',data:JSON.stringify({schema:'mqd-shop-design-v1',engine,shop:shop.slug,design,...(packed?{imageSourceFormat:TEAM_IMAGE_REFS,imageSourceTypes:sourceTypes}:{})})});
   }
   const preset=garmentLogo(shop,s.productId);
@@ -279,7 +281,7 @@ try {
   }
   window.MQDTeamStartup?.stage('Loading your garment preview…');window.MQDPrintShop=shop;window.MQDShopConnect=connectShopEveryday;mount();mountGarmentDraftLinks();
   if(engine==='2d')await import('./shop-everyday.js');
-  else {await import('./shop-editor.js?v=mapping-0f91ba5cf4d3ca25');await import('./mobile-workspace.js');if(teamMaster){window.MQDTeamStartup?.stage('Placing your team artwork and names…');await mountTeamMember(teamMaster);}else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
+  else {await import('./shop-editor.js?v=mapping-eaa0dfa370d8174d');await import('./mobile-workspace.js');if(teamMaster){window.MQDTeamStartup?.stage('Placing your team artwork and names…');await mountTeamMember(teamMaster);}else if(teamService)await(await import('./team-color-presets.js')).mountTeamColorPresets();refresh();$('productSelect').addEventListener('change',()=>setTimeout(refresh,0));}
   if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
   document.body.dataset.ready='true';window.MQDTeamStartup?.ready();ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {

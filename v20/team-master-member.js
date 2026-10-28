@@ -5,11 +5,11 @@ export async function mountTeamMember(master,{payload=null}={}){
  const designer=window.MQDDesigner;if(!designer)throw new Error('Team master requires the 3D designer.');
  await window.MQDTeamFlush?.().catch(()=>{});
  const copy=payload||cloneTeamMaster(master);assertTeamMemberCopy(copy,master,{complete:false});
- window.MQDTeamMaster=master;await designer.loadDesign(copy,{notify:false});
+ window.MQDTeamMaster=master;await designer.loadDesign(copy,{notify:false,waitForArtwork:true});
  const edits=createTeamEditQueue(designer,current=>assertTeamMemberCopy(current,master,{complete:false}),()=>window.dispatchEvent(new Event('mqd:shop-design-change')));window.MQDTeamFlush=()=>edits.flush();
  document.getElementById('teamMemberFields')?.remove();
  const box=document.createElement('fieldset');box.id='teamMemberFields';const legend=document.createElement('legend');legend.textContent=master.name+' · Your personal copy';box.append(legend);
- const note=document.createElement('p');note.textContent='Edit names below. Drag permitted names on the print-zone canvas or use their movement sliders. Logos, artwork and styling stay protected. Text can move and shirt colors can change only where MQD has allowed it. Your edits affect only your copy.';box.append(note);
+ const note=document.createElement('p');note.textContent='Choose the options MQD has enabled. Your changes affect only your personal copy; protected logo shapes, sizes and placements stay fixed.'+(master.rules.some(r=>r.role==='text')?' Drag permitted names on the print-zone canvas or use their movement sliders.':'');box.append(note);
  for(const rule of master.rules.filter(r=>r.role==='text')){
   const label=document.createElement('label');label.textContent=rule.label;const layer=copy.design.zones[rule.zone].layers.find(l=>l.templateLayerId===rule.layerId);const input=document.createElement(rule.choices?'select':'input');
   if(rule.choices)for(const choice of rule.choices)input.add(new Option(choice,choice));else{input.type='text';input.maxLength=rule.maxLength;}
@@ -18,8 +18,20 @@ export async function mountTeamMember(master,{payload=null}={}){
   if(rule.allowMove)for(const [key,title] of [['x','left / right'],['y','up / down']]){const position=document.createElement('label');position.textContent=rule.label+' '+title;const slider=document.createElement('input');slider.type='range';slider.min='-100';slider.max='100';slider.step='1';slider.value=layer[key];slider.dataset.teamLayer=rule.layerId;slider.dataset.teamZone=rule.zone;slider.dataset.teamCoordinate=key;slider.onchange=async()=>{const value=Number(slider.value);try{await update(l=>l[key]=value);}catch(error){document.getElementById('shopStatus').textContent=error.message;}};position.append(slider);box.append(position);}
 
  }
+ const logoRules=master.rules.filter(r=>r.role==='logoColor');
+ if(logoRules.length){
+  const label=document.createElement('label');label.textContent='Logo color';const picker=document.createElement('input');picker.type='color';picker.value=copy.design.zones[logoRules[0].zone].layers.find(l=>l.templateLayerId===logoRules[0].layerId).teamLogo.color;
+  const applyLogo=async color=>{await edits.apply(current=>{for(const rule of logoRules)current.design.zones[rule.zone].layers.find(l=>l.templateLayerId===rule.layerId).teamLogo.color=color.toUpperCase();});picker.value=color.toLowerCase();};picker.onchange=()=>applyLogo(picker.value).catch(error=>document.getElementById('shopStatus').textContent=error.message);label.append(picker);box.append(label);for(const [name,color]of [['Black','#000000'],['White','#FFFFFF']]){const button=document.createElement('button');button.type='button';button.textContent=name+' logo';button.onclick=()=>applyLogo(color).catch(error=>document.getElementById('shopStatus').textContent=error.message);box.append(button);}
+ }
+ if(master.payload.design.teamPermissions?.backgroundImage){
+  const label=document.createElement('label');label.textContent='Optional background image (all garment zones)';const file=document.createElement('input');file.type='file';file.accept='image/png,image/jpeg,image/webp';
+  const remove=document.createElement('button');remove.type='button';remove.textContent='Remove background image';
+  file.onchange=async()=>{const selected=file.files[0];if(!selected)return;file.disabled=true;try{if(!['image/png','image/jpeg','image/webp'].includes(selected.type)||selected.size>15*1024*1024)throw new Error('Choose a PNG, JPEG or WebP background up to 15 MB.');const src=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Background could not load.'));reader.readAsDataURL(selected);});await edits.apply(current=>current.design.teamBackground={src,filename:selected.name.slice(0,120)});}catch(error){document.getElementById('shopStatus').textContent=error.message;}finally{file.disabled=false;file.value='';}};
+  remove.onclick=()=>edits.apply(current=>delete current.design.teamBackground).catch(error=>document.getElementById('shopStatus').textContent=error.message);
+  label.append(file);box.append(label,remove);const note=document.createElement('p');note.textContent='The background fills each existing garment zone behind the fixed logos. Keep important details in the garment’s marked safe areas. Original image quality is preserved; alignment across seams is not guaranteed.';box.append(note);
+ }
  if(master.payload.design.teamPermissions?.wholeGarmentColor){
-  const applyColor=async color=>{await edits.apply(current=>{for(const zone of Object.values(current.design.zones))zone.background=color.toUpperCase();});box.querySelector('input[type=color]').value=color.toLowerCase();};
+  const applyColor=async color=>{await edits.apply(current=>{for(const zone of Object.values(current.design.zones))zone.background=color.toUpperCase();});picker.value=color.toLowerCase();};
   const label=document.createElement('label');label.textContent='Custom whole-shirt color';const picker=document.createElement('input');picker.type='color';picker.value=copy.design.zones.Front.background;picker.onchange=()=>applyColor(picker.value).catch(error=>document.getElementById('shopStatus').textContent=error.message);label.append(picker);box.append(label);mountTeamColorPresets({container:box,applyColor,allowMaster:true});
  }
  const preview=document.createElement('button');preview.type='button';preview.className='btn team-member-preview';preview.textContent='Preview my shirt';preview.onclick=()=>window.dispatchEvent(new Event('mqd:show-preview'));box.append(preview);

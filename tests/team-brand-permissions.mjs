@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {validateTeamMaster,cloneTeamMaster,assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-masters.js';
+import {GARMENT_MAPPING} from '../supabase/functions/_shared/shirt-games/mapping.js';
+import {tintLogoPixels,teamRenderZone} from '../v20/team-brand-render.js';
+const m=GARMENT_MAPPING.tshirt,source='data:image/png;base64,YQ==';
+const master={id:crypto.randomUUID(),team_id:crypto.randomUUID(),name:'Synthetic brand',payload:{schema:'mqd-design-v1',product:{id:'tshirt',model:m.model},templates:m.templates,design:{teamPermissions:{wholeGarmentColor:true,backgroundImage:true},zones:Object.fromEntries(m.zones.map(z=>[z,{background:'#FFFFFF',layers:[]}]))}},rules:[]};
+for(const zone of ['Front','Back']){const id=zone+'-logo';master.payload.design.zones[zone].layers.push({id,type:'image',src:source,filename:'original.png',visible:true,x:20,y:-30,scale:.2,rotation:0,teamLogo:{mode:'dark-on-white-v1',color:'#262626'}});master.rules.push({zone,layerId:id,role:'logoColor',label:'Fixed logo'});}
+validateTeamMaster(master);const snapshot=JSON.stringify(master),a=cloneTeamMaster(master),b=cloneTeamMaster(master);
+for(const z of Object.values(a.design.zones)){z.background='#112233';for(const l of z.layers)l.teamLogo.color='#FFFFFF';}
+a.design.teamBackground={src:source,filename:'background.png'};assertTeamMemberCopy(a,master);assertTeamMemberCopy(JSON.parse(JSON.stringify(a)),master);assert.equal(JSON.stringify(master),snapshot);assert.equal(b.design.teamBackground,undefined);assert.equal(b.design.zones.Front.layers[0].teamLogo.color,'#262626');
+for(const mutate of [p=>p.design.zones.Front.layers[0].src='data:image/png;base64,Yg==',p=>p.design.zones.Front.layers[0].x=21,p=>p.design.zones.Front.layers[0].scale=2,p=>p.design.zones.Front.layers[0].teamLogo.mode='alpha-v1',p=>p.design.zones.Front.layers[0].teamLogo.color='red',p=>p.design.teamBackground.x=1,p=>p.design.teamBackground.src='https://example.invalid/image.png',p=>p.design.teamPermissions.backgroundImage=false,p=>p.design.zones.Front.layers.push({type:'text',text:'not allowed'})]){const tampered=structuredClone(a);mutate(tampered);assert.throws(()=>assertTeamMemberCopy(tampered,master));}
+const locked=structuredClone(master);locked.rules.forEach(r=>r.role='locked');assert.throws(()=>assertTeamMemberCopy(a,locked));
+const noBackground=structuredClone(master);delete noBackground.payload.design.teamPermissions.backgroundImage;assert.throws(()=>assertTeamMemberCopy(a,noBackground));
+const pixels=new Uint8ClampedArray([255,255,255,255,38,38,38,255,147,147,147,255]);tintLogoPixels(pixels,'#FF0000',{whiteBackground:true});assert.deepEqual([...pixels],[255,0,0,0,255,0,0,255,255,0,0,127]);
+const alpha=new Uint8ClampedArray([30,30,30,87]);tintLogoPixels(alpha,'#FFFFFF');assert.deepEqual([...alpha],[255,255,255,87]);
+console.log('PASS brand permissions: independent copies, only approved color/background edits, source/position/style/treatment/extra-layer denial, historical opt-in, alpha and white-background rendering.');
+
+const state={background:'#FFFFFF',layers:[{id:'logo'}]},bg={src:source,image:{complete:true,naturalWidth:3600}};const rendered=teamRenderZone(state,bg,'Front');assert.equal(rendered.layers.length,2);assert.equal(state.layers.length,1);assert.equal(rendered.layers[1],state.layers[0]);assert.equal(rendered.layers[0],teamRenderZone(state,bg,'Front').layers[0],'Stable identity preserves existing renderer batch filters');assert.equal(teamRenderZone(state,null,'Front'),state);assert(rendered.layers[0].chatBackground);console.log('PASS background rendering is isolated from the saved layer list and preserves stable image batch identity.');

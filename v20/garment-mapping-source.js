@@ -3,6 +3,7 @@
 // Build-time composition keeps the existing editor closure and approved mapping behavior intact.
 
 // @mapping-begin imports
+import {teamLogoImage,teamRenderZone} from './team-brand-render.js';
 import {partitionTshirtBodyTriangle,tshirtSleeveArtworkBounds} from './tshirt-armhole-seams.js?v=2';
 import {refineTshirtCollar} from './tshirt-collar-shell.js';
 import {tshirtBodyPlacementFrame,matchTshirtDuplicatePlacement} from './tshirt-duplicate-placement.js';
@@ -826,7 +827,7 @@ function drawJacketSplash5Layer(c,zone,l,b,preview){
 
 // @mapping-begin drawLayerStack
 function drawLayerStack(c,zone,b,preview=false){
-  const z=zoneState(zone);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
+  const z=zoneState(zone,true);c.fillStyle=z.background||'#FFFFFF';c.fillRect(b.x,b.y,b.w,b.h);
   (z.layers||[]).forEach(l=>{if(l.visible===false)return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(c,zone,l,b,preview);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(c,zone,l,b,preview);return;}c.save();clipShirtSplash(c,product.id,zone,l,b);const cx=b.x+b.w/2+(l.x||0)*b.w/200,cy=b.y+b.h/2+(l.y||0)*b.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,b);}
     else if(l.type==='text'){drawTextLayer(c,l,b,zone);}c.restore();});
@@ -863,7 +864,7 @@ function makeCleanZoneDesignCanvas(zone,maxSide=1600){const ratio=zoneDesignAspe
 // @mapping-end makeCleanZoneDesignCanvas
 
 // @mapping-begin makeCleanZoneArtworkCanvas
-function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const minimum=product.id==='tshirt'&&zone==='Collar'?32:256;const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(minimum,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(minimum,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(x,zone,l,b,textMap.flat!==true);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(x,zone,l,b,textMap.flat!==true);return;}x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='text'&&textMap.textScaleY)x.scale(1,textMap.textScaleY);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,textMap.textStyle?textMap.textStyle(l):l,b,zone);x.restore();});return c;}
+function makeCleanZoneArtworkCanvas(zone,maxSide=1600,textMap={}){const minimum=product.id==='tshirt'&&zone==='Collar'?32:256;const ratio=zoneDesignAspect(zone);let w,h;if(ratio>=1){w=maxSide;h=Math.max(minimum,Math.round(maxSide/ratio));}else{h=maxSide;w=Math.max(minimum,Math.round(maxSide*ratio));}const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';const z=zoneState(zone,true),b={x:0,y:0,w,h};(z.layers||[]).forEach(l=>{if(l.visible===false||textMap.layerFilter&&!textMap.layerFilter(l))return;if(isJacketSplash5(product.id,zone,l)){drawJacketSplash5Layer(x,zone,l,b,textMap.flat!==true);return;}if(isCutlineBottomArtwork(l)){drawWaterSplash2(x,zone,l,b,textMap.flat!==true);return;}x.save();const imageFrame=l.type==='image'?textMap.imageFrame?.(l,b):null;if(imageFrame){x.translate(imageFrame.offsetX*b.w,imageFrame.offsetY*b.h);x.scale(imageFrame.scaleX,1);}else{clipShirtSplash(x,product.id,zone,l,b);}const imageOffset=typeof textMap.imageOffsetY==='function'?Number(textMap.imageOffsetY(l)):Number(textMap.imageOffsetY),layerY=(l.type==='text'?Number(textMap.offsetY):l.type==='image'?imageOffset:0)||0,cx=b.w/2+(l.x||0)*b.w/200,cy=b.h/2+(l.y||0)*b.h/200+layerY*b.h;x.translate(cx,cy);if(l.type==='text'&&textMap.flipX)x.scale(-1,1);x.rotate((l.rotation||0)*Math.PI/180);if(l.type==='text'&&textMap.textScaleY)x.scale(1,textMap.textScaleY);if(l.type==='image'&&l.image)drawImageLayer(x,l,b);else if(l.type==='text')drawTextLayer(x,textMap.textStyle?textMap.textStyle(l):l,b,zone);x.restore();});return c;}
 // @mapping-end makeCleanZoneArtworkCanvas
 
 // @mapping-begin makeLongSleeveTshirtArtworkCanvas
@@ -926,7 +927,7 @@ function drawTemplateGuide(c,zone,r,alpha=.46){
 
 // @mapping-begin drawZoneLayersRect
 function drawZoneLayersRect(c,zone,r){
-  const z=stateFor().zones[zone]||{background:'#FFFFFF',layers:[]};c.fillStyle=z.background||'#FFFFFF';c.fillRect(r.x,r.y,r.w,r.h);
+  const z=zoneState(zone,true)||{background:'#FFFFFF',layers:[]};c.fillStyle=z.background||'#FFFFFF';c.fillRect(r.x,r.y,r.w,r.h);
   (z.layers||[]).forEach(l=>{if(l.visible===false)return;c.save();const cx=r.x+r.w/2+(l.x||0)*r.w/200,cy=r.y+r.h/2+(l.y||0)*r.h/200;c.translate(cx,cy);c.rotate((l.rotation||0)*Math.PI/180);
     if(l.type==='image'&&l.image){drawImageLayer(c,l,r);}
     else if(l.type==='text'){drawTextLayer(c,l,r);}c.restore();});
@@ -1123,7 +1124,7 @@ function makeZoneTextureCanvas(zone){return makeCleanZoneDesignCanvas(zone,1600)
 // @mapping-end makeZoneTextureCanvas
 
 // @mapping-begin zoneHasContent
-function zoneHasContent(zone){const z=stateFor().zones[zone];return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
+function zoneHasContent(zone){const z=zoneState(zone,true);return z&&((z.background||'#FFFFFF').toUpperCase()!=='#FFFFFF'||(z.layers||[]).length);}
 // @mapping-end zoneHasContent
 
 // @mapping-begin maxLayerScale
@@ -1281,7 +1282,7 @@ function rebuildFleeceHoodiePreview(){
  if(product.id!=='fleece-hoodie'||!fleeceHoodieZoneMeshes.size)return false;
  clearDecals();updateFleeceHoodieZoneColors();garment.updateMatrixWorld(true);
  product.zones.forEach(zone=>{
-  const z=stateFor().zones[zone];if(!z?.layers?.some(l=>l.visible!==false))return;
+  const z=zoneState(zone,true);if(!z?.layers?.some(l=>l.visible!==false))return;
   const target=fleeceHoodieZoneMeshes.get(zone);if(!target)return;
   for(const [batchIndex,batch] of hoodieArtworkBatches(zone,z.layers).entries()){
   const canvas=makeCleanZoneArtworkCanvas(zone,1600,{layerFilter:layer=>batch.layers.includes(layer),imageFrame:layer=>hoodieSplashPreviewFrame(zone,layer)}),tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();tex.minFilter=THREE.LinearMipmapLinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;
@@ -1353,17 +1354,17 @@ function makeShirtPreviewArtwork(zone,maxSide,options={}){
   textStyle:longPoloCollar?layer=>({...layer,scale:(layer.scale||1)*1.5,bold:true,weight:layer.bold===false?700:900,
    ...(!Number(layer.strokeWidth)?{strokeWidth:layer.bold===false?.45:.8,strokeColor:layer.color||'#111111'}:{})}):options.textStyle,
   imageFrame:(layer,b)=>shirtSplashPreviewFrame(product.id,zone,layer,b)};
- const shiftedBack=product.id==='short-sleeve-polo'&&zone==='Back'&&zoneState(zone).layers.some(layer=>layer.visible!==false&&(isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)));
+ const shiftedBack=product.id==='short-sleeve-polo'&&zone==='Back'&&zoneState(zone,true).layers.some(layer=>layer.visible!==false&&(layer.teamMemberBackground||isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)));
  if(!shiftedBack)return makeCleanZoneArtworkCanvas(zone,maxSide,settings);
  // Preserve the approved back shift for every other layer. The water alone
  // reaches the hem, and is composited in its original stacking position.
- const layers=zoneState(zone).layers||[];
+ const layers=zoneState(zone,true).layers||[];
  const out=makeCleanZoneArtworkCanvas(zone,maxSide,{layerFilter:()=>false});
  const ctx=out.getContext('2d');
  const batches=[];
  for(const layer of layers){
   if(layer.visible===false)continue;
-  const splash=(isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)),last=batches.at(-1);
+  const splash=(layer.teamMemberBackground||isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)),last=batches.at(-1);
   if(last&&last.splash===splash)last.layers.push(layer);else batches.push({splash,layers:[layer]});
  }
  for(const batch of batches){
@@ -1377,11 +1378,11 @@ function makeShirtPreviewArtwork(zone,maxSide,options={}){
 // @mapping-begin updateTshirtZoneTextures
 function updateTshirtZoneTextures(){
  if(!['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-polo'].includes(product.id)||!tshirtZoneMeshes.size)return false;
- for(const [zone,mesh] of tshirtInteriorMeshes)mesh.material.color.set(zoneState(zone).background||'#FFFFFF');
+ for(const [zone,mesh] of tshirtInteriorMeshes)mesh.material.color.set(zoneState(zone,true).background||'#FFFFFF');
  const textureMax=previewTextureMax();
  product.zones.forEach(zone=>{
   const mesh=tshirtZoneMeshes.get(zone);if(!mesh)return;
-  const state=zoneState(zone),hasArtwork=(state.layers||[]).some(layer=>layer.visible!==false);
+  const state=zoneState(zone,true),hasArtwork=(state.layers||[]).some(layer=>layer.visible!==false);
   if(!hasArtwork){
     disposeZoneTexture(mesh);
     if(mesh.material?.color)mesh.material.color.set(state.background||'#FFFFFF');
@@ -1410,9 +1411,9 @@ function updateTshirtZoneTextures(){
     ?makeLongSleeveTshirtArtworkCanvas(zone,textureMax,true)
     :makeShirtPreviewArtwork(zone,textureMax),canvas=document.createElement('canvas');
   canvas.width=artwork.width;canvas.height=artwork.height;
-  const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
+  const paint=canvas.getContext('2d');paint.fillStyle=zoneState(zone,true).background||'#FFFFFF';paint.fillRect(0,0,canvas.width,canvas.height);
   const artworkY=product.id==='short-sleeve-polo'&&zone==='Back'?-canvas.height*.08:0;
-  const splashBack=product.id==='short-sleeve-polo'&&zone==='Back'&&state.layers.some(layer=>layer.visible!==false&&(isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)));
+  const splashBack=product.id==='short-sleeve-polo'&&zone==='Back'&&state.layers.some(layer=>layer.visible!==false&&(layer.teamMemberBackground||isShirtSplash(product.id,zone,layer)||isCutlineBottomArtwork(layer)));
   paint.drawImage(artwork,0,splashBack?0:artworkY);
   const interior=tshirtInteriorMeshes.get(zone);
   if(interior&&!interior.userData.neutralNeckInterior){
