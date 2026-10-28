@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {teamRenderZone} from '../v20/team-brand-render.js';
 import {createCanvas} from '@napi-rs/canvas';
 import * as THREE from 'three';
 import {TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY} from '../v20/tshirt-artwork-calibration.js';
@@ -15,14 +16,14 @@ for(const id of ['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-
   const states=new Map(zones.map(zone=>[zone,{background:'#336699',layers:[{type:'text',text:zone,visible:true}]}]));
   const meshes=new Map(zones.map(zone=>[zone,new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial())]));
   const interiors=new Map(id==='tshirt'?zones.slice(2).map(zone=>[zone,new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial())]):[]);
-  const calls=[];
+  const calls=[];let memberBackground=null;
   const artwork=(zone,size,options={})=>{
     calls.push({zone,options});
     const canvas=createCanvas(16,16),ctx=canvas.getContext('2d');
     ctx.fillStyle='#CC3300';ctx.fillRect(0,0,16,16);return canvas;
   };
   const c=vm.createContext({THREE,product:{id,zones},tshirtZoneMeshes:meshes,tshirtInteriorMeshes:interiors,
-    zoneState:zone=>states.get(zone),previewTextureMax:()=>16,ensureTemplateImage:()=>null,
+    zoneState:(zone,render)=>render?teamRenderZone(states.get(zone),memberBackground,zone):states.get(zone),previewTextureMax:()=>16,ensureTemplateImage:()=>null,
     disposeZoneTexture:mesh=>{mesh.material.map?.dispose();mesh.material.map=null;},
     TSHIRT_BODY_ARTWORK_OFFSET_Y,tshirtBodyImageOffsetY,hasOpaqueImageEdges:()=>false,
     makeShirtPreviewArtwork:artwork,makeLongSleeveTshirtArtworkCanvas:(zone,size)=>artwork(zone,size,{longSleeve:true}),
@@ -42,5 +43,8 @@ for(const id of ['tshirt','long-sleeve-tshirt','short-sleeve-polo','long-sleeve-
   assert.equal(c.updateTshirtZoneTextures(),true);
   for(const mesh of meshes.values()){assert.equal(mesh.material.map,null);assert.equal(mesh.material.color.getHexString(),'336699');}
   for(const mesh of interiors.values())assert.equal(mesh.material.color.getHexString(),'336699','removing artwork restores the zone background');
+  memberBackground={src:'synthetic-background',image:{complete:true,naturalWidth:1}};
+  assert.equal(c.updateTshirtZoneTextures(),true);for(const mesh of meshes.values())assert(mesh.material.map,'Member background renders in zones with no master layers');
+  memberBackground=null;assert.equal(c.updateTshirtZoneTextures(),true);for(const mesh of meshes.values())assert.equal(mesh.material.map,null,'Removing member background restores the ordinary solid route');
 }
 console.log('PASS: four shirt texture routes, calibrated Front and Back, locked backgrounds and interior color/reset.');

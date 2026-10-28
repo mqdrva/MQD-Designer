@@ -135,6 +135,7 @@ jobs:
           node tests/team-service.mjs
           node tests/owner-team-workspace.mjs
           node tests/team-masters.mjs
+          node tests/team-brand-permissions.mjs
           psql -v ON_ERROR_STOP=1 -f tests/team-checkout-business.sql
           node tests/team-checkout-memory.mjs
           node tests/owner-test-session.mjs
