@@ -104,12 +104,14 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028205945_owner_master_chunked_save.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028211104_owner_master_staging_lock_permission.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028212500_owner_master_bounded_read.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028212800_master_read_cache.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-master-chunked-save.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce-fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261024134136_owner_saved_master_publish.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-commerce.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261025041153_owner_organizer_billing.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-organizer-billing.sql
+          psql -v ON_ERROR_STOP=1 -f tests/public-master-read-cache.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261025044233_duplicate_owner_team.sql
           psql -v ON_ERROR_STOP=1 -f tests/owner-team-duplicate.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026165602_team_checkout_master_fingerprints.sql
