@@ -16,3 +16,7 @@ verify_jwt = false
 # Public voting is anonymous; owner actions validate getUser, admin role and MFA.
 [functions.mqd-design-contest]
 verify_jwt = false
+
+# Guest capability tokens and owner getUser + MFA are verified in the handler.
+[functions.mqd-support-chat]
+verify_jwt = false
