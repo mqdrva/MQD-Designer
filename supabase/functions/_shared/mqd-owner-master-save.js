@@ -37,3 +37,11 @@ export async function readOwnerPublicRequest(db,args){
  for(let part=1;part<parts;part++){const next=await db.rpc('mqd_read_owner_team_public_part',{...args,p_version:id,p_part:part});if(next.error)return next;if(next.data?.masterChunk?.id!==id)throw Error('Team artwork unavailable.');chunks.push(next.data.masterChunk.text);}
  const data={...first.data,master:JSON.parse(chunks.join(''))};delete data.masterChunk;return{data};
 }
+
+export async function readOwnerWorkspaceRequest(db,team){
+ const args={p_team:team,p_revision:null,p_part:0},first=await db.rpc('mqd_owner_workspace_part',args);
+ if(first.error||!first.data)return first;
+ const {revision,parts,text}=first.data;if(!Number.isInteger(parts)||parts<1||parts>32)throw Error('Owner setup size unavailable.');
+ const chunks=[text];for(let part=1;part<parts;part++){const next=await db.rpc('mqd_owner_workspace_part',{...args,p_revision:revision,p_part:part});if(next.error)return next;if(next.data?.revision!==revision)throw Error('Workspace changed. Reopen before continuing.');chunks.push(next.data.text);}
+ return {data:JSON.parse(chunks.join(''))};
+}
