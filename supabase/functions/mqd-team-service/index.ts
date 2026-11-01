@@ -1,7 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {packTeamMaster,unpackTeamMaster,packTeamResponse} from '../_shared/mqd-team-master-transport.js';
 import {boundedJson} from '../_shared/mqd-bounded-json.js';
-import {saveTeamMasterRequest,readTeamMasterRequest,readOwnerPublicRequest} from '../_shared/mqd-owner-master-save.js';
+import {saveTeamMasterRequest,readTeamMasterRequest,readOwnerPublicRequest,readOwnerWorkspaceRequest} from '../_shared/mqd-owner-master-save.js';
 import {OWNER_TEAM_POLICY,ORGANIZER_ACTIONS,organizerIdentityAllowed,organizerRewardTarget} from '../_shared/mqd-organizer-access.js';
 import {boundedMultipart} from '../_shared/mqd-bounded-multipart.js';
 import {restoreTeamImages,hydrateCheckoutMaster} from '../_shared/mqd-team-image-refs.js';
@@ -85,7 +85,7 @@ Deno.serve(async(req:Request)=>{
   if(body.action==='admin-workspace-list')return json({workspaces:await checked(db.from('mqd_print_shop_businesses').select('id,revision,name:shop_config->>name,slug:shop_config->>slug,kind:shop_config->>pilotKind,updated_at').eq('shop_config->>ownerManaged','true').order('updated_at',{ascending:false}).limit(50))});
   if(['admin-workspace-save','admin-workspace-load','admin-workspace-publish','admin-workspace-unpublish'].includes(body.action)){
    if(!uuid(body.id))throw new Error('Choose an owner workspace.');
-   const prior=await checked(db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).maybeSingle());
+   const prior=await checked(body.action==='admin-workspace-load'?readOwnerWorkspaceRequest(db,body.id):db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).maybeSingle());
    if(prior&&!prior.shop_config?.ownerManaged)return json({error:'This setup is managed through its existing Team workflow.'},409);
    if(body.action==='admin-workspace-save'){
     if(!Number.isInteger(body.revision)||body.revision<0)throw new Error('Reload before saving.');
