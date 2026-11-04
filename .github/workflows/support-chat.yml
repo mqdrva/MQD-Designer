@@ -1,0 +1,39 @@
+name: Human support chat
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  support-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: regression
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: regression
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tests/support-chat.mjs
+      - run: node tests/design-request.mjs
+      - run: |
+          psql -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role;'
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261022182802_human_support_chat.sql
+          psql -v ON_ERROR_STOP=1 -f tests/support-chat-schema.sql
