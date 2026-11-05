@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {longSleevePanelUv as uv} from '../v20/long-sleeve-panels.js';
-const {createCanvas}=createRequire(import.meta.url)('@napi-rs/canvas');
+const {createCanvas,GlobalFonts}=createRequire(import.meta.url)('@napi-rs/canvas');
+// Register the CI fallback explicitly: some runner images expose no usable
+// default sans-serif face to the native canvas renderer.
+if(process.env.MQD_TEST_FONT)assert(GlobalFonts.registerFromPath(process.env.MQD_TEST_FONT,'sans-serif'),'Mapping test font is available');
 const editor=fs.readFileSync(new URL(process.env.MQD_MAPPING_EDITOR||'../v20/editor.js',import.meta.url),'utf8');
 const extract=(a,b)=>editor.slice(editor.indexOf('function '+a+'('),editor.indexOf('function '+b+'('));
 let layers=[];
