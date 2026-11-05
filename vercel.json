@@ -80,7 +80,8 @@
   "outputDirectory": ".",
   "git": {
     "deploymentEnabled": {
-      "codex/shirt-games-private-build": false
+      "codex/shirt-games-private-build": false,
+      "codex/print-shop-design-sharing": false
     }
   }
 }
