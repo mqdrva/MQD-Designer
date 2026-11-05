@@ -24,7 +24,7 @@ The original ZIP is immutable in private storage; owner updates point to a new p
 
 - `node tests/print-shop-design-sharing.mjs`: actual service handler with synthetic auth/database/storage; both engines, byte-exact ZIPs, owner isolation, admin MFA, shared capability isolation, lock changes, revision conflict, suspended access and Team exclusion.
 - `tests/print-shop-design-schema.sql`: private table grants/RLS and private ZIP bucket in isolated PostgreSQL, included in existing CI.
-- `node tests/print-shop-design-browser.mjs`: existing real 2D/3D renderers in desktop/mobile browser, synthetic services only. Requires Playwright available to Node and a locally cached approved T-shirt GLB (`MQD_TEST_TSHIRT_GLB`); `THREE_ROOT` and `CHROME_PATH` optionally select existing local dependencies/browser. No real emails, payments or production data.
+- `node tests/print-shop-design-browser.mjs`: existing real 2D/3D renderers in desktop/mobile browser, synthetic services only, including server rejection after the owner relocks an already-open customer form. Requires Playwright available to Node and a locally cached approved T-shirt GLB (`MQD_TEST_TSHIRT_GLB`); `THREE_ROOT` and `CHROME_PATH` optionally select existing local dependencies/browser. No real emails, payments or production data.
 - Existing onboarding, paid access, logo, management, subscription, Team API and frozen-garment tests remain required.
 
 ## Review and release status

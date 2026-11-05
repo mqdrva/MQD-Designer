@@ -10,7 +10,10 @@ import * as shipping from '../supabase/functions/_shared/mqd-shipping.js';
 import { everydayProductionZip } from '../v20/everyday-production-package.js';
 import { SIZES, colorsForProduct, sizesForProduct } from '../v20/everyday-contract.js';
 import { zoneFor } from '../v20/everyday-preview-renderer.js';
-const { createCanvas, loadImage } = await import(process.env.EVERYDAY_CANVAS_MODULE || '@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = await import(process.env.EVERYDAY_CANVAS_MODULE || '@napi-rs/canvas');
+// CI runners do not consistently include a system-font fallback. Register the
+// fixture explicitly so a blank raster cannot accidentally pass export QA.
+if(process.env.EVERYDAY_TEST_FONT)assert(GlobalFonts.registerFromPath(process.env.EVERYDAY_TEST_FONT,'Inter'),'Export test font is available');
 const root = new URL('../', import.meta.url), read = path => fs.readFileSync(new URL(path, root), 'utf8');
 const pricing = everyday.everydayPricing(read('config/everyday-pricing.example.json'));
 globalThis.document = { createElement: () => createCanvas(800, 900) };

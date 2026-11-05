@@ -26,7 +26,7 @@ await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));const base='
 const f=fixture(),emails=[];let requestHandler;
 const db={...f.db,rpc:async(name,args)=>name==='mqd_claim_print_shop_request'?{data:[{id:args.p_id,reference:'SYNTHETIC-REQUEST',status:'reserved'}]}:{data:'test-only-mail-key'},from:table=>table==='mqd_print_shop_requests'?{update:()=>({eq:async()=>({})})}:f.db.from(table)};
 let pilot=await fs.readFile(path.join(root,'supabase/functions/mqd-print-shop-pilot/index.ts'),'utf8');pilot=pilot.replace(/^import .*;\n/gm,'');
-vm.runInNewContext(stripTypeScriptTypes(pilot),{createClient:()=>db,hasShopAccess,sharedShopDesign,savedShopAppearance,JSZip,PILOT_SHOP,MAX_REQUEST_BYTES,requestEstimate,money,validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath,crypto,TextEncoder,Uint8Array,Response,Request,File,btoa,atob,console,Deno:{env:{get:()=> 'synthetic-only'},serve:h=>requestHandler=h},fetch:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');emails.push(JSON.parse(options.body));return new Response('{"id":"synthetic-mail"}',{status:200});}});
+vm.runInNewContext(stripTypeScriptTypes(pilot),{createClient:()=>db,hasShopAccess,sharedShopDesign,savedShopAppearance,JSZip,PILOT_SHOP,MAX_REQUEST_BYTES,requestEstimate,money,validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath,crypto,Error,TextEncoder,Uint8Array,Response,Request,File,btoa,atob,console,Deno:{env:{get:()=> 'synthetic-only'},serve:h=>requestHandler=h},fetch:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');emails.push(JSON.parse(options.body));return new Response('{"id":"synthetic-mail"}',{status:200});}});
 const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{}),args:['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const context=await browser.newContext({viewport:{width:1360,height:1000},acceptDownloads:true});
 const errors=[];
@@ -82,6 +82,15 @@ try{
   const download=page.waitForEvent('download');await page.locator('#saveDraft').click();const d=await download;const file=path.join(output,engine+'-customer-copy.zip');await d.saveAs(file);const zip=await JSZip.loadAsync(await fs.readFile(file));const copied=JSON.parse(await zip.file('design.json').async('string'));
   assert.equal(engine==='2d'?copied.draft.artwork.front.texts[0].text:copied.design.design.zones.Back.layers[0].text,'CUSTOMER COPY');
   assert.deepEqual(f.files.get(f.designs.get(id).package_path),p.bytes,'Public edits preserve exact original');
+  if(engine==='2d'){
+   await page.locator('#shopName').fill('Synthetic Customer');await page.locator('#shopEmail').fill('copy@example.com');await page.locator('#shopPhone').fill('2025550101');await page.locator('#shopForm input[type=checkbox]').check();await page.waitForTimeout(2200);
+   await page.locator('#shopSend').click();await page.getByText('Request SYNTHETIC-REQUEST accepted',{exact:false}).waitFor();assert.equal(emails.length,1);
+   const sent=await JSZip.loadAsync(Buffer.from(emails[0].attachments[0].content,'base64'));assert.equal(JSON.parse(await sent.file('design.json').async('string')).draft.artwork.front.texts[0].text,'CUSTOMER COPY');
+   await f.call({action:'lock',id,businessId,locked:true,revision:2});
+   await page.locator('#shopSend').click();await page.getByText(/The shop updated this design|This shared design is view only/).waitFor();assert.equal(emails.length,1,'Owner relock blocks the already-open customer form server-side');
+   await f.call({action:'lock',id,businessId,locked:false,revision:3});
+  }
+
   await page.setViewportSize({width:390,height:844});await page.goto(url);await ready();assert(await page.locator('.shop-design-toolbar').isVisible());
   await page.screenshot({path:path.join(output,engine+'-mobile.png'),fullPage:true});await page.setViewportSize({width:1360,height:1000});
  }
@@ -95,6 +104,6 @@ try{
  console.log('Testing existing general shop request and ZIP');
  await page.goto(base+'/shops/'+shop.slug);await ready();assert.equal(await page.locator('.shop-design-toolbar').count(),0);await page.getByRole('button',{name:'Add Text',exact:true}).click();await page.locator('#textContent').fill('GENERAL REQUEST');await page.locator('#textContent').dispatchEvent('input');
  await page.locator('#shopName').fill('Synthetic Customer');await page.locator('#shopEmail').fill('test@example.com');await page.locator('#shopPhone').fill('2025550101');await page.locator('#shopForm input[type=checkbox]').check();await page.waitForTimeout(2200);await page.locator('#shopSend').click();await page.getByText('Request SYNTHETIC-REQUEST accepted',{exact:false}).waitFor();
- assert.equal(emails.length,1);assert.equal(emails[0].attachments.length,1);assert.equal(emails[0].to[0],'owner@example.com');assert((await JSZip.loadAsync(Buffer.from(emails[0].attachments[0].content,'base64'))).file('design.json'));
+ assert.equal(emails.length,2);assert.equal(emails.at(-1).attachments.length,1);assert.equal(emails.at(-1).to[0],'owner@example.com');assert((await JSZip.loadAsync(Buffer.from(emails.at(-1).attachments[0].content,'base64'))).file('design.json'));
  assert.deepEqual(errors,[]);console.log('PASS browser: 2D/3D exact saved links, locked viewing, navigation, editable copies, mobile, owner save/reopen, general unpaid request/email/ZIP; no real services called.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

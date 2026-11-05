@@ -1,4 +1,4 @@
-import {MAX_REQUEST_BYTES,requestEstimate} from '../mqd-print-shop-pilot/contract.js';
+import {MAX_REQUEST_BYTES,requestEstimate,garmentLogo,garmentLogoPath,assertFixedLogoPackage} from '../mqd-print-shop-pilot/contract.js';
 import {GARMENT_MAPPING} from '../_shared/shirt-games/mapping.js';
 import {maxZoneLayers} from '../_shared/mqd-layer-capacity.js';
 
@@ -30,6 +30,16 @@ export async function validateShopDesignPackage(bytes,shop,JSZip){
    if(!Array.isArray(zone.layers)||zone.layers.length>maxZoneLayers(d.product.id,name))throw new Error('Unsupported design layers.');
    for(const l of zone.layers)if(!['image','text'].includes(l.type)||l.libraryAssetId||l.type==='image'&&!raster.test(l.src||''))throw new Error('Use original uploaded artwork and text.');
   }
+ }
+ const preset=garmentLogo(shop,order.productId);
+ if(preset.mode!=='none'){
+  const placement=zip.file('brand/logo-placement.json'),asset=zip.file(garmentLogoPath(shop));
+  if(!placement||!asset||placement._data?.uncompressedSize>3000)throw new Error('The original shop logo and placement are missing.');
+  const manifest=JSON.parse(await placement.async('string'));
+  if(!same(manifest,{product:order.productId,preset,asset:garmentLogoPath(shop)}))throw new Error('Keep the saved shop logo placement.');
+  assertFixedLogoPackage(shop,order,saved,manifest);
+  const actual=await asset.async('uint8array'),expected=Uint8Array.from(atob(shop.garmentLogo.split(',')[1]),c=>c.charCodeAt(0));
+  if(actual.length!==expected.length||actual.some((v,i)=>v!==expected[i]))throw new Error('Keep the original shop logo artwork.');
  }
  return {engine:saved.engine,productId:order.productId};
 }
