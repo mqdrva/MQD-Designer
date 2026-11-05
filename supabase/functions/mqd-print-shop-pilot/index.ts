@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {hasShopAccess} from './access.js';
+import {sharedShopDesign,savedShopAppearance} from '../mqd-print-shop-designs/service.js';
 import JSZip from 'npm:jszip@3.10.1';
 import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath } from './contract.js';
 
@@ -42,7 +43,8 @@ Deno.serve(async req=>{
    const form=await new Request(req.url,{method:'POST',headers:{'Content-Type':req.headers.get('content-type')!},body}).formData();
    const raw=form.get('payload');if(typeof raw!=='string'||raw.length>20000)throw new Error('Request details are invalid.');
    const payload=JSON.parse(raw),file=form.get('package');
-   const record=await activeShop(db,payload.shop);if(!record)throw new Error('Shop unavailable or inactive.');const shop=record.shop;
+   const record=await activeShop(db,payload.shop);if(!record)throw new Error('Shop unavailable or inactive.');let shop=record.shop;
+   if(payload.sharedDesign){const shared=await sharedShopDesign(db,payload.sharedDesign,payload.shop);if(shared.row.locked)throw new Error('This shared design is view only. Contact your shop for changes or an order.');shop=savedShopAppearance(shared.row,shared.business);}
    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.requestId||''))throw new Error('Request identifier invalid.');
    const started=Number(payload.startedAt);if(payload.website||!Number.isFinite(started)||Date.now()-started<2000||Date.now()-started>86400000)throw new Error('Refresh the page and complete the request form.');
    const customer=payload.customer;

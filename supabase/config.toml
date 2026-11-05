@@ -16,3 +16,7 @@ verify_jwt = false
 # Public voting is anonymous; owner actions validate getUser, admin role and MFA.
 [functions.mqd-design-contest]
 verify_jwt = false
+
+# Owner actions validate verified shop email; shared capabilities are read-only.
+[functions.mqd-print-shop-designs]
+verify_jwt = false
