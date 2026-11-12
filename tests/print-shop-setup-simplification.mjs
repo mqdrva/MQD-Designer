@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {COLORS,SIZES,PRODUCT_OPTIONS} from '../v20/everyday-catalog.js';
-import {shopPrintZones,validateGarmentLogo} from '../v20/print-shop-contract.js';
+import {shopPrintZones,validateGarmentLogo,materialOptions} from '../v20/print-shop-contract.js';
 import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
 class Element {
  constructor(tag){this.tag=tag;this.children=[];this.dataset={};this.value='';this.className='';this.checked=false;}
@@ -12,11 +12,11 @@ class Element {
  setAttribute(){}
  addEventListener(){}
  setCustomValidity(message){this.validationMessage=message;}
- querySelectorAll(selector){const nodes=this.children.flatMap(c=>c instanceof Element?[c,...c.querySelectorAll('*')]:[]);if(selector==='*')return nodes;return nodes.filter(c=>selector==='input'?c.tag==='input':selector.startsWith('.')?c.className.split(' ').includes(selector.slice(1).replace(':checked',''))&&(!selector.endsWith(':checked')||c.checked):false);}
+ querySelectorAll(selector){const nodes=this.children.flatMap(c=>c instanceof Element?[c,...c.querySelectorAll('*')]:[]);if(selector==='*')return nodes;return nodes.filter(c=>selector==='input,textarea'?['input','textarea'].includes(c.tag):selector==='input'?c.tag==='input':selector.startsWith('.')?c.className.split(' ').includes(selector.slice(1).replace(':checked',''))&&(!selector.endsWith(':checked')||c.checked):false);}
  querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
 }
 const elements=Object.fromEntries(['shopSlug','setupStatus','garmentRows','premiumRows'].map(id=>[id,new Element('div')]));
-const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,URLSearchParams,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo});
+const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,URLSearchParams,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo,materialOptions});
 const source=fs.readFileSync(new URL('../v20/print-shop-setup.js',import.meta.url),'utf8');
 vm.runInContext(source.replace(/^import .*;\n/gm,'').split('for(const [id,name] of Object.entries(SHOP_PRINT_METHODS))')[0],context);
 for(const [input,expected] of [['MQD SHOP','mqd-shop'],['https://mymerchnow.app/shops/MQD-Shop/3d','mqd-shop'],['  Brenda’s Designs  ','brenda-s-designs']]){elements.shopSlug.value=input;vm.runInContext('normalizeShopLink()',context);assert.equal(elements.shopSlug.value,expected);}
@@ -31,8 +31,8 @@ for(const row of elements.garmentRows.children){assert.deepEqual(row.querySelect
 assert(elements.garmentRows.children[3].querySelectorAll('.offered-color:checked').some(i=>i.value==='Forest'));
 assert.equal(elements.garmentRows.children[3].querySelector('.garment-enabled').checked,false,'disabled garments receive shared selections for later');
 const premium=elements.premiumRows.children[0];assert.equal(premium.querySelectorAll('.offered-color').length,0);assert(premium.querySelectorAll('.dimension-row').length>0);assert(premium.querySelectorAll('.offered-size').length>0);
-premium.querySelector('.garment-brand').value='';premium.querySelector('.garment-style').value='';
-const collected=JSON.parse(vm.runInContext("JSON.stringify(collectGarments('premiumRows'))",context));assert(collected.tshirt.sizes.length);assert(Object.keys(collected.tshirt.printZones).length>0);
+premium.querySelector('.garment-materials').value='Cotton blend\nPerformance fabric';premium.querySelector('.garment-brand').value='';premium.querySelector('.garment-style').value='';
+const collected=JSON.parse(vm.runInContext("JSON.stringify(collectGarments('premiumRows'))",context));assert.deepEqual(collected.tshirt.materials,['Cotton blend','Performance fabric']);assert(collected.tshirt.sizes.length);assert(Object.keys(collected.tshirt.printZones).length>0);
 const fixture=JSON.parse(fs.readFileSync(new URL('./fixtures/print-shop-setup.json',import.meta.url)));fixture.plan='3d';fixture.shop.garments.tshirt=collected.tshirt;fixture.shop.pricing.premiumCents={tshirt:4000};const validated=validateSetup(fixture);assert(validated.shop.garments.tshirt.sizes.length);assert.equal(validated.shop.pricing.premiumCents.tshirt,4000);
 assert.equal(validated.shop.garments.tshirt.brand,'');assert.equal(validated.shop.garments.tshirt.style,'');
 vm.runInContext("sharedSetup('garmentRows');sharedSetup('premiumRows')",context);

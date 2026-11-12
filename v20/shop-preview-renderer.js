@@ -2,8 +2,8 @@ import {shopPrintZones,garmentLogo} from './print-shop-contract.js';
 import { artworkLayers, drawText, loadTextFonts } from './everyday-layers.js';
 import { ZONES } from './everyday-contract.js';
 export const PRODUCTS = {
-  'everyday-tshirt': { name: 'Cotton T-shirt', model: 'tshirt' },
-  'everyday-long-sleeve': { name: 'Cotton long sleeve', model: 'long-sleeve' },
+  'everyday-tshirt': { name: 'T-shirt', model: 'tshirt' },
+  'everyday-long-sleeve': { name: 'Long-sleeve T-shirt', model: 'long-sleeve' },
   'everyday-hoodie': { name: 'Hoodie', model: 'hoodie' },
   'everyday-polo': { name: 'Polo', model: 'polo' },
 };

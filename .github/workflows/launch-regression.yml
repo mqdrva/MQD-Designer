@@ -28,10 +28,15 @@ jobs:
           path: .cache/mqd-glbs
           key: ${{ runner.os }}-mqd-glbs-${{ hashFiles('tests/frozen-products.json') }}
       - run: npm ci
+      - name: Provide the font used by native text mapping fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-dejavu-core
       - name: Verify all 12 frozen garments
         run: npm run test:launch
         env:
           MQD_GLB_CACHE_DIR: .cache/mqd-glbs
+          MQD_TEST_FONT: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 
       - name: Verify Shirt Games privacy, proofs and sandbox boundaries
         run: node --test games/tests/*.test.mjs
@@ -140,6 +145,11 @@ jobs:
       - name: Verify private Print Shop saved-design sharing
         run: |
           node tests/print-shop-design-sharing.mjs
+          node tests/print-shop-request-feedback.mjs
+          node tests/print-shop-materials.mjs
+          node tests/print-shop-request-delivery.mjs
+          node tests/print-shop-request-flow.mjs
+          psql -v ON_ERROR_STOP=1 -f tests/print-shop-receipts-schema.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104150000_print_shop_saved_design_sharing.sql
           psql -v ON_ERROR_STOP=1 -f tests/print-shop-design-schema.sql
 

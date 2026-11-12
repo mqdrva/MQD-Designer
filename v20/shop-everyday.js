@@ -45,7 +45,7 @@ function syncOptions() {
   syncChoices('colorChoices', colorsForProduct(draft.product).map(color => [color, color]), draft.color, 'color', true);
   syncChoices('sizeChoices', sizesForProduct(draft.product, draft.color).map(size => [size, size]), draft.size, 'size');
   $('colorName').textContent = draft.color;
-  if ($('productDescription')) $('productDescription').textContent = PRODUCT_OPTIONS[draft.product].description;
+  if ($('productDescription')) $('productDescription').textContent = 'Confirm garment fabric and fit with '+window.MQDPrintShop.name+' before ordering.';
   if ($('sizeAvailability')) { const sizes = sizesForProduct(draft.product, draft.color); $('sizeAvailability').textContent = `${sizes.join(', ')} in ${draft.color}. Offered by this shop.`; }
   $('quantityMinus').disabled = busy || Number($('quantity').value) <= 1;
   $('quantityPlus').disabled = busy || Number($('quantity').value) >= 99;
