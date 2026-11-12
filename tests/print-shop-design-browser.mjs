@@ -95,7 +95,7 @@ try{
   await page.screenshot({path:path.join(output,engine+'-mobile.png'),fullPage:true});await page.setViewportSize({width:1360,height:1000});
  }
  console.log('Testing owner creation and save/reopen');
- await page.goto(base+'/print-shop-designs.html');await page.locator('#designEmail').fill('owner@example.com');await page.locator('#designPassword').fill('synthetic-only');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.locator('#newShopDesign').waitFor();await page.locator('#newShopDesign').click();await ready();
+ await page.goto(base+'/print-shop-designs.html');await page.locator('#designEmail').fill('owner@example.com');await page.getByText('Use an existing password instead',{exact:true}).click();await page.locator('#designPassword').fill('synthetic-only');await page.getByRole('button',{name:'Sign in with password',exact:true}).click();await page.locator('#newShopDesign').waitFor();await page.locator('#newShopDesign').click();await ready();
  await page.locator('.shop-design-toolbar input[maxlength="100"]').fill('Owner created design');await page.getByRole('button',{name:'Add Text',exact:true}).click();await page.locator('#textContent').fill('SHOP ORIGINAL');await page.locator('#textContent').dispatchEvent('input');
  await page.getByRole('button',{name:'Save design and get customer link'}).click();await page.getByText('Saved. Customer link ready.',{exact:false}).waitFor();
  const ownerLink=await page.getByRole('textbox',{name:'Customer design link'}).inputValue();assert(ownerLink.includes('#view='));

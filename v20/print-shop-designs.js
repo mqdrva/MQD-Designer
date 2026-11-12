@@ -1,3 +1,4 @@
+import {requestShopSignIn} from './print-shop-email-login.js';
 import {designCall,shopDesignAuth,customerDesignLink} from './print-shop-design-auth.js';
 const $=id=>document.getElementById(id);
 const say=value=>$('designStatus').textContent=value;
@@ -30,7 +31,14 @@ async function load(){
  }
  $('designShop').onchange=()=>refresh().catch(e=>say(e.message));await refresh();
 }
-$('designLogin').onsubmit=async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const {error}=await shopDesignAuth.auth.signInWithPassword({email:$('designEmail').value.trim(),password:$('designPassword').value});$('designPassword').value='';if(error)throw new Error('Sign-in failed. Use your shop-owner account.');await load();}catch(error){say(error.message);}finally{button.disabled=false;}};
+let emailLinkBusy=false,emailLinkTimer;
+$('designLogin').onsubmit=async e=>{
+ e.preventDefault();if(emailLinkBusy||!$('designEmail').reportValidity())return;
+ const button=$('designEmailLink');emailLinkBusy=true;button.disabled=true;say('Sending your secure sign-in link…');
+ try{await requestShopSignIn(shopDesignAuth,$('designEmail').value,location.origin);say('Check your inbox and spam folder for your sign-in link. Open it in this same browser on this device. You can request another link in one minute.');emailLinkTimer=setTimeout(()=>{emailLinkBusy=false;button.disabled=false;},60000);}
+ catch(error){say(error.message);emailLinkBusy=false;button.disabled=false;}
+};
+$('designPasswordSignIn').onclick=async()=>{if(!$('designEmail').reportValidity())return;const button=$('designPasswordSignIn');if(!$('designPassword').value){say('Enter your existing password, or choose Email me a sign-in link.');return;}button.disabled=true;try{const {error}=await shopDesignAuth.auth.signInWithPassword({email:$('designEmail').value.trim(),password:$('designPassword').value});$('designPassword').value='';if(error)throw new Error('Sign-in failed. Use your shop-owner account or request an email sign-in link.');await load();}catch(error){say(error.message);}finally{button.disabled=false;}};
 $('designGoogle').onclick=async()=>{const {error}=await shopDesignAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+'/print-shop-designs.html',queryParams:{prompt:'select_account'}}});if(error)say(error.message);};
 $('designLogout').onclick=async()=>{await shopDesignAuth.auth.signOut();$('savedDesigns').replaceChildren();$('designWorkspace').hidden=true;$('designLogin').hidden=false;say('Signed out.');};
-if((await shopDesignAuth.auth.getSession()).data.session)await load().catch(e=>say(e.message));
+try{const {data,error}=await shopDesignAuth.auth.getSession();if(error||params.has('error')||new URLSearchParams((location.hash||'').slice(1)).has('error')||!data.session&&params.has('code'))say('This sign-in link could not be used. Request a new link and open it in the same browser where you requested it.');else if(data.session)await load();}catch(error){say(error.message||'Sign-in could not finish. Request a new email link.');}
