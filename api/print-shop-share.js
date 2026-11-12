@@ -24,7 +24,7 @@ export function brandedShopHTML(html,shop,slug,engine){
  const image=shopLogoBytes(shop.logo)?ORIGIN+'/api/print-shop-share?shop='+encodeURIComponent(slug)+'&image=1':ORIGIN+'/assets/brand-logo.png';
  // Replace generic metadata in the initial response; crawlers need no JavaScript.
  html=html.replace(/<meta\b[^>]*(?:property|name)=["'](?:og:|twitter:)[^>]*>\s*/gi,'').replace(/<title>[\s\S]*?<\/title>/i,'<title>'+escape(title)+'</title>');
- const tags={'og:type':'website','og:site_name':shop.name,'og:title':title,'og:description':shop.tagline,'og:url':url,'og:image':image,'og:image:alt':shop.name+' logo','twitter:card':'summary','twitter:title':title,'twitter:description':shop.tagline,'twitter:image':image};
+ const tags={'og:type':'website','og:site_name':shop.name,'og:title':title,'og:description':shop.tagline,'og:url':url,'og:image':image,'og:image:alt':shopLogoBytes(shop.logo)?shop.name+' logo':'MyMerchNow logo','twitter:card':'summary','twitter:title':title,'twitter:description':shop.tagline,'twitter:image':image};
  return html.replace('</head>',Object.entries(tags).map(([key,value])=>'<meta '+(key.startsWith('og:')?'property':'name')+'="'+key+'" content="'+escape(value)+'">').join('\n')+'\n</head>');
 }
 export function createShopShareHandler({loadShop=publicShop,template=engine=>readFile(new URL(engine==='3d'?'../shop-3d.html':'../shop-2d.html',import.meta.url),'utf8')}={}){

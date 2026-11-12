@@ -47,11 +47,11 @@
       "dest": "/api/openai-apps-challenge"
     },
     {
-      "src": "/shops/([a-z0-9]+(?:-[a-z0-9]+)*)/3d/?",
+      "src": "/shops/(?!pilot(?:/|$))([a-z0-9]+(?:-[a-z0-9]+)*)/3d/?",
       "dest": "/api/print-shop-share?shop=$1&engine=3d"
     },
     {
-      "src": "/shops/([a-z0-9]+(?:-[a-z0-9]+)*)/?",
+      "src": "/shops/(?!pilot(?:/|$))([a-z0-9]+(?:-[a-z0-9]+)*)/?",
       "dest": "/api/print-shop-share?shop=$1&engine=2d"
     },
     {
