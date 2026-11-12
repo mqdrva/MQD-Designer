@@ -150,6 +150,7 @@ jobs:
           node tests/print-shop-request-delivery.mjs
           node tests/print-shop-request-flow.mjs
           node tests/print-shop-email-login.mjs
+          node tests/print-shop-share.mjs
           psql -v ON_ERROR_STOP=1 -f tests/print-shop-receipts-schema.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104150000_print_shop_saved_design_sharing.sql
           psql -v ON_ERROR_STOP=1 -f tests/print-shop-design-schema.sql
