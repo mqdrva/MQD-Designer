@@ -7,6 +7,7 @@ import {placeTeamPrint} from './team-production-placement.js';
 import {teamProductionFonts} from './team-production-fonts.js';
 import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-masters.js';
 import {mountTeamMember} from './team-master-member.js?v=brand-controls-20261028';
+import {mountMaterialControls} from './shop-material-controls.js';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
 import { MAX_REQUEST_BYTES, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath } from './print-shop-contract.js';
 import { VIEWS, constrainPlacement, constrainImagePlacement } from './everyday-contract.js';
@@ -28,7 +29,7 @@ const engine = document.body.dataset.shopEngine;
 const memberPreview=new URLSearchParams(location.search).get('memberPreview')==='1';
 const setupPreview = new URLSearchParams(location.search).get('setupPreview') === '1';
 const slug = location.pathname.match(/^\/(?:shops|teams)\/([a-z0-9-]+)(?:\/3d)?\/?$/)?.[1] || new URLSearchParams(location.search).get('shop') || 'pilot';
-let ownerWorkspaceData=null,garmentChoices=null,designSharing=null;
+let ownerWorkspaceData=null,garmentChoices=null,designSharing=null,materialControls=null;
 const requestedGarment=new URLSearchParams(location.search).get('garment');
 function mountGarmentDraftLinks(){if(!garmentChoices||Object.keys(garmentChoices).length<2)return;const nav=document.createElement('nav');nav.id='teamGarmentLinks';nav.style.cssText='display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px';nav.setAttribute('aria-label','Team garment drafts');const title=document.createElement('strong');title.textContent=ownerWorkspaceData&&!memberPreview?'Separate private garment drafts: ':'Choose your garment: ';nav.append(title);for(const [product,label]of Object.entries(garmentChoices)){const link=document.createElement('a'),url=new URL(location.href);url.searchParams.set('garment',product);link.href=url.pathname+url.search;link.textContent=label;link.style.margin='0 10px';if(teamMaster&&product===teamMaster.payload.product.id||!teamMaster&&product===Object.keys(shop.garments)[0])link.setAttribute('aria-current','page');if(!ownerWorkspaceData)link.onclick=event=>{if(!confirm('Changing garments starts a separate personal copy. Save your current personalized design first if you want to keep it. Continue?'))event.preventDefault();};nav.append(link);}document.querySelector('.shop-intro').after(nav);}
 let shop, getDraft, sending = false, cachedAttempt = null,checkoutFeedback;
@@ -41,6 +42,7 @@ function rows() {
 }
 function availableSizes(){if(engine==='2d'&&getDraft){const d=getDraft();return shopSizes(shop,d.product,d.color);}return shop.garments?.[window.MQDDesigner?.getContext().productId]?.sizes||['XS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'];}
 function syncRequestOptions(){
+  materialControls?.sync();
   const sizes=availableSizes();for(const select of document.querySelectorAll('#shopSizes select')){const old=select.value;select.replaceChildren(...sizes.map(s=>new Option(s,s)));select.value=sizes.includes(old)?old:sizes.includes('L')?'L':sizes[0];}
   if(engine==='3d'&&window.MQDDesigner){const id=window.MQDDesigner.getContext().productId,select=$('shopGarmentColor');const colors=shop.garments?.[id]?.colors||['White','Black'];const old=select.value;select.replaceChildren(...colors.map(c=>new Option(c,c)));select.value=colors.includes(old)?old:colors[0];}
 }
@@ -55,13 +57,13 @@ function addSize() {
 function summary() {
   if (engine === '2d') {
     const d = getDraft();
-    return { engine, productId:d.product, productName:garmentLabel(shop,d.product,PRODUCTS[d.product].name), garment:shop.garments?.[d.product], color:d.color, printMethod:d.printMethod, locations:VIEWS.filter(v=>artworkLayers(d.artwork[v]).length||(v==='front'&&garmentLogo(shop,d.product).mode==='fixed')), orderOptions:rows() };
+    return { ...(!teamService?materialControls?.value():{}), engine, productId:d.product, productName:garmentLabel(shop,d.product,PRODUCTS[d.product].name), garment:shop.garments?.[d.product], color:d.color, printMethod:d.printMethod, locations:VIEWS.filter(v=>artworkLayers(d.artwork[v]).length||(v==='front'&&garmentLogo(shop,d.product).mode==='fixed')), orderOptions:rows() };
   }
   const d = window.MQDDesigner.getContext();
   if (!window.MQDDesigner.hasShopArtwork()) throw new Error('Add artwork, text, or a garment color before requesting an order.');
   const design=window.MQDDesigner.exportDesign(), zoneMap={'Front':'front','Back':'back','Left Sleeve':'left','Right Sleeve':'right'};
   const locations=Object.entries(design.design.zones||{}).filter(([,z])=>z.layers?.length||(z.background&&z.background.toLowerCase()!=='#ffffff')).map(([zone])=>zoneMap[zone]||zone.toLowerCase());
-  return {printLimits:shopPrintZones(shop,d.productId),engine,productId:d.productId,productName:d.productName,garment:shop.garments?.[d.productId],color:$('shopGarmentColor').value,locations,printMethod:$('shopPrintMethod').value,orderOptions:rows()};
+  return {...(!teamService?materialControls?.value():{}),printLimits:shopPrintZones(shop,d.productId),engine,productId:d.productId,productName:d.productName,garment:shop.garments?.[d.productId],color:$('shopGarmentColor').value,locations,printMethod:$('shopPrintMethod').value,orderOptions:rows()};
 }
 function refresh() {
   if (!shop || (engine === '2d' && !getDraft)) return;
@@ -183,6 +185,7 @@ async function loadPackage(file,{waitForArtwork=false}={}) {
   if(requestEntry) {
     const request=JSON.parse(await requestEntry.async('string'));
     requestEstimate(shop,request);
+    materialControls?.restore(request);
     if(engine==='3d'){$('shopPrintMethod').value=request.printMethod;syncRequestOptions();if(request.color)$('shopGarmentColor').value=request.color;}
     $('shopSizes').replaceChildren();
     for(const item of request.orderOptions.slice(engine==='2d'?1:0)) {addSize();const row=$('shopSizes').lastElementChild;row.querySelector('select').value=item.size;row.querySelector('input').value=item.quantity;}
@@ -191,6 +194,7 @@ async function loadPackage(file,{waitForArtwork=false}={}) {
 }
 async function send(event) {
   event.preventDefault(); if(designSharing?.shopOwnerRequested){say('Use Save design and get customer link above.');return;} if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
+  try { materialControls?.validate(); } catch(error) { say(error.message); return; }
   sending=true;refresh();if(teamService){checkoutFeedback||=checkoutProgress();checkoutFeedback.start('Preparing your order…');}say('Preparing your order…');
   const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(c=>!c.closest('#checkoutProgress')), disabled=controls.map(c=>c.disabled),buttonText=$('shopSend').textContent;controls.forEach(c=>c.disabled=true);$('shopSend').textContent=teamService?'Preparing checkout…':'Preparing request…';
   try {
@@ -222,7 +226,8 @@ async function send(event) {
       throw new Error(response.status>=500?retryMessage:result.error||'Your design is still here. Please review the order and retry.');
     }
     if(teamService){if(result.paid){location.href='/team-order.html?id='+result.id;return;}const url=new URL(result.url);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com')throw new Error('Secure checkout link unavailable.');location.assign(url.href);return;}
-    say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.`);
+    const receipt=result.customerReceipt==='sent'?' A request receipt was accepted for your email address.':result.customerReceipt==='failed'?' Your email receipt could not be sent. Keep this reference; your request has still reached the shop.':'';
+    say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.${receipt}`);
   }catch(error){const connectionMessage=teamService
     ? 'Checkout could not be reached or the request was interrupted. Your design is safe. Please retry; if this continues, contact MYMERCHNOW.'
     : 'The request was interrupted. Your design is still here. Retry or save your ZIP and contact the shop.';
@@ -230,6 +235,7 @@ async function send(event) {
 }
 async function digest(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function mount() {
+  if(!teamService)materialControls=mountMaterialControls({shop,form:$('shopForm'),getProduct:()=>engine==='2d'?getDraft?.().product:window.MQDDesigner?.getContext().productId,onChange:refresh});
   if(memberPreview){$('saveDraft').hidden=true;$('shopLoad').closest('label').hidden=true;}
   document.title=`${shop.name} · ${engine.toUpperCase()} shirt designer`;
   if(teamService&&engine==='3d'){$('shopGarmentColor').closest('label').hidden=true;const note=$('shopGarmentColor').closest('label').nextElementSibling;if(note)note.textContent='All-over garment colors come from your design. Review the artwork before ordering.';}

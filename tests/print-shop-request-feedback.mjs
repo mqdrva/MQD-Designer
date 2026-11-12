@@ -24,6 +24,7 @@ for (const teamService of [false, true]) {
     const context = vm.createContext({
       teamService,
       designSharing: null,
+      materialControls: null,
       reviewOnly: false,
       setupPreview: false,
       sending: false,

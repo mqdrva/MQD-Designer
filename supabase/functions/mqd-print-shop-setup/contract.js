@@ -25,6 +25,21 @@ export function shopPrintZones(shop,product,size='L') {
 export function validPhone(value){if(typeof value!=='string'||value.length>40||!/^[-+0-9\s().]+$/.test(value.trim()))return false;const count=value.replace(/\D/g,'').length;return count>=7&&count<=15;}
 export const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 export const money = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+// Materials are shop-defined preferences, never a promise about a preview fabric.
+export const REQUEST_MATERIAL = '__request__';
+export function materialOptions(value = []) {
+  if (!Array.isArray(value) || value.length > 10 || value.some(v => typeof v !== 'string' || !v.trim() || v !== v.trim() || v.length > 80 || /[\x00-\x1f\x7f]/.test(v) || v === REQUEST_MATERIAL) || new Set(value.map(v => v.toLowerCase())).size !== value.length) throw new Error('Enter up to 10 different fabric options, one per line (80 characters each).');
+  return [...value];
+}
+export function requestMaterial(shop, summary, {requireSelection = false} = {}) {
+  const options = materialOptions(shop.garments?.[summary.productId]?.materials);
+  const material = summary.material ?? '', materialRequest = summary.materialRequest ?? '';
+  if (typeof material !== 'string' || typeof materialRequest !== 'string' || materialRequest.length > 150 || /[\x00-\x1f\x7f]/.test(materialRequest)) throw new Error('Enter a material preference up to 150 characters.');
+  if (material === REQUEST_MATERIAL) {
+    if (!materialRequest.trim()) throw new Error('Tell the shop which material you would like.');
+  } else if (materialRequest || material && !options.includes(material) || requireSelection && options.length && !material) throw new Error('Choose a fabric offered by this shop or request another material.');
+  return {material, materialRequest, quoteRequired: material === REQUEST_MATERIAL || !!options.length && !material};
+}
 // Shared by the public page and request endpoint: never trust a customer-supplied total.
 export function methodNeedsQuote(shop, engine, method) {
   if (['screen','sublimation'].includes(method)) return true;
@@ -67,7 +82,8 @@ export function requestEstimate(shop, summary) {
   if (totalQuantity > 500) throw new Error('Contact the shop directly for orders over 500 garments.');
   let unitCents;
   const offeredMethods = summary.engine === '3d' ? shop.printMethods3d || shop.printMethods : shop.printMethods;
-  let quoteRequired = methodNeedsQuote(shop,summary.engine,summary.printMethod);
+  const material = shop.fulfillmentMode === 'mymerchnow' ? null : requestMaterial(shop, summary);
+  let quoteRequired = methodNeedsQuote(shop,summary.engine,summary.printMethod) || !!material?.quoteRequired;
   const rule = p.printRules?.[summary.engine]?.[summary.printMethod];
   let setupCents = 0;
   if (!offeredMethods || !Object.hasOwn(offeredMethods, summary.printMethod)) throw new Error('Choose an available print method.');

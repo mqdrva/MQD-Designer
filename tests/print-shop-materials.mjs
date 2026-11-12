@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
+import {materialOptions,requestMaterial,requestEstimate,REQUEST_MATERIAL} from '../v20/print-shop-contract.js';
+const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/print-shop-setup.json',import.meta.url)));
+fixture.shop.garments['everyday-tshirt'].materials=['Cotton blend','Polyester performance'];
+fixture.plan='3d';fixture.shop.pricing.premiumCents={tshirt:4000};
+fixture.shop.garments.tshirt={...structuredClone(fixture.shop.garments['everyday-tshirt']),materials:['Polyester performance']};
+const shop=validateSetup(fixture).shop;
+assert.deepEqual(shop.garments['everyday-tshirt'].materials,fixture.shop.garments['everyday-tshirt'].materials);
+assert.deepEqual(shop.garments.tshirt.materials,['Polyester performance']);
+for(const bad of ['Cotton',Array(11).fill('Cotton'),['Cotton','cotton'],[''],['a'.repeat(81)],['a\nb'],[REQUEST_MATERIAL]])assert.throws(()=>materialOptions(bad));
+for(const engine of ['2d','3d']){
+ const summary={engine,productId:engine==='2d'?'everyday-tshirt':'tshirt',color:'White',printMethod:'htv',locations:['front'],orderOptions:[{size:'L',quantity:2}]};
+ assert.equal(requestMaterial(shop,summary).material,'','legacy saves do not invent a fabric');
+ assert.throws(()=>requestMaterial(shop,summary,{requireSelection:true}),/Choose a fabric/);
+ const offered=shop.garments[summary.productId].materials[0];
+ assert.equal(requestMaterial(shop,{...summary,material:offered},{requireSelection:true}).material,offered);
+ assert.throws(()=>requestEstimate(shop,{...summary,material:'Silk'}),/Choose a fabric/);
+ assert.throws(()=>requestMaterial(shop,{...summary,material:REQUEST_MATERIAL}),/Tell the shop/);
+ assert.throws(()=>requestMaterial(shop,{...summary,material:offered,materialRequest:'hidden surcharge'}),/Choose a fabric/);
+ assert.throws(()=>requestMaterial(shop,{...summary,material:REQUEST_MATERIAL,materialRequest:'a'.repeat(151)}),/150/);
+ assert.equal(requestEstimate(shop,{...summary,material:REQUEST_MATERIAL,materialRequest:'Please quote another fabric'}).quoteRequired,true);
+ assert.equal(requestEstimate(shop,{...summary,material:offered}).quoteRequired,false);
+ const legacy=structuredClone(shop);delete legacy.garments[summary.productId].materials;
+ assert.equal(requestMaterial(legacy,summary,{requireSelection:true}).material,'');
+ const team=structuredClone(shop);team.fulfillmentMode='mymerchnow';
+ assert.equal(requestEstimate(team,summary).quoteRequired,false,'Team checkout does not acquire material requirements');
+}
+console.log('PASS per-garment materials: setup round-trip, both engines, unknown/stale choices, custom quote, legacy saves and Team isolation.');

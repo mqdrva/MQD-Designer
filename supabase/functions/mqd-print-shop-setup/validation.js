@@ -1,4 +1,4 @@
-import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone,validateGarmentLogo} from './contract.js';
+import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone,validateGarmentLogo,materialOptions} from './contract.js';
 const two=['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'];
 const three=['tshirt','long-sleeve-tshirt','fleece-hoodie','short-sleeve-polo'];
 const colors=['White','Black','Navy','Royal','Red','Sport Grey','Charcoal','Forest Green','Forest','Purple','Gold','Light Blue','Sand'];
@@ -31,6 +31,7 @@ export function validateSetup(packet,{allowMissingContact=false}={}){
   for(const [id,price] of Object.entries(source)){
    dest[id]=cents(price);const g=raw.garments?.[id];if(!g)throw new Error('Enter garment details.');
    garments[id]={brand:text(g.brand??'',100,'garment brand'),style:text(g.style??'',100,'garment style'),sizes:choices(g.sizes,organizationType==='team'?sizes.filter(s=>s!=='6XL'):sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
+   if(organizationType!=='team')garments[id].materials=materialOptions(g.materials);
    garments[id].logoPreset=validateGarmentLogo(g.logoPreset,{garmentLogo,garments},id);
    const zones=shopPrintZones({garments},id);garments[id].printZones=Object.fromEntries(Object.entries(zones).map(([key,v])=>[key,{width:v.width,height:v.height}]));
   }

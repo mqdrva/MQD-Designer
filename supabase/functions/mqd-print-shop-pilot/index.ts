@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {hasShopAccess} from './access.js';
 import {sharedShopDesign,savedShopAppearance} from '../mqd-print-shop-designs/service.js';
+import {deliverRequest,requestEmails} from './delivery.js';
 import JSZip from 'npm:jszip@3.10.1';
-import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, money, validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath } from './contract.js';
+import { PILOT_SHOP, MAX_REQUEST_BYTES, requestEstimate, validPhone,garmentLogo,assertFixedLogoPackage,garmentLogoPath,requestMaterial } from './contract.js';
 
 const PUBLIC_KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const ALLOWED = new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git-codex-print-shop-paid-launch-mqd1.vercel.app','https://mqd-designer-vercel-git-codex-print-shop-launch-preview-mqd1.vercel.app','http://localhost:8765','http://127.0.0.1:8765']);
@@ -54,12 +55,14 @@ Deno.serve(async req=>{
    const bytes=new Uint8Array(await file.arrayBuffer());
    if(bytes[0]!==0x50||bytes[1]!==0x4b||bytes[2]!==3||bytes[3]!==4)throw new Error('The design package must be a ZIP.');
    const s=payload.summary,estimate=requestEstimate(shop,s);
+   requestMaterial(shop,s,{requireSelection:true});
    const zip=await JSZip.loadAsync(bytes),entries=Object.values(zip.files).filter((entry:any)=>!entry.dir) as any[];
    if(entries.length>60||entries.some(entry=>entry.name.includes('..')||entry.name.startsWith('/')||!/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(json|txt|png|jpg|jpeg|webp)$/i.test(entry.name))||entries.reduce((n,entry)=>n+(entry._data?.uncompressedSize||0),0)>32*1024*1024)throw new Error('Design package contains unsupported files or is too large.');
    const designFile=zip.file('design.json'),orderFile=zip.file('order-request.json');
    if(!designFile||!orderFile||(designFile as any)._data.uncompressedSize>24*1024*1024||(orderFile as any)._data.uncompressedSize>20000)throw new Error('Design package details are missing.');
    const design=JSON.parse(await designFile.async('string')),packOrder=JSON.parse(await orderFile.async('string'));
    if(design.schema!=='mqd-shop-design-v1'||design.engine!==s.engine||design.shop!==payload.shop||packOrder.productId!==s.productId||packOrder.printMethod!==s.printMethod||(s.engine==='2d'&&design.draft?.printMethod!==s.printMethod)||JSON.stringify(packOrder.orderOptions)!==JSON.stringify(s.orderOptions)||(s.engine==='2d'?design.draft?.product:design.design?.product?.id)!==s.productId)throw new Error('Design package does not match the order request.');
+   if((packOrder.material??'')!==(s.material??'')||(packOrder.materialRequest??'')!==(s.materialRequest??''))throw new Error('Design package material does not match the request.');
    const preset=garmentLogo(shop,s.productId);
    if(preset.mode==='fixed'){
     const manifestFile=zip.file('brand/logo-placement.json'),assetFile=zip.file(garmentLogoPath(shop));
@@ -77,13 +80,11 @@ Deno.serve(async req=>{
    const {data,error}=await db.rpc('mqd_claim_print_shop_request',{p_id:payload.requestId,p_shop:payload.shop,p_ip:ipHash,p_hash:contentHash});
    if(error)return json({error:error.message.includes('limit')?'Request limit reached. Please contact the shop directly.':'Request could not be reserved. Retry the same request.'},error.message.includes('limit')?429:409,cors);
    const row=data?.[0];if(!row)throw new Error('Request could not be reserved.');
-   if(row.status==='sent')return json({reference:row.reference,status:'sent'},200,cors);
-   let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-   const text=[`${shop.name} — UNPAID ORDER REQUEST`,row.reference,'',`Customer: ${customer.name}`,`Email: ${customer.email}`,`Phone: ${customer.phone||'Not provided'}`,`Designer: ${s.engine}`,`Garment: ${shop.garments?.[s.productId]?.brand||''} ${shop.garments?.[s.productId]?.style||s.productId}`,`Color: ${String(s.color||'See design package').slice(0,80)}`,`Print method: ${shop.printMethods[s.printMethod] || s.printMethod}`,`Sizes: ${s.orderOptions.map((r:any)=>`${r.size} x ${r.quantity}`).join(', ')}`,estimate.quoteRequired ? `Estimated total: Shop quote required${s.printMethod==='sublimation'?' — confirm garment and fabric suitability':''}` : `Estimated total: ${money(estimate.totalCents)} (estimate; excludes tax/shipping)`,`Notes: ${customer.notes||'None'}`,'','Attached ZIP contains mockups, original artwork, and editable design details. Review print readiness and quote/payment directly with the customer. No customer email confirmation or payment was sent.'].join('\n');
-   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','Idempotency-Key':`shop-${row.id}`},body:JSON.stringify({from,to:[record.recipient],reply_to:customer.email,subject:`[Print-shop pilot] ${row.reference} — unpaid order request`,text,attachments:[{filename:`${row.reference}-design.zip`,content:btoa(binary)}]})});
-   const result=await response.json();
-   if(!response.ok){await db.from('mqd_print_shop_requests').update({status:'failed',updated_at:new Date().toISOString()}).eq('id',row.id);return json({error:'The email service could not accept your request. Your design is still here. Retry or save the ZIP.'},502,cors);}
-   await db.from('mqd_print_shop_requests').update({status:'sent',provider_id:String(result.id||''),updated_at:new Date().toISOString()}).eq('id',row.id);
-   return json({reference:row.reference,status:'sent'},200,cors);
+   let binary='';if(row.status!=='sent')for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+   const emails=requestEmails({row,shop,customer,summary:s,estimate,recipient:record.recipient,from,attachment:{filename:`${row.reference}-design.zip`,content:btoa(binary)}});
+   let customerReceipt;
+   try{customerReceipt=await deliverRequest({db,row,emails,key});}
+   catch(error){return json({error:error instanceof Error?error.message:'The request could not be sent. Retry the same request.'},502,cors);}
+   return json({reference:row.reference,status:'sent',customerReceipt},200,cors);
  }catch(error){console.error('Print shop request failed',error instanceof Error?error.message:'Invalid request');return json({error:error instanceof Error?error.message:'Request could not be processed.'},400,cors);}
 });

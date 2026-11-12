@@ -146,6 +146,10 @@ jobs:
         run: |
           node tests/print-shop-design-sharing.mjs
           node tests/print-shop-request-feedback.mjs
+          node tests/print-shop-materials.mjs
+          node tests/print-shop-request-delivery.mjs
+          node tests/print-shop-request-flow.mjs
+          psql -v ON_ERROR_STOP=1 -f tests/print-shop-receipts-schema.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104150000_print_shop_saved_design_sharing.sql
           psql -v ON_ERROR_STOP=1 -f tests/print-shop-design-schema.sql
 
