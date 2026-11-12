@@ -4,3 +4,5 @@
 .print-shop[data-shared-locked=true] .everyday-options{display:none}.print-shop[data-shared-locked=true] .everyday-layout{display:block}.print-shop[data-shared-locked=true] .everyday-preview{max-width:850px;margin:auto}.print-shop[data-shared-locked=true] .everyday-preview>.subtle{display:none}.print-shop[data-shared-locked=true] .app{grid-template-columns:minmax(260px,1fr) minmax(300px,1fr)}
 @media(max-width:850px){.print-shop[data-shared-locked=true] .app{grid-template-columns:1fr}}
 .print-shop[data-shared-locked=true] #preview,.print-shop[data-shared-locked=true] #editorCanvas{touch-action:pan-y}
+
+#designLogin .btn{min-height:44px;white-space:normal;margin:6px 0}#designEmailLink{width:100%}#designEmailHelp,#designStatus{overflow-wrap:anywhere}#designLogin details{margin:16px 0}
