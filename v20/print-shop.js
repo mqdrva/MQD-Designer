@@ -192,7 +192,7 @@ async function loadPackage(file,{waitForArtwork=false}={}) {
 async function send(event) {
   event.preventDefault(); if(designSharing?.shopOwnerRequested){say('Use Save design and get customer link above.');return;} if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
   sending=true;refresh();if(teamService){checkoutFeedback||=checkoutProgress();checkoutFeedback.start('Preparing your order…');}say('Preparing your order…');
-  const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(c=>!c.closest('#checkoutProgress')), disabled=controls.map(c=>c.disabled),buttonText=$('shopSend').textContent;controls.forEach(c=>c.disabled=true);$('shopSend').textContent='Preparing checkout…';
+  const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(c=>!c.closest('#checkoutProgress')), disabled=controls.map(c=>c.disabled),buttonText=$('shopSend').textContent;controls.forEach(c=>c.disabled=true);$('shopSend').textContent=teamService?'Preparing checkout…':'Preparing request…';
   try {
     const customer={name:$('shopName').value.trim(),email:$('shopEmail').value.trim(),phone:$('shopPhone').value.trim(),notes:$('shopNotes').value.trim()};
     if(!validPhone(customer.phone))throw new Error('Enter a valid phone number with 7 to 15 digits.');
@@ -213,12 +213,20 @@ async function send(event) {
     form.append('payload',JSON.stringify({...(teamService?{action:'order-checkout',team:slug,guestToken,delivery,batchId}:{shop:slug,...(designSharing?.sharedSubmission()||{})}),requestId:attempt.id,summary:attempt.summary,customer:attempt.customer,website:$('shopWebsite').value,startedAt:Number($('shopStarted').value)}));
     form.append('package',attempt.blob,`${slug}-${engine}-design.zip`);
     if(ownerPaymentTest){const {ownerAuth}=await import('./owner-team-workspace.js');const {ownerTestAccessToken}=await import('./owner-test-session.js');paymentTestToken=await ownerTestAccessToken(ownerAuth);}
-    say('Sending your artwork securely and opening checkout…');
+    say(teamService?'Sending your artwork securely and opening checkout…':'Sending your design request to the shop…');
     const response=await fetch(teamService?teamEndpoint(''):API,{method:'POST',headers:teamHeaders(),body:form}),result=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(response.status>=500?'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.':result.error||'Your design is still here. Please review the order and retry.');
+    if(!response.ok){
+      const retryMessage=teamService
+        ? 'Checkout could not open. Your design is safe. Please retry; if it happens again, contact MYMERCHNOW.'
+        : 'Your request could not be sent. Your design is still here. Retry or save your ZIP and contact the shop.';
+      throw new Error(response.status>=500?retryMessage:result.error||'Your design is still here. Please review the order and retry.');
+    }
     if(teamService){if(result.paid){location.href='/team-order.html?id='+result.id;return;}const url=new URL(result.url);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com')throw new Error('Secure checkout link unavailable.');location.assign(url.href);return;}
     say(`Request ${result.reference} accepted by the email service for ${shop.name}. No payment was collected. The shop will contact you to confirm the final quote.`);
-  }catch(error){const message=error instanceof TypeError?'Checkout could not be reached or the request was interrupted. Your design is safe. Please retry; if this continues, contact MYMERCHNOW.':error.message;say(message);checkoutFeedback?.fail(message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);$('shopSend').textContent=buttonText;sending=false;refresh();}
+  }catch(error){const connectionMessage=teamService
+    ? 'Checkout could not be reached or the request was interrupted. Your design is safe. Please retry; if this continues, contact MYMERCHNOW.'
+    : 'The request was interrupted. Your design is still here. Retry or save your ZIP and contact the shop.';
+    const message=error instanceof TypeError?connectionMessage:error.message;say(message);checkoutFeedback?.fail(message);}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);$('shopSend').textContent=buttonText;sending=false;refresh();}
 }
 async function digest(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function mount() {

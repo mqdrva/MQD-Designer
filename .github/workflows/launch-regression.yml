@@ -140,6 +140,7 @@ jobs:
       - name: Verify private Print Shop saved-design sharing
         run: |
           node tests/print-shop-design-sharing.mjs
+          node tests/print-shop-request-feedback.mjs
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104150000_print_shop_saved_design_sharing.sql
           psql -v ON_ERROR_STOP=1 -f tests/print-shop-design-schema.sql
 
