@@ -29,6 +29,7 @@ export async function sharedShopDesign(db,{id,token,revision},shopSlug){
 }
 export function savedShopAppearance(row,business){
  const shop=structuredClone(business.shop_config),appearance=row.appearance;
+ if(shop.pageLogoPreview){shop.logo=shop.pageLogoPreview;delete shop.pageLogoPreview;}
  if(appearance){
   shop.garmentLogo=appearance.garmentLogo;
   if(shop.garments?.[row.product_id]||appearance.garment){

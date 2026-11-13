@@ -32,7 +32,7 @@ Deno.serve(async req=>{
  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
  if(req.method==='GET') {
    const slug=new URL(req.url).searchParams.get('shop');
-   const record=await activeShop(db,slug||'');return record?json({shop:record.shop},200,cors):json({error:'Shop not found or inactive.'},404,cors);
+   const record=await activeShop(db,slug||'');if(!record)return json({error:'Shop not found or inactive.'},404,cors);const shop={...record.shop,logo:record.shop.pageLogoPreview||record.shop.logo};delete shop.pageLogoPreview;return json({shop},200,cors);
  }
  if(req.method!=='POST')return json({error:'Method not allowed.'},405,cors);
  try {
