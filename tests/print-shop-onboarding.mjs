@@ -10,13 +10,13 @@ assert.equal(packet.owner.requestEmail,'brenda@example.com');
 assert.throws(()=>validateSetup({...fixture,owner:{...fixture.owner,phone:''}}),/phone/);
 const bad=structuredClone(fixture);bad.shop.garments['everyday-tshirt'].printZones.front.width=20;assert.throws(()=>validateSetup(bad));
 const rows=new Map(),emails=[];let failMail=false,handler;
-const db={auth:{getUser:async jwt=>({data:{user:jwt==='admin-mfa'?{app_metadata:{role:'admin'}}:null},error:jwt!=='admin-mfa'}),getClaims:async()=>({data:{claims:{aal:'aal2'}}})},rpc:async(name,{p_row})=>{
+const db={auth:{getUser:async jwt=>({data:{user:jwt==='admin-mfa'?{email:'brenda@example.com',email_confirmed_at:'confirmed',app_metadata:{role:'admin'}}:jwt==='admin-low'?{email:'brenda@example.com',email_confirmed_at:'confirmed',app_metadata:{role:'admin'}}:jwt==='shop-owner'?{email:'brenda@example.com',email_confirmed_at:'confirmed',app_metadata:{}}:jwt==='wrong-shop'?{email:'another@example.com',email_confirmed_at:'confirmed'}:jwt==='unverified'?{email:'brenda@example.com'}:null},error:!['admin-mfa','shop-owner','wrong-shop','unverified','admin-low'].includes(jwt)}),getClaims:async()=>({data:{claims:{aal:'aal2'}}})},rpc:async(name,{p_row})=>{
  if(name==='mqd_get_vault_secret')return {data:'mock-email-key'};
  const prior=rows.get(p_row.id);if(prior)return prior.payload_hash===p_row.payload_hash?{data:[structuredClone(prior)]}:{error:{message:'Submission content changed'}};
  const row={...p_row,status:'pending_review',billing_status:'not_configured',revision:1,token_expires_at:new Date(Date.now()+30*86400000).toISOString(),owner_email_sent:false,admin_email_sent:false};rows.set(row.id,row);return {data:[structuredClone(row)]};
 },from:()=>{let filters=[],change=null;const q={select:()=>q,eq:(key,value)=>{filters.push([key,value]);return q;},order:()=>q,limit:async()=>({data:[...rows.values()].map(r=>structuredClone(r))}),update:value=>{change=value;return q;},single:async()=>finish(),maybeSingle:async()=>finish(),then:(resolve,reject)=>Promise.resolve(finish()).then(resolve,reject)};function finish(){const row=[...rows.values()].find(r=>filters.every(([k,v])=>r[k]===v));if(!row)return {data:null,error:{message:'not found'}};if(change)Object.assign(row,change);return {data:structuredClone(row)};}return q;}};
 let source=await fs.readFile(new URL('../supabase/functions/mqd-print-shop-setup/index.ts',import.meta.url),'utf8');source=source.replace(/^import .*;\n/gm,'');
-const context={createClient:()=>db,validateSetup,hasAdminMfa:async()=>true,crypto:globalThis.crypto,btoa,atob,TextEncoder,TextDecoder,Uint8Array,Response,Request,AbortSignal,setTimeout,Deno:{env:{get:name=>name==='SUPABASE_SERVICE_ROLE_KEY'?'mock-private-service-key':'mock'},serve:h=>{handler=h;}},fetch:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');if(failMail)return new Response('{}',{status:422});emails.push(JSON.parse(options.body));return new Response('{"id":"mock-provider-id"}',{status:200});}};
+const context={createClient:()=>db,validateSetup,hasAdminMfa:async(_db,jwt)=>jwt==='admin-mfa',crypto:globalThis.crypto,btoa,atob,TextEncoder,TextDecoder,Uint8Array,Response,Request,AbortSignal,setTimeout,Deno:{env:{get:name=>name==='SUPABASE_SERVICE_ROLE_KEY'?'mock-private-service-key':'mock'},serve:h=>{handler=h;}},fetch:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');if(failMail)return new Response('{}',{status:422});emails.push(JSON.parse(options.body));return new Response('{"id":"mock-provider-id"}',{status:200});}};
 vm.runInNewContext(stripTypeScriptTypes(source),context);
 const key='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 async function call(body,jwt){const res=await handler(new Request('https://example.test',{method:'POST',headers:{apikey:key,'Content-Type':'application/json',Origin:'http://127.0.0.1:8765',...(jwt?{Authorization:'Bearer '+jwt}:{})},body:JSON.stringify(body)}));return {status:res.status,data:await res.json()};}
@@ -47,6 +47,17 @@ res=await call({action:'load',id,token});assert.equal(res.status,401,'expired ow
 res=await call({action:'load',id,token:recoveredToken});assert.equal(res.status,200);
 console.log('Onboarding passed: private confirmation, idempotency, admin authorization, review, owner updates, stale revisions, and saved-state email failure handling.');
 
+// Signed-in ownership never needs, returns or rotates a private setup token.
+for(const jwt of [undefined,'wrong-shop','unverified','admin-low'])assert([401,403].includes((await call({action:'account-load',id},jwt)).status));
+res=await call({action:'account-load',id},'shop-owner');assert.equal(res.status,200);assert(!JSON.stringify(res.data).includes(recoveredToken));
+const before=structuredClone(rows.get(id));rows.get(id).status='active';rows.get(id).billing_status='active';
+const upgrade=structuredClone(paidUpdate);upgrade.plan='3d';upgrade.shop.garments.tshirt=structuredClone(upgrade.shop.garments['everyday-tshirt']);upgrade.shop.pricing.premiumCents={tshirt:4000};
+res=await call({action:'account-update',id,revision:rows.get(id).revision,setup:upgrade},'shop-owner');assert.equal(res.status,200,JSON.stringify(res));
+assert.equal(rows.get(id).pending_plan,'3d');assert.equal(rows.get(id).plan,before.plan);assert.deepEqual(rows.get(id).shop_config,before.shop_config);assert.equal(rows.get(id).billing_status,'active');assert.equal(rows.get(id).status,'active');
+assert.equal((await call({action:'account-update',id,revision:before.revision,setup:upgrade},'shop-owner')).status,409);
+const rebind=structuredClone(upgrade);rebind.owner.requestEmail='another@example.com';assert.equal((await call({action:'account-update',id,revision:rows.get(id).revision,setup:rebind},'shop-owner')).status,409);
+rows.get(id).shop_config.organizationType='team';assert.equal((await call({action:'account-load',id},'shop-owner')).status,403);rows.get(id).shop_config.organizationType='print-shop';
+console.log('PASS account setup: verified owner, cross-account/Team denial, no private token exposure, staged 3D request, unchanged live plan and billing, revision conflicts.');
 rows.get(id).shop_config.ownerManaged=true;
 for(const action of ['load','update'])assert.equal((await call({action,id,token:recoveredToken,revision:rows.get(id).revision,setup:fixture})).status,403,'Old organizer setup token must not expose an MQD-owned master workspace');
 assert.equal((await call({action:'admin-recover',id,revision:rows.get(id).revision},'admin-mfa')).status,403,'Generic recovery cannot create an organizer setup-access link for an owner workspace');
