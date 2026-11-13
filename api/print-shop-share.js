@@ -22,6 +22,14 @@ export function shopLogoBytes(value){
 export function brandedShopHTML(html,shop,slug,engine){
  const title=shop.name+' · Shirt designer',url=ORIGIN+'/shops/'+slug+(engine==='3d'?'/3d':'');
  const image=shopLogoBytes(shop.logo)?ORIGIN+'/api/print-shop-share?shop='+encodeURIComponent(slug)+'&image=1':ORIGIN+'/assets/brand-logo.png';
+ // The public shop is already loaded for social metadata. Brand the initial
+ // visible HTML too, before client modules fetch designer settings.
+ const logo=shopLogoBytes(shop.logo)?shop.logo:'/assets/brand-logo.png';
+ html=html.replace(/<img\b[^>]*id="shopLogo"[^>]*>/i,()=>'<img id="shopLogo" src="'+escape(logo)+'" alt="'+escape(shop.name)+'">')
+  .replace(/(<strong\b[^>]*id="shopBrand"[^>]*>)[\s\S]*?(<\/strong>)/i,(_m,a,b)=>a+escape(shop.name)+b)
+  .replace(/(<div class="shop-intro">\s*<strong>)[\s\S]*?(<\/strong>)/i,(_m,a,b)=>a+'Shop order requests · final quote confirmed by the business'+b)
+  .replace(/(<p\b[^>]*id="shopDescription"[^>]*>)[\s\S]*?(<\/p>)/i,(_m,a,b)=>a+escape(shop.tagline)+b)
+  .replace(/(<a\b[^>]*id="shopSwitch"[^>]*href=")[^"]*("[^>]*>)[\s\S]*?(<\/a>)/i,(_m,a,b,c)=>a+'/shops/'+slug+(engine==='2d'?'/3d':'')+b+(engine==='2d'?'Try 3D designer':'Use 2D designer')+c);
  // Replace generic metadata in the initial response; crawlers need no JavaScript.
  html=html.replace(/<meta\b[^>]*(?:property|name)=["'](?:og:|twitter:)[^>]*>\s*/gi,'').replace(/<title>[\s\S]*?<\/title>/i,'<title>'+escape(title)+'</title>');
  const tags={'og:type':'website','og:site_name':shop.name,'og:title':title,'og:description':shop.tagline,'og:url':url,'og:image':image,'og:image:alt':shopLogoBytes(shop.logo)?shop.name+' logo':'MyMerchNow logo','twitter:card':'summary','twitter:title':title,'twitter:description':shop.tagline,'twitter:image':image};
