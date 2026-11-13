@@ -162,6 +162,7 @@ jobs:
           node tests/print-shop-subscription-webhook.mjs
           node tests/print-shop-paid-access.mjs
           node tests/print-shop-onboarding.mjs
+          node tests/print-shop-settings-persistence.mjs
           node tests/print-shop-admin-auth.mjs
           node tests/print-shop-billing.mjs
           node tests/print-shop-billing-webhook.mjs
