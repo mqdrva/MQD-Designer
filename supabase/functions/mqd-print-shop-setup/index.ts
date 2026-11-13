@@ -29,6 +29,22 @@ async function mail(db:any,data:any,key:string){
 }
 async function rawBody(req:Request){if(!req.headers.get('content-type')?.includes('application/json'))throw new Error('Send setup details as JSON.');const reader=req.body?.getReader();if(!reader)throw new Error('Setup details are missing.');let length=0;const chunks=[];while(true){const item=await reader.read();if(item.done)break;length+=item.value.length;if(length>24*1024*1024){await reader.cancel();throw new Error('Setup exceeds 24 MB. Keep your original intact and contact MYMERCHNOW.');}chunks.push(item.value);}const out=new Uint8Array(length);let i=0;for(const chunk of chunks){out.set(chunk,i);i+=chunk.length;}return JSON.parse(new TextDecoder().decode(out));}
 const packetFor=(row:any)=>({schema:'mqd-business-setup-v1',status:'pending-review',plan:row.pending_plan||row.plan,owner:{requestEmail:row.owner_email,phone:row.owner_phone},shop:row.pending_config||row.shop_config});
+// Keep designer entitlements separate from owner-editable shop settings.
+function settingsForEngines(incoming:any,current:any,engines:string[]){
+ const result=structuredClone(incoming);result.engines=[...engines];
+ if(!engines.includes('3d')){
+  result.pricing.premiumCents=structuredClone(current.pricing?.premiumCents||{});
+  result.printMethods3d=structuredClone(current.printMethods3d||{});
+  result.pricing.printRules['3d']=structuredClone(current.pricing?.printRules?.['3d']||{});
+ }else if(!incoming.engines.includes('3d')){
+  result.pricing.premiumCents=structuredClone(current.pricing?.premiumCents||{});
+  result.printMethods3d=structuredClone(current.printMethods3d||{});
+  result.pricing.printRules['3d']=structuredClone(current.pricing?.printRules?.['3d']||{});
+ }
+ const allowed=new Set([...Object.keys(result.pricing.baseCents||{}),...Object.keys(result.pricing.premiumCents||{})]);
+ result.garments=Object.fromEntries([...allowed].map(id=>[id,structuredClone(incoming.garments[id]||current.garments[id])]));
+ return result;
+}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'',cors:any={'Vary':'Origin'};
  if(ALLOWED.has(origin))Object.assign(cors,{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'apikey,content-type,authorization','Access-Control-Allow-Methods':'POST,OPTIONS'});
@@ -95,8 +111,20 @@ Deno.serve(async(req:Request)=>{
    if(row.status==='closed')return json({error:'This shop is closed. Contact MYMERCHNOW for help.'},409);
    const packet=validateSetup(body.setup);if(packet.shop.organizationType==='team')packet.shop=canonicalTeamShop(packet.shop);const teamPacket=packet.shop.organizationType==='team';if((row.shop_config.organizationType==='team')!==(packet.shop.organizationType==='team'))return json({error:'Create a separate Team or Print Shop setup to change service type.'},409);if(packet.owner.requestEmail!==row.owner_email||packet.shop.slug!==row.preferred_slug)return json({error:'Contact MYMERCHNOW to change your verified email or shop link.'},409);
    if(body.revision!==row.revision)return json({error:'Your setup changed. Reopen your private link before updating.'},409);
-   if(!account&&row.status==='active'&&packet.plan!==row.plan)return json({error:'Contact MYMERCHNOW support to request a subscription plan change.'},409);
-   const {data:changed,error:updateError}=await db.from(TABLE).update({pending_config:packet.shop,pending_plan:packet.plan,owner_phone:packet.owner.phone,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',row.id).eq('revision',row.revision).select('id').maybeSingle();if(updateError||!changed)return json({error:'Setup changed. Reload before updating.'},409);
+   if(teamPacket&&!account&&row.status==='active'&&packet.plan!==row.plan)return json({error:'Contact MYMERCHNOW support to request a subscription plan change.'},409);
+   const liveSettings=!teamPacket&&row.shop_config.fulfillmentMode!=='mymerchnow'&&!!row.approved_at&&!!row.email_verified_at&&['pilot_active','active'].includes(row.status);
+   if(!account&&row.status==='active'&&!liveSettings&&packet.plan!==row.plan)return json({error:'Contact MYMERCHNOW support to request a subscription plan change.'},409);
+   const requestedPlan=packet.plan!==row.plan?packet.plan:row.pending_plan&&row.pending_plan!==row.plan?row.pending_plan:null;
+   const update:any={owner_phone:packet.owner.phone,revision:row.revision+1,updated_at:new Date().toISOString()};
+   if(liveSettings){
+    update.shop_config=settingsForEngines(packet.shop,row.shop_config,row.shop_config.engines);
+    validateSetup({...packet,plan:row.plan,shop:update.shop_config});
+    update.pending_plan=requestedPlan;
+    update.pending_config=requestedPlan?(packet.plan===requestedPlan?packet.shop:settingsForEngines(packet.shop,row.pending_config,row.pending_config.engines)):null;
+    if(update.pending_config)validateSetup({...packet,plan:requestedPlan,shop:update.pending_config});
+   }else{update.pending_config=packet.shop;update.pending_plan=packet.plan;}
+   const {data:changed,error:updateError}=await db.from(TABLE).update(update).eq('id',row.id).eq('revision',row.revision).select('id').maybeSingle();if(updateError||!changed)return json({error:'Setup changed. Reload before updating.'},409);
+   if(liveSettings)return json({status:row.status,revision:row.revision+1,liveSettingsUpdated:true,planRequestPending:!!requestedPlan,notificationAccepted:false,message:requestedPlan?'Your logo and current-plan shop settings are live. Your designer plan request is saved separately; designer access and billing have not changed.':'Your logo and shop settings are live. Designer access and billing have not changed.'});
    let notificationAccepted=true;try{await mail(db,{to:['mqdrva@gmail.com'],reply_to:row.owner_email,subject:'[Print Shops] Owner update awaiting review',text:`${packet.shop.name} submitted updated settings.\nShop: ${row.preferred_slug}\nReference: ${row.id}\nReview in ${site}/print-shop-admin.html\nCurrent live settings remain unchanged until approval.`},'shop-update-'+row.id+'-'+(row.revision+1));}catch{notificationAccepted=false;}
    return json({status:'pending_review',revision:row.revision+1,notificationAccepted,message:notificationAccepted?'Changes saved for review. Your current live settings remain unchanged.':'Changes saved for review, but the notification email could not be confirmed. Contact MYMERCHNOW; your current live settings remain unchanged.'});
   }
