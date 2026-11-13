@@ -1,4 +1,4 @@
-import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone,validateGarmentLogo,materialOptions} from './contract.js';
+import {SHOP_PRINT_METHODS,shopPrintZones,requestEstimate,validPhone,validateGarmentLogo,materialOptions,HAT_FIT,isShopHat} from './contract.js';
 const two=['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'];
 const three=['tshirt','long-sleeve-tshirt','fleece-hoodie','short-sleeve-polo'];
 const colors=['White','Black','Navy','Royal','Red','Sport Grey','Charcoal','Forest Green','Forest','Purple','Gold','Light Blue','Sand'];
@@ -26,11 +26,11 @@ export function validateSetup(packet,{allowMissingContact=false}={}){
   if(length>max||!length||!(head[0]===137&&head[1]===80&&head[2]===78&&head[3]===71||head[0]===255&&head[1]===216||String.fromCharCode(...head.slice(0,4))==='RIFF'&&String.fromCharCode(...head.slice(8,12))==='WEBP'))throw new Error('Upload a supported garment logo up to '+limit+'.');
  }
  const baseCents={},premiumCents={},garments={};
- for(const [source,dest,allow] of [[p.baseCents,baseCents,two],[packet.plan==='3d'?p.premiumCents:{},premiumCents,organizationType==='team'?[...three,'long-sleeve-polo']:three]]){
+ for(const [source,dest,allow] of [[p.baseCents,baseCents,organizationType==='team'?two:[...two,'shop-hat']],[packet.plan==='3d'?p.premiumCents:{},premiumCents,organizationType==='team'?[...three,'long-sleeve-polo']:[...three,'hat']]]){
   if(!source||typeof source!=='object'||Array.isArray(source)||Object.keys(source).some(id=>!allow.includes(id)))throw new Error('Choose supported garments.');
   for(const [id,price] of Object.entries(source)){
    dest[id]=cents(price);const g=raw.garments?.[id];if(!g)throw new Error('Enter garment details.');
-   garments[id]={brand:text(g.brand??'',100,'garment brand'),style:text(g.style??'',100,'garment style'),sizes:choices(g.sizes,organizationType==='team'?sizes.filter(s=>s!=='6XL'):sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
+   garments[id]={brand:text(g.brand??'',100,'garment brand'),style:text(g.style??'',100,'garment style'),sizes:choices(g.sizes,isShopHat(id)?[HAT_FIT]:organizationType==='team'?sizes.filter(s=>s!=='6XL'):sizes,'sizes'),colors:choices(g.colors,colors,'colors'),additionalColorsRequested:text(g.additionalColorsRequested||'',100,'additional colors'),printZones:g.printZones};
    if(organizationType!=='team')garments[id].materials=materialOptions(g.materials);
    garments[id].logoPreset=validateGarmentLogo(g.logoPreset,{garmentLogo,garments},id);
    const zones=shopPrintZones({garments},id);garments[id].printZones=Object.fromEntries(Object.entries(zones).map(([key,v])=>[key,{width:v.width,height:v.height}]));

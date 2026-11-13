@@ -20,7 +20,7 @@ export async function validateShopDesignPackage(bytes,shop,JSZip){
   for(const [view,ref] of Object.entries(saved.files||{})){
    if(!['front','back','left','right'].includes(view)||!['image/png','image/jpeg','image/webp'].includes(ref.type)||!ref.path.startsWith('originals/')||!zip.file(ref.path)||!d.artwork[view])throw new Error('Original artwork is missing.');
   }
-  if(Object.keys(d.artwork).some(v=>!['front','back','left','right'].includes(v)))throw new Error('Unsupported print zone.');
+  if(Object.keys(d.artwork).some(v=>!(d.product==='shop-hat'?['front']:['front','back','left','right']).includes(v)))throw new Error('Unsupported print zone.');
   if(Object.values(d.photos||{}).some(Boolean))throw new Error('Save without private garment photos.');
  }else{
   const d=saved.design,m=GARMENT_MAPPING[d?.product?.id];

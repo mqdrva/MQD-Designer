@@ -9,7 +9,7 @@ import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-maste
 import {mountTeamMember} from './team-master-member.js?v=brand-controls-20261028';
 import {mountMaterialControls} from './shop-material-controls.js';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
-import { MAX_REQUEST_BYTES, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath } from './print-shop-contract.js';
+import { MAX_REQUEST_BYTES, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath,shop2dViews } from './print-shop-contract.js';
 import { VIEWS, constrainPlacement, constrainImagePlacement } from './everyday-contract.js';
 import { PRODUCTS, drawPreview, zoneFor, bitmap } from './shop-preview-renderer.js';
 import { artworkLayers, artworkBounds, printArtwork, printMetadata, imageClipped } from './everyday-layers.js';
@@ -80,7 +80,7 @@ export function connectShopEveryday({ getDraft: getter }) {
 function shopOrderSheet(d) {
   if (!Object.hasOwn(shop.printMethods || SHOP_PRINT_METHODS,d.printMethod)) throw new Error('Choose an available print method.');
   if(!shopColors(shop,d.product).includes(d.color)||!shopSizes(shop,d.product,d.color).includes(d.size))throw new Error('Choose an offered color and size.');
-  return {schemaVersion:1,range:'print-shop',product:d.product,garment:shop.garments?.[d.product],color:d.color,size:d.size,quantity:d.quantity,units:'inches',printMethod:d.printMethod,printMethodLabel:SHOP_PRINT_METHODS[d.printMethod],status:'shop-review-required',printLimits:shopPrintZones(shop,d.product,d.size),locations:Object.fromEntries(VIEWS.map(view=>[view,d.artwork[view]?printMetadata(d.artwork[view],view,zoneFor(d,view)):{status:'No print'}]))};
+  return {schemaVersion:1,range:'print-shop',product:d.product,garment:shop.garments?.[d.product],color:d.color,size:d.size,quantity:d.quantity,units:'inches',printMethod:d.printMethod,printMethodLabel:SHOP_PRINT_METHODS[d.printMethod],status:'shop-review-required',printLimits:shopPrintZones(shop,d.product,d.size),locations:Object.fromEntries(shop2dViews(d.product).map(view=>[view,d.artwork[view]?printMetadata(d.artwork[view],view,zoneFor(d,view)):{status:'No print'}]))};
 }
 async function buildPackage(progress=()=>{},{checkout=false}={}) {
   progress('Saving your name and color choices…');
@@ -91,7 +91,7 @@ async function buildPackage(progress=()=>{},{checkout=false}={}) {
     const d = structuredClone(getDraft()), persisted = structuredClone(d), files = {};
     persisted.photos = {};
     if(teamService)entries.push(...await teamProductionFonts(Object.values(d.artwork).flatMap(a=>(a?.texts||[]).map(t=>({...t,type:'text'})))));
-    for (const view of VIEWS.filter(v=>d.product!=='everyday-polo'||v==='front')) {
+    for (const view of shop2dViews(d.product)) {
       const frame = document.createElement('canvas'); frame.width = 800; frame.height = 900;
       await drawPreview(frame,d,view); entries.push({ name:`previews/${view}.png`, data:await blobFromCanvas(frame) });
       const art = d.artwork[view];
@@ -162,7 +162,7 @@ async function loadPackage(file,{waitForArtwork=false}={}) {
       const art=d.artwork[view]; if(!art)continue;
       const ref=saved.files?.[view];
       if(ref) { const entry=zip.file(ref.path); if(!entry||!['image/png','image/jpeg','image/webp'].includes(ref.type))throw new Error('Original artwork is missing or invalid.'); art.file=new File([await entry.async('uint8array')],safeArtworkName(ref.name),{type:ref.type}); }
-      if(d.product==='everyday-polo'&&view!=='front'){delete d.artwork[view];continue;}
+      if(!shop2dViews(d.product).includes(view)){delete d.artwork[view];continue;}
       for(const layer of artworkLayers(art)) layer.data.placement=(layer.kind==='image'?constrainImagePlacement:constrainPlacement)(layer.data.placement,zoneFor(d,view));
     }
     shopOrderSheet(d); await window.MQDShopEveryday.loadDraft(d);
