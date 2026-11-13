@@ -92,3 +92,25 @@ console.log('PASS automatic live settings: approved pilot/paid logo and settings
 row.status='active';row.approved_at=new Date().toISOString();row.plan='3d';row.shop_config=validateSetup(upgrade).shop;row.pending_config=null;row.pending_plan=null;
 const threeBefore=structuredClone(row.shop_config);res=await call({action:'account-update',id,revision:row.revision,setup:paidUpdate},'shop-owner');assert.equal(res.status,200,JSON.stringify(res));assert.equal(row.plan,'3d');assert.deepEqual([...row.shop_config.engines],['2d','3d']);assert.deepEqual(row.shop_config.pricing.premiumCents,threeBefore.pricing.premiumCents);assert.equal(row.pending_plan,'2d');assert.deepEqual(row.pending_config.engines,['2d']);
 console.log('PASS downgrade boundary: staged request retains current 3D access and prices.');
+// A full-size page logo is retained privately; the public derivative stays bounded.
+const {deflateSync}=await import('node:zlib'),{randomFillSync}=await import('node:crypto');
+function crc(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;}
+function chunk(type,data){const t=Buffer.from(type),out=Buffer.alloc(data.length+12);out.writeUInt32BE(data.length);t.copy(out,4);data.copy(out,8);out.writeUInt32BE(crc(out.subarray(4,-4)),out.length-4);return out;}
+const raw=Buffer.alloc(1300*(1300*3+1));randomFillSync(raw);for(let y=0;y<1300;y++)raw[y*(3901)]=0;
+const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(1300);ihdr.writeUInt32BE(1300,4);ihdr[8]=8;ihdr[9]=2;
+const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);
+const logoBytes=Buffer.concat([png.subarray(0,-12),chunk('tEXt',Buffer.alloc(5*1024*1024-png.length-12,65)),png.subarray(-12)]);
+assert.equal(logoBytes.length,5*1024*1024);
+await fs.writeFile('/private/tmp/mqd-shop-page-5mb.png',logoBytes).catch(()=>{});
+const small=await fs.readFile('assets/brand-logo.png'),dataURL=b=>'data:image/png;base64,'+b.toString('base64');
+const logoUpdate=structuredClone(upgrade);logoUpdate.shop.logo=dataURL(logoBytes);logoUpdate.shop.pageLogoPreview=dataURL(small);
+row.pending_config=null;row.pending_plan=null;const beforeLogo={plan:row.plan,billing:row.billing_status,expires:row.pilot_expires_at};const mailCount=emails.length;
+res=await call({action:'account-update',id,revision:row.revision,setup:logoUpdate},'shop-owner');assert.equal(res.status,200,JSON.stringify(res));assert(res.data.liveSettingsUpdated);assert.equal(row.shop_config.logo,logoUpdate.shop.logo);assert.equal(row.shop_config.pageLogoPreview,logoUpdate.shop.pageLogoPreview);assert.equal(emails.length,mailCount);
+res=await call({action:'account-load',id},'shop-owner');assert.equal(res.data.setup.shop.logo,logoUpdate.shop.logo);assert.deepEqual({plan:row.plan,billing:row.billing_status,expires:row.pilot_expires_at},beforeLogo);
+const tooLarge=structuredClone(logoUpdate);tooLarge.shop.logo=dataURL(Buffer.concat([logoBytes,Buffer.from([0])]));assert.throws(()=>validateSetup(tooLarge),/5 MB/);
+const missingPreview=structuredClone(logoUpdate);delete missingPreview.shop.pageLogoPreview;assert.throws(()=>validateSetup(missingPreview),/preview/);
+const broken=structuredClone(logoUpdate);broken.shop.logo='data:image/png;base64,YmFk';assert.throws(()=>validateSetup(broken));
+console.log('PASS 5 MB real PNG: exact original storage/reopen, bounded preview, live approved save, no emails/billing, oversize/malformed/missing-preview denial.');
+const {shopLogoBytes,brandedShopHTML}=await import('../api/print-shop-share.js');
+assert.deepEqual(shopLogoBytes(row.shop_config.pageLogoPreview).bytes,small);
+assert.match(brandedShopHTML(await fs.readFile('shop-2d.html','utf8'),{...row.shop_config,logo:row.shop_config.pageLogoPreview},'synthetic-settings','2d'),/api\/print-shop-share\?shop=synthetic-settings/);

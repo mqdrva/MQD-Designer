@@ -30,6 +30,8 @@ for(const [engine,hat] of [['2d',false],['3d',false],['2d',true],['3d',true]]){
    messages.push({body,key:options.headers['Idempotency-Key']});return new Response(JSON.stringify({id:'provider-'+messages.length}),{status:200});
  }});
  vm.runInNewContext(stripTypeScriptTypes(source),{...contract,GARMENT_MAPPING,createClient:()=>db,hasShopAccess,sharedShopDesign,savedShopAppearance,requestEmails,deliverRequest:options=>deliverRequest({...options,send}),JSZip,crypto,TextEncoder,Uint8Array,File,Request,Response,btoa,atob,URL,console,Deno:{env:{get:()=> 'synthetic-private-key'},serve:h=>handler=h}});
+ business.shop_config.pageLogoPreview='data:image/png;base64,iVBORw0KGgo=';
+ const publicResponse=await handler(new Request('https://example.test/?shop='+business.preferred_slug,{headers:{apikey:key}}));const publicData=await publicResponse.json();assert.equal(publicData.shop.logo,business.shop_config.pageLogoPreview);assert(!('pageLogoPreview' in publicData.shop));
  const p=await packageFor(engine),zip=await JSZip.loadAsync(p.bytes),order={...p.order,material:'Performance fabric',materialRequest:''};
  if(hat){
   order.productId=productId;order.orderOptions=[{size:contract.HAT_FIT,quantity:1}];order.locations=[engine==='2d'?'front':'front panel'];
