@@ -12,6 +12,7 @@ async function load(){
  if(!shops.length){say('No Print Shop is linked to this verified email. Sign in with the email used for your shop setup.');return;}
  async function refresh(){
   const shop=shops.find(s=>s.id===$('designShop').value);
+  $('manageShop').hidden=false;$('manageShop').href='/print-shop-setup.html?accountShop='+encodeURIComponent(shop.id);
   $('designEngine').replaceChildren(...shop.engines.map(e=>new Option(e.toUpperCase(),e)));
   const result=await designCall({action:'list',businessId:shop.id},{owner:true});
   $('savedDesigns').replaceChildren();

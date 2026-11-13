@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {requestShopSignIn} from '../v20/print-shop-email-login.js';
 const source=(await fs.readFile(new URL('../v20/print-shop-designs.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 for(const scenario of ['new-email','existing-email','rate-limit','callback','expired']){
- const elements=Object.fromEntries(['designStatus','designEmail','designEmailLink','designLogin','designWorkspace','designShop','designEngine','savedDesigns','designPasswordSignIn','designPassword','designGoogle','designLogout','newShopDesign'].map(id=>[id,{value:'',hidden:id==='designWorkspace',disabled:false,textContent:'',reportValidity:()=>true,replaceChildren(...children){this.children=children;this.value=children[0]?.value||'';}}]));
+ const elements=Object.fromEntries(['designStatus','designEmail','designEmailLink','designLogin','designWorkspace','designShop','designEngine','savedDesigns','designPasswordSignIn','designPassword','designGoogle','designLogout','newShopDesign','manageShop'].map(id=>[id,{value:'',hidden:id==='designWorkspace',disabled:false,textContent:'',reportValidity:()=>true,replaceChildren(...children){this.children=children;this.value=children[0]?.value||'';}}]));
  elements.designEmail.value=' owner@example.com ';
  const calls=[];let cooldown;
  const shopDesignAuth={auth:{getSession:async()=>({data:{session:scenario==='callback'?{access_token:'synthetic'}:null}}),signInWithOtp:async body=>{calls.push(body);return {error:scenario==='rate-limit'?{status:429}:null};}}};
