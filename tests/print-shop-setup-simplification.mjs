@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {COLORS,SIZES,PRODUCT_OPTIONS} from '../v20/everyday-catalog.js';
-import {shopPrintZones,validateGarmentLogo,materialOptions} from '../v20/print-shop-contract.js';
+import {shopPrintZones,validateGarmentLogo,materialOptions,HAT_FIT,isShopHat} from '../v20/print-shop-contract.js';
 import {validateSetup} from '../supabase/functions/mqd-print-shop-setup/validation.js';
 class Element {
  constructor(tag){this.tag=tag;this.children=[];this.dataset={};this.value='';this.className='';this.checked=false;}
  append(...nodes){this.children.push(...nodes);}
- add(node){this.children.push(node);if(this.children.length===1)this.value=node.value;}
+ get options(){return this.children;}
+ add(node){node.remove=()=>{this.children=this.children.filter(c=>c!==node);};this.children.push(node);if(this.children.length===1)this.value=node.value;}
  before(node){this.previous=node;}
  setAttribute(){}
  addEventListener(){}
@@ -16,7 +17,7 @@ class Element {
  querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
 }
 const elements=Object.fromEntries(['shopSlug','setupStatus','garmentRows','premiumRows'].map(id=>[id,new Element('div')]));
-const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,URLSearchParams,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo,materialOptions});
+const context=vm.createContext({document:{body:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),createTextNode:text=>text},location:{origin:'https://mymerchnow.app'},Option:class{constructor(text,value){this.text=text;this.value=value;}},URL,URLSearchParams,Date,COLORS,SIZES,PRODUCT_OPTIONS,shopPrintZones,validateGarmentLogo,materialOptions,HAT_FIT,isShopHat});
 const source=fs.readFileSync(new URL('../v20/print-shop-setup.js',import.meta.url),'utf8');
 vm.runInContext(source.replace(/^import .*;\n/gm,'').split('for(const [id,name] of Object.entries(SHOP_PRINT_METHODS))')[0],context);
 for(const [input,expected] of [['MQD SHOP','mqd-shop'],['https://mymerchnow.app/shops/MQD-Shop/3d','mqd-shop'],['  Brenda’s Designs  ','brenda-s-designs']]){elements.shopSlug.value=input;vm.runInContext('normalizeShopLink()',context);assert.equal(elements.shopSlug.value,expected);}
@@ -27,7 +28,7 @@ const shirt=elements.garmentRows.children[0];
 for(const input of shirt.querySelectorAll('.offered-size'))input.checked=['M','XL'].includes(input.value);
 for(const input of shirt.querySelectorAll('.offered-color'))input.checked=['Black','Forest Green'].includes(input.value);
 shirt.querySelectorAll('*').find(e=>e.tag==='button').onclick();
-for(const row of elements.garmentRows.children){assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['M','XL']);assert(row.querySelectorAll('.offered-color:checked').some(i=>i.value==='Black'));}
+for(const row of elements.garmentRows.children.filter(r=>!isShopHat(r.dataset.product))){assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['M','XL']);assert(row.querySelectorAll('.offered-color:checked').some(i=>i.value==='Black'));}
 assert(elements.garmentRows.children[3].querySelectorAll('.offered-color:checked').some(i=>i.value==='Forest'));
 assert.equal(elements.garmentRows.children[3].querySelector('.garment-enabled').checked,false,'disabled garments receive shared selections for later');
 const premium=elements.premiumRows.children[0];assert.equal(premium.querySelectorAll('.offered-color').length,0);assert(premium.querySelectorAll('.dimension-row').length>0);assert(premium.querySelectorAll('.offered-size').length>0);
@@ -41,7 +42,7 @@ common.querySelector('.shared-brand').value='Shared supplier';
 for(const input of common.querySelectorAll('.shared-size'))input.checked=['L','2XL'].includes(input.value);
 for(const input of common.querySelectorAll('.shared-color'))input.checked=input.value==='Black';
 common.querySelectorAll('*').find(e=>e.tag==='button').onclick();
-for(const row of elements.garmentRows.children){assert.equal(row.querySelector('.garment-brand').value,'Shared supplier');assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['L','2XL']);assert.deepEqual(row.querySelectorAll('.offered-color:checked').map(i=>i.value),['Black']);}
+for(const row of elements.garmentRows.children.filter(r=>!isShopHat(r.dataset.product))){assert.equal(row.querySelector('.garment-brand').value,'Shared supplier');assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['L','2XL']);assert.deepEqual(row.querySelectorAll('.offered-color:checked').map(i=>i.value),['Black']);}
 shirt.querySelectorAll('.offered-size').find(i=>i.value==='L').checked=false;
 assert.deepEqual(shirt.querySelectorAll('.offered-size:checked').map(i=>i.value),['2XL']);
 assert.deepEqual(elements.garmentRows.children[1].querySelectorAll('.offered-size:checked').map(i=>i.value),['L','2XL']);
@@ -49,5 +50,7 @@ const common3d=elements.premiumRows.previous;
 assert.equal(common3d.querySelectorAll('.shared-color').length,0);
 for(const input of common3d.querySelectorAll('.shared-size'))input.checked=input.value==='M';
 common3d.querySelectorAll('*').find(e=>e.tag==='button').onclick();
-for(const row of elements.premiumRows.children)assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['M']);
+for(const row of elements.premiumRows.children.filter(r=>!isShopHat(r.dataset.product)))assert.deepEqual(row.querySelectorAll('.offered-size:checked').map(i=>i.value),['M']);
 console.log('Passed: link normalization, reserved names, immutable owner link, shared 2D sizes/colors, later-enabled garments, simplified 3D fields, and backend-compatible setup.');
+
+for(const target of ['garmentRows','premiumRows']){const hat=elements[target].children.find(r=>isShopHat(r.dataset.product));assert(hat);assert.deepEqual(hat.querySelectorAll('.offered-size:checked').map(i=>i.value),[HAT_FIT]);assert.equal(hat.querySelector('.logo-mode').value,'none');assert.equal(hat.querySelectorAll('.dimension-row').length,target==='garmentRows'?1:0);}

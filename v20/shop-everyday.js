@@ -1,4 +1,4 @@
-import {garmentLogo} from './print-shop-contract.js';
+import {garmentLogo,shop2dViews} from './print-shop-contract.js';
 import { installArtworkPinch } from './artwork-pinch.js';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
 const PRINT_METHODS=window.MQDPrintShop.printMethods;
@@ -57,8 +57,8 @@ function selected() {
   return layer;
 }
 function controls() {
-  if(draft.product==='everyday-polo')view='front';
-  for(const button of document.querySelectorAll('#views button'))button.hidden=draft.product==='everyday-polo'&&button.dataset.view!=='front';
+  if(['everyday-polo','shop-hat'].includes(draft.product))view='front';
+  for(const button of document.querySelectorAll('#views button'))button.hidden=['everyday-polo','shop-hat'].includes(draft.product)&&button.dataset.view!=='front';
   syncOptions();
   const art = draft.artwork[view], zone = zoneFor(draft, view), layer = selected(), item = layer?.data;
   $('zoneLabel').textContent = `${zone.label} · Maximum ${zone.width} × ${zone.height} inches`;
@@ -74,7 +74,7 @@ function controls() {
     $('textBold').checked = item.bold; $('textItalic').checked = item.italic;
   }
   $('addText').disabled = (art?.texts?.length || 0) >= 5;
-  $('review').replaceChildren(...VIEWS.filter(v=>draft.product!=='everyday-polo'||v==='front').map(v => { const li = document.createElement('li'), layers = artworkLayers(draft.artwork[v]); li.textContent = `${zoneFor(draft, v).label}: ${layers.length ? layers.map(item => `${item.name} (${item.data.placement.width.toFixed(2)} × ${item.data.placement.height.toFixed(2)} in)`).join(' + ') : 'No print'}`; return li; }));
+  $('review').replaceChildren(...shop2dViews(draft.product).map(v => { const li = document.createElement('li'), layers = artworkLayers(draft.artwork[v]); li.textContent = `${zoneFor(draft, v).label}: ${layers.length ? layers.map(item => `${item.name} (${item.data.placement.width.toFixed(2)} × ${item.data.placement.height.toFixed(2)} in)`).join(' + ') : 'No print'}`; return li; }));
   for (const button of $('views').children) { if(button.hidden)continue;button.textContent = zoneFor(draft, button.dataset.view).label; button.setAttribute('aria-pressed', String(button.dataset.view === view)); }
 }
 function drawSelection() {
@@ -92,7 +92,7 @@ async function render() {
     await drawPreview(frame, snapshot, selectedView, { guides: true });
     if (current !== revision) return;
     ctx.clearRect(0, 0, 800, 900); ctx.drawImage(frame, 0, 0); drawSelection(); $('emptyPhoto').hidden = true;
-  } catch { if (current === revision) { $('emptyPhoto').hidden = false; status('The garment preview could not load. Refresh or add a development photo.'); } }
+  } catch (error) { console.warn('Shop preview failed',error); if (current === revision) { $('emptyPhoto').hidden = false; status('The garment preview could not load. Refresh or add a development photo.'); } }
 }
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -144,7 +144,7 @@ function updateSizes() {
 updateColors(); updateSizes();
 for (const [id, product] of shopProducts) $('product').add(new Option(garmentLabel(window.MQDPrintShop,id,product.name), id));
 $('product').value=draft.product;
-function applyLimits() {if(draft.product==='everyday-polo'){for(const v of ['back','left','right'])delete draft.artwork[v];view='front';} for (const v of VIEWS) for (const layer of artworkLayers(draft.artwork[v])) layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)(layer.data.placement, zoneFor(draft, v)); }
+function applyLimits() {if(['everyday-polo','shop-hat'].includes(draft.product)){for(const v of ['back','left','right'])delete draft.artwork[v];view='front';} for (const v of VIEWS) for (const layer of artworkLayers(draft.artwork[v])) layer.data.placement = (layer.kind === 'image' ? constrainImagePlacement : constrainPlacement)(layer.data.placement, zoneFor(draft, v)); }
 $('product').onchange = () => { draft.product = $('product').value; updateColors(); updateSizes(); applyLimits(); drag = null; status('Garment changed. Artwork fitted to its proposed print limits; review dimensions.'); render(); };
 $('color').onchange = () => { draft.color = $('color').value; updateSizes(); applyLimits(); drag = null; render(); };
 $('size').onchange = () => { draft.size = $('size').value; applyLimits(); status('Size changed. Review artwork dimensions against the proposed limits.'); render(); };

@@ -147,6 +147,7 @@ jobs:
           node tests/print-shop-design-sharing.mjs
           node tests/print-shop-request-feedback.mjs
           node tests/print-shop-materials.mjs
+          node tests/print-shop-hats.mjs
           node tests/print-shop-request-delivery.mjs
           node tests/print-shop-request-flow.mjs
           node tests/print-shop-email-login.mjs

@@ -1,3 +1,4 @@
+import {GARMENT_MAPPING} from '../_shared/shirt-games/mapping.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {hasShopAccess} from './access.js';
 import {sharedShopDesign,savedShopAppearance} from '../mqd-print-shop-designs/service.js';
@@ -63,6 +64,11 @@ Deno.serve(async req=>{
    const design=JSON.parse(await designFile.async('string')),packOrder=JSON.parse(await orderFile.async('string'));
    if(design.schema!=='mqd-shop-design-v1'||design.engine!==s.engine||design.shop!==payload.shop||packOrder.productId!==s.productId||packOrder.printMethod!==s.printMethod||(s.engine==='2d'&&design.draft?.printMethod!==s.printMethod)||JSON.stringify(packOrder.orderOptions)!==JSON.stringify(s.orderOptions)||(s.engine==='2d'?design.draft?.product:design.design?.product?.id)!==s.productId)throw new Error('Design package does not match the order request.');
    if((packOrder.material??'')!==(s.material??'')||(packOrder.materialRequest??'')!==(s.materialRequest??''))throw new Error('Design package material does not match the request.');
+   if(s.productId==='shop-hat'&&(Object.keys(design.draft.artwork||{}).some(v=>v!=='front')||Object.keys(design.files||{}).some(v=>v!=='front')))throw new Error('The 2D hat supports only front artwork.');
+   if(s.productId==='hat'){
+    const d=design.design,m=GARMENT_MAPPING.hat;
+    if(d.product.model!==m.model||JSON.stringify(d.templates)!==JSON.stringify(m.templates)||Object.keys(d.design?.zones||{}).some(v=>!m.zones.includes(v)))throw new Error('Keep the supported hat model and zones.');
+   }
    const preset=garmentLogo(shop,s.productId);
    if(preset.mode==='fixed'){
     const manifestFile=zip.file('brand/logo-placement.json'),assetFile=zip.file(garmentLogoPath(shop));

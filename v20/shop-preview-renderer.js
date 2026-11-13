@@ -6,12 +6,14 @@ export const PRODUCTS = {
   'everyday-long-sleeve': { name: 'Long-sleeve T-shirt', model: 'long-sleeve' },
   'everyday-hoodie': { name: 'Hoodie', model: 'hoodie' },
   'everyday-polo': { name: 'Polo', model: 'polo' },
+  'shop-hat': {name:'Hat',model:'hat'},
 };
 // Display approximations only. Orders identify blanks by manufacturer color name.
 export const COLOR_PREVIEW = { White: '#ffffff', Black: '#252525', Navy: '#26364c', Royal: '#2559ac', Red: '#c42a37', 'Sport Grey': '#b6b6b6', Charcoal: '#56565a', 'Dark Heather': '#606065', 'Forest Green': '#284b3b', Forest: '#284b3b', 'Light Blue': '#a8c8df', Sand: '#d2c4ad', Purple: '#563576', Gold: '#efb431' };
-export function zoneFor(draft,view){const zones=shopPrintZones(window.MQDPrintShop,draft.product,draft.size);if(!zones[view])throw new Error('Polo printing is left chest only.');return zones[view];}
+export function zoneFor(draft,view){const zones=shopPrintZones(window.MQDPrintShop,draft.product,draft.size);if(!zones[view])throw new Error('This print area is unavailable for this product.');return zones[view];}
 export function guideFor(draft, view) {
   const zone = zoneFor(draft, view), sleeve = view === 'left' || view === 'right';
+  if(draft.product==='shop-hat')return {x:310,y:330,width:180,height:180,scale:180/zone.width};
   // Wearer's left is on the viewer's right in the front view.
   if (draft.product === 'everyday-polo' && view === 'front') return {x:(zone.placement==='center'?400:483)-zone.width*26/2,y:235,scale:26,width:zone.width*26,height:zone.height*26};
   const calibration = {
@@ -26,9 +28,9 @@ export function guideFor(draft, view) {
 }
 export function photoKey(draft, view) { return `${draft.product}:${draft.color}:${view}`; }
 const bitmaps = new WeakMap(), models = new Map();
-export async function bitmap(blob) { if (!bitmaps.has(blob)) bitmaps.set(blob, createImageBitmap(blob)); return bitmaps.get(blob); }
+export async function bitmap(blob) { if (!bitmaps.has(blob)) bitmaps.set(blob, blob.type==='image/svg+xml'? (async()=>{const url=URL.createObjectURL(blob),image=new Image();try{image.src=url;await image.decode();return image;}finally{URL.revokeObjectURL(url);}})():createImageBitmap(blob)); return bitmaps.get(blob); }
 async function modelImage(product, view) {
-  const url = `/assets/everyday/models/${PRODUCTS[product].model}-${view}.png`;
+  const url = product==='shop-hat'?'/assets/print-shop/hat-front.svg':`/assets/everyday/models/${PRODUCTS[product].model}-${view}.png`;
   if (!models.has(url)) models.set(url, fetch(url).then(response => { if (!response.ok) throw new Error('Garment image unavailable.'); return response.blob(); }).then(bitmap).catch(error => { models.delete(url); throw error; }));
   return models.get(url);
 }

@@ -10,7 +10,16 @@ export const PILOT_SHOP = Object.freeze({
     methodCents: { transfer: 0, dtf: 500, dtg: 1000, htv:500 },
     methodBackCents: { transfer: 1000, dtf: 500, dtg: 500, htv:500 }, sizeCents: 500, sleeveCents: 500 }
 });
+export const HAT_FIT = 'Shop confirms fit';
+export const isShopHat = id => id === 'shop-hat' || id === 'hat';
+export const shop2dViews = id => ['everyday-polo','shop-hat'].includes(id) ? ['front'] : ['front','back','left','right'];
 export function shopPrintZones(shop,product,size='L') {
+  if(product==='hat')return {'Front Panel':{label:'Front Panel',width:1151,height:1050,units:'pixels'},'Top of Bill':{label:'Top of Bill',width:1169,height:941,units:'pixels'}};
+  if(product==='shop-hat'){
+    const zones=shop.garments?.[product]?.printZones,front=zones?.front;
+    if(!front||Object.keys(zones).some(v=>v!=='front')||!Number.isFinite(front.width)||front.width<.5||front.width>100||front.height!==front.width)throw new Error('Enter the measured square front print size for your hat (inches).');
+    return {front:{label:'Hat front',width:front.width,height:front.height,placement:'front-square'}};
+  }
   const polo=['everyday-polo','short-sleeve-polo'].includes(product);
   const defaults={front:{width:12,height:15},back:{width:12,height:15},left:{width:3,height:3},right:{width:3,height:3}};
   const configured=shop.garments?.[product]?.printZones;
@@ -69,21 +78,27 @@ export function requestEstimate(shop, summary) {
   const p = shop.pricing;
   if (!shop.engines.includes(summary.engine)) throw new Error('This designer is unavailable for this shop.');
   if(['everyday-polo','short-sleeve-polo','long-sleeve-polo'].includes(summary.productId)&&!(shop.fulfillmentMode==='mymerchnow'&&summary.engine==='3d'&&summary.printMethod==='all-over')&&summary.locations?.some(view=>view!=='front'))throw new Error('Polo printing is available only on the left chest pocket area.');
+  const hat=isShopHat(summary.productId);
+  if(hat){
+    const allowed=summary.engine==='2d'&&summary.productId==='shop-hat'?['front']:summary.engine==='3d'&&summary.productId==='hat'?['front panel','top of bill']:[];
+    if(shop.fulfillmentMode==='mymerchnow'||!allowed.length||!Array.isArray(summary.locations)||!summary.locations.length||summary.locations.some(v=>!allowed.includes(v))||new Set(summary.locations).size!==summary.locations.length)throw new Error('Use only the supported hat print areas.');
+    shopPrintZones(shop,summary.productId);
+  }
   const details=shop.garments?.[summary.productId];
   if(details && (!details.colors.includes(summary.color)||!Array.isArray(summary.orderOptions)||summary.orderOptions.some(row=>!details.sizes.includes(row.size))))throw new Error('Choose a color and size this shop offers.');
   const options = summary.orderOptions;
   if (!Array.isArray(options) || !options.length || options.length > 12) throw new Error('Choose your sizes and quantities.');
   let totalQuantity = 0, sizeTotal = 0;
   for (const row of options) {
-    if (!['XS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].includes(row.size) || !Number.isInteger(row.quantity) || row.quantity < 1 || row.quantity > 99) throw new Error('Choose a valid size and quantity from 1 to 99.');
+    if (!(hat?[HAT_FIT]:['XS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']).includes(row.size) || !Number.isInteger(row.quantity) || row.quantity < 1 || row.quantity > 99) throw new Error('Choose a valid size and quantity from 1 to 99.');
     totalQuantity += row.quantity;
-    if (!['XS','S','M','L','XL'].includes(row.size)) sizeTotal += (shop.fulfillmentMode==='mymerchnow'&&summary.engine==='3d'?0:p.sizeCents) * row.quantity;
+    if (!hat && !['XS','S','M','L','XL'].includes(row.size)) sizeTotal += (shop.fulfillmentMode==='mymerchnow'&&summary.engine==='3d'?0:p.sizeCents) * row.quantity;
   }
   if (totalQuantity > 500) throw new Error('Contact the shop directly for orders over 500 garments.');
   let unitCents;
   const offeredMethods = summary.engine === '3d' ? shop.printMethods3d || shop.printMethods : shop.printMethods;
   const material = shop.fulfillmentMode === 'mymerchnow' ? null : requestMaterial(shop, summary);
-  let quoteRequired = methodNeedsQuote(shop,summary.engine,summary.printMethod) || !!material?.quoteRequired;
+  let quoteRequired = hat || methodNeedsQuote(shop,summary.engine,summary.printMethod) || !!material?.quoteRequired;
   const rule = p.printRules?.[summary.engine]?.[summary.printMethod];
   let setupCents = 0;
   if (!offeredMethods || !Object.hasOwn(offeredMethods, summary.printMethod)) throw new Error('Choose an available print method.');
@@ -96,7 +111,7 @@ export function requestEstimate(shop, summary) {
     unitCents = p.premiumCents[summary.productId];
     if (!Number.isSafeInteger(unitCents)) throw new Error('This 3D garment is unavailable.');
   }
-  if (!['screen','sublimation'].includes(summary.printMethod) && rule?.mode === 'calculated') {
+  if (!hat && !['screen','sublimation'].includes(summary.printMethod) && rule?.mode === 'calculated') {
     const printCost = configuredPrintCost(rule,summary,totalQuantity);
     if (!printCost) quoteRequired = true;
     else { unitCents = (summary.engine==='2d'?p.baseCents:p.premiumCents)[summary.productId] + printCost.unitCents; setupCents = printCost.setupCents; }
@@ -110,6 +125,7 @@ export function garmentLogo(shop,product){return shop?.garments?.[product]?.logo
 export function validateGarmentLogo(raw,shop,product){
  const v=raw||{mode:'none'};if(!['none','movable','fixed'].includes(v.mode))throw new Error('Choose a valid garment logo option.');
  if(v.mode==='none')return {mode:'none'};
+ if(isShopHat(product))throw new Error('For hats, use customer artwork in the supported hat zones.');
  if(typeof shop.garmentLogo!=='string'||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(shop.garmentLogo))throw new Error('Upload an original garment logo.');
  const placement=['everyday-polo','short-sleeve-polo'].includes(product)?v.placement:'center';
  if(!['center','left-chest'].includes(placement))throw new Error('Choose a logo position.');

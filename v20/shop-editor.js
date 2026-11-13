@@ -969,8 +969,8 @@ function ensureCustomerUx(){
 }
 function renderPrintQuality(){
   ensureCustomerUx();
-  const q=zoneQuality(activeZone),resolution=$('resolutionCheck'),value=$('printQualityValue'),note=$('printQualityNote');
-  if(resolution&&value&&note){resolution.className='q-check '+q.tone;value.textContent=q.label;note.textContent=q.note+' Estimated against a 300-DPI production target.';}
+  const hat=product.id==='hat',q=hat?{tone:'neutral',label:'Original artwork preserved',note:'Your shop confirms physical print dimensions and resolution for this hat.'}:zoneQuality(activeZone),resolution=$('resolutionCheck'),value=$('printQualityValue'),note=$('printQualityNote');
+  if(resolution&&value&&note){resolution.className='q-check '+q.tone;value.textContent=q.label;note.textContent=q.note+(hat?'':' Estimated against a 300-DPI production target.');}
   const s=activeLayerSafeAreaStatus(),safe=$('safeAreaCheck'),safeValue=$('safeAreaValue'),safeNote=$('safeAreaNote');
   if(safe&&safeValue&&safeNote){safe.className='q-check '+s.tone;safeValue.textContent=s.label;safeNote.textContent=s.note;}
 }
