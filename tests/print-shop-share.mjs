@@ -8,7 +8,11 @@ assert.deepEqual(shopLogoBytes(shop.logo).bytes,bytes);assert.equal(shopLogoByte
 for(const engine of ['2d','3d']){
  const html=engine==='2d'?html2:html3,result=brandedShopHTML(html,shop,'example',engine);
  assert.match(result,/og:image/);assert.match(result,/api\/print-shop-share\?shop=example&amp;image=1/);assert(!result.includes('<script>bad()'));
- assert.equal(result.split('<body')[1],html.split('<body')[1],'Designer body and controls must remain identical');
+ const stripBranding=body=>body.replace(/<header>[\s\S]*?<\/header>/,'').replace(/<div class="shop-intro">[\s\S]*?<\/div>/,'');
+ assert.equal(stripBranding(result.split('<body')[1]),stripBranding(html.split('<body')[1]),'Designer controls and request flow remain identical');
+ assert(!result.includes('MYMERCHNOW Pilot Shop'));assert(!result.includes('Print-shop pilot · sample prices'));
+ assert.match(result,/<strong id="shopBrand">Example &amp; Friends/);assert.match(result,/<img id="shopLogo" src="data:image\/png;base64,/);
+ assert(!result.includes('href="/shops/pilot'));assert.match(result,/Your &quot;own&quot; designer/);
  assert.equal((result.match(/property="og:image"/g)||[]).length,1);assert(!result.includes('og:image:alt" content="Morales'));
  assert.match(result,/Example &amp; Friends/);
 }
