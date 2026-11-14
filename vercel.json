@@ -12,7 +12,7 @@
       "src": "/print-shops/?",
       "status": 307,
       "headers": {
-        "Location": "/print-shop-setup.html",
+        "Location": "/print-shops.html",
         "Cache-Control": "no-store"
       }
     },

@@ -13,6 +13,8 @@ async function load(){
  async function refresh(){
   const shop=shops.find(s=>s.id===$('designShop').value);
   $('manageShop').hidden=false;$('manageShop').href='/print-shop-setup.html?accountShop='+encodeURIComponent(shop.id);
+  $('shopSubscription').hidden=false;$('shopSubscription').href=$('manageShop').href+'#ownerBilling';
+  $('openShop').hidden=false;$('openShop').href='/shops/'+encodeURIComponent(shop.slug)+(shop.engines.includes('2d')?'':'/3d');
   $('designEngine').replaceChildren(...shop.engines.map(e=>new Option(e.toUpperCase(),e)));
   const result=await designCall({action:'list',businessId:shop.id},{owner:true});
   $('savedDesigns').replaceChildren();

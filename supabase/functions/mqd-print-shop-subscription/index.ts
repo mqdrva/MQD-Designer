@@ -6,7 +6,7 @@ const ALLOWED=new Set(['https://mymerchnow.app','https://mqd-designer-vercel-git
 const sha=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function limitedBody(req:Request,max:number){const reader=req.body?.getReader();if(!reader)throw new Error('Body missing');let count=0;const chunks:Uint8Array[]=[];while(true){const part=await reader.read();if(part.done)break;count+=part.value.length;if(count>max){await reader.cancel();throw new Error('Body too large');}chunks.push(part.value);}const bytes=new Uint8Array(count);let i=0;for(const c of chunks){bytes.set(c,i);i+=c.length;}return new TextDecoder().decode(bytes);}
 Deno.serve(async(req:Request)=>{
- const origin=req.headers.get('origin')||'',cors=ALLOWED.has(origin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'apikey,content-type','Access-Control-Allow-Methods':'POST,OPTIONS',Vary:'Origin'}:{Vary:'Origin'};
+ const origin=req.headers.get('origin')||'',cors=ALLOWED.has(origin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'apikey,content-type,authorization','Access-Control-Allow-Methods':'POST,OPTIONS',Vary:'Origin'}:{Vary:'Origin'};
  const json=(body:any,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
  if(origin&&!ALLOWED.has(origin))return json({error:'This subscription origin is unavailable.'},403);
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
@@ -14,20 +14,30 @@ Deno.serve(async(req:Request)=>{
  let db:any,lease:string|undefined,businessId:string|undefined;
  try{
   const text=await limitedBody(req,3000);const body=JSON.parse(text);
-  if(!['status','checkout','portal'].includes(body.action)||typeof body.id!=='string'||!/^[a-f0-9-]{36}$/.test(body.id)||typeof body.token!=='string'||!/^[a-f0-9]{64}$/.test(body.token))return json({error:'Private business access required.'},401);
+  if(!['status','checkout','portal'].includes(body.action)||typeof body.id!=='string'||!/^[a-f0-9-]{36}$/.test(body.id))return json({error:'Private business access required.'},401);
   db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const {data:shop,error}=await db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).eq('token_hash',await sha(body.token)).single();
-  if(error||!shop||!Number.isFinite(Date.parse(shop.token_expires_at))||Date.parse(shop.token_expires_at)<=Date.now()||!shop.email_verified_at)return json({error:'This private link is invalid, unconfirmed or expired.'},401);
+  let shop:any;
+  const jwt=req.headers.get('authorization')?.replace(/^Bearer /,'')||'';
+  if(jwt){
+   const {data,error}=await db.auth.getUser(jwt);const user=data?.user;
+   if(error||!user?.email_confirmed_at||!user.email||user.is_anonymous)return json({error:'Sign in with your verified shop-owner email.'},401);
+   const result=await db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).eq('owner_email',user.email.toLowerCase()).single();shop=result.data;
+   if(result.error||!shop||!shop.email_verified_at||shop.shop_config?.organizationType==='team'||shop.shop_config?.fulfillmentMode==='mymerchnow'||shop.shop_config?.ownerManaged)return json({error:'This Print Shop is unavailable for this account.'},403);
+  }else{
+   if(typeof body.token!=='string'||!/^[a-f0-9]{64}$/.test(body.token))return json({error:'Private business access required.'},401);
+   const result=await db.from('mqd_print_shop_businesses').select('*').eq('id',body.id).eq('token_hash',await sha(body.token)).single();shop=result.data;
+   if(result.error||!shop||!Number.isFinite(Date.parse(shop.token_expires_at))||Date.parse(shop.token_expires_at)<=Date.now()||!shop.email_verified_at)return json({error:'This private link is invalid, unconfirmed or expired.'},401);
+  }
   const config=await configuration(db),{data:account}=await db.from(ACCOUNT_TABLE).select('*').eq('business_id',shop.id).maybeSingle();
   const {data:preflightBusiness}=await db.rpc('mqd_get_vault_secret',{secret_name:'mqd_print_shop_subscription_preflight_business'});
   const checkoutEnabled=config.enabled||preflightBusiness===shop.id;
-  if(body.action==='status')return json({mode:'live',enabled:checkoutEnabled,approved:!!shop.approved_at&&['pilot_active','active'].includes(shop.status),status:account?.status||'not_started',cancelAtPeriodEnd:account?.cancel_at_period_end||false,periodEnd:account?.period_end||null,hasCustomer:config.ready&&!!account?.stripe_customer_id,plan:shop.plan,policyVersion:POLICY_VERSION,message:config.enabled?'Monthly designer subscription. Cancel anytime; access continues through the paid month.':'Paid subscriptions are not open yet. Your unpaid pilot does not convert automatically.'});
+  if(body.action==='status')return json({pilotExpiresAt:shop.pilot_expires_at||null,shopStatus:shop.status,mode:'live',enabled:checkoutEnabled,approved:!!shop.approved_at&&['pilot_active','active'].includes(shop.status),status:account?.status||'not_started',cancelAtPeriodEnd:account?.cancel_at_period_end||false,periodEnd:account?.period_end||null,hasCustomer:config.ready&&!!account?.stripe_customer_id,plan:shop.plan,policyVersion:POLICY_VERSION,message:config.enabled?'Monthly designer subscription. Cancel anytime; access continues through the paid month.':'Paid subscriptions are not open yet. Your unpaid pilot does not convert automatically.'});
   if(!config.ready||body.action==='checkout'&&!checkoutEnabled)return json({error:'Paid subscriptions are not open yet.'},503);
   if(body.action==='checkout'&&(!shop.approved_at||!['pilot_active','active'].includes(shop.status)||shop.pending_config))return json({error:'Your business setup and any changes must be approved before subscribing.'},409);
   if(body.action==='checkout'&&body.policyVersion!==POLICY_VERSION)return json({error:'Review and accept the current subscription terms before continuing.'},409);
   const stripe=new Stripe(config.key,{apiVersion:'2026-08-26.dahlia',httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:2});
   lease=crypto.randomUUID();businessId=shop.id;const claim=await db.rpc('mqd_claim_print_shop_subscription',{p_business:shop.id,p_lease:lease});if(claim.error)return json({error:'Billing is already opening. Try again shortly.'},409);
-  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app',returnUrl=base+'/print-shop-setup.html?setupId='+shop.id;
+  let record=claim.data[0];const base=ALLOWED.has(origin)?origin:'https://mymerchnow.app',returnUrl=base+'/print-shop-setup.html?'+(jwt?'accountShop=':'setupId=')+shop.id;
   if(body.action==='portal'){
    if(!record.stripe_customer_id)throw new Error('Start a subscription before opening billing management.');
    const session=await stripe.billingPortal.sessions.create({customer:record.stripe_customer_id,configuration:config.portal,return_url:returnUrl});return json({mode:'live',url:session.url});
