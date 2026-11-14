@@ -68,6 +68,9 @@ await Promise.all(workers);
 console.log(`PASS: all ${products.length} frozen product GLBs downloaded and structurally validated.`);
 
 const tests=[
+  ['print-shop-subscription.mjs'],
+  ['print-shop-setup-simplification.mjs'],
+  ['print-shop-settings-persistence.mjs'],
   ['editor-alignment-grid.mjs'],
   ['back-layer-capacity.mjs'],
   ['template-backgrounds.mjs'],

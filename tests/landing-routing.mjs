@@ -19,16 +19,20 @@ assert(landing.includes('No account needed to start'));
 const firstRoute=path=>config.routes.find(route=>route.src&&!route.continue&&new RegExp('^'+route.src+'$').test(path));
 for(const [path,destination] of [
  ['/teams','/team-setup.html'],['/teams/','/team-setup.html'],
- ['/print-shops','/print-shop-setup.html'],['/print-shops/','/print-shop-setup.html']
+ ['/print-shops','/print-shops.html'],['/print-shops/','/print-shops.html']
 ]){
  const route=firstRoute(path);
- assert.equal(route?.status,307,`${path} must open the service signup`);
+ assert.equal(route?.status,307,`${path} must open the service entry page`);
  assert.equal(route.headers.Location,destination);
  assert.equal(route.headers['Cache-Control'],'no-store');
  assert(config.routes.indexOf(route)<config.routes.findIndex(r=>r.handle==='filesystem'));
  const setup=fs.readFileSync(destination.slice(1),'utf8');
- assert(setup.includes('id="setupForm"'));
- assert(setup.includes('No payment is collected by submitting this form.'));
+ if(path.startsWith('/print-shops')){
+  for(const content of ['Try the 2D demo','Try the 3D demo','$49','$99','href="/print-shop-setup.html"','does not automatically convert'])assert(setup.includes(content));
+ }else{
+  assert(setup.includes('id="setupForm"'));
+  assert(setup.includes('No payment is collected by submitting this form.'));
+ }
 }
 for(const path of ['/teams/moparkings','/teams/moparkings/3d','/teams/luvnoone/3d','/shops/pilot','/shops/pilot/3d']){
  assert.equal(firstRoute(path),undefined,`${path} must retain its existing designer route`);
