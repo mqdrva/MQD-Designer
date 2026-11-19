@@ -27,6 +27,7 @@ for (const teamService of [false, true]) {
       materialControls: null,
       reviewOnly: false,
       setupPreview: false,
+      marketingDemo: false,
       sending: false,
       ownerPaymentTest: false,
       checkoutFeedback: null,
@@ -77,3 +78,10 @@ for (const teamService of [false, true]) {
   }
 }
 console.log('PASS request feedback and retry controls for shop requests and Team checkout, including material preference notes.');
+
+const demoMessages=[];
+const demo=vm.createContext({marketingDemo:true,say:message=>demoMessages.push(message)});
+vm.runInContext(sendFunction,demo);
+await vm.runInContext('send({preventDefault(){}})',demo);
+assert.match(demoMessages[0],/Product demo only/);
+console.log('PASS marketing demo exits before package creation, customer validation or sending.');
