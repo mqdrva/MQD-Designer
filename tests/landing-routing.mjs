@@ -28,7 +28,7 @@ for(const [path,destination] of [
  assert(config.routes.indexOf(route)<config.routes.findIndex(r=>r.handle==='filesystem'));
  const setup=fs.readFileSync(destination.slice(1),'utf8');
  if(path.startsWith('/print-shops')){
-  for(const content of ['Try the 2D demo','Try the 3D demo','$49','$99','href="/print-shop-setup.html"','does not automatically convert'])assert(setup.includes(content));
+  for(const content of ['id="shopDemo"','data-demo-engine="2d"','data-demo-engine="3d"','$49','$99','href="/print-shop-setup.html?configure=1"','id="shopLeadForm"','No card needed.','It never starts a subscription automatically.'])assert(setup.includes(content));
  }else{
   assert(setup.includes('id="setupForm"'));
   assert(setup.includes('No payment is collected by submitting this form.'));
