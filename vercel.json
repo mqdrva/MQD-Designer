@@ -90,7 +90,8 @@
     "deploymentEnabled": {
       "codex/shirt-games-private-build": false,
       "codex/print-shop-design-sharing": false,
-      "codex/print-shop-workflow-clarity": false
+      "codex/print-shop-workflow-clarity": false,
+      "codex/print-shop-benefit-first": false
     }
   },
   "functions": {

@@ -10,7 +10,7 @@ const start=source.indexOf('let logoReads=');const end=source.indexOf('\n}',sour
 vm.runInContext(source.slice(start,end),context);
 assert.equal(nodes.setupForm.inert,true,'saved settings cannot overwrite interactive user edits during loading');
 assert.equal(nodes.setupForm['aria-busy'],'true');
-assert(html.indexOf('setupForm").inert=true')<html.indexOf('<script type="module" src="/v20/print-shop-setup.js'),'guard runs before module loading');
+assert(html.indexOf('setupForm").inert=true')<html.indexOf('await import("/v20/print-shop-setup.js'),'guard runs before module loading');
 const guard=source.slice(source.indexOf('function build(){')+'function build(){'.length,source.indexOf('if(teamSetup&&!teamPricing)',source.indexOf('function build(){')));
 vm.runInContext('function assertReady(){'+guard+'}',context);
 context.input={id:'logoFile',files:[{}],value:'logo.png',disabled:false};context.apply=image=>{applied=image;};

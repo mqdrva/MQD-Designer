@@ -9,7 +9,7 @@ import {assertTeamMemberCopy} from '../supabase/functions/_shared/mqd-team-maste
 import {mountTeamMember} from './team-master-member.js?v=brand-controls-20261028';
 import {mountMaterialControls} from './shop-material-controls.js';
 import {shopColors,shopSizes,garmentLabel} from './shop-garments.js';
-import { MAX_REQUEST_BYTES, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath,shop2dViews } from './print-shop-contract.js';
+import { MAX_REQUEST_BYTES, PILOT_SHOP, requestEstimate, money, SHOP_PRINT_METHODS, methodNeedsQuote, validPhone, shopPrintZones,garmentLogo,garmentLogoPath,shop2dViews } from './print-shop-contract.js';
 import { VIEWS, constrainPlacement, constrainImagePlacement } from './everyday-contract.js';
 import { PRODUCTS, drawPreview, zoneFor, bitmap } from './shop-preview-renderer.js';
 import { artworkLayers, artworkBounds, printArtwork, printMetadata, imageClipped } from './everyday-layers.js';
@@ -27,6 +27,8 @@ const KEY = 'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';
 const $ = id => document.getElementById(id);
 const engine = document.body.dataset.shopEngine;
 const memberPreview=new URLSearchParams(location.search).get('memberPreview')==='1';
+const marketingDemo = !teamService && new URLSearchParams(location.search).get('marketingDemo')==='1';
+if(marketingDemo){document.body.classList.add('marketing-demo');const style=document.createElement('link');style.rel='stylesheet';style.href='/v20/print-shop-demo.css?v=20261118';document.head.append(style);}
 const setupPreview = new URLSearchParams(location.search).get('setupPreview') === '1';
 const slug = location.pathname.match(/^\/(?:shops|teams)\/([a-z0-9-]+)(?:\/3d)?\/?$/)?.[1] || new URLSearchParams(location.search).get('shop') || 'pilot';
 let ownerWorkspaceData=null,garmentChoices=null,designSharing=null,materialControls=null;
@@ -68,7 +70,7 @@ function summary() {
 function refresh() {
   if (!shop || (engine === '2d' && !getDraft)) return;
   syncRequestOptions();if(reviewOnly){for(const option of $('productSelect')?.options||[])option.textContent=option.textContent.replace(/ — \$[\d,.]+$/,'');$('shopEstimate').textContent='Design review only · Save your personal copy. Checkout is disabled.';$('shopSend').disabled=true;return;}if(engine==='3d'&&window.MQDDesigner){const mode=garmentLogo(shop,window.MQDDesigner.getContext().productId).mode;const button=$('shopAddBusinessLogo');if(button)button.hidden=mode!=='movable';}
-  try { const estimate = requestEstimate(shop,summary()); $('shopEstimate').textContent = teamService?money(estimate.totalCents)+' garment subtotal · '+estimate.totalQuantity+' garment(s). Shipping is shown separately in checkout.':estimate.quoteRequired ? `Shop quote required · ${estimate.totalQuantity} garment(s).${summary().printMethod === 'sublimation' ? ' The shop must confirm a suitable garment and fabric for sublimation.' : ' The shop confirms artwork, setup and final pricing.'}` : `${money(estimate.totalCents)} estimated total · ${estimate.totalQuantity} garment(s). ${shop.pilot?'Sample pricing; ':''}shop approval, tax and shipping may change the final amount.${summary().printMethod==='sublimation'?' The shop must confirm a suitable garment and fabric.':''}`; $('shopSend').disabled = sending || setupPreview || (teamService&&$('teamDelivery')?.value==='team'&&!$('teamBatch')?.value); }
+  try { const estimate = requestEstimate(shop,summary()); $('shopEstimate').textContent = teamService?money(estimate.totalCents)+' garment subtotal · '+estimate.totalQuantity+' garment(s). Shipping is shown separately in checkout.':estimate.quoteRequired ? `Shop quote required · ${estimate.totalQuantity} garment(s).${summary().printMethod === 'sublimation' ? ' The shop must confirm a suitable garment and fabric for sublimation.' : ' The shop confirms artwork, setup and final pricing.'}` : `${money(estimate.totalCents)} estimated total · ${estimate.totalQuantity} garment(s). ${shop.pilot?'Sample pricing; ':''}shop approval, tax and shipping may change the final amount.${summary().printMethod==='sublimation'?' The shop must confirm a suitable garment and fabric.':''}`; $('shopSend').disabled = sending || setupPreview || marketingDemo || (teamService&&$('teamDelivery')?.value==='team'&&!$('teamBatch')?.value); }
   catch(error) { $('shopEstimate').textContent = error.message; $('shopSend').disabled = true; }
 }
 export function connectShopEveryday({ getDraft: getter }) {
@@ -193,7 +195,7 @@ async function loadPackage(file,{waitForArtwork=false}={}) {
   cachedAttempt=null; refresh(); say('Saved design reopened. Review prices, sizes and placement before requesting an order.');
 }
 async function send(event) {
-  event.preventDefault(); if(designSharing?.shopOwnerRequested){say('Use Save design and get customer link above.');return;} if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
+  event.preventDefault(); if(marketingDemo){say('Product demo only. Request a pilot to set up your own shop.');return;} if(designSharing?.shopOwnerRequested){say('Use Save design and get customer link above.');return;} if(reviewOnly){say('Design review only. Checkout is disabled.');return;} if(setupPreview){say('This is a setup preview. Customer requests are available after shop activation.');return;} if(sending || !$('shopForm').reportValidity())return;
   try { materialControls?.validate(); } catch(error) { say(error.message); return; }
   sending=true;refresh();if(teamService){checkoutFeedback||=checkoutProgress();checkoutFeedback.start('Preparing your order…');}say('Preparing your order…');
   const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(c=>!c.closest('#checkoutProgress')), disabled=controls.map(c=>c.disabled),buttonText=$('shopSend').textContent;controls.forEach(c=>c.disabled=true);$('shopSend').textContent=teamService?'Preparing checkout…':'Preparing request…';
@@ -249,10 +251,16 @@ function mount() {
   if(teamService&&!reviewOnly){
     const group=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='Delivery';group.append(legend);const label=document.createElement('label');label.textContent='How should we ship?';const choice=document.createElement('select');choice.id='teamDelivery';choice.add(new Option('Ship to me — regular shipping','individual'));choice.add(new Option('Ship together to the team — organizer pays shipping','team'));label.append(choice);group.append(label);const batchLabel=document.createElement('label');batchLabel.textContent='Choose your team batch';const select=document.createElement('select');select.id='teamBatch';for(const b of teamBatches)select.add(new Option('Orders close '+new Date(b.cutoff_at).toLocaleString()+' · up to '+b.max_quantity+' garments',b.id));if(!teamBatches.length)select.add(new Option('No open team batch — choose individual shipping',''));batchLabel.append(select);group.append(batchLabel);const note=document.createElement('p');note.textContent='Individual shipping: $10 for 1–9 garments, $15 for 10–19, $20 for 20+. Combined orders wait until the batch closes; late payments need review. The organizer receives and distributes the shipment.';group.append(note);$('shopForm').prepend(group);choice.onchange=()=>{batchLabel.hidden=choice.value!=='team';select.required=choice.value==='team';$('shopSend').disabled=setupPreview||choice.value==='team'&&!select.value;};choice.onchange();
   }
+  if(marketingDemo){
+    $('shopSwitch').href='/shop-'+(engine==='2d'?'3d':'2d')+'.html?marketingDemo=1';
+    document.querySelector('.shop-intro > strong').textContent='Try the designer · Sample prices';
+    $('shopDescription').textContent='Add artwork or text and explore your design. Request a pilot to create your own branded shop.';
+    $('shopForm').hidden=true;$('shopSend').disabled=true;infoLine.hidden=true;
+  }
   if(setupPreview){
     $('shopSwitch').href+='?setupPreview=1';
     const note=document.createElement('p');note.textContent='BUSINESS SETUP PREVIEW · Not a live shop. Customer requests and payments are disabled.';note.className='setup-note';
-    const back=document.createElement('a');back.href=new URLSearchParams(location.search).has('ownerWorkspace')?'/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace')):teamService?'/team-setup.html':'/print-shop-setup.html';back.textContent='Return to business setup';note.append(' ',back);
+    const back=document.createElement('a');back.href=new URLSearchParams(location.search).has('ownerWorkspace')?'/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace')):teamService?'/team-setup.html':'/print-shop-setup.html?configure=1';back.textContent='Return to business setup';note.append(' ',back);
     document.querySelector('.shop-intro').prepend(note);
     $('shopSend').textContent=teamService?'Checkout — available after Team activation':'Send order request — available after activation';
     const test=document.createElement('a');test.href='/shops/pilot';test.textContent='Use the pilot shop to send a test email request';if(!teamService)note.append(' · ',test);
@@ -281,7 +289,11 @@ try {
     ownerLoading=document.createElement('div');ownerLoading.setAttribute('role','status');ownerLoading.style.cssText='position:fixed;inset:0;z-index:10000;background:#fff;display:grid;place-content:center;padding:24px;text-align:center';ownerLoading.textContent='Opening the saved customer design and original artwork…';document.body.append(ownerLoading);
   }
   if(ownerPaymentTest){const {ownerAuth}=await import('./owner-team-workspace.js');const {requireAdminMfa}=await import('./admin-security.js');await requireAdminMfa(ownerAuth);paymentTestToken=(await ownerAuth.auth.getSession()).data.session?.access_token;if(!paymentTestToken)throw new Error('Sign into the MQD owner workspace first.');}
-  if(setupPreview){
+  if(marketingDemo){
+    if(engine==='3d'){const probe=document.createElement('canvas');const gl=probe.getContext('webgl2')||probe.getContext('webgl');if(!gl)throw new Error('3D graphics are unavailable in this browser.');gl.getExtension('WEBGL_lose_context')?.loseContext();}
+    shop=structuredClone(PILOT_SHOP);
+  }
+  else if(setupPreview){
     const ownerId=new URLSearchParams(location.search).get('ownerWorkspace');
     let packet;
     if(teamService&&ownerId){
@@ -305,7 +317,15 @@ try {
   if(setupPreview&&!memberPreview&&new URLSearchParams(location.search).get('ownerWorkspace'))await(await import('./owner-workspace-editor.js')).mountOwnerWorkspaceEditor(new URLSearchParams(location.search).get('ownerWorkspace'),{workspace:ownerWorkspaceData,loadPackage});
   if(designSharing?.sharingRequested)await designSharing.mountSharedShopDesign({loadPackage});
   if(designSharing?.shopOwnerRequested){await designSharing.mountShopOwnerDesign({shop,engine,loadPackage,buildPackage});document.querySelector('.shop-request').hidden=true;}
+  if(marketingDemo&&engine==='3d')document.querySelector('[data-mobile-pane="preview"]')?.click();
   document.body.dataset.ready='true';window.MQDTeamStartup?.ready();ownerLoading?.remove();document.body.removeAttribute('aria-busy');
 } catch(error) {
+  if(marketingDemo){
+    document.querySelector('main')?.setAttribute('hidden','');
+    const fallback=document.createElement('section');fallback.className='shop-failure';fallback.setAttribute('role','status');
+    const title=document.createElement('h2');title.textContent='Try the 2D designer on this browser';
+    const message=document.createElement('p');message.textContent='The 3D preview could not start here. Try the 2D designer, or open the demo on a device with 3D graphics enabled.';
+    const link=document.createElement('a');link.href='/shop-2d.html?marketingDemo=1';link.textContent='Open the 2D demo';fallback.append(title,message,link);document.body.append(fallback);
+  }
   window.MQDTeamStartup?.fail();$('shopSend').disabled=true;say(`The ${teamService?'team':'shop'} designer could not start: ${error.message}. Refresh to try again.`);if(ownerLoading){ownerLoading.textContent='The saved draft could not open: '+error.message+' No master changes have been saved. ';const back=document.createElement('a');back.href=teamService?'/team-setup.html?ownerWorkspace=1&workspaceId='+encodeURIComponent(new URLSearchParams(location.search).get('ownerWorkspace')):'/print-shop-designs.html';back.textContent=teamService?'Return to the existing owner setup':'Return to Print Shop designs';ownerLoading.append(back);}
 }

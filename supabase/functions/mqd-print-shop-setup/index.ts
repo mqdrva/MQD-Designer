@@ -1,3 +1,4 @@
+import {receiveInterest} from './interest.js';
 import {canonicalTeamShop} from '../mqd-team-service/runtime.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {validateSetup} from './validation.js';
@@ -56,6 +57,7 @@ Deno.serve(async(req:Request)=>{
  try{
   const body=await rawBody(req),db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const site=ALLOWED.has(origin)?origin:'https://mymerchnow.app';
+  if(body.action==='interest')return json(await receiveInterest({body,req,db,hash,mail,ipSecret:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''}));
   if(['admin-list','admin-review','admin-recover','admin-detail'].includes(body.action)){
    const jwt=req.headers.get('authorization')?.replace(/^Bearer /,'')||'';const {data,error:authError}=await db.auth.getUser(jwt);
    if(authError||data.user?.app_metadata?.role!=='admin'||!await hasAdminMfa(db,jwt))return json({error:'Owner administrator access required.'},403);
