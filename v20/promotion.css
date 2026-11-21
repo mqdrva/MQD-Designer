@@ -2,5 +2,5 @@
 @media(min-width:761px){.app{height:calc(100vh - 62px - var(--mqd-promotion-height,0px))}}
 @media(max-width:760px){.app.mobile-design-studio[data-mobile-workspace="canvas"]{height:calc(100dvh - 150px - var(--mqd-promotion-height,0px))}}
 
-#halloweenSpecial[data-promotion="black-friday-2026"]{background:#171717;color:#fff;padding:9px 12px}
-#halloweenSpecial[data-promotion="black-friday-2026"] a{color:#ffd180;font-weight:800;white-space:nowrap;text-underline-offset:3px;margin-inline-start:6px}
+#halloweenSpecial[data-promotion^="black-friday-2026"]{background:#171717;color:#fff;padding:9px 12px}
+#halloweenSpecial[data-promotion^="black-friday-2026"] a{color:#ffd180;font-weight:800;white-space:nowrap;text-underline-offset:3px;margin-inline-start:6px}

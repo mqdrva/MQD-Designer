@@ -19,6 +19,7 @@ assert.equal(card.hidden,true);assert.equal(banner.hidden,true,'graphic and anno
 now=pricing.BLACK_FRIDAY_START;listeners.focus();
 assert.equal(card.hidden,true,'Halloween artwork stays hidden during Black Friday');
 assert.equal(banner.hidden,false);
+assert.match(banner.textContent,/from \$20/);
 assert.match(banner.textContent,/Ends Cyber Monday, Nov 30 at 11:59 PM ET/);
 assert.equal(banner.link.href,'/custom-apparel.html#products');
 now=pricing.BLACK_FRIDAY_END;listeners.focus();

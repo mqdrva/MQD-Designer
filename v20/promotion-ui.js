@@ -24,7 +24,7 @@ function update(){
   const shop=document.createElement('a');
   shop.href='/custom-apparel.html#products';
   shop.textContent='Shop the Sale';
-  banner.replaceChildren('Black Friday Sale • Select premium custom apparel from $25 • Ends Cyber Monday, Nov 30 at 11:59 PM ET ',shop);
+  banner.replaceChildren('Black Friday Sale • Premium custom apparel from $20 • Ends Cyber Monday, Nov 30 at 11:59 PM ET ',shop);
  }else{
   banner.textContent='Halloween Special: 20% off all 12 garments • Ends Oct 31, 2026 at 11:59 PM Eastern • Automatically applied';
  }
