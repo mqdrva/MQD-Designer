@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import Stripe from "npm:stripe@22.4.0";
 import { shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
-import { garmentPriceCents, pricingEpoch, halloweenActive } from "../_shared/mqd-promotion-pricing.js";
+import { garmentPriceCents, pricingEpoch, halloweenActive, blackFridayEligible, BLACK_FRIDAY_ID } from "../_shared/mqd-promotion-pricing.js";
 import { isEveryday, everydayCheckout, everydayPricing, EverydayError } from "../_shared/mqd-everyday.js";
 
 const SITE_URL = "https://mymerchnow.app/";
@@ -145,7 +145,8 @@ Deno.serve(async (req: Request) => {
     const pricingTime = Date.now();
     const hasEveryday = orders.some((order: any) => isEveryday(order.product_id));
     const everydayConfig = hasEveryday ? everydayPricing(Deno.env.get("MQD_EVERYDAY_PRICING")) : null;
-    const promotionId = pricingEpoch(pricingTime) + (everydayConfig ? `-everyday-${everydayConfig.version}` : "");
+    const promotion = pricingEpoch(pricingTime, { includeBlackFriday: orders.some(order => blackFridayEligible(order.product_id)) });
+    const promotionId = promotion + (everydayConfig ? `-everyday-${everydayConfig.version}` : "");
     const lineItems: any[] = [];
     let totalQuantity = 0;
     for (const order of orders as any[]) {
@@ -198,7 +199,7 @@ Deno.serve(async (req: Request) => {
       item_quantity: String(totalQuantity),
       shipping_cents: String(shippingCents),
         promotion_id: promotionId,
-        discount_percent: halloweenActive(pricingTime) ? "20" : "0",
+        ...(promotion === BLACK_FRIDAY_ID ? { promotion_kind: "fixed-price" } : { discount_percent: halloweenActive(pricingTime) ? "20" : "0" }),
         ...(everydayConfig ? { promotion_scope: "premium-only", everyday_pricing_version: everydayConfig.version } : {})
     };
     if (allOwnedByUser) metadata.mqd_user_id = user.id;

@@ -4,18 +4,25 @@ import vm from 'node:vm';
 import * as pricing from '../v20/promotion-pricing.js';
 const source=fs.readFileSync('v20/promotion-ui.js','utf8').replace(/^import .*\n/gm,'');
 let now=pricing.HALLOWEEN_END-1;
-const banner={hidden:true,textContent:'',getBoundingClientRect:()=>({height:30})};
+const banner={hidden:true,dataset:{},textContent:'',replaceChildren(text,link){this.textContent=text;this.link=link;},getBoundingClientRect:()=>({height:30})};
 const card={hidden:true};const listeners={};
 vm.runInNewContext(source,{
- ...pricing,halloweenActive:()=>pricing.halloweenActive(now),
+ ...pricing,
  Date:class extends Date{static now(){return now;}},Event,
  location:{pathname:'/'},setTimeout:()=>1,clearTimeout(){},
  window:{addEventListener:(event,fn)=>listeners[event]=fn,dispatchEvent(){}},
- document:{hidden:false,getElementById:()=>banner,querySelectorAll:selector=>selector==='[data-halloween-promo]'?[card]:[],querySelector:()=>null,documentElement:{style:{setProperty(){}}},addEventListener(){}}
+ document:{hidden:false,createElement:()=>({}),getElementById:()=>banner,querySelectorAll:selector=>selector==='[data-halloween-promo]'?[card]:[],querySelector:()=>null,documentElement:{style:{setProperty(){}}},addEventListener(){}}
 });
 assert.equal(card.hidden,false);assert.equal(banner.hidden,false);
 now=pricing.HALLOWEEN_END;listeners.focus();
 assert.equal(card.hidden,true);assert.equal(banner.hidden,true,'graphic and announcement expire together');
+now=pricing.BLACK_FRIDAY_START;listeners.focus();
+assert.equal(card.hidden,true,'Halloween artwork stays hidden during Black Friday');
+assert.equal(banner.hidden,false);
+assert.match(banner.textContent,/Ends Cyber Monday, Nov 30 at 11:59 PM ET/);
+assert.equal(banner.link.href,'/custom-apparel.html#products');
+now=pricing.BLACK_FRIDAY_END;listeners.focus();
+assert.equal(banner.hidden,true);
 // Run the actual loader with two videos: no eager source, both play muted near viewport.
 for(const reduced of [false,true]){
  let observe;const videos=Array.from({length:2},()=>({dataset:{videoSrc:'qa.mp4'},removeAttribute(name){assert.equal(name,'autoplay');this.autoRemoved=true;},load(){this.loaded=true;},play(){this.played=true;return Promise.resolve();}}));
