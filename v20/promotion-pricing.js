@@ -7,7 +7,9 @@ export const BLACK_FRIDAY_CENTS = Object.freeze({
   'tshirt': 4000,
   'long-sleeve-tshirt': 4500,
   'short-sleeve-polo': 4500,
-  'long-sleeve-polo': 4500,
+  'long-sleeve-polo': 5000,
+  'lightweight-jacket': 8000,
+  'mask': 2000,
   'fleece-hoodie': 8000,
   'hood-mask-shirt': 5000,
   'shorts': 3500,
@@ -15,7 +17,8 @@ export const BLACK_FRIDAY_CENTS = Object.freeze({
   'hooded-long-sleeve': 5000,
   'hat': 2500
 });
-export const BLACK_FRIDAY_ID = 'black-friday-2026';
+// Price revision keeps resumed checkouts from reusing sessions with old sale prices.
+export const BLACK_FRIDAY_ID = 'black-friday-2026-v2';
 export function blackFridayActive(now = Date.now()) {
   return Number.isFinite(now) && now >= BLACK_FRIDAY_START && now < BLACK_FRIDAY_END;
 }

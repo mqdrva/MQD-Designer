@@ -19,7 +19,7 @@ for(const [i,id] of Object.keys(BASE_CENTS).entries()){
 assert.equal(halloweenActive(NaN),false);
 assert.throws(()=>garmentPriceCents('unknown'),/Unknown garment/);
 assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',dateStyle:'short',timeStyle:'long'}).format(new Date(HALLOWEEN_END-1)),'10/31/26, 11:59:59 PM EDT');
-const blackFridayPrices=[4000,4500,4500,4500,8000,9000,2500,5000,3500,4000,5000,2500];
+const blackFridayPrices=[4000,4500,4500,5000,8000,8000,2000,5000,3500,4000,5000,2500];
 for(const [i,id] of Object.keys(BASE_CENTS).entries()){
  assert.equal(garmentPriceCents(id,BLACK_FRIDAY_START-1),BASE_CENTS[id]);
  assert.equal(garmentPriceCents(id,BLACK_FRIDAY_START),blackFridayPrices[i]);
@@ -77,6 +77,7 @@ for(const slug of ['create-mqd-checkout','create-mqd-guest-checkout','create-mqd
  const regularKey=await checkout(slug,HALLOWEEN_END);
  assert.notEqual(saleKey,regularKey,'retry at expiry cannot replay the sale Session');
  const blackFridayKey=await checkout(slug,BLACK_FRIDAY_END-1);
+ assert(blackFridayKey.includes('black-friday-2026-v2'),'revised prices must not reuse an older Black Friday checkout session');
  const postBlackFridayKey=await checkout(slug,BLACK_FRIDAY_END);
  assert.notEqual(blackFridayKey,postBlackFridayKey,'checkout retries get regular prices after Cyber Monday');
  await checkout(slug,HALLOWEEN_END-1,{badSize:true});
