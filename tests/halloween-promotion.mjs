@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import * as pricing from '../v20/promotion-pricing.js';
 import * as everyday from '../supabase/functions/_shared/mqd-everyday.js';
 import {shippingCentsForQuantity} from '../v20/checkout-pricing.js';
-const {BASE_CENTS,HALLOWEEN_END,HALLOWEEN_START,garmentPriceCents,halloweenActive,pricingEpoch}=pricing;
+const {BASE_CENTS,HALLOWEEN_END,HALLOWEEN_START,BLACK_FRIDAY_START,BLACK_FRIDAY_END,BLACK_FRIDAY_ID,garmentPriceCents,halloweenActive,blackFridayActive,pricingEpoch}=pricing;
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 assert.equal(read('v20/promotion-pricing.js'),read('supabase/functions/_shared/mqd-promotion-pricing.js'));
 assert.equal(Object.keys(BASE_CENTS).length,12);
@@ -19,6 +19,16 @@ for(const [i,id] of Object.keys(BASE_CENTS).entries()){
 assert.equal(halloweenActive(NaN),false);
 assert.throws(()=>garmentPriceCents('unknown'),/Unknown garment/);
 assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',dateStyle:'short',timeStyle:'long'}).format(new Date(HALLOWEEN_END-1)),'10/31/26, 11:59:59 PM EDT');
+const blackFridayPrices=[4000,4500,4500,4500,8000,9000,2500,5000,3500,4000,5000,2500];
+for(const [i,id] of Object.keys(BASE_CENTS).entries()){
+ assert.equal(garmentPriceCents(id,BLACK_FRIDAY_START-1),BASE_CENTS[id]);
+ assert.equal(garmentPriceCents(id,BLACK_FRIDAY_START),blackFridayPrices[i]);
+ assert.equal(garmentPriceCents(id,BLACK_FRIDAY_END-1),blackFridayPrices[i]);
+ assert.equal(garmentPriceCents(id,BLACK_FRIDAY_END),BASE_CENTS[id]);
+ assert.equal(garmentPriceCents(id,BLACK_FRIDAY_END-1,{includeBlackFriday:false}),BASE_CENTS[id]);
+}
+assert.equal(blackFridayActive(NaN),false);
+assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',dateStyle:'short',timeStyle:'long'}).format(new Date(BLACK_FRIDAY_END-1)),'11/30/26, 11:59:59 PM EST');
 const guestToken='d6098f67-c597-4335-9043-eef71dcdcc64';
 const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(guestToken))).toString('hex');
 async function checkout(slug,now,{badOwner=false,badSize=false}={}){
@@ -52,6 +62,10 @@ async function checkout(slug,now,{badOwner=false,badSize=false}={}){
  assert(captured.params.line_items.every(l=>l.quantity===2));
  assert.equal(captured.params.shipping_options[0].shipping_rate_data.fixed_amount.amount,2000,'24 garments keep full-price shipping');
  assert.equal(captured.params.metadata.promotion_id,pricingEpoch(now));
+ if(pricingEpoch(now)===BLACK_FRIDAY_ID){
+  assert.equal(captured.params.metadata.promotion_kind,'fixed-price');
+  assert.equal(captured.params.metadata.discount_percent,undefined);
+ }
  for(const [i,order] of orders.entries()){
   assert.equal(updates[i*2].data.product_price,garmentPriceCents(order.product_id,now)/100);
   assert.equal(updates[i*2+1].data.unit_price,garmentPriceCents(order.product_id,now)/100);
@@ -62,8 +76,11 @@ for(const slug of ['create-mqd-checkout','create-mqd-guest-checkout','create-mqd
  const saleKey=await checkout(slug,HALLOWEEN_END-1);
  const regularKey=await checkout(slug,HALLOWEEN_END);
  assert.notEqual(saleKey,regularKey,'retry at expiry cannot replay the sale Session');
+ const blackFridayKey=await checkout(slug,BLACK_FRIDAY_END-1);
+ const postBlackFridayKey=await checkout(slug,BLACK_FRIDAY_END);
+ assert.notEqual(blackFridayKey,postBlackFridayKey,'checkout retries get regular prices after Cyber Monday');
  await checkout(slug,HALLOWEEN_END-1,{badSize:true});
  if(slug!=='create-mqd-checkout')await checkout(slug,HALLOWEEN_END-1,{badOwner:true});
 }
 // Frozen renderer and model mappings stay byte-for-byte unchanged; existing baseline tests cover them.
-console.log('PASS: all 12 sale prices, Eastern cutoff, server-enforced guest/account/sandbox checkout, shipping, captured order prices, tampering and expiry retries.');
+console.log('PASS: Halloween and Black Friday garment prices, Eastern cutoffs, server-enforced guest/account/sandbox checkout, shipping, captured order prices, tampering and expiry retries.');

@@ -6,7 +6,7 @@ import {AUTH_SAVE_MARKER,authSaveResumeId,authSaveRedirectUrl,createAuthSaveReco
 import { takeEverydayReturn } from './everyday-account.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 import {shippingCentsForQuantity} from './checkout-pricing.js';
-import {garmentPrice,halloweenActive,BASE_CENTS,pricingEpoch} from './promotion-pricing.js';
+import {garmentPrice,halloweenActive,blackFridayActive,blackFridayEligible,BASE_CENTS,pricingEpoch} from './promotion-pricing.js?v=20261121-black-friday';
 
 const $=id=>document.getElementById(id);
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
@@ -131,10 +131,14 @@ function renderOrderSummary(){
   const options=selectedOrderOptions();
   const quantity=options.reduce((sum,item)=>sum+item.quantity,0);
   const sizes=options.map(item=>`${item.size||'Item'} × ${item.quantity}`).join(' · ');
-  const subtotal=(priceFor(currentProductId())*quantity).toFixed(2);
+  const id=currentProductId();
+  const subtotal=(priceFor(id)*quantity).toFixed(2);
   const detail=document.createElement('div');detail.textContent=sizes;
   const total=document.createElement('strong');total.textContent=`${quantity} ${quantity===1?'item':'items'} · $${subtotal}`;
-  const note=document.createElement('div');note.textContent=halloweenActive()?'Halloween Special: 20% off included. Before shipping and tax.':'Estimated subtotal before shipping and tax';
+  const note=document.createElement('div');
+  note.textContent='Estimated subtotal before shipping and tax';
+  if(halloweenActive())note.textContent='Halloween Special: 20% off included. Before shipping and tax.';
+  if(blackFridayActive()&&blackFridayEligible(id))note.textContent='Black Friday price included. Before shipping and tax.';
   summary.replaceChildren(detail,total,note);
 }
 
@@ -162,7 +166,8 @@ function applyPriceOverridesToUI(){
     const price=priceFor(option.value);
     if(!Object.prototype.hasOwnProperty.call(BASE_CENTS,option.value))continue;
     const base=option.textContent.replace(/\s+—\s+\$.*$/,'');
-    const target=`${base} — $${price.toFixed(2)}${halloweenActive()?` (was $${(BASE_CENTS[option.value]/100).toFixed(2)})`:""}`;
+    const onSale=halloweenActive()||(blackFridayActive()&&blackFridayEligible(option.value));
+    const target=`${base} — $${price.toFixed(2)}${onSale?` (was $${(BASE_CENTS[option.value]/100).toFixed(2)})`:""}`;
     if(option.textContent!==target)option.textContent=target;
   }
 }

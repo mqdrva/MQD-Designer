@@ -1,6 +1,6 @@
 import {remainingTemplateFields} from './template-contract.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
-import {garmentPrice,pricingEpoch} from './promotion-pricing.js';
+import {garmentPrice,pricingEpoch} from './promotion-pricing.js?v=20261121-black-friday';
 
 const SUPABASE_URL='https://gsxuhpffgdffsqksrkrf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4';

@@ -1,4 +1,4 @@
-import {garmentPrice} from './promotion-pricing.js';
+import {garmentPrice} from './promotion-pricing.js?v=20261121-black-friday';
 
 export function everydayExampleCents(pricing){
   const amounts=[pricing?.baseCents?.['everyday-tshirt'],pricing?.printCents?.front,pricing?.methodCents?.transfer??0];

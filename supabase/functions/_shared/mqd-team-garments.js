@@ -7,7 +7,7 @@ export function ownerGarmentShop(shop,productId){
  if(!Object.hasOwn(TEAM_3D_GARMENTS,productId))throw new Error('Choose a supported team garment.');
  const next=structuredClone(shop),base=Object.values(shop.garments)[0];
  next.engines=['3d'];next.garments={[productId]:shop.garments[productId]||{brand:'',style:'',sizes:base?.sizes||['S','M','L','XL','2XL'],colors:['White'],logoPreset:{mode:'none'}}};
- next.pricing.premiumCents={[productId]:garmentPriceCents(productId)};next.pricing.baseCents={};return next;
+ next.pricing.premiumCents={[productId]:garmentPriceCents(productId, Date.now(), { includeBlackFriday: false })};next.pricing.baseCents={};return next;
 }
 
 // Copy normalized placements into the destination's existing mapping. This is a
