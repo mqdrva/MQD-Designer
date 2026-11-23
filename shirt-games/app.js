@@ -57,7 +57,7 @@ cropCanvas.onkeydown=e=>{const delta={ArrowLeft:[-15,0],ArrowRight:[15,0],ArrowU
 $('invited').onchange=count;$('back').onclick=()=>show('landing');$('kind').onchange=()=>{updateKind();preview().catch(e=>say(e.message))};for(const id of ['contributionText','side','ink'])$(id).oninput=()=>preview().catch(e=>say(e.message));
 $('createForm').onsubmit=guard(async()=>{const value=await api('create',{type:selected,invited:Number($('invited').value),name:$('creatorName').value,color:$('startingColor').value,birthdayName:$('birthdayName').value,tone:$('tone').value,sayings:[...document.querySelectorAll('#sayingChoices input:checked')].map(x=>Number(x.value))},null);saveSession(value);await refresh()});
 $('joinForm').onsubmit=guard(async()=>{const p=new URLSearchParams(location.hash.slice(1));const value=await api('claim',{id:p.get('join'),invite:p.get('invite'),name:$('joinName').value},null);saveSession(value);await refresh()});
-$('photo').onchange=guard(async()=>{const seq=++uploadGeneration;photoData=null;photoImage=null;originalPhoto=null;facePrepared=false;outlineRecipe=null;outlineMode=false;outlinePoints=[];$('traceFace').disabled=false;$('outlineActions').hidden=true;$('cropApproval').checked=false;$('photoPermission').checked=false;const file=$('photo').files[0];if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8*1024*1024)throw Error('Choose PNG, JPEG or WebP up to 8 MB');const url=URL.createObjectURL(file);const img=new Image();try{img.src=url;await img.decode();if(seq!==uploadGeneration)return;if(img.width*img.height>40000000)throw Error('Choose a photo under 40 megapixels');originalPhoto={url:await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)}),width:img.width,height:img.height};if(seq!==uploadGeneration)return;photoImage=img;if(game.type==='faces'){const probe=document.createElement('canvas');probe.width=40;probe.height=40;const pc=probe.getContext('2d');pc.drawImage(img,0,0,40,40);const pixels=pc.getImageData(0,0,40,40).data;let transparent=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]<32)transparent++;facePrepared=transparent>80;$('cutout').checked=facePrepared;}cropState={zoom:1,panX:0,panY:0};pointers.clear();$('photoStatus').textContent=`${img.width} × ${img.height} source pixels. Crop below. The preview is 500 × 500; your original image and crop settings are retained privately for future production review.`;await crop();if(game.type==='faces'&&!$('cutout').checked){if(catalog.cutoutMode==='manual-or-transparent')$('photoStatus').textContent='Pinch/drag to frame the face. Then tap Trace face & hair, mark its outline, and choose Keep face only. Nothing is sent to a paid background-removal service.';else await makeFaceCutout(seq)}}finally{URL.revokeObjectURL(url)}});
+$('photo').onchange=guard(async()=>{setContributionStatus('');const seq=++uploadGeneration;photoData=null;photoImage=null;originalPhoto=null;facePrepared=false;outlineRecipe=null;outlineMode=false;outlinePoints=[];$('traceFace').disabled=false;$('outlineActions').hidden=true;$('cropApproval').checked=false;$('photoPermission').checked=false;const file=$('photo').files[0];if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8*1024*1024)throw Error('Choose PNG, JPEG or WebP up to 8 MB');const url=URL.createObjectURL(file);const img=new Image();try{img.src=url;await img.decode();if(seq!==uploadGeneration)return;if(img.width*img.height>40000000)throw Error('Choose a photo under 40 megapixels');originalPhoto={url:await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)}),width:img.width,height:img.height};if(seq!==uploadGeneration)return;photoImage=img;if(game.type==='faces'){const probe=document.createElement('canvas');probe.width=40;probe.height=40;const pc=probe.getContext('2d');pc.drawImage(img,0,0,40,40);const pixels=pc.getImageData(0,0,40,40).data;let transparent=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]<32)transparent++;facePrepared=transparent>80;$('cutout').checked=facePrepared;}cropState={zoom:1,panX:0,panY:0};pointers.clear();$('photoStatus').textContent=`${img.width} × ${img.height} source pixels. Crop below. The preview is 500 × 500; your original image and crop settings are retained privately for future production review.`;await crop();if(game.type==='faces'&&!$('cutout').checked){if(catalog.cutoutMode==='manual-or-transparent')$('photoStatus').textContent='Pinch/drag to frame the face. Then tap Trace face & hair, mark its outline, and choose Keep face only. Nothing is sent to a paid background-removal service.';else await makeFaceCutout(seq)}}finally{URL.revokeObjectURL(url)}});
 async function makeFaceCutout(seq=uploadGeneration){if(!originalPhoto)throw Error('Choose a photo first');$('photoStatus').textContent='Separating your face and hair on this Mac…';$('makeFace').disabled=true;try{const result=await api('face-cutout',{id:game.id,photo:originalPhoto});if(seq!==uploadGeneration)return;const img=new Image();img.src=result.url;await img.decode();if(seq!==uploadGeneration)return;photoImage=img;facePrepared=true;$('cutout').checked=true;cropState={zoom:1,panX:0,panY:0};await crop();$('photoStatus').textContent='Background removed on this Mac. Review the face and hair, adjust with pinch/drag, then approve your cutout.'}catch(e){if(seq===uploadGeneration){photoData=null;$('photoStatus').textContent=e.message+' Use a clearer single-face photo, or choose a transparent face PNG and check the cutout box.'}throw e}finally{$('makeFace').disabled=false}}
 function drawOutline(){
  const c=$('cropCanvas'),ctx=c.getContext('2d');ctx.clearRect(0,0,500,500);const g=cropGeometry(photoImage.width,photoImage.height,$('cutout').checked,cropState);ctx.drawImage(photoImage,g.x,g.y,g.w,g.h);ctx.strokeStyle='#df2332';ctx.lineWidth=3;ctx.fillStyle='#fff';ctx.beginPath();outlinePoints.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of outlinePoints){ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke()}$('outlineStatus').textContent=`${outlinePoints.length} outline points. Follow the outside of the hair and face, ending beneath the chin. Then choose Keep face only.`;
@@ -73,7 +73,69 @@ $('applyOutline').onclick=guard(async()=>{
 $('makeFace').onclick=guard(()=>makeFaceCutout());
 $('faceReveal').onclick=guard(async()=>{$('faceRevealStatus').textContent='Preparing face cutouts on this Mac…';game=await api('face-reveal',{id:game.id});await paint();showReveal()});
 $('cutout').onchange=()=>{cropState={zoom:1,panX:0,panY:0};crop().catch(e=>say(e.message))};
-$('contributionForm').onsubmit=guard(async()=>{let photo=null;if($('kind').value==='photo'){if(outlineMode)throw Error('Finish or cancel the face outline before submitting');if(game.type==='faces'&&!photoData?.cutout)throw Error('Make a face cutout or upload a transparent face PNG before submitting');if(!photoData||!$('photoPermission').checked||!$('cropApproval').checked)throw Error('Choose your photo, confirm permission, and approve the crop');photo={...photoData,consent:true,cropApproved:true,source:originalPhoto,crop:{...cropState}}}game=await api('submit',{id:game.id,kind:$('kind').value,text:$('contributionText').value,ink:$('ink').value,side:game.type==='pass'?$('side').value:'both',photo});photoData=null;photoImage=null;await paint();if(game.status==='revealed')showReveal()});
+const contributionForm = $('contributionForm');
+const contributionStatus = $('contributionStatus');
+const contributionSubmit = $('contributionSubmit');
+let contributionPending = false;
+
+function setContributionStatus(message, error = false) {
+ contributionStatus.textContent = message;
+ contributionStatus.classList.toggle('submission-error', error);
+ if (error) contributionStatus.focus();
+}
+
+function approvedPhoto() {
+ if (!photoData) throw Error('Choose a photo before submitting.');
+ if (outlineMode) throw Error('Tap Keep face only to finish the outline, or cancel it.');
+ if (game.type === 'faces' && !photoData.cutout) {
+  throw Error('Tap Trace face & hair, outline your face and hair, then tap Keep face only. You can also upload a transparent face PNG.');
+ }
+ if (!$('photoPermission').checked) throw Error('Check the box confirming you have permission to use this photo.');
+ if (!$('cropApproval').checked) throw Error('Check “I approve this crop/cutout” after your last adjustment.');
+ return {...photoData, consent: true, cropApproved: true, source: originalPhoto, crop: {...cropState}};
+}
+
+contributionForm.onsubmit = async event => {
+ event.preventDefault();
+ if (contributionPending) return;
+ say('');
+ setContributionStatus('');
+
+ const kind = $('kind').value;
+ let photo;
+ try {
+  photo = kind === 'photo' ? approvedPhoto() : null;
+ } catch (error) {
+  setContributionStatus(error.message, true);
+  return;
+ }
+
+ contributionPending = true;
+ contributionSubmit.disabled = true;
+ setContributionStatus(kind === 'photo' ? 'Saving your photo…' : 'Saving your contribution…');
+ try {
+  game = await api('submit', {
+   id: game.id,
+   kind,
+   text: $('contributionText').value,
+   ink: $('ink').value,
+   side: game.type === 'pass' ? $('side').value : 'both',
+   photo
+  });
+  photoData = null;
+  photoImage = null;
+  setContributionStatus('');
+  await paint();
+  if (game.status === 'revealed') showReveal();
+  else $('turnWait').focus();
+ } catch (error) {
+  if (contributionForm.hidden) say(error.message);
+  else setContributionStatus(error.message || 'Could not save your contribution. Try again.', true);
+ } finally {
+  contributionPending = false;
+  contributionSubmit.disabled = false;
+ }
+};
 $('voteForm').onsubmit=guard(async()=>{game=await api('submit',{id:game.id,votes:game.sayings.map((_,i)=>Number($('vote-'+i).value)),prediction:$('prediction').value===''?null:Number($('prediction').value)});await paint();if(game.status==='revealed')showReveal()});
 $('refresh').onclick=guard(refresh);$('finishEarly').onclick=()=>{$('finishConfirm').hidden=false;$('finishConfirm').scrollIntoView({behavior:'smooth',block:'center'})};$('cancelFinish').onclick=()=>{$('finishConfirm').hidden=true};$('confirmFinish').onclick=guard(async()=>{game=await api('change',{id:game.id,action:'finish'});$('finishConfirm').hidden=true;await paint();showReveal()});$('approve').onclick=guard(async()=>{game=await api('change',{id:game.id,action:'approve'});await paint()});
 $('front').onclick=guard(async()=>{side='front';await preview()});$('backView').onclick=guard(async()=>{side='back';await preview()});for(const id of ['product','finalColor','resultEdit'])$(id).oninput=()=>{if(game.type==='picked')resultIndex=Math.max(0,game.results.findIndex(x=>x.seat===game.self));$('placementReviewed').checked=false;preview().catch(e=>say(e.message))};
