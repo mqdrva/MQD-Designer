@@ -23,7 +23,13 @@ export function createGameRepository(db,{ownerMfa=async()=>false,checkout=async(
   async settings(){return checked(await db.from('mqd_shirt_game_settings').select('enabled,checkout_enabled,verified_templates,menu').eq('id',true).single())},
   async saveMenu(menu){checked(await db.from('mqd_shirt_game_settings').update({menu}).eq('id',true))},
   async createGame(owner,engine){const response=await db.rpc('mqd_shirt_game_create',{p_owner:owner,p_engine:engine});if(response.error)throw new GameError('Could not create the game. The test may be full or temporarily paused.',409)},
-  async readGame(id){return checked(await db.from('mqd_shirt_games').select('id,engine,version,expires_at').eq('id',id).maybeSingle())},
+  async listHostedGames(owner){
+   return checked(await db.from('mqd_shirt_games')
+    .select('id,created_at,type:engine->>type,status:engine->>status')
+    .eq('owner_id',owner).gt('expires_at',new Date().toISOString())
+    .order('created_at',{ascending:false}).limit(150));
+  },
+  async readGame(id){return checked(await db.from('mqd_shirt_games').select('id,owner_id,engine,version,expires_at').eq('id',id).maybeSingle())},
   async commit(id,version,engine){return checked(await db.rpc('mqd_shirt_game_commit',{p_id:id,p_expected:version,p_engine:engine}))===true},
   async publicView(view){
    const copy=structuredClone(view);

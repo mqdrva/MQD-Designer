@@ -13,9 +13,19 @@ const hash=x=>createHash('sha256').update(String(x)).digest('hex');
 const matches=(value,digest)=>typeof value==='string'&&typeof digest==='string'&&timingSafeEqual(Buffer.from(hash(value)),Buffer.from(digest));
 const text=(x,max=80)=>String(x??'').trim().slice(0,max);
 export function initialState(){return {games:{},orders:{},events:[],menu:TYPES.map((id,rank)=>({id,rank,visible:true})),rulesApproved:false};}
-export function participant(game,secret){const seat=game.seats.find(s=>matches(secret,s.tokenHash));check(seat,'Private game access required',401);return seat;}
-// Hosted adapter must verify the saved draft belongs to the authenticated account first.
-export function resumeParticipant(game,index){const seat=game.seats[index];check(seat?.claimed,'Participant not found',404);const secret=token();seat.tokenHash=hash(secret);game.revision++;return {id:game.id,token:secret};}
+export function participant(game,secret){
+  const seat=game.seats.find(s=>matches(secret,s.tokenHash)||s.resumeTokenHashes?.some(digest=>matches(secret,digest)));
+  check(seat,'Private game access required',401);return seat;
+}
+// The hosted adapter verifies account ownership before issuing seat credentials.
+export function resumeParticipant(game,index,{keepExisting=false}={}){
+  const seat=game.seats[index];check(seat?.claimed,'Participant not found',404);
+  const secret=token(),digest=hash(secret);
+  if(keepExisting)seat.resumeTokenHashes=[...(seat.resumeTokenHashes||[]).slice(-4),digest];
+  else {seat.tokenHash=digest;delete seat.resumeTokenHashes;}
+  game.revision++;
+  return {id:game.id,token:secret};
+}
 function requireCreator(game,seat){check(seat.index===0,'Only the creator can do this',403);}
 function open(game){check(game.status==='collecting','This game is already revealed',409);}
 export function photo(input){

@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import * as E from '../server/engine.mjs';import {handleGameAction} from '../hosted/service.mjs';import {templateHash} from '../hosted/commerce.mjs';
-function fixture(type='pass',invited=1){const state=E.initialState();state.rulesApproved=true;const c=E.createGame(state,{type,invited,name:'Creator',birthdayName:'Sam',sayings:[0,1]});let row={id:c.id,engine:state.games[c.id],version:1,expires_at:new Date(Date.now()+86400000).toISOString()};const settings={enabled:true,menu:state.menu};const repo={settings:async()=>settings,readGame:async()=>structuredClone(row),commit:async(id,version,engine)=>{if(row.version!==version)return false;row={...row,engine,version:version+1};return true},publicView:async v=>v,createGame:async()=>{},saveDraft:async()=>{},storePhoto:async(id,seat,p)=>({photo:{...p,url:'game-asset:'+id+'/photo.png'},files:[]}),discardPhoto:async()=>{},ownerMfa:async()=>false};const call=(route,body={},actorToken=c.token,user=null)=>handleGameAction({route,body:{id:c.id,...body},actorToken,user,repo});return {repo,call,c,row:()=>row,settings}}
+function fixture(type='pass',invited=1){const state=E.initialState();state.rulesApproved=true;const c=E.createGame(state,{type,invited,name:'Creator',birthdayName:'Sam',sayings:[0,1]});let row={id:c.id,owner_id:'host',engine:state.games[c.id],version:1,expires_at:new Date(Date.now()+86400000).toISOString()};const settings={enabled:true,menu:state.menu};const repo={settings:async()=>settings,readGame:async()=>structuredClone(row),commit:async(id,version,engine)=>{if(row.version!==version)return false;row={...row,engine,version:version+1};return true},publicView:async v=>v,createGame:async()=>{},saveDraft:async()=>{},storePhoto:async(id,seat,p)=>({photo:{...p,url:'game-asset:'+id+'/photo.png'},files:[]}),discardPhoto:async()=>{},ownerMfa:async()=>false};const call=(route,body={},actorToken=c.token,user=null)=>handleGameAction({route,body:{id:c.id,...body},actorToken,user,repo});return {repo,call,c,row:()=>row,settings}}
 const note={kind:'text',text:'Secret message',side:'both',ink:'#c96f4e'};
 test('hosted creator requires verified user; closed feature rejects mutation',async()=>{const f=fixture();await assert.rejects(f.call('create',{type:'pass',invited:1}),/Sign in/);await assert.rejects(f.call('create',{type:'pass',invited:1},'',{id:'user',is_anonymous:true}),/Sign in/);f.settings.enabled=false;await assert.rejects(f.call('submit',note),/not open/);assert.equal((await f.call('catalog')).menu[0].available,false)});
 test('hosted private invite and reveal retain engine privacy',async()=>{const f=fixture();const friend=await f.call('claim',{invite:f.c.invitations[0].token,name:'Friend'},'');await f.call('submit',note);const hidden=await f.call('state',{},friend.token);assert.ok(!JSON.stringify(hidden).includes('Secret message'));const shown=await f.call('submit',{...note,text:'Friend note'},friend.token);assert.equal(shown.status,'revealed');assert.equal(shown.participants[0].contribution.text,'Secret message');await assert.rejects(f.call('claim',{invite:f.c.invitations[0].token,name:'Intruder'},''),/already revealed/)});
@@ -12,3 +12,35 @@ test('saved game recovery requires the draft owner and rotates only their seat t
 test('hosted purchasing requires the signed-in participant, matching draft and approved template',async()=>{const f=fixture();const draftId='12345678-1234-4234-8234-123456789abc';const draft={id:draftId,game_id:f.c.id,buyer_seat:0,buyer_id:'buyer',snapshot:{id:draftId,product:'tshirt',templateManifest:{Front:{width:100,height:200}}}};f.repo.readDraft=async()=>draft;await assert.rejects(f.call('checkout',{draftId}),/Sign in/);await assert.rejects(f.call('checkout',{draftId},f.c.token,{id:'buyer'}),/waiting for/);f.settings.checkout_enabled=true;await assert.rejects(f.call('checkout',{draftId},f.c.token,{id:'stranger'}),/access denied/);await assert.rejects(f.call('checkout',{draftId},f.c.token,{id:'buyer'}),/production review/);f.settings.verified_templates={tshirt:templateHash(draft.snapshot)};f.repo.prepareOrder=async(d,u,seat,p)=>{assert.equal(seat,0);assert.equal(p.range,'shirt-games');return {orderNumber:'MQD-TEST'}};f.repo.checkout=async p=>({url:'https://checkout.stripe.com/'+p.orderNumber});assert.match((await f.call('checkout',{draftId},f.c.token,{id:'buyer'})).url,/checkout.stripe.com/)});
 
 test('owner sandbox never uses public checkout and requires an approved source snapshot',async()=>{const f=fixture();f.repo.ownerMfa=async()=>true;const admin={id:'owner',app_metadata:{role:'admin'}},id='12345678-1234-4234-8234-123456789abc';f.repo.readDraft=async()=>({is_test:false,snapshot:{snapshot:{status:'collecting',approved:false}}});await assert.rejects(f.call('owner',{action:'sandbox-checkout',orderId:id},'',admin),/Approved game draft/);f.repo.readDraft=async()=>({id,is_test:false,snapshot:{snapshot:{status:'revealed',approved:true}}});f.repo.startSandbox=async(d,u)=>({test:true,owner:u.id});assert.equal((await f.call('owner',{action:'sandbox-checkout',orderId:id},'',admin)).test,true);f.repo.readDraft=async()=>({id,is_test:true,snapshot:{snapshot:{status:'revealed',approved:true}}});await assert.rejects(f.call('owner',{action:'sandbox-checkout',orderId:id},'',admin),/Approved game draft/);await assert.rejects(f.call('owner',{action:'sandbox-list'},'',{id:'player',app_metadata:{role:'customer'}}),/Owner access/)});
+
+
+test('My Games uses the verified account and returns only summary fields',async()=>{
+ const f=fixture('faces'),host={id:'host'};
+ f.repo.listHostedGames=async owner=>{
+  assert.equal(owner,host.id);
+  return [{id:f.c.id,type:'faces',status:'collecting',created_at:'2026-11-01T12:00:00Z',engine:f.row().engine}];
+ };
+ await assert.rejects(f.call('my-games',{ownerId:host.id},'',null),/Sign in/);
+ await assert.rejects(f.call('my-games',{},'',{id:host.id,is_anonymous:true}),/Sign in/);
+ const result=await f.call('my-games',{ownerId:'stranger'},'',host);
+ assert.deepEqual(result,{games:[{id:f.c.id,title:'CRAZY FACES',status:'collecting',createdAt:'2026-11-01T12:00:00Z'}]});
+});
+
+test('host resumes an existing game across devices without exposing sealed submissions or breaking friend access',async()=>{
+ const f=fixture(),host={id:'host'};
+ const guest=await f.call('claim',{invite:f.c.invitations[0].token,name:'Friend'},'');
+ await f.call('submit',note);
+ await assert.rejects(f.call('resume-host',{},guest.token,null),/Sign in/);
+ await assert.rejects(f.call('resume-host',{},guest.token,{id:'stranger'}),/creator access/);
+ const {token}=await f.call('resume-host',{},'',host);
+ const state=await f.call('state',{},token);
+ assert.equal(state.self,0);
+ assert.equal(state.ownSubmission.submitted,true);
+ assert.equal(state.participants[0].contribution,null);
+ assert.equal((await f.call('state',{},guest.token)).self,1);
+ assert.equal((await f.call('state')).self,0);
+ await f.call('submit',{...note,text:'Friend note'},guest.token);
+ assert.equal((await f.call('state',{},token)).status,'revealed');
+ f.row().expires_at='2020-01-01T00:00:00Z';
+ await assert.rejects(f.call('resume-host',{},'',host),/expired/);
+});

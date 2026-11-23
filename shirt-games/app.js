@@ -4,12 +4,102 @@ import {cropGeometry,transformCrop} from './crop.js';
 let cropState={zoom:1,panX:0,panY:0},facePrepared=false,outlineMode=false,outlinePoints=[],outlineRecipe=null;
 const $=id=>document.getElementById(id);let catalog,selected='pass',session=null,game=null,side='front',photoImage=null,photoData=null,originalPhoto=null,resultIndex=0,uploadGeneration=0,orderDraftId=null;
 const say=message=>{$('message').textContent=message||'';};
-async function api(route,body={},secret=session?.token){const jwt=await accountToken();const r=await fetch('https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-shirt-games',{method:'POST',headers:{'Content-Type':'application/json',apikey:'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4',...(jwt?{Authorization:'Bearer '+jwt}:{}),...(secret?{'X-Game-Token':secret}:{})},body:JSON.stringify({route,body})});const data=await r.json();if(!r.ok)throw Error(data.error||'Game request failed');return data}
-function show(id){for(const x of ['landing','setup','join','game'])$(x).hidden=x!==id}
+async function api(route,body={},secret=session?.token){const jwt=await accountToken();const r=await fetch('https://gsxuhpffgdffsqksrkrf.supabase.co/functions/v1/mqd-shirt-games',{method:'POST',headers:{'Content-Type':'application/json',apikey:'sb_publishable_T8BLz1mvCQGfs1-8Fa574A_imKn7qx4',...(jwt?{Authorization:'Bearer '+jwt}:{}),...(secret?{'X-Game-Token':secret}:{})},body:JSON.stringify({route,body})});const data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||'Game request failed'),{status:r.status});return data}
+function show(id){for(const x of ['landing','myGames','setup','join','game'])$(x).hidden=x!==id}
 function option(value,label){const o=document.createElement('option');o.value=value;o.textContent=label;return o}
 function count(){$('participantCount').textContent=`You + ${$('invited').value} invited friends = ${Number($('invited').value)+1} total participants.`}
 function guard(fn){return async e=>{e?.preventDefault();say('');const button=e?.submitter||e?.currentTarget;if(button?.tagName==='BUTTON')button.disabled=true;try{await fn(e)}catch(err){say(err.message)}finally{if(button?.tagName==='BUTTON')button.disabled=false}}}
-function saveSession(value){session={...value};sessionStorage.setItem('mqd-game-'+session.id,JSON.stringify(session));location.hash='game='+session.id}
+const sessionKey=id=>'mqd-game-'+id;
+const guestPrefix='mqd-guest-game-';
+const gamePath=id=>'/shirt-games/#'+new URLSearchParams({game:id});
+
+function saveSession(value){
+ session={...value};
+ sessionStorage.setItem(sessionKey(value.id),JSON.stringify(session));
+ location.hash='game='+value.id;
+}
+
+function savedGuest(id){
+ try{return JSON.parse(localStorage.getItem(guestPrefix+id));}catch{return null;}
+}
+
+function rememberGuest(){
+ if(game.self===0)return;
+ const summary={id:game.id,title:game.title,status:game.status,token:session.token,lastOpened:Date.now()};
+ try{localStorage.setItem(guestPrefix+game.id,JSON.stringify(summary));}catch{/* Game access still works in the current tab. */}
+ const link=new URL(gamePath(game.id),location.origin);
+ link.hash=new URLSearchParams({game:game.id,access:session.token});
+ const subject=encodeURIComponent('My private Shirt Games link');
+ const body=encodeURIComponent('Use this private link to return to your seat:\r\n\r\n'+link.href);
+ $('guestRecoveryEmail').href='mailto:?subject='+subject+'&body='+body;
+}
+
+async function showMyGames(account){
+ show('myGames');
+ const status=$('myGamesStatus');
+ status.textContent='Finding your games…';
+ let hosted=[],hostError='';
+ if(account){
+  try{hosted=(await api('my-games',{},null)).games;}
+  catch(error){hostError=error.message;}
+ }
+ const ownedIds=new Set(hosted.map(item=>item.id));
+ const guestGames=[];
+ try{
+  for(let i=0;i<localStorage.length;i++){
+   const key=localStorage.key(i);
+   if(!key?.startsWith(guestPrefix))continue;
+   const item=savedGuest(key.slice(guestPrefix.length));
+   if(item?.token&&!ownedIds.has(item.id))guestGames.push(item);
+  }
+ }catch{/* Signed-in games are still available if browser storage is blocked. */}
+ guestGames.sort((a,b)=>b.lastOpened-a.lastOpened);
+ const rows=[...hosted,...guestGames].map(item=>{
+  const row=document.createElement('div');
+  row.className='review-row';
+  const details=document.createElement('div');
+  const title=document.createElement('strong');
+  title.textContent=item.title;
+  const meta=document.createElement('div');
+  meta.className='muted';
+  const date=new Date(item.createdAt||item.lastOpened);
+  const formatted=new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(date);
+  meta.textContent=[item.createdAt?'Hosted':'Joined on this browser',item.status==='revealed'?'Revealed':'In progress',formatted].join(' · ');
+  const resume=document.createElement('a');
+  resume.className='game-button';
+  resume.textContent='Resume';
+  resume.href=gamePath(item.id);
+  resume.setAttribute('aria-label','Resume '+item.title+' · '+formatted);
+  details.append(title,meta);
+  row.append(details,resume);
+  return row;
+ });
+ $('myGamesList').replaceChildren(...rows);
+ status.textContent=hostError||(account?(rows.length?'':'Your active games will show here after you start or join one.'):'Sign in with the account you used to start a game to see it here.');
+}
+
+async function reopenGame(id,account,access){
+ const browserSession=JSON.parse(sessionStorage.getItem(sessionKey(id)));
+ const candidate=access?{id,token:access}:browserSession||savedGuest(id);
+ if(candidate&&(!candidate.hostAccount||candidate.hostAccount===account?.id)){
+  session=candidate;
+  try{
+   await refresh();
+   saveSession(candidate);
+   return;
+  }catch(error){
+   session=null;
+   if(error.status===404||error.status===410){
+    try{localStorage.removeItem(guestPrefix+id);}catch{/* Browser storage is optional. */}
+   }
+   if(error.status!==401||access)throw error;
+  }
+ }
+ if(!account)throw Error('Sign in to reopen a game you started. If you joined as a friend, use your private return link or original browser.');
+ const resumed=await api('resume-host',{id},null);
+ saveSession({id,token:resumed.token,hostAccount:account.id,invitations:browserSession?.invitations});
+ await refresh();
+}
 async function refresh(){const next=await api('state',{id:session.id});if(game&&next.revision<game.revision)return;const justRevealed=game?.status!=='revealed'&&next.status==='revealed';game=next;await paint();if(justRevealed)showReveal()}
 function showReveal(){say('The reveal is ready! Everyone in this private game can now see it.');$('revealPreview').scrollIntoView({behavior:'smooth',block:'start'});$('revealPreview').focus({preventScroll:true})}
 let syncing=false;
@@ -20,6 +110,8 @@ function currentDraft(){const kind=$('kind').value;if(kind==='photo'&&!photoData
 async function preview(){if(!game)return;const ownResult=game.results.findIndex(x=>x.seat===game.self);const resultText=game.type==='picked'&&game.approved&&resultIndex===ownResult&&$('resultEdit').value?$('resultEdit').value:null;await renderGame($('garmentCanvas'),game,{side,product:$('product').value,color:game.approved?$('finalColor').value:game.color,resultIndex,resultText,draft:$('contributionForm').hidden?null:currentDraft()});$('front').setAttribute('aria-pressed',String(side==='front'));$('backView').setAttribute('aria-pressed',String(side==='back'));}
 async function paint(){
  show('game');const me=game.participants[game.self],revealed=game.status==='revealed',creator=game.self===0;
+ $('guestRecovery').hidden=creator;
+ rememberGuest();
  $('gameType').textContent=game.title;$('gameHeading').textContent=revealed?'Made by your people.':'The surprise is taking shape.';$('gameMeta').textContent=`Creator + ${game.invited} invited friends = ${game.participants.length} participants · ${game.participants.filter(x=>x.submitted).length} contributions sealed`;$('roleHeading').textContent=`You’re ${me.name}${creator?' · Creator':''}`;
  $('seats').replaceChildren(...game.participants.map(p=>{const el=document.createElement('div');el.className='seat'+(p.index===game.self?' mine':'');el.textContent=`${p.name} · ${p.submitted?'sealed':p.claimed?'joined':'invited'}`;return el}));
  $('invites').hidden=!creator||revealed||!session.invitations?.length;$('inviteList').replaceChildren();for(const inv of session.invitations||[]){const row=document.createElement('div');row.className='invite';const label=document.createElement('span');label.textContent=`Friend slot ${inv.slot} · ${game.participants[inv.slot].claimed?'claimed':'waiting'}`;const url=(catalog.phoneBaseUrl||location.origin)+'/shirt-games/#join='+game.id+'&invite='+inv.token;const copy=document.createElement('button');copy.textContent='Copy invite';copy.onclick=guard(async()=>{if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(url);say('Private invitation copied.');return}catch{}}const input=row.querySelector('input');input.hidden=false;input.focus();input.select();say('Touch and hold the invitation link below, then choose Copy.')});const link=document.createElement('a');link.textContent='Open invitation';link.href=url;link.target='_blank';link.rel='noopener';const invitation=document.createElement('input');invitation.type='text';invitation.readOnly=true;invitation.value=url;invitation.hidden=true;invitation.setAttribute('aria-label',`Private invitation for friend slot ${inv.slot}`);row.append(label,copy,link,invitation);$('inviteList').append(row)}
@@ -55,7 +147,7 @@ function zoomBy(factor){adjustCrop({x:250,y:250},{x:250,y:250},factor)}
 $('zoomIn').onclick=()=>zoomBy(1.15);$('zoomOut').onclick=()=>zoomBy(1/1.15);$('resetCrop').onclick=()=>{cropState={zoom:1,panX:0,panY:0};crop().catch(e=>say(e.message))};
 cropCanvas.onkeydown=e=>{const delta={ArrowLeft:[-15,0],ArrowRight:[15,0],ArrowUp:[0,-15],ArrowDown:[0,15]}[e.key];if(delta){e.preventDefault();adjustCrop({x:250,y:250},{x:250+delta[0],y:250+delta[1]})}else if(['+','=','-'].includes(e.key)){e.preventDefault();zoomBy(e.key==='-'?1/1.15:1.15)}};
 $('invited').onchange=count;$('back').onclick=()=>show('landing');$('kind').onchange=()=>{updateKind();preview().catch(e=>say(e.message))};for(const id of ['contributionText','side','ink'])$(id).oninput=()=>preview().catch(e=>say(e.message));
-$('createForm').onsubmit=guard(async()=>{const value=await api('create',{type:selected,invited:Number($('invited').value),name:$('creatorName').value,color:$('startingColor').value,birthdayName:$('birthdayName').value,tone:$('tone').value,sayings:[...document.querySelectorAll('#sayingChoices input:checked')].map(x=>Number(x.value))},null);saveSession(value);await refresh()});
+$('createForm').onsubmit=guard(async()=>{const auth=await authReady;const value=await api('create',{type:selected,invited:Number($('invited').value),name:$('creatorName').value,color:$('startingColor').value,birthdayName:$('birthdayName').value,tone:$('tone').value,sayings:[...document.querySelectorAll('#sayingChoices input:checked')].map(x=>Number(x.value))},null);saveSession({...value,hostAccount:auth?.user?.id});await refresh()});
 $('joinForm').onsubmit=guard(async()=>{const p=new URLSearchParams(location.hash.slice(1));const value=await api('claim',{id:p.get('join'),invite:p.get('invite'),name:$('joinName').value},null);saveSession(value);await refresh()});
 $('photo').onchange=guard(async()=>{setContributionStatus('');const seq=++uploadGeneration;photoData=null;photoImage=null;originalPhoto=null;facePrepared=false;outlineRecipe=null;outlineMode=false;outlinePoints=[];$('traceFace').disabled=false;$('outlineActions').hidden=true;$('cropApproval').checked=false;$('photoPermission').checked=false;const file=$('photo').files[0];if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8*1024*1024)throw Error('Choose PNG, JPEG or WebP up to 8 MB');const url=URL.createObjectURL(file);const img=new Image();try{img.src=url;await img.decode();if(seq!==uploadGeneration)return;if(img.width*img.height>40000000)throw Error('Choose a photo under 40 megapixels');originalPhoto={url:await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)}),width:img.width,height:img.height};if(seq!==uploadGeneration)return;photoImage=img;if(game.type==='faces'){const probe=document.createElement('canvas');probe.width=40;probe.height=40;const pc=probe.getContext('2d');pc.drawImage(img,0,0,40,40);const pixels=pc.getImageData(0,0,40,40).data;let transparent=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]<32)transparent++;facePrepared=transparent>80;$('cutout').checked=facePrepared;}cropState={zoom:1,panX:0,panY:0};pointers.clear();$('photoStatus').textContent=`${img.width} × ${img.height} source pixels. Crop below. The preview is 500 × 500; your original image and crop settings are retained privately for future production review.`;await crop();if(game.type==='faces'&&!$('cutout').checked){if(catalog.cutoutMode==='manual-or-transparent')$('photoStatus').textContent='Pinch/drag to frame the face. Then tap Trace face & hair, mark its outline, and choose Keep face only. Nothing is sent to a paid background-removal service.';else await makeFaceCutout(seq)}}finally{URL.revokeObjectURL(url)}});
 async function makeFaceCutout(seq=uploadGeneration){if(!originalPhoto)throw Error('Choose a photo first');$('photoStatus').textContent='Separating your face and hair on this Mac…';$('makeFace').disabled=true;try{const result=await api('face-cutout',{id:game.id,photo:originalPhoto});if(seq!==uploadGeneration)return;const img=new Image();img.src=result.url;await img.decode();if(seq!==uploadGeneration)return;photoImage=img;facePrepared=true;$('cutout').checked=true;cropState={zoom:1,panX:0,panY:0};await crop();$('photoStatus').textContent='Background removed on this Mac. Review the face and hair, adjust with pinch/drag, then approve your cutout.'}catch(e){if(seq===uploadGeneration){photoData=null;$('photoStatus').textContent=e.message+' Use a clearer single-face photo, or choose a transparent face PNG and check the cutout box.'}throw e}finally{$('makeFace').disabled=false}}
@@ -142,9 +234,20 @@ $('front').onclick=guard(async()=>{side='front';await preview()});$('backView').
 $('nextResult').onclick=guard(async()=>{resultIndex=(resultIndex+1)%game.results.length;$('placementReviewed').checked=false;await paint()});$('myResult').onclick=guard(async()=>{resultIndex=Math.max(0,game.results.findIndex(r=>r.seat===game.self));$('placementReviewed').checked=false;await paint()});$('checkoutGame').onclick=guard(async()=>{if(!orderDraftId)throw Error('Save your approved order draft first');const result=await api('checkout',{id:game.id,draftId:orderDraftId});location.assign(result.url)});
 for(const id of ['product','finalColor','size','quantity','resultEdit'])$(id).addEventListener('input',()=>{orderDraftId=null;$('checkoutGame').hidden=true;$('orderStatus').textContent='';});
 $('prepareOrder').onclick=guard(async()=>{if(game.type==='picked'&&game.results[resultIndex]?.seat!==game.self)throw Error('View your own shirt before preparing an order');const o=await api('order-draft',{id:game.id,product:$('product').value,size:$('size').value,quantity:Number($('quantity').value),color:$('finalColor').value,resultText:$('resultEdit').value,reviewed:$('placementReviewed').checked});orderDraftId=o.id;$('checkoutGame').hidden=!catalog.checkoutEnabled;$('orderStatus').textContent=`${o.reference} saved as an unpaid draft. No charge or manufacturing package was created.`;});
-async function init(){catalog=await api('catalog',{},null);if(catalog.hosted)document.querySelector('.test-note').textContent='Private contributions stay hidden until the reveal. '+(catalog.checkoutEnabled?'Buying is optional.':'Online test · purchasing is not open yet.');if(catalog.phoneBaseUrl){document.querySelector('.test-note').textContent='Private Wi-Fi test • keep your Mac awake • contributions stay on the local test server • checkout is disabled';const inviteHelp=document.querySelector('#invites .muted');inviteHelp.textContent='Share each private invitation with the chosen friend. Every phone must use the test access code and the same Wi-Fi. Each invitation can be claimed once.';}for(const id of ['startingColor','finalColor']){$(id).replaceChildren(...catalog.colors.map(([name,hex])=>option(hex,name)));$(id).value='#e8d7be'}
+async function init(auth){
+ const account=auth?.user&&!auth.user.is_anonymous?auth.user:null;
+ const hash=new URLSearchParams(location.hash.slice(1));
+ const returnAccess=hash.get('access');
+ if(returnAccess){
+  hash.delete('access');
+  history.replaceState(null,'',location.pathname+location.search+'#'+hash);
+ }
+ catalog=await api('catalog',{},null);if(catalog.hosted)document.querySelector('.test-note').textContent='Private contributions stay hidden until the reveal. '+(catalog.checkoutEnabled?'Buying is optional.':'Online test · purchasing is not open yet.');if(catalog.phoneBaseUrl){document.querySelector('.test-note').textContent='Private Wi-Fi test • keep your Mac awake • contributions stay on the local test server • checkout is disabled';const inviteHelp=document.querySelector('#invites .muted');inviteHelp.textContent='Share each private invitation with the chosen friend. Every phone must use the test access code and the same Wi-Fi. Each invitation can be claimed once.';}for(const id of ['startingColor','finalColor']){$(id).replaceChildren(...catalog.colors.map(([name,hex])=>option(hex,name)));$(id).value='#e8d7be'}
  $('sayingChoices').replaceChildren(...catalog.sayings.map((t,i)=>{const label=document.createElement('label');label.className='check';const c=document.createElement('input');c.type='checkbox';c.value=i;c.checked=i<2;label.append(c,document.createTextNode(t));return label}));
  const copy={pass:['✦','One shirt. Secret turns. A surprise made by your people.'],faces:['☺','Your funniest faces, repeated across the whole shirt.'],birthday:['✺','Sweet memories or playful roasts. A birthday worth wearing.'],picked:['↗','Your friends vote. Your new title gets its own shirt.']};
  $('cards').replaceChildren(...catalog.menu.map(g=>{const card=document.createElement('article');card.className='card';const icon=document.createElement('div');icon.className='artmark';icon.textContent=copy[g.id][0];const h=document.createElement('h2');h.textContent=g.title;const p=document.createElement('p');p.textContent=copy[g.id][1];const b=document.createElement('button');b.className='primary';b.textContent=g.available?'Start game':'Opening soon';b.disabled=!g.available;b.onclick=()=>{selected=g.id;$('setupTitle').textContent=g.title;$('birthdayFields').hidden=g.id!=='birthday';$('sayingFields').hidden=g.id!=='picked';show('setup');count()};card.append(icon,h,p,b);return card}));
- const hash=new URLSearchParams(location.hash.slice(1));if(catalog.hosted&&hash.has('game')&&hash.has('draft')){const resumed=await api('resume',{id:hash.get('game'),draftId:hash.get('draft')},null);saveSession({id:resumed.id,token:resumed.token});await refresh();for(const [id,key] of [['product','product'],['finalColor','color'],['size','size'],['quantity','quantity'],['resultEdit','saying']])if(resumed.selection[key]!=null)$(id).value=resumed.selection[key];resultIndex=Math.max(0,game.results.findIndex(r=>r.seat===game.self));$('placementReviewed').checked=false;await preview();say('Your saved game design is open. Review the garment before preparing a new order.');}else if(hash.has('join'))show('join');else if(hash.has('game')){const saved=sessionStorage.getItem('mqd-game-'+hash.get('game'));if(saved){session=JSON.parse(saved);await refresh()}else {show('landing');say('This tab has no access to that game. Use your private invitation or return to the tab where you joined.')}}else show('landing');}
+ if(catalog.hosted&&hash.has('game')&&hash.has('draft')){const resumed=await api('resume',{id:hash.get('game'),draftId:hash.get('draft')},null);saveSession({id:resumed.id,token:resumed.token});await refresh();for(const [id,key] of [['product','product'],['finalColor','color'],['size','size'],['quantity','quantity'],['resultEdit','saying']])if(resumed.selection[key]!=null)$(id).value=resumed.selection[key];resultIndex=Math.max(0,game.results.findIndex(r=>r.seat===game.self));$('placementReviewed').checked=false;await preview();say('Your saved game design is open. Review the garment before preparing a new order.');}else if(hash.has('join'))show('join');else if(hash.has('game'))await reopenGame(hash.get('game'),account,returnAccess);
+ else if(new URLSearchParams(location.search).get('view')==='my-games')await showMyGames(account);
+ else show('landing');
+}
 authReady.then(init).catch(e=>say(e.message));
