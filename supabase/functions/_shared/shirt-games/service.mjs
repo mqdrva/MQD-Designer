@@ -25,10 +25,27 @@ export async function handleGameAction({route,body={},actorToken='',user=null,re
   const state=E.initialState();state.rulesApproved=true;state.menu=settings.menu;
   const created=E.createGame(state,body);await repo.createGame(user.id,state.games[created.id]);return created;
  }
+ if(route==='my-games'){
+  if(!user||user.is_anonymous)fail('Sign in to find games you started',401);
+  const rows=await repo.listHostedGames(user.id);
+  return {games:rows.map(row=>({id:row.id,title:E.TITLES[row.type],status:row.status,createdAt:row.created_at}))};
+ }
+ if(route==='resume-host'&&(!user||user.is_anonymous))fail('Sign in to reopen a game you started',401);
  if(!UUID.test(String(body.id||'')))fail('Invalid game');
- if(!['claim','state','submit','change','order-draft','face-cutout','face-reveal','checkout','resume'].includes(route))fail('Unknown game action',404);
+ if(!['claim','state','submit','change','order-draft','face-cutout','face-reveal','checkout','resume','resume-host'].includes(route))fail('Unknown game action',404);
  let row=await repo.readGame(body.id);if(!row)fail('Game not found',404);
  if(new Date(row.expires_at)<=new Date())fail('This game has expired',410);
+ if(route==='resume-host'){
+  for(let attempt=0;attempt<3;attempt++){
+   if(row.owner_id!==user.id)fail('Game creator access required',403);
+   const game=structuredClone(row.engine);
+   const resumed=E.resumeParticipant(game,0,{keepExisting:true});
+   if(await repo.commit(game.id,row.version,game))return resumed;
+   row=await repo.readGame(body.id);
+   if(!row||new Date(row.expires_at)<=new Date())fail('This game has expired',410);
+  }
+  fail('Another update arrived. Please try reopening your game again.',409);
+ }
  if(route==='resume'){
   if(!user||user.is_anonymous)fail('Sign in to reopen your game design',401);
   if(!UUID.test(String(body.draftId||'')))fail('Invalid saved game design');
