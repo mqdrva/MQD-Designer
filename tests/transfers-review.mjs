@@ -109,7 +109,14 @@ if(process.argv.includes('--serve')){
   });
   server.listen(Number(process.env.TRANSFERS_PORT||4316),'127.0.0.1',()=>console.log('Transfer review http://127.0.0.1:'+server.address().port+'/'));
 }else{
-  const checkEnabled = setup => transferHandler({createClient:()=>db,env:name=>setup[name]})(new Request('https://test.invalid'));
+  const submitSource=await fs.readFile(path.join(base,'supabase/functions/submit-mqd-transfer/index.ts'),'utf8');
+  const checkEnabled=setup=>{
+    let handler;
+    vm.runInNewContext(stripTypeScriptTypes(submitSource.replace(/^import .*\n/gm,'')),{
+      createClient:()=>db,transferHandler,Deno:{env:{get:name=>setup[name]},serve:fn=>{handler=fn;}}
+    });
+    return handler(new Request('https://test.invalid'));
+  };
   assert.equal((await checkEnabled({SUPABASE_URL:'https://gsxuhpffgdffsqksrkrf.supabase.co'})).status,200);
   assert.equal((await checkEnabled({SUPABASE_URL:'https://gsxuhpffgdffsqksrkrf.supabase.co',MQD_TRANSFERS_ENABLED:'false'})).status,503);
   assert.equal((await checkEnabled({SUPABASE_URL:'https://test.invalid',MQD_TRANSFERS_ENABLED:'false'})).status,503);
