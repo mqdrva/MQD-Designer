@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {createHmac,webcrypto} from 'node:crypto';
+import {transferOrderPrices} from '../../supabase/functions/_shared/mqd-transfers.js';
 import {quantityFromOrderItem,shippingCentsForQuantity} from '../../supabase/functions/_shared/mqd-shipping.js';
 const source=stripTypeScriptTypes(readFileSync(new URL('../../supabase/functions/stripe-mqd-test-webhook/index.ts',import.meta.url),'utf8').replace(/^import .*;$/gm,''));
 async function exercise({game=true,wrongSession=false,badSignature=false,amount=5000,live=false}={}){
@@ -11,7 +12,7 @@ async function exercise({game=true,wrongSession=false,badSignature=false,amount=
  const updates=[],emails=[];let handler;
  const db={from:table=>({select:()=>({in:async()=>({data:table==='mqd_orders'?[order]:[{order_id:'order-1',unit_price:40,quantity:1,order_options:[{size:'M',quantity:1}]}],error:null})}),update:value=>{updates.push(value);return {eq:()=>({or:async()=>({error:null})})}}})};
  const env={SUPABASE_URL:'https://unit.invalid',SUPABASE_SERVICE_ROLE_KEY:'unit-service-key',MQD_STRIPE_TEST_WEBHOOK_SECRET:'whsec_unit_fixture'};
- runInNewContext(source,{Deno:{env:{get:key=>env[key]},serve:fn=>{handler=fn}},createClient:()=>db,TextEncoder,Response,crypto:webcrypto,console,quantityFromOrderItem,shippingCentsForQuantity,escapeMqdEmailHtml:String,mqdOwnerEmails:async()=>['unit-owner@example.test'],queueMqdEmail:async(_db,email)=>{emails.push(email)}});
+ runInNewContext(source,{Deno:{env:{get:key=>env[key]},serve:fn=>{handler=fn}},createClient:()=>db,TextEncoder,Response,crypto:webcrypto,console,transferOrderPrices,quantityFromOrderItem,shippingCentsForQuantity,escapeMqdEmailHtml:String,mqdOwnerEmails:async()=>['unit-owner@example.test'],queueMqdEmail:async(_db,email)=>{emails.push(email)}});
  const epoch=Math.floor(Date.now()/1000),payload=JSON.stringify({id:'evt_test_unit',type:'checkout.session.completed',created:epoch,livemode:live,data:{object:{id:'cs_test_unit',metadata:{mqd_test:'1',order_numbers:'MQD-TEST123'},payment_status:'paid',amount_subtotal:4000,amount_total:amount,total_details:{amount_shipping:1000},currency:'usd'}}});
  const signature=createHmac('sha256','whsec_unit_fixture').update(epoch+'.'+payload).digest('hex');
  const response=await handler(new Request('https://unit.invalid/webhook',{method:'POST',body:payload,headers:{'stripe-signature':`t=${epoch},v1=${badSignature?'wrong':signature}`}}));
