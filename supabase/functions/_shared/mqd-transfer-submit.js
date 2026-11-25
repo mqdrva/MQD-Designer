@@ -23,7 +23,7 @@ export function transferHandler({ createClient, env }) {
     const headers = { 'Access-Control-Allow-Origin': allowed ? origin : 'https://mymerchnow.app', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Cache-Control': 'no-store', 'Content-Type': 'application/json', Vary: 'Origin' };
     const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
-    const enabled = env('MQD_TRANSFERS_ENABLED') ?? (env('SUPABASE_URL') === 'https://gsxuhpffgdffsqksrkrf.supabase.co' ? 'true' : 'false');
+    const enabled = env('MQD_TRANSFERS_ENABLED') ?? 'true';
     if (enabled !== 'true') return json({ error: 'Transfer ordering is unavailable.' }, 503);
     if (request.method === 'GET') return json({ enabled: true });
     if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);

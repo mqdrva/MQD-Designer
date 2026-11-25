@@ -112,7 +112,7 @@ if(process.argv.includes('--serve')){
   const checkEnabled = setup => transferHandler({createClient:()=>db,env:name=>setup[name]})(new Request('https://test.invalid'));
   assert.equal((await checkEnabled({SUPABASE_URL:'https://gsxuhpffgdffsqksrkrf.supabase.co'})).status,200);
   assert.equal((await checkEnabled({SUPABASE_URL:'https://gsxuhpffgdffsqksrkrf.supabase.co',MQD_TRANSFERS_ENABLED:'false'})).status,503);
-  assert.equal((await checkEnabled({SUPABASE_URL:'https://test.invalid'})).status,503);
+  assert.equal((await checkEnabled({SUPABASE_URL:'https://test.invalid',MQD_TRANSFERS_ENABLED:'false'})).status,503);
   assert.deepEqual([1,2,3,4,5,6,7].map(transfers.dtfCents),[1000,2000,2500,3500,4500,5000,6000]);
   assert.equal((await upload('sublimation-all-over',2)).status,400);
   assert.equal((await upload('dtf-sheet',1,{sheet:{layers:[]}})).status,400);
