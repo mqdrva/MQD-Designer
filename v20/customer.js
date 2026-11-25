@@ -1,3 +1,4 @@
+import {cartLineTotals,isTransfer} from './transfers-cart.js';
 import {remainingTemplateFields} from './template-contract.js';
 import {loadSelectedTemplate} from './template-designer.js';
 import {createContestSaveInvite,showContestSaveInvite} from './contest-save-invite.js';
@@ -178,7 +179,7 @@ function migratePriceVersion(){
   if(current!==MQD_PRICE_VERSION){
     // Everyday quotes have their own server-validated price version.
     let everydayItems=[];
-    try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');if(Array.isArray(items))everydayItems=items.filter(item=>item?.range==='everyday'&&['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'].includes(item.productId));}catch{}
+    try{const items=JSON.parse(localStorage.getItem('mqd-cart')||'[]');if(Array.isArray(items))everydayItems=items.filter(item=>['dtf-sheet','sublimation-square'].includes(item?.productId)||item?.range==='everyday'&&['everyday-tshirt','everyday-long-sleeve','everyday-hoodie','everyday-polo'].includes(item.productId));}catch{}
     if(everydayItems.length)localStorage.setItem('mqd-cart',JSON.stringify(everydayItems));
     else localStorage.removeItem('mqd-cart');
     localStorage.setItem('mqd-price-version',MQD_PRICE_VERSION);
@@ -772,7 +773,7 @@ function closeCart(){
 
 function cartTotals(items=cartItems()){
   const quantity=items.reduce((sum,item)=>sum+(Number(item.totalQuantity)||1),0);
-  const subtotal=items.reduce((sum,item)=>sum+(Number(item.price)||0)*(Number(item.totalQuantity)||1),0);
+  const subtotal=cartLineTotals(items).reduce((sum,cents)=>sum+cents,0)/100;
   const shipping=items.length?shippingCentsForQuantity(quantity)/100:0;
   const shippingTier=quantity<=9?'1–9 items':quantity<=19?'10–19 items':'20+ items';
   return {quantity,subtotal,shipping,shippingTier,total:subtotal+shipping};
@@ -781,13 +782,14 @@ function cartTotals(items=cartItems()){
 function renderCart(){
   const items=cartItems();
   const totals=cartTotals(items);
+  const lineTotals=cartLineTotals(items);
   const list=$('cartList'),empty=$('cartEmpty'),footer=$('cartFooter'),checkout=$('checkoutCart'),clear=$('clearCart');
   if(!list)return;
   list.innerHTML=items.map((item,index)=>{
     const quantity=Number(item.totalQuantity)||1;
     const options=(item.orderOptions||[]).map(option=>`<span>${escapeHtml(option.size||'Item')} × ${Number(option.quantity)||1}</span>`).join('');
     const syncState=item.syncing?'<div class="cart-sync pending">Syncing design…</div>':item.pendingSync?'<div class="cart-sync pending">Saved locally · sync required before checkout</div>':'<div class="cart-sync ready">Ready for checkout</div>';
-    return `<article class="cart-item"><div class="cart-item-main"><div class="cart-item-heading"><h3>${escapeHtml(item.productName||'Custom product')}</h3><strong>$${((Number(item.price)||0)*quantity).toFixed(2)}</strong></div><div class="cart-item-options">${options||`<span>Quantity × ${quantity}</span>`}</div><div class="cart-reference">Ref: ${escapeHtml(item.orderNumber||'Pending')}</div>${syncState}</div><button class="btn danger cart-remove" type="button" data-cart-remove="${index}" aria-label="Remove ${escapeHtml(item.productName||'item')} from cart">Remove</button></article>`;
+    return `<article class="cart-item"><div class="cart-item-main"><div class="cart-item-heading"><h3>${escapeHtml(item.productName||'Custom product')}</h3><strong>$${(lineTotals[index]/100).toFixed(2)}</strong></div><div class="cart-item-options">${options||`<span>${isTransfer(item.productId)?'Individual sheets':'Quantity'} × ${quantity}</span>`}</div><div class="cart-reference">Ref: ${escapeHtml(item.orderNumber||'Pending')}</div>${syncState}</div><button class="btn danger cart-remove" type="button" data-cart-remove="${index}" aria-label="Remove ${escapeHtml(item.productName||'item')} from cart">Remove</button></article>`;
   }).join('');
   empty?.classList.toggle('hidden',items.length>0);
   footer?.classList.toggle('hidden',items.length===0);

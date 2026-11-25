@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { boundedFormData, validateGuestFiles, consumeBudget } from '../supabase/functions/_shared/mqd-upload-guard.js';
+import { transferOrderPrices } from '../supabase/functions/_shared/mqd-transfers.js';
 import { quantityFromOrderItem, shippingCentsForQuantity } from '../supabase/functions/_shared/mqd-shipping.js';
 
 const form = new FormData();
@@ -25,8 +26,8 @@ function loadHandler(name, client, env={}) {
   let handler;
   const ts=readFileSync(new URL(`../supabase/functions/${name}/index.ts`,import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
   const js=stripTypeScriptTypes(ts);
-  new Function('Deno','createClient','quantityFromOrderItem','shippingCentsForQuantity','escapeMqdEmailHtml','mqdOwnerEmails','queueMqdEmail', js)(
-    {serve:fn=>handler=fn,env:{get:key=>env[key]||'test'}},()=>client,quantityFromOrderItem,shippingCentsForQuantity,x=>x,async()=>['owner@example.com'],async()=>({status:'sent'})
+  new Function('Deno','createClient','quantityFromOrderItem','shippingCentsForQuantity','escapeMqdEmailHtml','mqdOwnerEmails','queueMqdEmail','transferOrderPrices', js)(
+    {serve:fn=>handler=fn,env:{get:key=>env[key]||'test'}},()=>client,quantityFromOrderItem,shippingCentsForQuantity,x=>x,async()=>['owner@example.com'],async()=>({status:'sent'}),transferOrderPrices
   );
   return handler;
 }

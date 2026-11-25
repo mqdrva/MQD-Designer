@@ -20,3 +20,6 @@ verify_jwt = false
 # Owner actions validate verified shop email; shared capabilities are read-only.
 [functions.mqd-print-shop-designs]
 verify_jwt = false
+
+[functions.submit-mqd-transfer]
+verify_jwt = false

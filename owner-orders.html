@@ -7,7 +7,7 @@
   <title>MQD Owner Orders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/v20/owner-orders.css?v=20260917c">
+  <link rel="stylesheet" href="/v20/owner-orders.css?v=transfer-measurements">
 </head>
 <body>
 <header>
@@ -82,7 +82,12 @@
 
       <section class="detail-section" aria-live="polite"><h3>Owner email notification</h3><div id="ownerNotificationStatus">Open an order to check notification status.</div></section>
       <section id="reorderComparison" class="detail-section" aria-live="polite"><h3>Production comparison · owner only</h3><div id="reorderComparisonBody">Open an order to compare its saved design.</div></section>
-      <section class="detail-section"><div class="section-head"><div><h3>Garments</h3><p>Product, size, quantity, and price captured with this order.</p></div></div><div id="itemList" class="item-list"></div></section>
+      <section class="detail-section"><div class="section-head"><div><h3 id="itemHeading">Garments</h3><p>Product, size, quantity, and price captured with this order.</p></div></div><div id="itemList" class="item-list"></div></section>
+      <section id="transferMeasurements" class="detail-section" hidden>
+        <h3>Transfer measurements</h3>
+        <p>Final width and height after cropping. Positions are measured from the top-left of each sheet.</p>
+        <div id="transferMeasurementSheets"></div>
+      </section>
       <section id="savedDesignSection" class="detail-section hidden"><div class="section-head"><div><h3>Customer saved design</h3><p>The account design linked to this purchase.</p></div></div><div class="saved-design-card"><div class="saved-design-preview"><img id="savedDesignPreview" alt="Saved customer design preview"><div id="savedDesignPreviewMissing" class="preview-missing hidden">No saved preview</div></div><div class="saved-design-meta"><strong id="savedDesignName">Saved design</strong><div id="savedDesignStatus" class="muted"></div><div id="savedDesignUpdated" class="muted"></div></div></div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Background HEX colors</h3><p>Production colors saved for each print zone.</p></div><button id="downloadColors" class="btn small" type="button">Download HEX JSON</button></div><div id="colorGrid" class="color-grid"></div></section>
       <section class="detail-section"><div class="section-head"><div><h3>Saved design &amp; production files</h3><p>Mockup, design snapshot, original artwork, captured zone files, and production metadata.</p></div><button id="downloadProductionZip" class="btn primary small" type="button">Download Production ZIP</button></div><div class="file-actions"><button id="downloadDesign" class="file-button" type="button">Saved Design JSON</button><button id="downloadOrderSummary" class="file-button" type="button">Order Summary JSON</button></div><div id="assetGroups" class="asset-groups"></div><div id="zoneFallback" class="note hidden">This older order was created before automatic zone PNG capture. Its design JSON, original artwork, mockup, HEX colors, and per-zone metadata are still available in the Production ZIP.</div></section>
@@ -91,6 +96,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/v20/owner-zip-mockup-views.js?v=20261016-complete-proof"></script>
-<script type="module" src="/v20/owner-orders.js?v=20261016-owner-paid-workflow-v2"></script>
+<script type="module" src="/v20/owner-orders.js?v=transfer-measurements"></script>
 </body>
 </html>

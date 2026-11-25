@@ -1,3 +1,4 @@
+import * as transfers from '../supabase/functions/_shared/mqd-transfers.js';
 import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {stripTypeScriptTypes} from 'node:module';
 import {UUID,assertTemplateDraft,cloneTemplate,templateLayers} from '../v20/template-contract.js';
 import {verifyTemplateOrder,prepareTemplateOrder} from '../supabase/functions/_shared/mqd-template-orders.js';
@@ -68,7 +69,7 @@ for(const slug of ['create-mqd-checkout','create-mqd-guest-checkout']){
  let stripeCalls=0,checkoutHandler,captured;
  class Stripe{static createFetchHttpClient(){return{};}constructor(){this.checkout={sessions:{create:async(params)=>{stripeCalls++;captured=params;return{id:'cs_live_LOCAL_FIXTURE_ONLY',url:'https://checkout.stripe.com/local-fixture-only',payment_status:'unpaid'};}}};}}
  const code=fs.readFileSync(new URL('../supabase/functions/'+slug+'/index.ts',import.meta.url),'utf8').replace(/^import .*;\s*$/gm,'');
- vm.runInNewContext(stripTypeScriptTypes(code),{...promotion,...everyday,...shipping,Stripe,verifyTemplateOrder,createClient:()=>db,crypto,Request,Response,URL,TextEncoder,console:{error(){}},Deno:{env:{get:key=>key==='MQD_STRIPE_SECRET_KEY'?'sk_live_LOCAL_FIXTURE_ONLY':key==='SUPABASE_URL'?'https://test.supabase.co':key==='SUPABASE_SERVICE_ROLE_KEY'?'local-fixture-only':undefined},serve:fn=>checkoutHandler=fn}});
+ vm.runInNewContext(stripTypeScriptTypes(code),{...transfers,...promotion,...everyday,...shipping,Stripe,verifyTemplateOrder,createClient:()=>db,crypto,Request,Response,URL,TextEncoder,console:{error(){}},Deno:{env:{get:key=>key==='MQD_STRIPE_SECRET_KEY'?'sk_live_LOCAL_FIXTURE_ONLY':key==='SUPABASE_URL'?'https://test.supabase.co':key==='SUPABASE_SERVICE_ROLE_KEY'?'local-fixture-only':undefined},serve:fn=>checkoutHandler=fn}});
  const request=()=>new Request('https://test/checkout',{method:'POST',headers:{'Content-Type':'application/json',...(!guest?{Authorization:'Bearer owner'}:{})},body:JSON.stringify({orderNumbers:[order.order_number],checkoutToken:crypto.randomUUID(),guestToken:token})});
  let response=await checkoutHandler(request());assert.equal(response.status,200,await response.clone().text());assert.equal(stripeCalls,1);assert.equal(captured.line_items[0].quantity,3);assert.equal(captured.line_items[0].price_data.unit_amount,promotion.garmentPriceCents('tshirt'));assert.equal((await response.json()).url,'https://checkout.stripe.com/local-fixture-only');
  tables.mqd_orders[0].design_json.design.zones.Back.layers[3].text=source.design.zones.Back.layers[3].text;

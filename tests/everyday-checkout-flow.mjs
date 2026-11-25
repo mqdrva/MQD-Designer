@@ -1,3 +1,4 @@
+import * as transfers from '../supabase/functions/_shared/mqd-transfers.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -126,7 +127,7 @@ async function checkout(slug, order, item, { corrupt, badOwner=false, missingPri
   const orders=[structuredClone(order),premium],items=[structuredClone(item),{id:'premium-item',order_id:premium.id,product_id:'tshirt',quantity:2,order_options:[{size:'L',quantity:2}]}];
   orders[0].is_test=test; if(badOwner) orders[0].guest_checkout_token_hash='wrong'; if(corrupt) corrupt(orders[0],items[0]);
   const checkoutDb={...supabase,auth:{getUser:async()=>({data:{user:{id:signed?'account-fixture':'admin-fixture',app_metadata:{role:'admin'}}},error:null})},from:table=>{ const query=new Query(table); query.then=(resolve,reject)=>Promise.resolve(query.updated?{error:null}:{data:table==='mqd_orders'?orders:items,error:null}).then(resolve,reject); return query; }};
-  const context=vm.createContext({...everyday,...promotion,...shipping,Stripe,crypto,Request,Response,URL,TextEncoder,console:{error(){}},createClient:()=>checkoutDb,Deno:{env:{get:name=>missingPricing&&name==='MQD_EVERYDAY_PRICING'?'':env[name]},serve:fn=>handler=fn}});
+  const context=vm.createContext({...transfers,...everyday,...promotion,...shipping,Stripe,crypto,Request,Response,URL,TextEncoder,console:{error(){}},createClient:()=>checkoutDb,Deno:{env:{get:name=>missingPricing&&name==='MQD_EVERYDAY_PRICING'?'':env[name]},serve:fn=>handler=fn}});
   vm.runInContext(stripTypeScriptTypes(read(`supabase/functions/${slug}/index.ts`).replace(/^import .*\n/gm,'')),context);
   const response=await handler(new Request('https://fixture.invalid',{method:'POST',headers:{authorization:'Bearer fixture','content-type':'application/json'},body:JSON.stringify({orderNumbers:orders.map(o=>o.order_number),checkoutToken:crypto.randomUUID(),guestToken,price:0.01})}));
   return {response,captured};
@@ -166,7 +167,7 @@ for(const initialEpoch of [null,'old-premium-version']) {
   const readyEveryday={range:'everyday',productId:'everyday-polo',orderNumber:'MQD-FIRSTVISIT'};
   const memory=new Map([['mqd-cart',JSON.stringify([{productId:'tshirt',price:50},readyEveryday])]]);
   if(initialEpoch)memory.set('mqd-price-version',initialEpoch);
-  const migrationContext=vm.createContext({syncStoredCatalogPrices(){},MQD_PRICE_VERSION:'current-premium-version',localStorage:{getItem:key=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value),removeItem:key=>memory.delete(key)}});
+  const migrationContext=vm.createContext({...transfers,syncStoredCatalogPrices(){},MQD_PRICE_VERSION:'current-premium-version',localStorage:{getItem:key=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value),removeItem:key=>memory.delete(key)}});
   vm.runInContext(migrationSource+';migratePriceVersion();',migrationContext);
   assert.deepEqual(JSON.parse(memory.get('mqd-cart')),[readyEveryday],'First premium visit must preserve an Everyday order while invalidating stale premium prices');
   assert.equal(memory.get('mqd-price-version'),'current-premium-version');
@@ -208,7 +209,7 @@ db.mqd_order_items=[structuredClone(detail.items[0]),{id:'premium-paid-item',ord
 let webhook;
 const secret='whsec_fixture_only';
 const ownerMessages=[];
-const context=vm.createContext({...shipping,crypto,Request,Response,TextEncoder,Date,console:{error(){}},createClient:()=>supabase,mqdOwnerEmails:async()=>['owner@example.com'],queueMqdEmail:async(_db,message)=>{ownerMessages.push(message);return{status:'sent'};},escapeMqdEmailHtml:value=>value,Deno:{env:{get:name=>name==='MQD_STRIPE_WEBHOOK_SIGNING_SECRET'?secret:env[name]},serve:fn=>webhook=fn}});
+const context=vm.createContext({...transfers,...shipping,crypto,Request,Response,TextEncoder,Date,console:{error(){}},createClient:()=>supabase,mqdOwnerEmails:async()=>['owner@example.com'],queueMqdEmail:async(_db,message)=>{ownerMessages.push(message);return{status:'sent'};},escapeMqdEmailHtml:value=>value,Deno:{env:{get:name=>name==='MQD_STRIPE_WEBHOOK_SIGNING_SECRET'?secret:env[name]},serve:fn=>webhook=fn}});
 vm.runInContext(stripTypeScriptTypes(read('supabase/functions/stripe-mqd-webhook/index.ts').replace(/^import .*\n/gm,'')),context);
 async function paymentEvent(paymentStatus,amount){const time=Math.floor(Date.now()/1000),body=JSON.stringify({id:'evt_fixture',livemode:true,type:'checkout.session.completed',created:time,data:{object:{id:'cs_live_fixture',payment_status:paymentStatus,currency:'usd',metadata:{order_numbers:db.mqd_orders.map(o=>o.order_number).join(',')},amount_subtotal:amount,amount_total:amount+shipping.shippingCentsForQuantity(5),total_details:{amount_shipping:shipping.shippingCentsForQuantity(5)}}}});const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const signature=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(`${time}.${body}`))).toString('hex');return webhook(new Request('https://fixture.invalid',{method:'POST',headers:{'stripe-signature':`t=${time},v1=${signature}`},body}));}
 assert.equal((await paymentEvent('paid',1)).status,409);assert(db.mqd_orders.every(o=>o.status==='submitted'));

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buy Transfers | MyMerchNow</title>
+<link rel="stylesheet" href="/v20/transfers.css?v=layer-tools">
+<script type="module" src="/v20/transfers.js?v=layer-tools"></script>
+</head>
+<body>
+<header><a href="/custom-apparel.html"><img src="/assets/brand-logo.png" alt="MyMerchNow home"></a><a href="/index.html">Shirt designer</a><a href="#transferCart" id="cartLink">Cart (0)</a></header>
+<main>
+<h1>Buy Transfers</h1>
+<p>Ready-to-press printed transfers. Shirt previews show placement. Garments are sold separately.</p>
+<p id="reviewBanner" hidden>Local review · Test checkout only</p>
+<div id="products" class="products" aria-label="Transfer products"></div>
+<div class="layout">
+<section class="panel" aria-labelledby="editorTitle">
+<h2 id="editorTitle">Design your transfer</h2>
+<p id="editorHelp"></p>
+<label id="sizeField" hidden>Adult size <select id="size"><option>S</option><option>M</option><option>L</option><option>XL</option></select></label>
+<div id="sheets" class="sheets" aria-label="Print areas"></div>
+<div class="tools">
+<label class="button">Upload artwork<input id="artwork" type="file" disabled accept="image/png,image/jpeg,image/webp" multiple></label>
+<button id="removeSheet" type="button">Remove sheet</button>
+</div>
+<div id="previewWrap">
+<div id="workspace" tabindex="0" role="group" aria-label="Artwork workspace" aria-describedby="transformHelp">
+<div id="printArtwork"></div>
+<div id="transform" aria-hidden="true" hidden>
+<div id="transformFrame"></div>
+<span class="resize-handle nw" data-x="-1" data-y="-1"></span>
+<span class="resize-handle ne" data-x="1" data-y="-1"></span>
+<span class="resize-handle sw" data-x="-1" data-y="1"></span>
+<span class="resize-handle se" data-x="1" data-y="1"></span>
+</div>
+</div>
+<div id="shirtSides" hidden>
+<div><h3>Front preview</h3><div id="frontShirt" class="shirt-print side-preview"></div></div>
+<div><h3>Back preview</h3><div id="backShirt" class="shirt-print side-preview"></div></div>
+</div>
+<div id="shirtPreview" hidden><h3>Shirt placement preview</h3><div id="shirt" aria-label="Illustrative T-shirt mockup"></div><p>Illustration of placement only. Exact placement depends on how you press the transfer.</p></div>
+</div>
+<p id="bounds"></p>
+<p id="transformHelp">Select artwork to move it, drag a corner to resize, or pinch with two fingers. Use arrow keys to move and + or − to resize.</p>
+<section class="layer-panel" aria-labelledby="layersTitle">
+<h3 id="layersTitle">Layers</h3>
+<p id="emptyLayers">Upload artwork to add a layer.</p>
+<ul id="layers" aria-label="Graphics on this print area, top layer first"></ul>
+<div id="layerActions" class="controls" hidden>
+<button id="duplicate" type="button">Duplicate</button>
+<button id="openCrop" type="button">Crop</button>
+<button id="forward" type="button">Move forward</button>
+<button id="backward" type="button">Move backward</button>
+<button id="delete" type="button">Remove graphic</button>
+</div>
+</section>
+<div id="controls" class="controls" hidden>
+<label>Left <input id="x" type="number" step=".1" inputmode="decimal"></label>
+<label>Top <input id="y" type="number" step=".1" inputmode="decimal"></label>
+<label>Width <input id="width" type="number" step=".1" inputmode="decimal"></label>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+<p id="quote"></p>
+<button class="primary" id="add" type="button">Add to cart</button>
+</section>
+<section class="panel" id="transferCart" aria-labelledby="cartTitle">
+<h2 id="cartTitle">Your cart</h2>
+<ul id="cartRows"></ul>
+<p id="subtotal"></p>
+<p>Shipping and any applicable tax are shown at checkout.</p>
+<button id="checkout" class="primary" type="button">Secure checkout</button>
+<p id="cartStatus" role="status"></p>
+</section>
+</div>
+</main>
+<dialog id="cropDialog" aria-labelledby="cropTitle">
+<form method="dialog">
+<h2 id="cropTitle">Crop artwork</h2>
+<div id="cropPhoto"><img id="cropImage" alt="Original artwork"><div id="cropBounds" aria-hidden="true"></div></div>
+<div class="crop-edges">
+<label>Left edge <input type="range" data-crop-edge="left" min="0" max="95" step="1" value="0"></label>
+<label>Right edge <input type="range" data-crop-edge="right" min="0" max="95" step="1" value="0"></label>
+<label>Top edge <input type="range" data-crop-edge="top" min="0" max="95" step="1" value="0"></label>
+<label>Bottom edge <input type="range" data-crop-edge="bottom" min="0" max="95" step="1" value="0"></label>
+</div>
+<div class="controls crop-buttons">
+<button type="button" id="resetCrop">Reset</button>
+<button type="submit" value="cancel" autofocus>Cancel</button>
+<button type="submit" class="primary" value="apply">Apply crop</button>
+</div>
+</form>
+</dialog>
+</body>
+</html>
