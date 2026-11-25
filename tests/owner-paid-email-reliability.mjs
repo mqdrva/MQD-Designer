@@ -1,3 +1,4 @@
+import { transferOrderPrices } from '../supabase/functions/_shared/mqd-transfers.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -12,7 +13,7 @@ class Query{
  update(){this.write=true;calls.push(this.table==='customer_designs'?'design-status':'payment-record');return this;}
  then(resolve,reject){const result=this.write?{error:this.table==='customer_designs'&&designDenied?{message:'permission denied for table customer_designs'}:null}:{data:this.table==='mqd_orders'?[order]:[{order_id:'order-1',unit_price:40,quantity:1}]};return Promise.resolve(result).then(resolve,reject);}
 }
-const context={Request,Response,TextEncoder,Uint8Array,crypto:crypto.webcrypto,console:{error:()=>{}},Date,
+const context={transferOrderPrices,Request,Response,TextEncoder,Uint8Array,crypto:crypto.webcrypto,console:{error:()=>{}},Date,
  Deno:{env:{get:key=>key==='MQD_STRIPE_WEBHOOK_SIGNING_SECRET'?'test-only-signing-secret':'test-only'},serve:fn=>handler=fn},
  createClient:()=>({from:table=>new Query(table)}),quantityFromOrderItem:item=>item.quantity,shippingCentsForQuantity:()=>1000,
  mqdOwnerEmails:async()=>ownerRecipients,escapeMqdEmailHtml:v=>String(v),queueMqdEmail:async(_,{html})=>{assert.match(html,/owner-orders\.html\?order=order-1/);calls.push('owner-notification');return{status:deliveryStatus};}};

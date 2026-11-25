@@ -1,3 +1,4 @@
+import * as transfers from '../supabase/functions/_shared/mqd-transfers.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -47,7 +48,7 @@ async function checkout(slug,now,{badOwner=false,badSize=false}={}){
   constructor(){this.checkout={sessions:{create:async(params,options)=>{captured={params,options};return {id:test?'cs_test_qa':'cs_live_qa',url:'https://checkout.stripe.com/qa',payment_status:'unpaid'};}}};}
  }
  const env={SUPABASE_URL:'https://qa.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-fixture-only',MQD_STRIPE_SECRET_KEY:'sk_live_fixture',MQD_STRIPE_TEST_SECRET_KEY:'sk_test_fixture'};
- const context=vm.createContext({
+ const context=vm.createContext({...transfers,
   ...pricing,...everyday,shippingCentsForQuantity,Stripe,crypto,Request,Response,URL,TextEncoder,console,
   Date:class extends Date{static now(){return now;}},
   createClient:()=>({auth:{getUser:async()=>({data:{user:{id:'qa-user',email:'qa@example.invalid',app_metadata:{role:'admin'}}},error:null})},from:table=>new Query(table),rpc:async()=>({data:test?'sk_test_fixture':'sk_live_fixture',error:null})}),

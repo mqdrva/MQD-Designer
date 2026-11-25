@@ -6,7 +6,7 @@ export function pinchPlacement(original, factor, zone, allowOverflow = false) {
   const width=Math.min(Math.max(.1,original.width*factor),zone.width,zone.height/ratio), height=width*ratio;
   return {width,height,x:Math.max(0,Math.min(zone.width-width,original.x+(original.width-width)/2)),y:Math.max(0,Math.min(zone.height-height,original.y+(original.height-height)/2))};
 }
-export function installArtworkPinch(canvas, {selection, apply, cancelDrag}) {
+export function installArtworkPinch(canvas, {selection, apply, cancelDrag, resize = pinchPlacement}) {
   const points=new Map(); let gesture=null, finishing=false;
   const distance=()=>{const p=[...points.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);};
   function consume(event){event.preventDefault();event.stopImmediatePropagation();cancelDrag();}
@@ -23,7 +23,7 @@ export function installArtworkPinch(canvas, {selection, apply, cancelDrag}) {
     points.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(points.size>=2||finishing){
       consume(event);
-      if(gesture&&points.size===2){const current=selection();if(current?.key===gesture.key)apply(pinchPlacement(gesture.placement,distance()/gesture.distance,current.zone,current.allowOverflow),gesture.key);else {gesture=null;finishing=true;}}
+      if(gesture&&points.size===2){const current=selection();if(current?.key===gesture.key)apply(resize(gesture.placement,distance()/gesture.distance,current.zone,current.allowOverflow),gesture.key);else {gesture=null;finishing=true;}}
     }
   },true);
   function end(event){

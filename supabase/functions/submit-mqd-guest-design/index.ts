@@ -1,3 +1,4 @@
+import { isTransfer } from "../_shared/mqd-transfers.js";
 import {prepareTemplateOrder} from '../_shared/mqd-template-orders.js';
 import { boundedFormData, validateGuestFiles, consumeBudget, UploadError } from "../_shared/mqd-upload-guard.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -57,6 +58,7 @@ Deno.serve(async (req: Request) => {
     if (!raw || raw.length > 2_000_000) return json(req, { error: "Invalid design payload" }, 400);
     const payload = JSON.parse(raw), p = payload?.product;
     if (String(p?.id || "").startsWith("everyday-")) return json(req, { error: "Please use the Everyday designer to submit this garment." }, 400);
+    if (isTransfer(p?.id)) return json(req, { error: "Use the Transfers editor for this product." }, 400);
     if (!p?.id || !p?.name || !payload?.design?.zones) return json(req, { error: "Incomplete design" }, 400);
 
     let materializedBytes=uploadedBytes;

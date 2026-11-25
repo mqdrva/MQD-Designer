@@ -1,3 +1,4 @@
+import { transferOrderPrices } from "../_shared/mqd-transfers.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { quantityFromOrderItem, shippingCentsForQuantity } from "../_shared/mqd-shipping.js";
@@ -84,7 +85,7 @@ Deno.serve(async (req: Request) => {
     const orderNumbers = orderNumbersFor(session);
     if (!orderNumbers.length) return json({ error: "Checkout session has no valid order references" }, 400);
     const { data: orders, error: ordersError } = await supabase.from("mqd_orders")
-      .select("id,order_number,product_name,design_id,user_id,status,stripe_payment_status,is_test")
+      .select("id,order_number,product_id,engine_calibration,product_name,design_id,user_id,status,stripe_payment_status,is_test,design_json")
       .in("order_number", orderNumbers);
     if (ordersError) throw ordersError;
     if (!orders || orders.length !== orderNumbers.length) return json({ error: "One or more checkout orders were not found" }, 404);
@@ -93,15 +94,18 @@ Deno.serve(async (req: Request) => {
     if (metadataUserId && orders.some((order: any) => order.user_id !== metadataUserId)) return json({ error: "Checkout ownership verification failed" }, 400);
 
     const { data: items, error: itemsError } = await supabase.from("mqd_order_items")
-      .select("order_id,unit_price,quantity,order_options")
+      .select("order_id,product_id,unit_price,quantity,order_options")
       .in("order_id", orders.map((order: any) => order.id));
     if (itemsError) throw itemsError;
     if (!items || items.length !== orders.length) return json({ error: "Checkout item verification failed" }, 409);
     const itemByOrder = new Map(items.map((item: any) => [item.order_id, item]));
+    let transferPrices;
+    try { transferPrices = transferOrderPrices(orders.map((order: any) => ({ ...order, status: "submitted" })), itemByOrder); }
+    catch { return json({ error: "Transfer order verification failed" }, 409); }
     const totalQuantity = orders.reduce((sum: number, order: any) => sum + quantityFromOrderItem(itemByOrder.get(order.id)), 0);
     const expectedSubtotalCents = orders.reduce((sum: number, order: any) => {
       const item: any = itemByOrder.get(order.id);
-      return sum + Math.round(Number(item.unit_price || 0) * 100) * quantityFromOrderItem(item);
+      return sum + (transferPrices.get(order.id)?.cents ?? Math.round(Number(item.unit_price || 0) * 100) * quantityFromOrderItem(item));
     }, 0);
     const expectedShippingCents = shippingCentsForQuantity(totalQuantity);
 
@@ -131,7 +135,7 @@ Deno.serve(async (req: Request) => {
       const item: any = itemByOrder.get(order.id);
       const alreadyPaid = order.status === "paid" || order.stripe_payment_status === "paid";
       const quantity = quantityFromOrderItem(item);
-      const orderSubtotal = Math.round(Number(item.unit_price || 0) * 100) * quantity / 100;
+      const orderSubtotal = (transferPrices.get(order.id)?.cents ?? Math.round(Number(item.unit_price || 0) * 100) * quantity) / 100;
       const update: Record<string, unknown> = {
         stripe_checkout_session_id: String(session.id || ""),
         stripe_payment_intent_id: stripeId(session.payment_intent),

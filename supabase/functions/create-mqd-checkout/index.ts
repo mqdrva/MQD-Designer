@@ -1,3 +1,4 @@
+import { transferOrderPrices, transferCheckoutLine } from "../_shared/mqd-transfers.js";
 import {verifyTemplateOrder} from '../_shared/mqd-template-orders.js';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
@@ -120,7 +121,7 @@ Deno.serve(async (req) => {
     stage = "read-orders";
     const { data: orders, error: orderError } = await supabase
       .from("mqd_orders")
-      .select("id,order_number,status,product_id,design_json,design_id,customer_email,is_test")
+      .select("id,order_number,status,product_id,engine_calibration,design_json,design_id,customer_email,is_test")
       .eq("user_id", user.id)
       .in("order_number", orderNumbers);
     if (orderError) throw orderError;
@@ -142,6 +143,9 @@ Deno.serve(async (req) => {
     const itemsByOrder = new Map((itemRows || []).map((row) => [row.order_id, row]));
     if (orders.some((order) => !itemsByOrder.has(order.id))) return json(req, { error: "A cart item is missing its production details" }, 409);
 
+    let transferPrices;
+    try { transferPrices = transferOrderPrices(orders, itemsByOrder); }
+    catch (error) { return json(req, { error: error instanceof Error ? error.message : "Invalid transfer design" }, 409); }
     const pricingTime = Date.now();
     const hasEveryday = orders.some(order => isEveryday(order.product_id));
     const everydayConfig = hasEveryday ? everydayPricing(Deno.env.get("MQD_EVERYDAY_PRICING")) : null;
@@ -152,6 +156,12 @@ Deno.serve(async (req) => {
     for (const order of orders) {
       const item = itemsByOrder.get(order.id);
       if (item.product_id !== order.product_id) return json(req, { error: "A cart item failed product verification" }, 409);
+      const transfer = transferPrices.get(order.id);
+      if (transfer) {
+        totalQuantity += transfer.count;
+        lineItems.push(transferCheckoutLine(order, transfer, false));
+        continue;
+      }
       const everyday = isEveryday(order.product_id) ? everydayCheckout(order, item, Deno.env.get("MQD_EVERYDAY_PRICING")) : null;
       const catalog = everyday ? everyday.catalog : CATALOG[order.product_id];
       if (!catalog) return json(req, { error: `Checkout is not configured for ${order.product_id}` }, 409);

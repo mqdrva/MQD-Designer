@@ -86,6 +86,8 @@ jobs:
           node tests/landing-routing.mjs
       - name: Verify Halloween pricing and all checkout paths
         run: node tests/halloween-promotion.mjs
+      - name: Verify transfer uploads and checkout
+        run: node tests/transfers-review.mjs
       - name: Verify mobile artwork upload and retry behavior
         run: node tests/mobile-guest-cart.mjs
       - name: Verify mobile artwork pinch gestures
